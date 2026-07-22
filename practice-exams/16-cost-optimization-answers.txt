@@ -1,0 +1,20 @@
+1_C - Steady 24/7 for 3 years = 3-year Reserved Instances / Savings Plans.
+2_B - Interruptible batch, cheapest = Spot Instances.
+3_B - Unknown/changing access, no retrieval fee = S3 Intelligent-Tiering.
+4_A - Auto-transition + expire objects = S3 Lifecycle policies.
+5_A - ML right-sizing recommendations = Compute Optimizer.
+6_A - Alert on cost threshold/forecast = AWS Budgets.
+7_B - Most flexible commitment discount = Compute Savings Plans.
+8_B - Pay-for-use variable traffic = Serverless or Auto Scaling.
+9_A - Avoid NAT charges for S3/DynamoDB = Gateway VPC Endpoints (free).
+10_B - Predictable steady DynamoDB cheapest = Provisioned + auto scaling (+ reserved).
+11_A - Non-prod business-hours DB = stop/start instance.
+12_A - Over-provisioned gp2 -> gp3 with right IOPS/throughput.
+13_A - Rarely accessed, 12h ok, cheapest = Glacier Deep Archive.
+14_A - Volume discounts + shared RI/SP = Organizations consolidated billing.
+15_A - Cheap infrequent S3 queries = Athena.
+16_A - Idle resources + RI opportunities = Trusted Advisor.
+17_A - Baseline + burst = On-Demand + Spot mixed instances policy.
+18_A - Edge caching reduces origin requests/transfer cost.
+19_AB - CloudFront caching + keep traffic in-Region/VPC endpoints.
+20_A - Detect unusual spend + root cause = Cost Anomaly Detection.

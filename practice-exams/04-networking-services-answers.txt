@@ -1,0 +1,20 @@
+1_B - Outbound-only internet for private subnet = NAT Gateway in public subnet + route.
+2_B - Block a specific IP range at subnet level = NACL deny rule (SG has no deny).
+3_B - Security Groups stateful; NACLs stateless.
+4_B - HTTP(S) path-based routing = Application Load Balancer.
+5_B - Ultra-low latency, millions rps, static IP, TCP = Network Load Balancer.
+6_B - Free private access to S3/DynamoDB = Gateway VPC Endpoint.
+7_B - Many VPCs + on-prem, transitive, central = Transit Gateway.
+8_B - Global cached static delivery = CloudFront with S3 origin.
+9_B - TCP/UDP, 2 static anycast IPs, backbone failover = Global Accelerator.
+10_B - Zone apex to ALB, free, health checks = Alias record.
+11_B - Percentage traffic split / A-B test = Weighted routing.
+12_B - Lowest network latency Region = Latency-based routing.
+13_B - Lock S3 origin to CloudFront only = OAC/OAI.
+14_B - Restrict multiple files per session = Signed Cookies (single file = Signed URL).
+15_B - Dedicated private high-bandwidth link = Direct Connect.
+16_B - Quick encrypted IPsec tunnel/backup = Site-to-Site VPN.
+17_B - Expose service privately to many VPCs = PrivateLink endpoint service (NLB).
+18_C - /24 = 256 - 5 reserved = 251 usable.
+19_BC - NAT GW lives in public subnet w/ EIP and is managed/HA within an AZ.
+20_B - SQLi + rate-based rules on ALB = AWS WAF.

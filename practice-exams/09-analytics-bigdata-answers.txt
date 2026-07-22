@@ -1,0 +1,20 @@
+1_A - Real-time, multi-consumer, replay = Kinesis Data Streams.
+2_B - Near-real-time managed delivery to S3/Redshift = Kinesis Firehose.
+3_B - Ad-hoc SQL on S3, pay per scan = Amazon Athena.
+4_A - Serverless ETL + crawler + catalog = AWS Glue.
+5_A - Managed Spark/Hadoop clusters = Amazon EMR.
+6_A - Full-text search + log dashboards = OpenSearch Service.
+7_A - BI dashboards, SPICE, per-session = QuickSight.
+8_A - Data lake governance + fine-grained perms = Lake Formation.
+9_B - Parquet/ORC + partitioning cuts Athena cost/scan.
+10_B - Real-time SQL/stream analytics = Managed Flink (Kinesis Data Analytics).
+11_A - Petabyte warehouse + complex joins/BI = Redshift.
+12_A - Query S3 + Redshift together = Redshift Spectrum.
+13_B - Increase provisioned throughput = add shards (resharding).
+14_A - Managed Kafka, minimal change = Amazon MSK.
+15_D - Firehose does NOT deliver to SQS (S3/Redshift/OpenSearch/Splunk yes).
+16_A - Ad-hoc SQL on logs, least setup = Athena.
+17_B - Streams = real-time custom/replay; Firehose = managed near-real-time delivery.
+18_AB - Spark ETL (EMR/Glue) + Redshift warehouse.
+19_A - No-code visual data prep = Glue DataBrew.
+20_B - Infrequent S3 queries, lowest cost = Athena.

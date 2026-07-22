@@ -1,0 +1,20 @@
+1_C - Steady, predictable 24/7 for 3 years = Standard RI 3-year All Upfront (highest discount).
+2_B - Interruptible + restartable + cheapest = Spot Instances (up to 90% off).
+3_B - No infrastructure + pay per task = ECS on Fargate.
+4_A - Event-driven, unpredictable, <15 min = Lambda triggered by S3 (least ops).
+5_C - Lowest inter-node latency for HPC = Cluster placement group + EFA.
+6_C - Lambda max is 15 min; 25-min job needs Fargate or AWS Batch.
+7_C - Keep a metric (CPU 60%) at target = Target tracking scaling (simplest).
+8_D - Zero downtime + easy rollback = Immutable (new ASG, swap if healthy).
+9_B - Temporary, very high IOPS, no persistence = Instance Store.
+10_B - Known time-based spike = Scheduled scaling (predictive also valid/proactive).
+11_C - EKS = standard Kubernetes, portable across clouds.
+12_B - Visibility/control of physical sockets/cores for licensing = Dedicated Hosts.
+13_C - Most flexible (families/Regions/Fargate/Lambda) = Compute Savings Plans.
+14_B - Mixed Spot+On-Demand and multiple types = Launch template + mixed instances policy.
+15_B - Remove cold starts = Provisioned concurrency (pre-warmed).
+16_B - Long-running Docker batch jobs with auto provisioning = AWS Batch.
+17_B - Spread across racks, max 7/AZ = Spread placement group.
+18_C - Simplest, bundled, fixed monthly price = Amazon Lightsail.
+19_BC - HA across AZ failure = multi-AZ Auto Scaling group + multi-AZ ALB.
+20_B - Faster healthy instances = pre-baked golden AMI (less bootstrap time).

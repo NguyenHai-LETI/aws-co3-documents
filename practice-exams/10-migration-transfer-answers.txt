@@ -1,0 +1,20 @@
+1_B - DB migration w/ minimal downtime + replication = DMS.
+2_B - Convert different-engine schema = Schema Conversion Tool (SCT).
+3_B - 80 TB, limited bandwidth, deadline = Snowball Edge.
+4_A - Lift-and-shift servers w/ continuous replication = MGN.
+5_A - Scheduled incremental NFS->EFS = DataSync.
+6_A - Keep SFTP, land in S3 = AWS Transfer Family.
+7_B - Continuous sync during migration = Full load + CDC.
+8_A - Central migration tracking = Migration Hub.
+9_C - 100 PB physical move = Snowmobile.
+10_B - Small, rugged, portable few-TB device = Snowcone.
+11_C - Same engine, no SCT = MySQL -> RDS MySQL (homogeneous).
+12_A - Discover dependencies/right-size = Application Discovery Service/Migration Evaluator.
+13_B - Network would take weeks = use Snowball Edge.
+14_B - Compute Optimized = local/edge compute during transfer.
+15_A - Central backup across services = AWS Backup.
+16_AB - DataSync destinations include S3 and EFS (and FSx).
+17_B - Heterogeneous: SCT (schema) then DMS (data).
+18_A - On-prem file share cached locally + replicate to AWS = Storage Gateway.
+19_B - Snow vs online decided by data size vs bandwidth/time.
+20_B - Large VMware lift-and-shift, low risk = MGN.

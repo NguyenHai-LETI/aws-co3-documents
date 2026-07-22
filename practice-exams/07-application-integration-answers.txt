@@ -1,0 +1,20 @@
+1_B - Decouple + buffer spikes = Amazon SQS.
+2_B - Exact order + no duplicates = SQS FIFO.
+3_B - Parallel fan-out = S3 -> SNS -> multiple SQS queues.
+4_B - Isolate repeatedly failing messages = Dead-letter queue.
+5_B - Hide in-flight message from other consumers = Visibility timeout.
+6_B - Fewer empty receives, lower cost = Long polling.
+7_B - Route AWS + SaaS events by pattern = EventBridge.
+8_A - Long-running orchestration with retries = Step Functions Standard.
+9_C - On-prem AMQP/MQTT/STOMP, minimal change = Amazon MQ.
+10_B - SNS = pub/sub push (1:many).
+11_A - Subset per subscriber = SNS message filtering policies.
+12_B - Daily serverless schedule = EventBridge cron rule.
+13_B - Standard = high throughput, at-least-once.
+14_B - Email + SMS notifications = Amazon SNS.
+15_B - >256 KB messages = SQS Extended Client + S3.
+16_B - Durable decoupling, no message loss = SQS with retention + DLQ.
+17_A - Wait for human approval/callback = Step Functions task token.
+18_A - SaaS (Salesforce) to S3/Redshift no-code = AWS AppFlow.
+19_AB - SNS targets include SQS and Lambda.
+20_B - Ordered, high-volume, replayable streaming = Kinesis Data Streams.

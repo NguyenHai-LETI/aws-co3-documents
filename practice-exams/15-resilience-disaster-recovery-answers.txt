@@ -1,0 +1,20 @@
+1_A - Lowest cost, longest RTO = Backup & Restore.
+2_C - Scaled-down but running, scale up on failover = Warm Standby.
+3_D - Full capacity in multiple Regions, near-zero RTO/RPO = Multi-Site Active-Active.
+4_B - Near-zero RPO relational cross-Region = Aurora Global Database.
+5_AB - AZ-failure HA = multi-AZ ASG + multi-AZ ALB w/ health checks.
+6_B - Max acceptable data loss in time = RPO.
+7_A - Auto-replace unhealthy instances = ELB health checks + ASG.
+8_A - Protect/recover S3 data = Versioning (+ MFA Delete).
+9_A - Multi-Region active-active DynamoDB = Global Tables.
+10_A - Active-passive failover = Failover routing + health checks.
+11_A - Central automated backups w/ retention = AWS Backup.
+12_A - Keep messages until processed; failures -> DLQ.
+13_B - Multi-AZ RDS auto-fails over to standby via DNS.
+14_A - Pilot Light DB = continuously replicated DB ready to promote.
+15_AB - Resilience to spikes = SQS buffer + Auto Scaling consumers.
+16_A - Cross-Region DR + compliance for S3 = CRR with versioning.
+17_A - Active-Active = Route 53 to full stacks in both Regions + global data.
+18_A - Distribute + replace across AZs = EC2 Auto Scaling multi-AZ.
+19_A - RTO 1h/RPO 15m cost-effective = Backup & Restore w/ frequent replication (Pilot Light also acceptable; cheapest = A).
+20_AB - Fault tolerance = multi-AZ tiers + Multi-AZ database.

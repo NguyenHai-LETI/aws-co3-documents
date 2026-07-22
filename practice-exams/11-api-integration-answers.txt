@@ -1,0 +1,20 @@
+1_A - Serverless REST API + Lambda + throttling/cache = API Gateway + Lambda.
+2_B - GraphQL, exact data, real-time + offline = AppSync.
+3_C - Persistent two-way chat = WebSocket API.
+4_B - Cheapest/lowest-latency simple proxy = HTTP API.
+5_A - Validate Cognito JWT = Cognito authorizer.
+6_A - Custom auth logic = Lambda authorizer.
+7_A - Protect backend from spikes = Throttling (rate/burst).
+8_A - Reach private VPC ALB/NLB = VPC Link.
+9_A - Cache responses by TTL = API Gateway caching.
+10_A - Scalable transactional email = Amazon SES.
+11_A - Multi-channel campaigns + analytics = Amazon Pinpoint.
+12_AB - AppSync data sources include DynamoDB and Lambda.
+13_A - Separate environments/config = Stages + stage variables.
+14_A - Browser cross-origin control = CORS.
+15_A - Meter/limit per customer = Usage plans + API keys.
+16_A - Call AWS services directly (e.g., SQS) = AWS service integration.
+17_A - Global low-latency cached API = CloudFront + edge-optimized API Gateway.
+18_A - Certificate-based client auth = Mutual TLS (mTLS).
+19_AB - API Gateway throttles + supports REST/HTTP/WebSocket.
+20_A - Mobile near-real-time sync + offline conflict = AppSync.

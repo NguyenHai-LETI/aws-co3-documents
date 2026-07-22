@@ -1,0 +1,20 @@
+1_A - Connection pooling + faster failover for Lambda+RDS = RDS Proxy.
+2_A - Share subnets/Transit Gateway across accounts = AWS RAM.
+3_A - Accepted/Rejected IP traffic detail = VPC Flow Logs.
+4_A - Hybrid DNS on-prem <-> VPC = Route 53 Resolver endpoints.
+5_A - Managed Kafka-compatible streaming = Amazon MSK.
+6_A - Stateful managed VPC firewall/IPS/domain filtering = AWS Network Firewall.
+7_A - Insert third-party firewall appliances transparently = Gateway Load Balancer.
+8_A - Org-wide S3 usage visibility/optimization = S3 Storage Lens.
+9_A - Idle-then-bursty relational, fast auto-scale = Aurora Serverless v2.
+10_A - Modify S3 objects on retrieval via Lambda = S3 Object Lambda.
+11_A - Point-to-point source->target w/ filter/enrich = EventBridge Pipes.
+12_A - RDS Proxy supports IAM auth + Secrets Manager.
+13_AB - Flow Logs delivered to CloudWatch Logs and S3 (also Firehose).
+14_A - Share License Manager/Resolver rules across accounts = AWS RAM.
+15_A - IPv6 outbound-only = Egress-only Internet Gateway.
+16_A - Approved-domain egress filtering = Network Firewall domain filtering.
+17_A - Consumes Flow/DNS/CloudTrail logs for threats = GuardDuty.
+18_A - RDS Proxy reduces failover time by managing/rerouting connections.
+19_AB - RAM use cases = share Transit Gateway and shared-VPC subnets.
+20_A - On-prem queries to AWS private DNS = Route 53 Resolver inbound endpoint.

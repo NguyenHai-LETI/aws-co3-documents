@@ -1,0 +1,20 @@
+1_B - EC2 -> S3 securely = IAM role on the instance (never store keys).
+2_B - Auto-rotate DB credentials = AWS Secrets Manager.
+3_B - ML threat detection from CloudTrail/Flow/DNS logs = GuardDuty.
+4_A - Discover/classify PII in S3 = Amazon Macie.
+5_B - Detect non-compliant resources (EBS encrypted) = AWS Config rules.
+6_B - Who/when of API actions = CloudTrail.
+7_A - Full control of keys + usage audit = KMS Customer Managed Key.
+8_B - Max permission guardrail across accounts = SCPs.
+9_A - Auth + temporary AWS creds = Cognito User Pool + Identity Pool.
+10_B - Advanced DDoS, 24/7 DRT, cost protection = Shield Advanced.
+11_B - Free auto-renewing public certs = ACM.
+12_B - External auditor, no long-term keys = cross-account IAM role (AssumeRole).
+13_A - Aggregate findings + compliance checks = Security Hub.
+14_B - Encrypt large data, fewer KMS calls = envelope encryption (data key).
+15_A - CVE scanning of EC2/ECR/Lambda = Amazon Inspector.
+16_A - Central WAF/Shield across accounts = AWS Firewall Manager.
+17_B - Root user = enable MFA, don't use daily.
+18_B - Private API access from private subnet = Interface VPC Endpoint.
+19_AB - WAF blocks SQLi/XSS and supports rate-based rules.
+20_B - Domain join + trust to on-prem AD = AWS Managed Microsoft AD.

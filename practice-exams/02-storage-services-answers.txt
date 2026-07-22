@@ -1,0 +1,20 @@
+1_B - Frequent→IA (ms access for a year)→Deep Archive (12h ok, cheapest long-term).
+2_C - Unknown/changing access + auto-tiering, no retrieval fee = Intelligent-Tiering.
+3_B - Shared multi-AZ POSIX file system for Linux = Amazon EFS.
+4_C - 50k IOPS consistent low latency = io2 / io2 Block Express.
+5_B - Cannot delete even by root = S3 Object Lock Compliance mode.
+6_B - Replication requires Versioning on both source and destination.
+7_B - On-prem NFS/SMB with local cache backed by S3 = S3 File Gateway.
+8_C - 600 TB in 2 weeks over slow link = Snowball Edge Storage Optimized.
+9_B - Snapshot -> copy with encryption -> new encrypted volume.
+10_B - HPC/ML, sub-ms, S3-integrated, high throughput = FSx for Lustre.
+11_B - Windows SMB + Active Directory = FSx for Windows File Server.
+12_B - Faster global uploads to one bucket = S3 Transfer Acceleration.
+13_B - SQL to retrieve subset from one object = S3 Select.
+14_B - New-object trigger = S3 Event Notification -> Lambda (or EventBridge).
+15_B - Single-AZ tolerant, infrequent, lowest cost = S3 One Zone-IA.
+16_C - Minimum 30 days in Standard before transition to Standard-IA.
+17_B - Protect against accidental delete + rollback = Versioning.
+18_B - Same volume on multiple instances same AZ = io1/io2 EBS Multi-Attach.
+19_AC - Automated scheduled incremental transfer = DataSync and Storage Gateway.
+20_B - Rarely accessed, retrieve in minutes, low cost = Glacier Flexible Retrieval.

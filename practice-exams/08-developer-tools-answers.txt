@@ -1,0 +1,20 @@
+1_B - Managed private Git repo = CodeCommit.
+2_A - Serverless build/test, per-minute = CodeBuild.
+3_B - Automated deploys to EC2/Lambda/ECS w/ rollback = CodeDeploy.
+4_A - End-to-end pipeline orchestration = CodePipeline.
+5_B - New fleet + instant rollback by swap = Blue/green deployment.
+6_A - Private package repo + proxy public = CodeArtifact.
+7_A - ML code review + profiling = CodeGuru.
+8_B - CodeBuild build phases file = buildspec.yml.
+9_B - CodeDeploy lifecycle hooks file = appspec.yml.
+10_B - Private container registry for ECS/EKS = Amazon ECR.
+11_B - Update a few at a time = OneAtATime/HalfAtATime.
+12_A - Distributed request tracing = AWS X-Ray.
+13_A - Simplified serverless template -> CFN = AWS SAM.
+14_A - Auto-start on push = CodeCommit/GitHub source action in CodePipeline.
+15_B - Serverless build, no infra to manage = CodeBuild advantage.
+16_A - Production sign-off = Manual approval action.
+17_A - Native CI/CD chain = CodeCommit->CodeBuild->CodeDeploy via CodePipeline.
+18_B - Build-time secrets = Parameter Store/Secrets Manager refs.
+19_AB - CodePipeline models stages and integrates 3rd-party actions.
+20_A - IaC + drift detection = CloudFormation.

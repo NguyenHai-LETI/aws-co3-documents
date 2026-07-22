@@ -1,0 +1,20 @@
+1_B - AZ failure + automatic failover for RDS = Multi-AZ deployment.
+2_B - Scale reads without hurting primary = Read Replicas.
+3_B - Serverless NoSQL, spiky traffic, no planning = DynamoDB on-demand.
+4_B - Active-active relational, global, near-zero RPO = Aurora Global Database.
+5_B - Microsecond DynamoDB reads, minimal code change = DAX.
+6_B - Leaderboard sorted sets + persistence = ElastiCache for Redis.
+7_C - Petabyte OLAP data warehouse = Amazon Redshift.
+8_C - Heterogeneous migration (Oracle->Aurora PG) = SCT + DMS.
+9_B - Connection pooling for Lambda+RDS = RDS Proxy.
+10_A - Highly connected/graph data = Amazon Neptune.
+11_B - Different PK/SK, add later = Global Secondary Index (GSI).
+12_A - Immutable, cryptographically verifiable ledger = QLDB.
+13_B - Predictable steady throughput, lowest cost = Provisioned + auto scaling.
+14_B - MongoDB-compatible managed DB = DocumentDB.
+15_B - Encrypt existing RDS = encrypted snapshot copy -> restore new instance.
+16_A - Time-series IoT metrics = Amazon Timestream.
+17_B - Cache only on miss = Lazy loading (cache-aside).
+18_B - Idle-then-bursty Aurora cost optimization = Aurora Serverless v2.
+19_BC - Multi-AZ = synchronous HA; Read Replicas = async, promotable.
+20_A - Managed serverless Cassandra (CQL) = Amazon Keyspaces.

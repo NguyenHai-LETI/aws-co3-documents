@@ -1,0 +1,20 @@
+1_B - Source IP + static IP + TCP at scale = NLB.
+2_B - Generic SQL cache, least code change = ElastiCache.
+3_AB - Gateway Endpoint (S3/DynamoDB, free) + Interface Endpoint (most services).
+4_A - CloudFront caches HTTP; Global Accelerator = TCP/UDP static IP.
+5_A - Auto rotate DB creds = Secrets Manager; cheap config = Parameter Store.
+6_A - Who-did-what = CloudTrail; config/compliance = AWS Config.
+7_A - Synchronous HA standby = Multi-AZ; async read scaling = Read Replicas.
+8_A - Queue 1:1 = SQS; pub/sub 1:N = SNS.
+9_A - Serverless SQL over S3 = Athena; warehouse = Redshift.
+10_A - Managed Kubernetes = EKS; AWS-proprietary = ECS.
+11_A - Graph = Neptune; MongoDB-compatible = DocumentDB.
+12_A - Real-time custom/replay = Kinesis Data Streams; managed delivery = Firehose.
+13_A - Subnet stateless deny = NACL; instance stateful allow = Security Group.
+14_A - Free L3/4 DDoS = Shield Standard; L7 web exploits = WAF.
+15_A - Linux NFS multi-AZ = EFS; Windows SMB+AD = FSx for Windows.
+16_A - Online incremental = DataSync; offline device = Snowball.
+17_A - Server lift-and-shift = MGN; DB migration w/ CDC = DMS.
+18_A - Sign-in = User Pools; AWS creds = Identity Pools.
+19_A - 12h cheapest archive = Deep Archive; ms archive = Glacier Instant Retrieval.
+20_A - Workflow orchestration = Step Functions; event routing = EventBridge.

@@ -1,0 +1,20 @@
+1_A - Central policy-based backups across services = AWS Backup.
+2_A - Managed persistent virtual desktops (DaaS) = WorkSpaces.
+3_A - Stream a single app to browser = AppStream 2.0.
+4_A - MQTT IoT devices + shadows + rules = IoT Core.
+5_A - AWS services on-prem (data residency) = Outposts.
+6_A - Low latency metro near users = Local Zones.
+7_A - 5G edge ultra-low latency = Wavelength.
+8_A - Satellite downlink as a service = Ground Station.
+9_A - Managed omnichannel contact center = Amazon Connect.
+10_A - Flexible cron/one-time schedules at scale = EventBridge Scheduler.
+11_A - 7-year retention across services = AWS Backup vaults + lifecycle.
+12_A - Crowdsourced human tasks = Mechanical Turk.
+13_A - Outposts = AWS services in your data center (hybrid).
+14_A - AWS Backup supports DynamoDB.
+15_A - Stream GPU 3D apps to remote users = AppStream 2.0.
+16_A - Consistent AWS APIs on-prem, low latency = Outposts.
+17_A - Replicate servers to AWS for fast DR = Elastic Disaster Recovery (DRS).
+18_A - Low-latency delivery in distant city = Local Zones.
+19_AB - Edge extensions = Local Zones and Wavelength.
+20_A - Cross-account/Region central backup policy = AWS Backup + Organizations.
