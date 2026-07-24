@@ -1,0 +1,15 @@
+1_A - Serverless REST front for Lambda with throttling/auth/caching = API Gateway.
+2_A - Managed GraphQL + real-time + offline sync = AWS AppSync.
+3_A - Transactional/marketing email at scale = Amazon SES.
+4_A - Per-customer request quotas with keys = Usage plans + API keys.
+5_A - Simple low-latency low-cost HTTP proxy to Lambda = HTTP API.
+6_A - Bidirectional real-time = WebSocket API.
+7_A - Authorize with Cognito tokens = Cognito authorizer.
+8_A - Reduce backend load for repeated GETs = API caching.
+9_A - VPC-only API = Private REST API with interface VPC endpoint.
+10_A - Protect backend from spikes = throttling limits.
+11_A - Custom token validation with caching = Lambda authorizer (token-based).
+12_AB - Mutual TLS = enable mTLS on custom domain + truststore of client CAs in S3.
+13_A - Edge-optimized reduces latency via CloudFront edge locations.
+14_AB - REST API reasons = caching + mapping templates/usage plans/API keys.
+15_A - Transform request/response payloads = mapping templates (VTL).

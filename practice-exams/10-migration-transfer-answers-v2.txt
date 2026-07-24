@@ -1,0 +1,15 @@
+1_A - DB migration with minimal downtime + ongoing replication = DMS with CDC.
+2_A - Heterogeneous schema/procedure conversion = Schema Conversion Tool (SCT).
+3_A - 200 TB, limited bandwidth, deadline = Snowball Edge.
+4_A - Managed SFTP to S3 = AWS Transfer Family.
+5_A - Scheduled on-prem NFS to EFS with verification = AWS DataSync.
+6_A - Discover server inventory + dependencies = Application Discovery Service.
+7_A - Lift-and-shift VMs to EC2 = Application Migration Service (MGN).
+8_A - Central migration tracking dashboard = AWS Migration Hub.
+9_A - Snowball favored by limited bandwidth + large data + deadline.
+10_A - Homogeneous Oracle->RDS Oracle minimal downtime = DMS with CDC.
+11_AB - Live migration = full load + CDC on a replication instance.
+12_A - Bulk + ongoing = DMS with Snowball Edge initial load then CDC.
+13_A - DataSync=bulk transfer; Storage Gateway=hybrid access; Transfer Family=managed SFTP/FTPS/FTP.
+14_A - Pre-migration cost recommendations = Migration Evaluator.
+15_A - Oracle->Aurora PG minimal downtime = SCT + DMS full load + CDC + validate + cutover.

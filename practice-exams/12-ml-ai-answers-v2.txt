@@ -1,0 +1,15 @@
+1_A - Image/video object/face/content detection = Amazon Rekognition.
+2_A - Extract text/forms/tables from documents = Amazon Textract.
+3_A - Speech to text = Amazon Transcribe.
+4_A - Text to lifelike speech = Amazon Polly.
+5_A - Language translation = Amazon Translate.
+6_A - Sentiment/key phrase NLP = Amazon Comprehend.
+7_A - Conversational chatbot (ASR+NLU) = Amazon Lex.
+8_A - Enterprise NL document search = Amazon Kendra.
+9_A - Real-time personalized recommendations = Amazon Personalize.
+10_A - Build/train/deploy custom models = Amazon SageMaker.
+11_A - Time-series demand forecasting = Amazon Forecast.
+12_A - ML fraud detection, low expertise = Amazon Fraud Detector.
+13_A - Generative AI via foundation-model API = Amazon Bedrock.
+14_A - Scale-to-zero spiky inference = SageMaker Serverless Inference.
+15_A - Clinical entity extraction = Amazon Comprehend Medical.

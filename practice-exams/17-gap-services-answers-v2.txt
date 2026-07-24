@@ -1,0 +1,15 @@
+1_A - Lambda pooling + IAM auth + fast failover for RDS = RDS Proxy.
+2_A - Share subnets/Transit Gateway across accounts = AWS Resource Access Manager (RAM).
+3_A - Capture accept/reject IP traffic = VPC Flow Logs.
+4_A - On-prem resolving Route 53 private zone = Resolver inbound endpoint.
+5_A - Managed Kafka with native APIs = Amazon MSK.
+6_A - Auto-delete expired items, no job = DynamoDB TTL.
+7_A - Transparent scalable appliance inspection = Gateway Load Balancer.
+8_A - Managed stateful firewall + IPS for VPC = AWS Network Firewall.
+9_A - Org-wide S3 usage metrics + recommendations = S3 Storage Lens.
+10_A - Transform objects on GET without changing stored object = S3 Object Lambda.
+11_AB - Hybrid DNS = Resolver outbound (to on-prem) + inbound (from on-prem).
+12_A - GWLB encapsulation = GENEVE (port 6081).
+13_A - SQS -> filter/enrich -> target, low code = EventBridge Pipes.
+14_AB - RDS Proxy = connection pooling + reduced failover time.
+15_A - Managed serverless cron/rate scheduler = EventBridge Scheduler.

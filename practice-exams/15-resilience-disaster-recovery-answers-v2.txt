@@ -1,0 +1,30 @@
+1_B - Survive AZ failure = ASG across multiple AZs behind ELB.
+2_A - Lowest cost, hours RTO/RPO, restore from backup = Backup & Restore.
+3_B - Minimal core running, scale on disaster = Pilot Light.
+4_A - Scaled-down fully functional, quick scale up = Warm Standby.
+5_A - Near-zero RTO/RPO, multi-Region serving = Multi-Site Active-Active.
+6_A - RTO = max downtime; RPO = max data loss.
+7_A - Auto failover with sync replication = RDS Multi-AZ.
+8_A - S3 copy to another Region for DR = Cross-Region Replication.
+9_A - Route around unhealthy Region = health checks + failover routing.
+10_A - Multi-Region active-active NoSQL = DynamoDB Global Tables.
+11_A - Aurora cross-Region DR, fast failover, low lag = Aurora Global Database.
+12_A - Auto-replace unhealthy instances = Auto Scaling group with health checks.
+13_A - Survive whole-Region loss = Multi-Region architecture.
+14_A - Central scheduled policy backups = AWS Backup.
+15_A - SQS resilience = messages persist until processed/deleted.
+16_A - NAT resilience = redundant NAT Gateways per AZ.
+17_A - Read Replicas can be manually promoted to primary.
+18_A - Lower RPO = continuous/async replication to DR Region.
+19_A - Avoid session loss = externalize state to ElastiCache/DynamoDB.
+20_A - Cross-zone LB = even distribution across targets in all AZs.
+21_C - Minutes RTO, seconds RPO, moderate cost, no full idle = Warm Standby.
+22_AB - Active-active closest + instant failover = Route 53 latency + health checks / Global Accelerator.
+23_A - Non-disruptive DR drills = Elastic Disaster Recovery drill launches.
+24_AB - Aurora Global = managed unplanned failover + sub-second replication lag.
+25_A - Durable cross-AZ data = EFS multi-AZ or replicate/snapshot across AZs.
+26_A - Immutable backups vs ransomware = AWS Backup Vault Lock.
+27_AB - Prevent cascading failure = queue-based load leveling + circuit breaker/timeouts+backoff.
+28_A - Near-zero RPO S3 with 15-min SLA = S3 Replication Time Control (RTC).
+29_A - Instant failover independent of DNS TTL = Global Accelerator.
+30_AB - AZ tolerance = Multi-AZ ASG compute + RDS Multi-AZ standby.

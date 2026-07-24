@@ -1,0 +1,15 @@
+1_A - Ordered, exactly-once queue = SQS FIFO.
+2_A - Fan-out to many subscribers = SNS.
+3_A - CloudFront caches static content; Global Accelerator routes to nearest endpoint via static anycast IPs.
+4_A - Gateway endpoint = S3/DynamoDB; Interface endpoint (PrivateLink) = other services via ENI.
+5_A - Redis favored by persistence/replication/sorted sets/pub-sub.
+6_A - Athena favored by ad-hoc serverless SQL on S3, pay per query.
+7_A - FSx for Windows favored by SMB + Active Directory.
+8_A - DynamoDB favored by key-value/document, massive scale, serverless.
+9_A - DataSync favored by ongoing/scheduled online transfer with bandwidth.
+10_A - Step Functions favored by multi-step workflow orchestration.
+11_A - Data Streams=real-time/replay/shards; Firehose=managed delivery; SQS=decoupling, no replay.
+12_A - NAT Gateway=managed IPv4 outbound; NAT Instance=self-managed; Egress-Only IGW=IPv6 outbound-only.
+13_A - Aurora Global DB favored by relational cross-Region reads + fast DR.
+14_A - User Pools=authentication; Identity Pools=authorize AWS resources via temp credentials.
+15_A - WAF=Layer 7 filtering; Shield=DDoS; Security Group=stateful instance firewall.

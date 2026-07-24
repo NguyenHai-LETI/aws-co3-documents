@@ -1,0 +1,15 @@
+1_A - Managed virtual desktops (DaaS) = Amazon WorkSpaces.
+2_A - Stream desktop app to browser = Amazon AppStream 2.0.
+3_A - AWS infra in your data center, residency = AWS Outposts.
+4_A - Low latency in metro near a Region = AWS Local Zones.
+5_A - Ultra-low latency at 5G edge = AWS Wavelength.
+6_A - Centralized policy-based backups across services = AWS Backup.
+7_A - Continuous replication DR for on-prem servers = Elastic Disaster Recovery (DRS).
+8_A - Managed cloud contact center = Amazon Connect.
+9_A - Connect/manage millions of IoT devices = AWS IoT Core.
+10_A - Managed email + calendaring = Amazon WorkMail.
+11_AB - On-prem residency + metro low latency = Outposts + Local Zones.
+12_A - Immutable backups vs ransomware = AWS Backup Vault Lock (compliance mode).
+13_AB - Central backups = cross-Region copy + cross-account via Organizations.
+14_A - DRS low-cost standby = continuous block replication to cheap staging, full instances only on failover.
+15_A - Temporary reset-after-session desktops = non-persistent AppStream 2.0 / WorkSpaces rebuild.

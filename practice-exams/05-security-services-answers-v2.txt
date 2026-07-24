@@ -1,0 +1,30 @@
+1_B - EC2 access to S3 without stored keys = attach IAM role to instance.
+2_B - Temporary cross-account access = cross-account IAM role + sts:AssumeRole.
+3_B - Secrets with automatic rotation = AWS Secrets Manager.
+4_A - Customer-managed keys + key-usage audit = AWS KMS.
+5_B - SQLi/XSS protection at HTTP layer = AWS WAF.
+6_B - Large DDoS + 24/7 + cost protection = AWS Shield Advanced.
+7_B - Threat detection from Flow Logs/DNS/CloudTrail = Amazon GuardDuty.
+8_A - Discover/classify PII in S3 = Amazon Macie.
+9_A - Vulnerability + network exposure scanning = Amazon Inspector.
+10_B - User sign-up/sign-in + federation + tokens = Cognito User Pools.
+11_AB - Central multi-account guardrails = AWS Organizations + SCPs.
+12_B - Free auto-renewing TLS cert for ALB = ACM.
+13_A - Enforce MFA on sensitive actions = MFA + policy condition aws:MultiFactorAuthPresent.
+14_B - Single-tenant HSM, FIPS 140-2 L3 = AWS CloudHSM.
+15_A - Record/evaluate config compliance over time = AWS Config.
+16_B - Record API calls / who did what = AWS CloudTrail.
+17_A - Aggregate/prioritize security findings = AWS Security Hub.
+18_B - Integrate on-prem AD with AWS = AWS Directory Service (AD Connector / Managed Microsoft AD).
+19_B - Free hierarchical versioned config values = SSM Parameter Store.
+20_B - AWS-managed keys, no cost, no key mgmt = SSE-S3.
+21_B - Cap maximum permissions of a user = IAM permissions boundary.
+22_B - Explicit deny / SCP always overrides an allow = Denied.
+23_AB - Cross-account KMS use = key policy grants external account + external IAM policy allows kms:Decrypt.
+24_B - KMS rotation keeps old key material to decrypt old ciphertext (transparent).
+25_B - On-prem temporary AWS creds without long-term keys = IAM Roles Anywhere / STS.
+26_AB - Cross-account access needs both resource policy allow AND principal identity/SCP allow.
+27_B - Block per-IP request floods = WAF rate-based rule.
+28_AB - Restrict assume-role to corp network + MFA = aws:SourceIp + aws:MultiFactorAuthPresent.
+29_B - Landing zone + baseline guardrails + central logging = AWS Control Tower.
+30_B - Envelope encryption data key = kms:GenerateDataKey (plaintext + encrypted copy).

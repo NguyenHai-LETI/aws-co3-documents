@@ -1,0 +1,30 @@
+1_B - AZ outage + automatic failover for RDS = Multi-AZ deployment.
+2_B - Offload reads with least write impact = Read Replicas.
+3_B - Lambda exhausting RDS connections = RDS Proxy (connection pooling).
+4_B - Global relational, low-latency multi-Region reads, near-zero RPO DR = Aurora Global Database.
+5_B - Spiky NoSQL, no capacity planning, single-digit ms = DynamoDB on-demand.
+6_B - Microsecond DynamoDB reads, minimal code change = DAX.
+7_B - Leaderboard sorted sets + persistence = ElastiCache for Redis.
+8_C - Petabyte OLAP data warehouse = Amazon Redshift.
+9_C - Heterogeneous migration (Oracle->Aurora PG) = SCT + DMS.
+10_B - Idle-then-bursty Aurora cost optimization = Aurora Serverless v2.
+11_A - Highly connected/graph queries = Amazon Neptune.
+12_A - Time-series IoT metrics = Amazon Timestream.
+13_A - Immutable cryptographically verifiable ledger = QLDB.
+14_B - MongoDB-compatible managed DB = DocumentDB.
+15_A - Serverless Cassandra-compatible (CQL) = Amazon Keyspaces.
+16_B - Different PK/SK, added after creation = Global Secondary Index (GSI).
+17_B - Encrypt existing RDS = encrypted snapshot copy -> restore new instance.
+18_B - Cache only on miss = Lazy loading (cache-aside).
+19_B - Auto-delete expired items with no job = DynamoDB TTL.
+20_BC - Multi-AZ = synchronous HA; Read Replicas = async, promotable.
+21_AC - Lambda+RDS: RDS Proxy with IAM auth (no stored password) + pooling with faster failover.
+22_B - Multi-Region active-active DynamoDB = Global Tables.
+23_AB - Hot partition fix = write sharding/high-cardinality key + DAX for hot reads.
+24_AB - Reader endpoint for load-balanced reads + writer/cluster endpoint auto-tracks primary after failover.
+25_B - PITR to any second = automated backups + transaction logs.
+26_B - Region loss, sub-minute promotion = Aurora Global Database failover.
+27_B - Trigger Lambda per item change = DynamoDB Streams.
+28_B - Cache always consistent on writes, higher write latency = write-through.
+29_A - Query S3 data from Redshift without loading = Redshift Spectrum.
+30_B - Redis AZ failover with minimal loss = Multi-AZ replication group with automatic failover.

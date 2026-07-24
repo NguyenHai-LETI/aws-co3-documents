@@ -1,0 +1,30 @@
+1_B - Predictable 24/7 fixed type, 3 years = Standard Reserved Instances.
+2_C - Interruptible fault-tolerant batch = Spot Instances.
+3_A - Flexible across families/Regions, steady = Compute Savings Plans.
+4_B - Unknown/changing pattern, no lifecycle mgmt = S3 Intelligent-Tiering.
+5_B - Frequent 30 days then rare = Standard-IA after 30 days then Glacier.
+6_A - Idle-then-bursty relational = Aurora Serverless v2.
+7_A - Right-sizing from utilization = AWS Compute Optimizer.
+8_A - Visualize/forecast spend = AWS Cost Explorer.
+9_A - Alert on budget threshold = AWS Budgets.
+10_A - ML-based spend spike detection = Cost Anomaly Detection.
+11_A - Avoid NAT cost for S3 = Gateway VPC endpoint.
+12_A - Volume discounts + one bill = Consolidated billing via Organizations.
+13_A - Per-team cost attribution = Cost allocation tags.
+14_A - Dev/test only business hours = schedule start/stop.
+15_A - Cheaper tunable EBS = migrate gp2 to gp3.
+16_A - Cheap rarely-restored snapshots = EBS Snapshot Archive.
+17_A - Interruption-tolerant container cost = Fargate Spot.
+18_A - Steady RDS/ElastiCache/Redshift = Reserved Instances/Nodes.
+19_A - Reduce origin transfer + latency globally = CloudFront.
+20_A - Lambda memory sweet spot = Compute Optimizer / Lambda Power Tuning.
+21_AB - Baseline on Savings Plans/RIs + spikes on Spot/On-Demand Auto Scaling.
+22_AB - Reduce cross-AZ cost = co-locate in same AZ + reduce cross-AZ chatter.
+23_AB - Max Spot with fewer interruptions = diversify types/AZs + capacity-optimized strategy.
+24_AB - IA/Glacier have min durations + per-object overhead; tiny/short objects cheaper in Standard.
+25_A - Enforce approved instance types = SCPs via Organizations.
+26_A - Redshift pay-per-use, no capacity mgmt = Redshift Serverless.
+27_AB - Cheaper DR replication = replicate to cheaper destination class via S3 Replication.
+28_AB - Cut NAT cost = Gateway endpoints (S3/DynamoDB) + Interface endpoints (ECR/SSM).
+29_A - Cover EC2+Fargate+Lambda = Compute Savings Plans.
+30_A - Hourly resource-level cost data for Athena = Cost and Usage Report (CUR) to S3.

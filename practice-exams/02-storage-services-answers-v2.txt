@@ -1,0 +1,30 @@
+1_B - Frequent then rare but instant retrieval = transition to S3 Standard-IA (min 30 days first).
+2_C - Unpredictable/changing pattern, no lifecycle management = S3 Intelligent-Tiering.
+3_C - 7-year archive, lowest cost, 12-48h retrieval OK = Glacier Deep Archive.
+4_B - Cannot delete/overwrite even by root, fixed retention = Object Lock Compliance mode.
+5_B - CRR requirement = Versioning enabled on both source and destination buckets.
+6_C - 40,000 IOPS consistent low latency = io2 (Provisioned IOPS SSD).
+7_B - Sequential large files, throughput-focused, low cost = st1 (Throughput Optimized HDD).
+8_B - Shared file system across AZs for Linux = Amazon EFS.
+9_B - Windows SMB + Active Directory = FSx for Windows File Server.
+10_B - HPC/ML high-performance FS integrated with S3 = FSx for Lustre.
+11_A - On-prem NFS/SMB backed by S3 with local cache = S3 File Gateway.
+12_B - 500 TB, limited bandwidth, deadline = Snowball Edge.
+13_B - Encrypt existing EBS = snapshot, copy with encryption, create new volume.
+14_B - Move EBS across AZ = snapshot then create volume in target AZ (EBS is AZ-locked).
+15_B - Speed up global large uploads to one bucket = S3 Transfer Acceleration.
+16_B - Trigger Lambda on object create, simplest = S3 Event Notification to Lambda.
+17_A - SQL to retrieve subset from objects without full download = S3 Select.
+18_B - Single-AZ tolerable, cheapest S3 with ms access = S3 One Zone-IA.
+19_B - Scheduled incremental on-prem NFS to EFS with verification = AWS DataSync.
+20_B - Virtual tape backups stored in AWS = Tape Gateway (VTL).
+21_AB - Shared block volume, multiple instances same AZ = EBS Multi-Attach on io1/io2.
+22_B - Per-team scoped access at scale without huge policy = S3 Access Points.
+23_B - SSE-KMS hits KMS request quotas; fix with quota increase or S3 Bucket Keys.
+24_B - 15-min replication SLA = S3 Replication Time Control (RTC).
+25_B - Remove first-read init penalty on restored volumes = Fast Snapshot Restore.
+26_B - Cheap storage for rarely restored snapshots, 24-72h = EBS Snapshot Archive.
+27_B - Short throughput job, data in S3 = FSx for Lustre Scratch deployment.
+28_B - Force HTTPS = bucket policy denying aws:SecureTransport = false.
+29_AB - Destination owns objects = owner override; replicate existing = S3 Batch Replication.
+30_B - Small rugged edge device with limited compute = AWS Snowcone.

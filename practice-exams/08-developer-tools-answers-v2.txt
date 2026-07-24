@@ -1,0 +1,15 @@
+1_A - Orchestrate CI/CD stages = AWS CodePipeline.
+2_A - Managed build/test, no build servers = AWS CodeBuild.
+3_A - Private managed Git with IAM = AWS CodeCommit.
+4_A - Automated deploy with rollback = AWS CodeDeploy.
+5_A - Distributed tracing across microservices = AWS X-Ray.
+6_A - Managed package/artifact repo = AWS CodeArtifact.
+7_A - Lambda canary traffic shifting + rollback = CodeDeploy Lambda deployment.
+8_A - IaC in programming languages -> CloudFormation = AWS CDK.
+9_A - Simplified serverless template -> CloudFormation = AWS SAM.
+10_A - Automated code review + profiling = Amazon CodeGuru.
+11_AB - Pipeline with test/build + approval + deploy = CodePipeline + CodeBuild.
+12_A - Private container registry with scanning = Amazon ECR.
+13_A - Zero-downtime EC2 deploy with auto rollback = CodeDeploy Blue/Green with ELB.
+14_A - Low-latency pipeline trigger on commit = EventBridge rule on the repo.
+15_A - Find latency across services = X-Ray service map/trace segments.
