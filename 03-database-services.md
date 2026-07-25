@@ -4,6 +4,8 @@
 
 Database services chiếm **15-20% câu hỏi** trong kỳ thi. Phải hiểu rõ khi nào dùng relational, NoSQL, cache, hay graph database.
 
+> 📌 **Bảng so sánh cắt ngang theo đặc điểm** (replica · Multi-AZ · backup · scaling · cost · serverless · security): xem [F-so-sanh-database-theo-dac-diem.md](F-so-sanh-database-theo-dac-diem.md)
+
 ---
 
 ## 1️⃣ AMAZON RDS (Relational Database Service)
