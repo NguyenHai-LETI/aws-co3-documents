@@ -1,0 +1,8 @@
+node_modules/
+dist/
+# Raw logs of AI coach runs (plans and generated packs are kept)
+coach/runs/
+coach/.lock
+# regenerated after every submitted test
+coach/snapshot.md
+.DS_Store

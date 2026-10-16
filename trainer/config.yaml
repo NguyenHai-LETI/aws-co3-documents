@@ -1,0 +1,18 @@
+# Cấu hình trainer (đọc lại mỗi request — không cần khởi động lại app)
+
+coach:
+  model: ""                 # trống = model mặc định của Claude Code; ví dụ: sonnet | opus | claude-opus-5-5
+  effort: ""                # trống = mặc định; low | medium | high | xhigh | max
+  max_budget_usd: 0         # chỉ áp dụng khi Claude Code dùng API key; 0 = không giới hạn
+  skip_if_no_new_results: true   # lượt chạy theo lịch bỏ qua nếu không có bài làm/issue mới
+  schedule: ["08:30", "12:30", "21:00"]   # giờ chạy tự động (npm run schedule -- install)
+  claude_bin: ""            # đường dẫn Claude Code CLI nếu app không tự tìm thấy
+  use_api_key: false        # false = luôn dùng đăng nhập claude.ai (bỏ ANTHROPIC_API_KEY khỏi môi trường của coach)
+
+srs:
+  intervals_days: [1, 3, 7, 14, 30]   # khoảng cách ôn của box 1..5 (Leitner)
+  mastered_box: 4                     # box ≥ giá trị này = "đã thuộc"
+
+practice:
+  default_count: 20
+  quick_count: 10

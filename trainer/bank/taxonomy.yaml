@@ -1,0 +1,381 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TAXONOMY — từ điển dùng chung cho ngân hàng câu hỏi (app + AI coach đều đọc file này)
+#
+# - exam / domains : thông số kỳ thi SAA-C03 (dùng cho chế độ "Thi thử" và chấm điểm)
+# - topics         : chủ đề (= chương tài liệu). `notes` = file lý thuyết liên quan ở thư mục gốc
+# - timing         : rubric ước lượng thời gian làm 1 câu (xem bank/SCHEMA.md §4)
+# - services       : tên service chuẩn → topic + các chuỗi nhận diện (dùng để gắn `services`)
+# - features       : tag khái niệm (kebab-case) → các chuỗi nhận diện (dùng để gắn `tags`)
+#
+# Quy tắc khớp chuỗi (match):
+#   • services : pattern 1 từ → phân biệt hoa/thường; pattern nhiều từ → không phân biệt
+#   • features : không phân biệt hoa/thường, TRỪ pattern viết HOA toàn bộ (acronym như SCP, RTO)
+#   • kết thúc bằng `*` = khớp tiền tố (vd `decoupl*` khớp decouple/decoupled/decoupling)
+# AI coach được phép BỔ SUNG service/feature mới vào đây (không xoá/đổi tên cái cũ).
+# ─────────────────────────────────────────────────────────────────────────────
+
+exam:
+  code: SAA-C03
+  name: AWS Certified Solutions Architect – Associate
+  questions: 65          # 50 tính điểm + 15 thử nghiệm
+  duration_min: 130
+  esl_extra_min: 30      # thí sinh không dùng tiếng Anh bản ngữ được +30 phút
+  pass_scaled: 720       # thang 100–1000
+  pass_pct: 72
+
+domains:
+  - { id: secure,      code: D1, weight: 30, label: "Design Secure Architectures",          label_vi: "Kiến trúc bảo mật" }
+  - { id: resilient,   code: D2, weight: 26, label: "Design Resilient Architectures",       label_vi: "Kiến trúc bền vững / HA / DR" }
+  - { id: performance, code: D3, weight: 24, label: "Design High-Performing Architectures",  label_vi: "Kiến trúc hiệu năng cao" }
+  - { id: cost,        code: D4, weight: 20, label: "Design Cost-Optimized Architectures",   label_vi: "Kiến trúc tối ưu chi phí" }
+
+difficulties:
+  - { id: easy,   label: "Dễ" }
+  - { id: medium, label: "Vận dụng" }
+  - { id: hard,   label: "Khó / Nâng cao" }
+
+topics:
+  - { id: compute,     icon: "🖥️", label: "Compute",                          notes: [01-compute-services.md, C-kien-truc-web-app.md] }
+  - { id: storage,     icon: "💾", label: "Storage",                          notes: [02-storage-services.md, D-kien-truc-luu-tru.md] }
+  - { id: database,    icon: "🗄️", label: "Database",                         notes: [03-database-services.md, E-kien-truc-database.md, F-so-sanh-database-theo-dac-diem.md] }
+  - { id: networking,  icon: "🌐", label: "Networking & Content Delivery",    notes: [04-networking-services.md] }
+  - { id: security,    icon: "🔐", label: "Security, Identity & Compliance",  notes: [05-security-services.md, B-bao-mat-compliance.md] }
+  - { id: management,  icon: "🧭", label: "Management & Governance",          notes: [06-management-governance.md] }
+  - { id: integration, icon: "🔗", label: "Application Integration",          notes: [07-application-integration.md] }
+  - { id: devtools,    icon: "🛠️", label: "Developer Tools",                  notes: [08-developer-tools.md] }
+  - { id: analytics,   icon: "📊", label: "Analytics & Big Data",             notes: [09-analytics-bigdata.md] }
+  - { id: migration,   icon: "🚚", label: "Migration & Transfer",             notes: [10-migration-transfer.md] }
+  - { id: api,         icon: "🔌", label: "API & Front-end Integration",      notes: [11-api-integration.md] }
+  - { id: ml,          icon: "🧠", label: "Machine Learning / AI",            notes: [12-ml-ai.md] }
+  - { id: other,       icon: "🧩", label: "Other Services",                   notes: [13-other-services.md] }
+  - { id: resilience,  icon: "🛟", label: "Resilience & Disaster Recovery",   notes: [A-nen-tang-kien-truc.md, P-architecture-diagrams.md] }
+  - { id: cost,        icon: "💰", label: "Cost Optimization",                notes: [A-nen-tang-kien-truc.md, L-quyet-dinh-nhanh.md] }
+
+# Ước lượng thời gian 1 câu (giây) — chuẩn SAA-C03: 130 phút / 65 câu = 120 s/câu cho câu dài
+# chuẩn (~170 từ gồm cả đáp án). Công thức (xem SCHEMA.md §4):
+#   time = clamp( round_to( words × 60 / wpm + think[difficulty] + multi_bonus ), min, max )
+timing:
+  official_seconds_per_question: 120
+  words_per_minute: 130
+  think_seconds: { easy: 30, medium: 40, hard: 55 }
+  multi_bonus_seconds: { "2": 20, "3": 30 }
+  min_seconds: 45
+  max_seconds: 180
+  round_to: 5
+
+services:
+  # ── Compute
+  EC2:                   { topic: compute, match: [EC2, Elastic Compute Cloud] }
+  Lambda:                { topic: compute, match: [Lambda] }
+  ECS:                   { topic: compute, match: [ECS, Elastic Container Service] }
+  EKS:                   { topic: compute, match: [EKS, Elastic Kubernetes Service, Kubernetes] }
+  Fargate:               { topic: compute, match: [Fargate] }
+  ECR:                   { topic: compute, match: [ECR, Elastic Container Registry] }
+  AWS Batch:             { topic: compute, match: [AWS Batch] }
+  Elastic Beanstalk:     { topic: compute, match: [Elastic Beanstalk, Beanstalk] }
+  Lightsail:             { topic: compute, match: [Lightsail] }
+  App Runner:            { topic: compute, match: [App Runner] }
+  EC2 Auto Scaling:      { topic: compute, match: [EC2 Auto Scaling, Auto Scaling group*, Auto Scaling, ASG] }
+  # ── Storage
+  S3:                    { topic: storage, match: [S3, Simple Storage Service] }
+  S3 Glacier:            { topic: storage, match: [Glacier] }
+  EBS:                   { topic: storage, match: [EBS, Elastic Block Store] }
+  EFS:                   { topic: storage, match: [EFS, Elastic File System] }
+  FSx:                   { topic: storage, match: [FSx] }
+  Storage Gateway:       { topic: storage, match: [Storage Gateway, File Gateway, Volume Gateway, Tape Gateway] }
+  # ── Database
+  RDS:                   { topic: database, match: [RDS, Relational Database Service] }
+  RDS Proxy:             { topic: database, match: [RDS Proxy] }
+  Aurora:                { topic: database, match: [Aurora] }
+  DynamoDB:              { topic: database, match: [DynamoDB] }
+  DAX:                   { topic: database, match: [DAX, DynamoDB Accelerator] }
+  ElastiCache:           { topic: database, match: [ElastiCache] }
+  MemoryDB:              { topic: database, match: [MemoryDB] }
+  Neptune:               { topic: database, match: [Neptune] }
+  DocumentDB:            { topic: database, match: [DocumentDB] }
+  Keyspaces:             { topic: database, match: [Keyspaces] }
+  Timestream:            { topic: database, match: [Timestream] }
+  QLDB:                  { topic: database, match: [QLDB, Quantum Ledger Database] }
+  Redshift:              { topic: database, match: [Redshift] }
+  # ── Networking & Content Delivery
+  VPC:                   { topic: networking, match: [VPC, Virtual Private Cloud] }
+  NAT Gateway:           { topic: networking, match: [NAT Gateway, NAT instance] }
+  Internet Gateway:      { topic: networking, match: [Internet Gateway, IGW] }
+  Transit Gateway:       { topic: networking, match: [Transit Gateway] }
+  VPC Peering:           { topic: networking, match: [VPC Peering] }
+  PrivateLink:           { topic: networking, match: [PrivateLink, interface endpoint, interface VPC endpoint] }
+  VPC Endpoint:          { topic: networking, match: [VPC endpoint, gateway endpoint, gateway VPC endpoint] }
+  Direct Connect:        { topic: networking, match: [Direct Connect, DX] }
+  Site-to-Site VPN:      { topic: networking, match: [Site-to-Site VPN, VPN] }
+  Client VPN:            { topic: networking, match: [Client VPN] }
+  Route 53:              { topic: networking, match: [Route 53] }
+  Route 53 Resolver:     { topic: networking, match: [Route 53 Resolver, Resolver endpoint, inbound endpoint, outbound endpoint] }
+  CloudFront:            { topic: networking, match: [CloudFront] }
+  Global Accelerator:    { topic: networking, match: [Global Accelerator] }
+  ELB:                   { topic: networking, match: [ELB, Elastic Load Balancing, Classic Load Balancer, load balancer] }
+  ALB:                   { topic: networking, match: [ALB, Application Load Balancer] }
+  NLB:                   { topic: networking, match: [NLB, Network Load Balancer] }
+  GWLB:                  { topic: networking, match: [GWLB, Gateway Load Balancer] }
+  Network Firewall:      { topic: networking, match: [Network Firewall] }
+  VPC Flow Logs:         { topic: networking, match: [Flow Logs] }
+  VPC Lattice:           { topic: networking, match: [VPC Lattice] }
+  # ── Security, Identity & Compliance
+  IAM:                   { topic: security, match: [IAM, Identity and Access Management] }
+  IAM Identity Center:   { topic: security, match: [IAM Identity Center, AWS SSO, Single Sign-On] }
+  STS:                   { topic: security, match: [STS, Security Token Service, AssumeRole] }
+  KMS:                   { topic: security, match: [KMS, Key Management Service] }
+  CloudHSM:              { topic: security, match: [CloudHSM] }
+  Secrets Manager:       { topic: security, match: [Secrets Manager] }
+  ACM:                   { topic: security, match: [ACM, Certificate Manager] }
+  WAF:                   { topic: security, match: [WAF, Web Application Firewall] }
+  Shield:                { topic: security, match: [Shield] }
+  GuardDuty:             { topic: security, match: [GuardDuty] }
+  Inspector:             { topic: security, match: [Inspector] }
+  Macie:                 { topic: security, match: [Macie] }
+  Security Hub:          { topic: security, match: [Security Hub] }
+  Detective:             { topic: security, match: [Amazon Detective] }
+  Cognito:               { topic: security, match: [Cognito] }
+  Directory Service:     { topic: security, match: [Directory Service, Managed Microsoft AD, AD Connector] }
+  Firewall Manager:      { topic: security, match: [Firewall Manager] }
+  RAM:                   { topic: security, match: [Resource Access Manager, AWS RAM] }
+  AWS Artifact:          { topic: security, match: [AWS Artifact] }
+  Audit Manager:         { topic: security, match: [Audit Manager] }
+  # ── Management & Governance
+  CloudWatch:            { topic: management, match: [CloudWatch] }
+  CloudTrail:            { topic: management, match: [CloudTrail] }
+  AWS Config:            { topic: management, match: [AWS Config, Config rule, Config rules] }
+  Systems Manager:       { topic: management, match: [Systems Manager, SSM, Session Manager, Parameter Store, Patch Manager] }
+  CloudFormation:        { topic: management, match: [CloudFormation, StackSets] }
+  Organizations:         { topic: management, match: [Organizations] }
+  Control Tower:         { topic: management, match: [Control Tower] }
+  Service Catalog:       { topic: management, match: [Service Catalog] }
+  Trusted Advisor:       { topic: management, match: [Trusted Advisor] }
+  Health Dashboard:      { topic: management, match: [Health Dashboard, AWS Health] }
+  License Manager:       { topic: management, match: [License Manager] }
+  Proton:                { topic: management, match: [Proton] }
+  # ── Application Integration
+  SQS:                   { topic: integration, match: [SQS, Simple Queue Service] }
+  SNS:                   { topic: integration, match: [SNS, Simple Notification Service] }
+  EventBridge:           { topic: integration, match: [EventBridge, CloudWatch Events] }
+  Step Functions:        { topic: integration, match: [Step Functions] }
+  Amazon MQ:             { topic: integration, match: [Amazon MQ, ActiveMQ, RabbitMQ] }
+  AppFlow:               { topic: integration, match: [AppFlow] }
+  SWF:                   { topic: integration, match: [SWF, Simple Workflow] }
+  # ── Developer Tools
+  CodeCommit:            { topic: devtools, match: [CodeCommit] }
+  CodeBuild:             { topic: devtools, match: [CodeBuild] }
+  CodeDeploy:            { topic: devtools, match: [CodeDeploy] }
+  CodePipeline:          { topic: devtools, match: [CodePipeline] }
+  CodeArtifact:          { topic: devtools, match: [CodeArtifact] }
+  Cloud9:                { topic: devtools, match: [Cloud9] }
+  X-Ray:                 { topic: devtools, match: [X-Ray] }
+  CDK:                   { topic: devtools, match: [CDK, Cloud Development Kit] }
+  SAM:                   { topic: devtools, match: [SAM, Serverless Application Model] }
+  # ── Analytics & Big Data
+  Kinesis:               { topic: analytics, match: [Kinesis] }
+  Kinesis Data Streams:  { topic: analytics, match: [Kinesis Data Streams, KDS] }
+  Data Firehose:         { topic: analytics, match: [Kinesis Data Firehose, Data Firehose, Firehose] }
+  Managed Apache Flink:  { topic: analytics, match: [Kinesis Data Analytics, Managed Service for Apache Flink, Apache Flink] }
+  Kinesis Video Streams: { topic: analytics, match: [Kinesis Video Streams] }
+  Athena:                { topic: analytics, match: [Athena] }
+  Glue:                  { topic: analytics, match: [Glue, Glue Data Catalog, Glue crawler] }
+  EMR:                   { topic: analytics, match: [EMR, Elastic MapReduce] }
+  OpenSearch:            { topic: analytics, match: [OpenSearch, Elasticsearch] }
+  QuickSight:            { topic: analytics, match: [QuickSight] }
+  Lake Formation:        { topic: analytics, match: [Lake Formation] }
+  MSK:                   { topic: analytics, match: [MSK, Managed Streaming for Apache Kafka, Kafka] }
+  Data Pipeline:         { topic: analytics, match: [Data Pipeline] }
+  # ── Migration & Transfer
+  DMS:                   { topic: migration, match: [DMS, Database Migration Service] }
+  SCT:                   { topic: migration, match: [SCT, Schema Conversion Tool] }
+  Application Migration Service: { topic: migration, match: [Application Migration Service, MGN] }
+  DataSync:              { topic: migration, match: [DataSync] }
+  Transfer Family:       { topic: migration, match: [Transfer Family, Transfer for SFTP] }
+  Snow Family:           { topic: migration, match: [Snowball, Snowcone, Snowmobile, Snow Family] }
+  Migration Hub:         { topic: migration, match: [Migration Hub] }
+  Application Discovery Service: { topic: migration, match: [Application Discovery Service, Discovery Agent] }
+  Migration Evaluator:   { topic: migration, match: [Migration Evaluator] }
+  # ── API & Front-end
+  API Gateway:           { topic: api, match: [API Gateway] }
+  AppSync:               { topic: api, match: [AppSync, GraphQL] }
+  SES:                   { topic: api, match: [SES, Simple Email Service] }
+  Pinpoint:              { topic: api, match: [Pinpoint] }
+  Amplify:               { topic: api, match: [Amplify] }
+  # ── ML / AI
+  SageMaker:             { topic: ml, match: [SageMaker] }
+  Rekognition:           { topic: ml, match: [Rekognition] }
+  Comprehend:            { topic: ml, match: [Comprehend] }
+  Translate:             { topic: ml, match: [Amazon Translate] }
+  Transcribe:            { topic: ml, match: [Transcribe] }
+  Polly:                 { topic: ml, match: [Polly] }
+  Lex:                   { topic: ml, match: [Lex] }
+  Textract:              { topic: ml, match: [Textract] }
+  Kendra:                { topic: ml, match: [Kendra] }
+  Personalize:           { topic: ml, match: [Amazon Personalize] }
+  Forecast:              { topic: ml, match: [Amazon Forecast] }
+  Fraud Detector:        { topic: ml, match: [Fraud Detector] }
+  Bedrock:               { topic: ml, match: [Bedrock] }
+  Amazon Q:              { topic: ml, match: [Amazon Q] }
+  # ── Other services
+  WorkSpaces:            { topic: other, match: [WorkSpaces] }
+  AppStream 2.0:         { topic: other, match: [AppStream] }
+  Outposts:              { topic: other, match: [Outposts] }
+  Local Zones:           { topic: other, match: [Local Zones, Local Zone] }
+  Wavelength:            { topic: other, match: [Wavelength] }
+  AWS Backup:            { topic: other, match: [AWS Backup, Backup plan, backup vault] }
+  Elastic Disaster Recovery: { topic: other, match: [Elastic Disaster Recovery, DRS, CloudEndure] }
+  IoT Core:              { topic: other, match: [IoT Core, IoT Greengrass, Greengrass] }
+  Amazon Connect:        { topic: other, match: [Amazon Connect] }
+  # ── Cost management
+  Cost Explorer:         { topic: cost, match: [Cost Explorer] }
+  AWS Budgets:           { topic: cost, match: [AWS Budgets, Budgets] }
+  Cost and Usage Report: { topic: cost, match: [Cost and Usage Report, CUR] }
+  Compute Optimizer:     { topic: cost, match: [Compute Optimizer] }
+  Cost Anomaly Detection: { topic: cost, match: [Cost Anomaly Detection] }
+  Pricing Calculator:    { topic: cost, match: [Pricing Calculator] }
+
+features:
+  # ── EC2 / compute
+  spot-instances:        [Spot Instance*, Spot Fleet, Spot]
+  reserved-instances:    [Reserved Instance*, Convertible RI*, Standard RI*]
+  savings-plans:         [Savings Plan*]
+  on-demand-instances:   [On-Demand Instance*]
+  dedicated-hosts:       [Dedicated Host*]
+  dedicated-instances:   [Dedicated Instance*]
+  capacity-reservation:  [Capacity Reservation*]
+  placement-groups:      [placement group*]
+  efa:                   [Elastic Fabric Adapter, EFA]
+  ec2-hibernation:       [hibernat*]
+  launch-template:       [launch template*]
+  asg-lifecycle-hooks:   [lifecycle hook*]
+  asg-warm-pool:         [warm pool*]
+  scaling-policies:      [target tracking, step scaling, scheduled scaling, predictive scaling, simple scaling]
+  instance-store:        [instance store*]
+  user-data:             [user data]
+  ami:                   [AMI, AMIs, Amazon Machine Image*, golden image*]
+  # ── Lambda / serverless
+  lambda-concurrency:    [provisioned concurrency, reserved concurrency, cold start*]
+  lambda-layers:         [Lambda layer*]
+  lambda-edge:           [Lambda@Edge, CloudFront Functions]
+  # ── S3
+  s3-storage-classes:    [Standard-IA, One Zone-IA, Infrequent Access, S3 Standard, storage class*]
+  s3-intelligent-tiering: [Intelligent-Tiering]
+  s3-glacier-tiers:      [Glacier Instant Retrieval, Glacier Flexible Retrieval, Deep Archive]
+  s3-lifecycle:          [lifecycle polic*, lifecycle rule*, lifecycle configuration*]
+  s3-versioning:         [versioning]
+  s3-replication:        [Cross-Region Replication, Same-Region Replication, CRR, SRR, S3 Replication]
+  s3-object-lock:        [Object Lock, WORM, Vault Lock]
+  s3-transfer-acceleration: [Transfer Acceleration]
+  s3-presigned-url:      [presigned URL*, pre-signed URL*]
+  s3-access-points:      [Access Point*]
+  s3-event-notifications: [event notification*]
+  s3-multipart-upload:   [multipart upload*]
+  s3-storage-lens:       [Storage Lens, Storage Class Analysis]
+  s3-object-lambda:      [Object Lambda]
+  s3-block-public-access: [Block Public Access]
+  sse-s3:                [SSE-S3]
+  sse-kms:               [SSE-KMS, DSSE-KMS]
+  sse-c:                 [SSE-C]
+  client-side-encryption: [client-side encryption]
+  # ── EBS / file
+  ebs-volume-types:      [gp2, gp3, io1, io2, st1, sc1, Provisioned IOPS]
+  snapshots:             [snapshot*]
+  ebs-multi-attach:      [Multi-Attach]
+  fsx-lustre:            [FSx for Lustre, Lustre]
+  fsx-windows:           [FSx for Windows*]
+  fsx-ontap:             [ONTAP, OpenZFS]
+  sgw-volume-modes:      [cached volume*, stored volume*]
+  # ── Databases
+  multi-az:              [Multi-AZ]
+  read-replicas:         [read replica*]
+  aurora-global-database: [Aurora Global Database, Global Database]
+  aurora-serverless:     [Aurora Serverless*]
+  aurora-endpoints:      [reader endpoint, writer endpoint, cluster endpoint, custom endpoint]
+  dynamodb-global-tables: [Global Tables, global table]
+  dynamodb-streams:      [DynamoDB Streams]
+  dynamodb-capacity:     [on-demand capacity, provisioned capacity, on-demand mode, provisioned mode, RCU, WCU]
+  dynamodb-indexes:      [Global Secondary Index*, Local Secondary Index*, GSI, LSI]
+  ttl:                   [TTL, Time to Live]
+  pitr:                  [point-in-time*, PITR]
+  automated-backups:     [automated backup*]
+  db-encryption:         [encrypt* the database, encrypted snapshot*, unencrypted]
+  iam-db-auth:           [IAM database authentication, IAM authentication]
+  connection-pooling:    [connection pool*]
+  caching-strategies:    [lazy loading, cache-aside, write-through, write-back]
+  redis-vs-memcached:    [Redis, Memcached, Valkey]
+  sharding:              [shard*, partition key*, hot partition*, hot key*]
+  # ── Networking
+  subnets:               [public subnet*, private subnet*, subnet*]
+  security-groups:       [security group*]
+  nacl:                  [network ACL*, NACL*]
+  bastion-host:          [bastion*]
+  egress-only-igw:       [Egress-Only*]
+  elastic-ip:            [Elastic IP*]
+  ipv6:                  [IPv6]
+  hybrid-dns:            [hybrid DNS, conditional forward*]
+  vpc-sharing:           [VPC sharing, shared VPC, share subnet*]
+  dx-resiliency:         [Direct Connect gateway, LAG, link aggregation, backup VPN, VPN backup]
+  route53-routing:       [weighted routing, latency-based routing, latency routing, failover routing, geolocation routing, geoproximity routing, multivalue answer*, simple routing]
+  route53-health-checks: [health check*]
+  alias-records:         [alias record*, Alias record*]
+  cloudfront-origin-security: [Origin Access Control, Origin Access Identity, OAC, OAI]
+  signed-urls-cookies:   [signed URL*, signed cookie*]
+  elb-features:          [sticky session*, cross-zone, deregistration delay, connection draining, path-based, host-based, listener rule*]
+  tls-termination:       [TLS, SSL, HTTPS, mutual TLS, mTLS]
+  # ── Security / identity
+  iam-roles:             [IAM role*, instance profile*, execution role*, service role*]
+  iam-policies:          [IAM polic*, identity-based polic*, resource-based polic*, bucket polic*, key polic*, trust polic*]
+  permission-boundaries: [permissions boundar*, permission boundar*]
+  scp:                   [SCP, SCPs, service control polic*]
+  least-privilege:       [least privilege, least-privilege]
+  mfa:                   [MFA, multi-factor*]
+  cross-account-access:  [cross-account]
+  federation:            [federat*, SAML, OIDC, identity provider*, web identity]
+  key-rotation:          [key rotation, rotate*, rotation]
+  envelope-encryption:   [envelope encryption, data key*]
+  encryption-at-rest:    [at rest]
+  encryption-in-transit: [in transit]
+  ddos-protection:       [DDoS]
+  web-attacks:           [SQL injection, cross-site scripting, XSS, rate-based rule*, Bot Control, bots]
+  threat-detection:      [malicious, compromised, anomal*, unauthorized]
+  compliance:            [compliance, compliant, HIPAA, PCI DSS, PCI, GDPR, audit*]
+  # ── Integration
+  sqs-dlq:               [dead-letter*, DLQ]
+  sqs-fifo:              [FIFO]
+  sqs-visibility-timeout: [visibility timeout]
+  sqs-long-polling:      [long polling]
+  sqs-large-messages:    [Extended Client*, 256 KB]
+  fan-out:               [fan-out, fanout, fan out]
+  sns-filtering:         [filter polic*, message filtering]
+  decoupling:            [decoupl*, loosely coupled]
+  orchestration:         [orchestrat*, workflow*, state machine*]
+  event-driven:          [event-driven, event bus, EventBridge Pipes, EventBridge Scheduler]
+  # ── Resilience / DR
+  dr-backup-restore:     [backup and restore, Backup & Restore]
+  dr-pilot-light:        [pilot light]
+  dr-warm-standby:       [warm standby]
+  dr-multi-site:         [multi-site, active-active, active/active]
+  rto-rpo:               [RTO, RPO]
+  high-availability:     [highly available, high availability, fault toleran*, fault-toleran*]
+  multi-region:          [multi-Region, cross-Region, another Region, second Region, secondary Region]
+  # ── Analytics
+  streaming-ingestion:   [real-time, real time, streaming, clickstream*]
+  data-lake:             [data lake*]
+  etl:                   [ETL, "extract, transform, and load"]
+  columnar-formats:      [Parquet, ORC, columnar]
+  redshift-spectrum:     [Redshift Spectrum]
+  kinesis-shards:        [shard capacity, resharding]
+  # ── Migration
+  cdc-replication:       [change data capture, CDC, ongoing replication, continuous replication]
+  heterogeneous-migration: [heterogeneous]
+  offline-transfer:      [offline transfer, petabyte*, limited bandwidth, no network connectivity]
+  # ── Management / IaC / deploy
+  infrastructure-as-code: [infrastructure as code, IaC]
+  cfn-drift:             [drift*]
+  deployment-strategies: [blue/green, blue-green, canary, rolling deployment*, rolling update*, all-at-once, in-place deployment*, immutable deployment*]
+  centralized-logging:   [centralized log*, log aggregation, Logs Insights]
+  tagging:               [cost allocation tag*, tag polic*, tagging]
+  # ── Cost
+  right-sizing:          [right-siz*, rightsiz*, underutilized, over-provisioned]
+  data-transfer-cost:    [data transfer cost*, data transfer charge*, egress cost*, egress charge*]
+  serverless-cost:       [pay only for, pay-per-use, pay per request, scale to zero]
