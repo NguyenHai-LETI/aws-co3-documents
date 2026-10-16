@@ -19,7 +19,8 @@ trong ngân hàng câu hỏi để người học luyện ngay trong app.
 
 ## Quy trình
 
-1. **Đọc `trainer/bank/SCHEMA.md`** (định dạng, rubric thời gian §4, chuẩn chất lượng §6) và `trainer/bank/taxonomy.yaml`.
+1. **Đọc `trainer/bank/SCHEMA.md`** (định dạng §3 — gồm định dạng giải thích, rubric thời gian + câu dài §4, chuẩn chất lượng §6)
+   và `trainer/bank/taxonomy.yaml` (đặc biệt `tasks` 1.1–4.4, `services`, `features`).
 2. **Đọc tài liệu nguồn.** File lớn → Grep/đọc theo đoạn liên quan tới `focus`/`topic`. Không có `sources` → dùng
    notes của topic (`taxonomy.yaml → topics[].notes`). PDF → đọc trực tiếp nếu công cụ cho phép.
 3. **Lập dàn ý** (trong đầu): liệt kê các *điểm quyết định* có thể thi — “khi nào chọn X thay vì Y”, giới hạn quan trọng,
@@ -31,12 +32,20 @@ trong ngân hàng câu hỏi để người học luyện ngay trong app.
    - front matter: `pack: doc-<slug>` (kebab-case, duy nhất), `title`, `exam: SAA-C03`, `origin: doc`,
      `created`, `generated_by: <run_id>`, `source: <danh sách file nguồn>`.
    - id câu: `doc-<slug>-<nn>` (01, 02, …).
-   - mỗi câu đủ metadata: `domain, topic, services, tags, difficulty, time, concept, refs` (`refs` = file nguồn + anchor nếu có).
+   - mỗi câu đủ metadata: `domain, task, topic, services, tags, difficulty, time, concept, refs, hint`
+     (`task` = task statement exam guide **cùng domain**; `refs` = file nguồn + anchor nếu có;
+     `hint` = 1 dòng tiếng Việt ≤ 140 ký tự hướng tới yêu cầu/từ khoá quyết định, **không lộ đáp án**).
+   - Câu `medium`/`hard` ưu tiên **dạng câu dài** như đề thật: đề 60–120 từ (bối cảnh + 2–3 ràng buộc + qualifier) — SCHEMA §4.
    - ~25% câu multiple-response `(Choose TWO)` với 5 lựa chọn khi độ khó hard.
-   - Đáp án đúng phân bố đều A–D; giải thích ngắn: vì sao đúng + distractor sai ở đâu.
+   - **Lựa chọn dài tương đương nhau**, cùng “dáng” câu; đáp án đúng **không** được dài nhất (≥ 15 % so với mọi distractor là lỗi chất lượng).
+   - Đáp án đúng phân bố đều A–D.
+   - Giải thích theo định dạng SCHEMA §3: 1–2 câu vì sao đúng + mỗi distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>`
+     + dòng cuối `> 🇻🇳 …`; **gọi lựa chọn bằng nội dung, không bao giờ bằng chữ cái** (app xáo thứ tự đáp án).
+   - Ghi `enriched: <YYYY-MM-DD>` khi câu đã có đủ giải thích chuẩn + hint + task (để ENRICH không xử lý lại).
    - Kiến thức **chỉ** lấy từ tài liệu nguồn hoặc hiểu biết AWS chắc chắn; tài liệu và kiến thức của bạn mâu thuẫn →
      theo kiến thức AWS hiện hành *đáng tin cậy hơn* và ghi chú trong giải thích “(notes ghi …, thực tế …)”.
-6. **Kiểm tra:** `node trainer/scripts/validate.ts packs/docs/<tên-file> --fill-time` — sửa đến khi **0 lỗi ❌**.
+6. **Kiểm tra:** `node trainer/scripts/validate.ts packs/docs/<tên-file> --fill-time` — sửa đến khi **0 lỗi ❌**
+   và không còn cảnh báo về chữ cái trong giải thích / đáp án đúng dài nhất.
    Không chạy được lệnh → tự soát kỹ theo SCHEMA.
 7. (tuỳ chọn) Thêm service/tag mới vào `taxonomy.yaml` (chỉ thêm).
 

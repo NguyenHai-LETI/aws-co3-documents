@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 12-v2-01
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Rekognition
 - difficulty: medium
@@ -23,12 +24,12 @@ created: 2026-10-16
 
 An app must detect objects, faces, and inappropriate content in images and video. Which service?
 
-- A. Amazon Rekognition
-- B. Amazon Comprehend
-- C. Amazon Textract
-- D. Amazon Polly
+- A. Amazon Textract
+- B. Amazon Rekognition
+- C. Amazon Polly
+- D. Amazon Comprehend
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Image/video object/face/content detection = Amazon Rekognition.
 
@@ -36,6 +37,7 @@ An app must detect objects, faces, and inappropriate content in images and video
 
 ## Q 12-v2-02
 - domain: performance
+- task: 3.3
 - topic: ml
 - services: Textract
 - difficulty: medium
@@ -44,12 +46,12 @@ An app must detect objects, faces, and inappropriate content in images and video
 
 A company must extract text, key-value pairs, and tables from scanned documents/forms. Which service?
 
-- A. Amazon Textract
-- B. Amazon Rekognition
-- C. Amazon Transcribe
-- D. Amazon Translate
+- A. Amazon Rekognition
+- B. Amazon Transcribe
+- C. Amazon Translate
+- D. Amazon Textract
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Extract text/forms/tables from documents = Amazon Textract.
 
@@ -57,6 +59,7 @@ A company must extract text, key-value pairs, and tables from scanned documents/
 
 ## Q 12-v2-03
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Transcribe
 - difficulty: medium
@@ -65,12 +68,12 @@ A company must extract text, key-value pairs, and tables from scanned documents/
 
 An application must convert speech in audio files to text (transcription). Which service?
 
-- A. Amazon Transcribe
-- B. Amazon Polly
-- C. Amazon Comprehend
-- D. Amazon Lex
+- A. Amazon Lex
+- B. Amazon Comprehend
+- C. Amazon Transcribe
+- D. Amazon Polly
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Speech to text = Amazon Transcribe.
 
@@ -78,6 +81,7 @@ An application must convert speech in audio files to text (transcription). Which
 
 ## Q 12-v2-04
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Polly
 - difficulty: medium
@@ -86,12 +90,12 @@ An application must convert speech in audio files to text (transcription). Which
 
 An app must convert text into lifelike speech (text-to-speech). Which service?
 
-- A. Amazon Polly
-- B. Amazon Transcribe
-- C. Amazon Translate
+- A. Amazon Transcribe
+- B. Amazon Translate
+- C. Amazon Polly
 - D. Amazon Lex
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Text to lifelike speech = Amazon Polly.
 
@@ -99,6 +103,7 @@ An app must convert text into lifelike speech (text-to-speech). Which service?
 
 ## Q 12-v2-05
 - domain: performance
+- task: 3.5
 - topic: ml
 - services: Translate
 - tags: streaming-ingestion
@@ -108,12 +113,12 @@ An app must convert text into lifelike speech (text-to-speech). Which service?
 
 A company must translate text between languages in real time. Which service?
 
-- A. Amazon Translate
-- B. Amazon Comprehend
+- A. Amazon Textract
+- B. Amazon Translate
 - C. Amazon Polly
-- D. Amazon Textract
+- D. Amazon Comprehend
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Language translation = Amazon Translate.
 
@@ -121,6 +126,7 @@ A company must translate text between languages in real time. Which service?
 
 ## Q 12-v2-06
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Comprehend
 - difficulty: medium
@@ -129,12 +135,12 @@ A company must translate text between languages in real time. Which service?
 
 A company must analyze customer feedback for sentiment and key phrases (NLP). Which service?
 
-- A. Amazon Comprehend
-- B. Amazon Rekognition
-- C. Amazon Kendra
-- D. Amazon Personalize
+- A. Amazon Kendra
+- B. Amazon Personalize
+- C. Amazon Rekognition
+- D. Amazon Comprehend
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Sentiment/key phrase NLP = Amazon Comprehend.
 
@@ -142,6 +148,7 @@ A company must analyze customer feedback for sentiment and key phrases (NLP). Wh
 
 ## Q 12-v2-07
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Lex
 - difficulty: medium
@@ -150,12 +157,12 @@ A company must analyze customer feedback for sentiment and key phrases (NLP). Wh
 
 A team must build a conversational chatbot with automatic speech recognition and natural language understanding. Which service?
 
-- A. Amazon Lex
-- B. Amazon Polly
-- C. Amazon Translate
+- A. Amazon Polly
+- B. Amazon Translate
+- C. Amazon Lex
 - D. Amazon Comprehend
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Conversational chatbot (ASR+NLU) = Amazon Lex.
 
@@ -163,6 +170,7 @@ A team must build a conversational chatbot with automatic speech recognition and
 
 ## Q 12-v2-08
 - domain: performance
+- task: 3.3
 - topic: ml
 - services: Kendra
 - difficulty: medium
@@ -171,12 +179,12 @@ A team must build a conversational chatbot with automatic speech recognition and
 
 A company wants an intelligent enterprise search service over internal documents using natural language queries. Which service?
 
-- A. Amazon Kendra
-- B. Amazon Comprehend
-- C. OpenSearch only
-- D. Athena
+- A. OpenSearch only
+- B. Athena
+- C. Amazon Comprehend
+- D. Amazon Kendra
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Enterprise NL document search = Amazon Kendra.
 
@@ -184,6 +192,7 @@ A company wants an intelligent enterprise search service over internal documents
 
 ## Q 12-v2-09
 - domain: performance
+- task: 3.5
 - topic: ml
 - services: Personalize
 - tags: streaming-ingestion
@@ -194,8 +203,8 @@ A company wants an intelligent enterprise search service over internal documents
 An e-commerce site wants real-time personalized product recommendations. Which service?
 
 - A. Amazon Personalize
-- B. Amazon Forecast
-- C. Amazon Rekognition
+- B. Amazon Rekognition
+- C. Amazon Forecast
 - D. Amazon Kendra
 
 **Answer:** A
@@ -206,6 +215,7 @@ An e-commerce site wants real-time personalized product recommendations. Which s
 
 ## Q 12-v2-10
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: SageMaker
 - difficulty: medium
@@ -214,12 +224,12 @@ An e-commerce site wants real-time personalized product recommendations. Which s
 
 A company must build, train, and deploy custom ML models end-to-end in a managed environment. Which service?
 
-- A. Amazon SageMaker
-- B. Amazon Comprehend
+- A. Amazon Lex
+- B. Amazon SageMaker
 - C. Amazon Rekognition
-- D. Amazon Lex
+- D. Amazon Comprehend
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Build/train/deploy custom models = Amazon SageMaker.
 
@@ -227,6 +237,7 @@ A company must build, train, and deploy custom ML models end-to-end in a managed
 
 ## Q 12-v2-11
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Forecast
 - difficulty: hard
@@ -235,12 +246,12 @@ A company must build, train, and deploy custom ML models end-to-end in a managed
 
 A company must forecast future product demand from historical time-series data without building models manually. Which service?
 
-- A. Amazon Forecast
+- A. Amazon SageMaker only
 - B. Amazon Personalize
-- C. Amazon SageMaker only
-- D. Amazon Comprehend
+- C. Amazon Comprehend
+- D. Amazon Forecast
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Time-series demand forecasting = Amazon Forecast.
 
@@ -248,6 +259,7 @@ A company must forecast future product demand from historical time-series data w
 
 ## Q 12-v2-12
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Fraud Detector
 - difficulty: hard
@@ -257,9 +269,9 @@ A company must forecast future product demand from historical time-series data w
 A company must detect potentially fraudulent online transactions using ML with minimal ML expertise. Which service?
 
 - A. Amazon Fraud Detector
-- B. Amazon GuardDuty
+- B. Amazon Comprehend
 - C. Amazon Macie
-- D. Amazon Comprehend
+- D. Amazon GuardDuty
 
 **Answer:** A
 
@@ -269,6 +281,7 @@ A company must detect potentially fraudulent online transactions using ML with m
 
 ## Q 12-v2-13
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Bedrock
 - difficulty: hard
@@ -278,9 +291,9 @@ A company must detect potentially fraudulent online transactions using ML with m
 A team needs to build generative AI applications using foundation models via a managed API without managing infrastructure. Which service?
 
 - A. Amazon Bedrock
-- B. Amazon SageMaker Ground Truth
+- B. Amazon Kendra
 - C. Amazon Comprehend
-- D. Amazon Kendra
+- D. Amazon SageMaker Ground Truth
 
 **Answer:** A
 
@@ -290,6 +303,7 @@ A team needs to build generative AI applications using foundation models via a m
 
 ## Q 12-v2-14
 - domain: cost
+- task: 4.2
 - topic: ml
 - services: SageMaker
 - tags: serverless-cost
@@ -299,12 +313,12 @@ A team needs to build generative AI applications using foundation models via a m
 
 A SageMaker inference endpoint has spiky traffic and must scale to zero when idle to save cost while handling bursts. Which option?
 
-- A. SageMaker Serverless Inference
+- A. Multi-model endpoint always-on
 - B. Always-on real-time endpoint
-- C. Batch transform only
-- D. Multi-model endpoint always-on
+- C. SageMaker Serverless Inference
+- D. Batch transform only
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Scale-to-zero spiky inference = SageMaker Serverless Inference.
 
@@ -312,6 +326,7 @@ A SageMaker inference endpoint has spiky traffic and must scale to zero when idl
 
 ## Q 12-v2-15
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Comprehend
 - difficulty: hard
@@ -320,11 +335,11 @@ A SageMaker inference endpoint has spiky traffic and must scale to zero when idl
 
 A medical documents pipeline must extract entities like medications and diagnoses from clinical text. Which service is purpose-built?
 
-- A. Amazon Comprehend Medical
-- B. Amazon Textract
-- C. Amazon Translate
-- D. Amazon Rekognition
+- A. Amazon Translate
+- B. Amazon Comprehend Medical
+- C. Amazon Rekognition
+- D. Amazon Textract
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Clinical entity extraction = Amazon Comprehend Medical.

@@ -2,9 +2,10 @@
 // bank/SCHEMA.md — keep both in sync. The parser is deliberately lenient about cosmetics
 // (bold markers, blockquotes, checkboxes) and strict about content (ids, keys, metadata).
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { asString, asStringList, splitFrontMatter } from './frontmatter.ts';
 import { normalizeDomain } from './taxonomy.ts';
-import { estimateQuestionTime } from '../../shared/timing.ts';
+import { countWords, estimateQuestionTime } from '../../shared/timing.ts';
 import type {
   BankProblem,
   Difficulty,
@@ -36,7 +37,19 @@ export const META_KEYS = [
   'status',
   'created',
   'source',
+  'task',
+  'hint',
+  'enriched',
 ] as const;
+
+/** Short content hash of what a learner sees + the key — used as `base` in AI patches and to detect edits. */
+export function questionHash(stem: string, options: Option[], answer: string[]): string {
+  const src = `${stem.trim()}\n${options.map((o) => `${o.key}. ${o.text.trim()}`).join('\n')}\n${[...answer].sort().join('')}`;
+  return crypto.createHash('sha1').update(src).digest('hex').slice(0, 10);
+}
+
+/** Option-letter references in an explanation break when options are shuffled for display. */
+export const LETTER_REF_RE = /(^|\n)\s*[-*]?\s*\(?[A-H]\)?\s*[:.)–—-]\s|\b(?:[Oo]ption|[Aa]nswer|[Cc]hoice|[Đđ]áp án)\s+[A-H]\b|=\s*[A-H]\b(?![’'])|\([A-H]\)/; // uppercase letters only — "answer a few" is prose
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const STATUSES: QuestionStatus[] = ['active', 'draft', 'retired'];
@@ -137,6 +150,13 @@ export function parsePack(text: string, file: string, tax: Taxonomy): ParsedPack
     if (q) questions.push(q);
   }
   if (!blocks.length) problems.push({ level: 'warning', file, line: 1, message: 'No questions found (expected headings like "## Q my-id-01")' });
+  const singles = questions.filter((q) => q.answer.length === 1);
+  if (origin !== 'imported' && singles.length >= 8) {
+    const counts = new Map<string, number>();
+    for (const q of singles) counts.set(q.answer[0], (counts.get(q.answer[0]) ?? 0) + 1);
+    const [top, n] = [...counts].sort((a, b) => b[1] - a[1])[0];
+    if (n / singles.length > 0.45) problems.push({ level: 'warning', file, line: 1, message: `Correct answers are skewed: ${top} in ${n}/${singles.length} single-answer questions — spread them across A–D` });
+  }
 
   const pack: Pack = {
     id: packId,
@@ -318,8 +338,28 @@ function parseBlock(b: RawBlock, ctx: Ctx): Question | undefined {
     warn(`time ${time}s is far from the rubric estimate ${rubricTime}s (SCHEMA.md §4)`);
   }
 
+  const task = get('task');
+  if (task) {
+    const def = tax.tasks?.find((t) => t.id === task);
+    if (!def) err(`Unknown task "${task}" (taxonomy.yaml → tasks: 1.1 … 4.4)`);
+    else if (domain && def.domain !== domain) warn(`task ${task} belongs to domain ${def.domain}, but domain is ${domain}`);
+  }
+  if (explanationText && LETTER_REF_RE.test(explanationText.replace(/\*\*Answer:?\*\*.*$/m, ''))) {
+    warn('Explanation refers to option letters (A/B/…) — options can be shuffled; refer to the option content instead');
+  }
+  const single = answer?.length === 1 ? answer[0] : undefined;
+  if (ctx.origin !== 'imported' && single && options.length >= 3) {
+    const len = (k: string) => options.find((o) => o.key === k)?.text.length ?? 0;
+    const correct = len(single);
+    const others = options.filter((o) => o.key !== single).map((o) => o.text.length);
+    if (others.length && correct > Math.max(...others) * 1.3 && correct - Math.max(...others) >= 15) {
+      warn('Correct option is much longer than every distractor (length gives the answer away) — balance option lengths');
+    }
+  }
+
   if (!domain || !answer?.length || options.length < 2 || !stemText) return undefined;
 
+  const words = countWords(stemText);
   return {
     id: b.id,
     pack: ctx.packId,
@@ -341,6 +381,12 @@ function parseBlock(b: RawBlock, ctx: Ctx): Question | undefined {
     refs: getList('refs'),
     created: get('created'),
     source: get('source'),
+    task: task || undefined,
+    hint: get('hint') || undefined,
+    enriched: get('enriched') || undefined,
+    words,
+    longForm: words >= (tax.timing.long_form_min_words ?? 55),
+    hash: questionHash(stemText, opts, answer ?? []),
     file,
     line: b.line,
   };
@@ -366,11 +412,15 @@ export interface QuestionDraft {
   status?: QuestionStatus;
   created?: string;
   source?: string;
+  task?: string;
+  hint?: string;
+  enriched?: string;
 }
 
 export function serializeQuestion(q: QuestionDraft): string {
   const out: string[] = [`## Q ${q.id}`];
   out.push(`- domain: ${q.domain}`);
+  if (q.task) out.push(`- task: ${q.task}`);
   out.push(`- topic: ${q.topic}`);
   if (q.services?.length) out.push(`- services: ${q.services.join(', ')}`);
   if (q.tags?.length) out.push(`- tags: ${q.tags.join(', ')}`);
@@ -379,8 +429,10 @@ export function serializeQuestion(q: QuestionDraft): string {
   if (q.variantOf?.length) out.push(`- variant_of: ${q.variantOf.join(', ')}`);
   if (q.concept) out.push(`- concept: ${q.concept}`);
   if (q.refs?.length) out.push(`- refs: ${q.refs.join(', ')}`);
+  if (q.hint) out.push(`- hint: ${q.hint.replace(/\s+/g, ' ').trim()}`);
   if (q.status && q.status !== 'active') out.push(`- status: ${q.status}`);
   if (q.created) out.push(`- created: ${q.created}`);
+  if (q.enriched) out.push(`- enriched: ${q.enriched}`);
   if (q.source) out.push(`- source: ${q.source}`);
   out.push('', q.stem.trim(), '');
   for (const o of q.options) out.push(`- ${o.key}. ${o.text.trim()}`);
@@ -406,4 +458,30 @@ export function serializePack(
   if (intro.trim()) parts.push(intro.trim(), '');
   parts.push(questions.map(serializeQuestion).join('\n---\n\n'));
   return parts.join('\n');
+}
+
+/** Converts a parsed question back to a serializable draft (defaults become explicit metadata). */
+export function toDraft(q: Question): QuestionDraft {
+  return {
+    id: q.id,
+    stem: q.stem,
+    options: q.options.map((o) => ({ ...o })),
+    answer: [...q.answer],
+    explanation: q.explanation,
+    domain: q.domain,
+    topic: q.topic,
+    services: [...q.services],
+    tags: [...q.tags],
+    difficulty: q.difficulty,
+    time: q.time,
+    variantOf: [...q.variantOf],
+    concept: q.concept,
+    refs: [...q.refs],
+    status: q.status,
+    created: q.created,
+    source: q.source,
+    task: q.task,
+    hint: q.hint,
+    enriched: q.enriched,
+  };
 }

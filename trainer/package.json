@@ -14,10 +14,17 @@
     "validate": "node scripts/validate.ts",
     "snapshot": "node scripts/snapshot.ts",
     "coach": "node scripts/coach-run.ts",
-    "schedule": "sh scripts/schedule.sh",
+    "schedule": "node scripts/schedule.ts",
     "typecheck": "tsc --noEmit -p .",
     "build": "vite build",
-    "test": "node --test \"tests/*.test.ts\""
+    "test": "node --test \"tests/*.test.ts\"",
+    "rebalance": "node scripts/rebalance-answers.ts",
+    "classify-tasks": "node scripts/classify-tasks.ts",
+    "apply-patch": "node scripts/apply-patch.ts",
+    "enrich-batch": "node scripts/enrich-batch.ts",
+    "sync": "node scripts/sync.ts",
+    "test:e2e": "node --test \"tests/e2e/*.test.ts\"",
+    "test:ui": "node tests/ui/smoke.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.1.2",
@@ -32,6 +39,7 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "playwright": "^1.64.1",
     "typescript": "~5.9.3"
   }
 }

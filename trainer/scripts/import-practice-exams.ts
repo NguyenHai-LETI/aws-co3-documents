@@ -1,11 +1,16 @@
 // One-off migration: practice-exams/*-exam[-v2].md + *-answers[-v2].txt → bank/packs/imported/*.md
-// Usage: node scripts/import-practice-exams.ts [--force] [--dry-run]
+// Usage: node scripts/import-practice-exams.ts [--force] [--dry-run] [--keep-order]
 // Existing pack files are never overwritten without --force (they may contain fixes made later).
+// Options get the same canonical order as scripts/rebalance-answers.ts (correct letters spread evenly;
+// --keep-order keeps the source order) and letter references in explanations become option text.
+// When --force changes the letters of questions that already existed, a migration record is written
+// and result files are remapped (server/lib/migrations.ts).
 import fs from 'node:fs';
 import path from 'node:path';
-import { PACKS_DIR, REPO_DIR, TRAINER_DIR, rel } from '../server/config.ts';
+import { PACKS_DIR, REPO_DIR, rel } from '../server/config.ts';
 import { loadTaxonomy } from '../server/lib/taxonomy.ts';
-import { classifyDomain, detectFeatures, detectServices, topicFromServices } from '../server/lib/classify.ts';
+import { classifyDomain, detectFeatures, detectServices, guessTask, topicFromServices } from '../server/lib/classify.ts';
+import { assignTargets, canonicalLayout, isIdentity, isPositional, mappingByText, migrateResults, replaceLetterRefs, writeMigration } from '../server/lib/migrations.ts';
 import { parsePack, serializePack, type QuestionDraft } from '../server/lib/pack-format.ts';
 import { stringifyFrontMatter } from '../server/lib/frontmatter.ts';
 import { estimateQuestionTime } from '../shared/timing.ts';
@@ -14,6 +19,7 @@ import type { Difficulty, DomainId } from '../shared/types.ts';
 const args = new Set(process.argv.slice(2));
 const FORCE = args.has('--force');
 const DRY = args.has('--dry-run');
+const KEEP_ORDER = args.has('--keep-order');
 const SRC_DIR = path.join(REPO_DIR, 'practice-exams');
 const OUT_DIR = path.join(PACKS_DIR, 'imported');
 
@@ -92,6 +98,7 @@ if (!DRY) fs.mkdirSync(OUT_DIR, { recursive: true });
 
 let total = 0;
 const report: string[] = [];
+const layoutChanges = new Map<string, { map: Record<string, string>; before: string; after: string }>();
 for (const f of files) {
   const m = f.match(/^(\d{2})-(.+)-exam(-v2)?\.md$/)!;
   const [ch, slug, v2] = [m[1], m[2], m[3]];
@@ -138,6 +145,16 @@ for (const f of files) {
   }
 
   const packId = `saa-${ch}-${slug}-${version}`;
+  // exam-guide task + the canonical layout of scripts/rebalance-answers.ts (a re-import never undoes it)
+  const targets = assignTargets(drafts, packId);
+  for (const d of drafts) {
+    d.task = guessTask(d, tax);
+    if (KEEP_ORDER || isPositional(d)) continue;
+    d.explanation = replaceLetterRefs(d.explanation, d.options).text;
+    const layout = canonicalLayout(d, targets.get(d.id));
+    d.options = layout.options;
+    d.answer = layout.answer;
+  }
   const title = cleanTitle(exam.title, ch, version);
   const outFile = path.join(OUT_DIR, `${ch}-${slug}-${version}.md`);
   const intro = [
@@ -158,14 +175,38 @@ for (const f of files) {
   if (parsed.questions.length !== drafts.length) report.push(`ROUND-TRIP MISMATCH ${f}: ${drafts.length} → ${parsed.questions.length}`);
 
   total += drafts.length;
+  if (fs.existsSync(outFile) && FORCE) {
+    // letters of existing questions that move → migration record, so result files follow
+    const fresh = new Map(parsed.questions.map((q) => [q.id, q]));
+    for (const old of parsePack(fs.readFileSync(outFile, 'utf8'), rel(outFile), tax).questions) {
+      const now = fresh.get(old.id);
+      if (!now) continue;
+      const map = mappingByText(old.options, now.options);
+      if (!map) report.push(`${old.id}: option texts changed in the source — stored results keep their letters`);
+      else if (!isIdentity(map)) layoutChanges.set(old.id, { map, before: old.answer.join(''), after: now.answer.join('') });
+    }
+  }
   if (DRY) continue;
   if (fs.existsSync(outFile) && !FORCE) {
     report.push(`exists, kept: ${rel(outFile)} (use --force to overwrite)`);
     continue;
   }
   fs.writeFileSync(outFile, text);
-  console.log(`✓ ${rel(outFile, TRAINER_DIR)}  ${drafts.length} questions`);
+  console.log(`✓ ${rel(outFile)}  ${drafts.length} questions`);
 }
 
 console.log(`\nImported ${total} questions from ${files.length} exam files${DRY ? ' (dry run)' : ''}.`);
+if (layoutChanges.size) {
+  if (DRY) console.log(`${layoutChanges.size} existing question(s) would change option letters (a migration record would be written).`);
+  else {
+    const rec = writeMigration('import-layout', {
+      kind: 'import-layout',
+      note: 'Re-import changed the option order of existing questions (scripts/import-practice-exams.ts --force): old → new letters.',
+      questions: Object.fromEntries([...layoutChanges].map(([id, c]) => [id, c.map])),
+      answers: Object.fromEntries([...layoutChanges].map(([id, c]) => [id, [c.before, c.after] as [string, string]])),
+    });
+    const m = migrateResults();
+    console.log(`Migration ${rec.id}: ${layoutChanges.size} question(s) changed letters · ${m.migrated} result file(s) remapped.`);
+  }
+}
 if (report.length) console.log('\n' + report.join('\n'));

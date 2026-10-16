@@ -6,3 +6,6 @@ coach/.lock
 # regenerated after every submitted test
 coach/snapshot.md
 .DS_Store
+
+# regenerated for each ENRICH run (patches in coach/patches/ are kept as an audit trail)
+coach/enrich/

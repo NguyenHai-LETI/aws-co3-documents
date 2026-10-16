@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 11-v2-01
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway, Lambda
 - difficulty: medium
@@ -25,8 +26,8 @@ A serverless REST API must front Lambda functions with throttling, authorization
 
 - A. Amazon API Gateway
 - B. Application Load Balancer
-- C. CloudFront
-- D. AppSync
+- C. AppSync
+- D. CloudFront
 
 **Answer:** A
 
@@ -36,6 +37,7 @@ A serverless REST API must front Lambda functions with throttling, authorization
 
 ## Q 11-v2-02
 - domain: performance
+- task: 3.4
 - topic: api
 - services: AppSync
 - tags: streaming-ingestion
@@ -45,12 +47,12 @@ A serverless REST API must front Lambda functions with throttling, authorization
 
 A mobile app needs a managed GraphQL API with real-time subscriptions and offline sync. Which service?
 
-- A. AWS AppSync
-- B. API Gateway REST
-- C. Amazon SES
-- D. Cognito
+- A. Amazon SES
+- B. Cognito
+- C. API Gateway REST
+- D. AWS AppSync
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Managed GraphQL + real-time + offline sync = AWS AppSync.
 
@@ -58,6 +60,7 @@ A mobile app needs a managed GraphQL API with real-time subscriptions and offlin
 
 ## Q 11-v2-03
 - domain: performance
+- task: 3.4
 - topic: api
 - services: SES
 - difficulty: medium
@@ -66,12 +69,12 @@ A mobile app needs a managed GraphQL API with real-time subscriptions and offlin
 
 An application must send transactional and marketing emails at scale. Which service?
 
-- A. Amazon SES
-- B. Amazon SNS
+- A. API Gateway
+- B. Amazon SES
 - C. Amazon Pinpoint only
-- D. API Gateway
+- D. Amazon SNS
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Transactional/marketing email at scale = Amazon SES.
 
@@ -79,6 +82,7 @@ An application must send transactional and marketing emails at scale. Which serv
 
 ## Q 11-v2-04
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway
 - difficulty: medium
@@ -88,9 +92,9 @@ An application must send transactional and marketing emails at scale. Which serv
 API Gateway must limit each customer to a number of requests per month with API keys. Which feature?
 
 - A. Usage plans + API keys
-- B. Resource policies
-- C. Stage variables
-- D. Mapping templates
+- B. Stage variables
+- C. Mapping templates
+- D. Resource policies
 
 **Answer:** A
 
@@ -100,6 +104,7 @@ API Gateway must limit each customer to a number of requests per month with API 
 
 ## Q 11-v2-05
 - domain: performance
+- task: 3.2
 - topic: api
 - services: Lambda, API Gateway
 - difficulty: medium
@@ -108,12 +113,12 @@ API Gateway must limit each customer to a number of requests per month with API 
 
 A cost-sensitive team needs a simple, low-latency HTTP API proxying to Lambda without advanced features. Which API Gateway type?
 
-- A. HTTP API
-- B. REST API
-- C. WebSocket API
+- A. REST API
+- B. WebSocket API
+- C. HTTP API
 - D. Private REST only
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Simple low-latency low-cost HTTP proxy to Lambda = HTTP API.
 
@@ -121,6 +126,7 @@ A cost-sensitive team needs a simple, low-latency HTTP API proxying to Lambda wi
 
 ## Q 11-v2-06
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway
 - tags: streaming-ingestion
@@ -130,12 +136,12 @@ A cost-sensitive team needs a simple, low-latency HTTP API proxying to Lambda wi
 
 A chat application needs bidirectional real-time communication between clients and backend. Which API Gateway type?
 
-- A. WebSocket API
+- A. GraphQL only
 - B. REST API
-- C. HTTP API
-- D. GraphQL only
+- C. WebSocket API
+- D. HTTP API
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Bidirectional real-time = WebSocket API.
 
@@ -143,27 +149,37 @@ A chat application needs bidirectional real-time communication between clients a
 
 ## Q 11-v2-07
 - domain: secure
+- task: 1.2
 - topic: api
-- services: Cognito, API Gateway
+- services: API Gateway, Cognito
+- tags: cognito-authorizer
 - difficulty: medium
 - time: 50
+- concept: API Gateway Cognito authorizer authorizes requests using Cognito user pool tokens
+- hint: Đề dùng token từ user pool để cho phép request — tính năng authorizer nào của API Gateway khớp?
+- enriched: 2026-10-16
 - source: practice-exams/11-api-integration-exam-v2.md#Q7
 
 API Gateway must authorize requests using Cognito user pool tokens. Which feature?
 
-- A. Cognito authorizer
-- B. API keys
-- C. Usage plans
-- D. Stage variables
+- A. Stage variable maps
+- B. Usage plan throttling
+- C. API key validation
+- D. Cognito authorizer
 
-**Answer:** A
+**Answer:** D
 
-**Explanation:** Authorize with Cognito tokens = Cognito authorizer.
+**Explanation:** The **Cognito authorizer** checks the user pool token on each request and rejects invalid ones before the backend is invoked.
+- Stage variable maps: pass per-stage configuration to integrations; they do not authorize callers.
+- Usage plan throttling: sets rate and quota limits per API key, not identity checks.
+- API key validation: identifies a client application but does not validate user identity or tokens.
+> 🇻🇳 Cho phép request bằng token Cognito user pool → Cognito authorizer.
 
 ---
 
 ## Q 11-v2-08
 - domain: performance
+- task: 3.3
 - topic: api
 - services: API Gateway
 - difficulty: medium
@@ -172,12 +188,12 @@ API Gateway must authorize requests using Cognito user pool tokens. Which featur
 
 Repeated identical GET requests hit the backend unnecessarily. Which API Gateway feature reduces backend load?
 
-- A. API caching on the stage
-- B. Throttling
-- C. Usage plans
-- D. Mapping templates
+- A. Throttling
+- B. Usage plans
+- C. Mapping templates
+- D. API caching on the stage
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Reduce backend load for repeated GETs = API caching.
 
@@ -185,6 +201,7 @@ Repeated identical GET requests hit the backend unnecessarily. Which API Gateway
 
 ## Q 11-v2-09
 - domain: performance
+- task: 3.4
 - topic: api
 - services: PrivateLink, VPC, API Gateway
 - difficulty: medium
@@ -194,8 +211,8 @@ Repeated identical GET requests hit the backend unnecessarily. Which API Gateway
 An API must only be reachable from within a VPC, not the public internet. Which API Gateway option?
 
 - A. Private REST API with an interface VPC endpoint
-- B. Edge-optimized API
-- C. Regional public API
+- B. Regional public API
+- C. Edge-optimized API
 - D. WebSocket API
 
 **Answer:** A
@@ -206,6 +223,7 @@ An API must only be reachable from within a VPC, not the public internet. Which 
 
 ## Q 11-v2-10
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway
 - difficulty: medium
@@ -214,12 +232,12 @@ An API must only be reachable from within a VPC, not the public internet. Which 
 
 API Gateway must protect the backend from traffic spikes with request rate/burst limits. Which feature?
 
-- A. Throttling limits
-- B. Caching
-- C. Mapping templates
-- D. Stage variables
+- A. Mapping templates
+- B. Stage variables
+- C. Throttling limits
+- D. Caching
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Protect backend from spikes = throttling limits.
 
@@ -227,6 +245,7 @@ API Gateway must protect the backend from traffic spikes with request rate/burst
 
 ## Q 11-v2-11
 - domain: performance
+- task: 3.2
 - topic: api
 - services: Lambda
 - difficulty: hard
@@ -236,9 +255,9 @@ API Gateway must protect the backend from traffic spikes with request rate/burst
 A custom authorization scheme must validate a bearer token via a Lambda before allowing API access, caching the result. Which feature?
 
 - A. Lambda authorizer (token-based) with result caching
-- B. IAM authorization only
+- B. Cognito only
 - C. API keys
-- D. Cognito only
+- D. IAM authorization only
 
 **Answer:** A
 
@@ -248,29 +267,38 @@ A custom authorization scheme must validate a bearer token via a Lambda before a
 
 ## Q 11-v2-12
 - domain: secure
+- task: 1.2
 - topic: api
-- services: S3
+- services: API Gateway, S3
 - tags: tls-termination
 - difficulty: hard
 - time: 95
+- concept: API Gateway mTLS needs mutual TLS enabled on a custom domain plus a client-CA truststore stored in S3
+- hint: Xác thực bằng chứng chỉ client cần hai thành phần: bật TLS hai chiều ở tên miền và nơi lưu danh sách CA tin cậy.
+- enriched: 2026-10-16
 - source: practice-exams/11-api-integration-exam-v2.md#Q12
 
 A B2B API must authenticate clients using client certificates (mutual TLS). Which two are needed? (Choose TWO)
 
-- A. Enable mutual TLS on a custom domain
-- B. A truststore of client CA certificates in S3
-- C. API keys only
-- D. CloudFront signed cookies
-- E. WAF rate rule
+- A. API keys only
+- B. CloudFront signed cookies
+- C. Enable mutual TLS on a custom domain
+- D. WAF rate rule
+- E. A truststore of client CA certificates in S3
 
-**Answer:** A, B
+**Answer:** C, E
 
-**Explanation:** Mutual TLS = enable mTLS on custom domain + truststore of client CAs in S3.
+**Explanation:** Mutual TLS on API Gateway needs two parts: **enable mTLS on the custom domain**, and supply a **truststore of client CA certificates in S3** that API Gateway uses to validate client certificates.
+- API keys only: identify callers but do not authenticate with certificates.
+- CloudFront signed cookies: restrict access to CloudFront content, not client-cert authentication of an API.
+- WAF rate rule: throttles request rates and does not verify client identity.
+> 🇻🇳 mTLS = bật mTLS trên custom domain + truststore CA của client trong S3.
 
 ---
 
 ## Q 11-v2-13
 - domain: performance
+- task: 3.4
 - topic: api
 - services: CloudFront
 - difficulty: hard
@@ -279,12 +307,12 @@ A B2B API must authenticate clients using client certificates (mutual TLS). Whic
 
 An edge-optimized REST API serving global users must reduce latency for clients far from the Region. What does edge-optimized use?
 
-- A. CloudFront edge locations in front of the API
-- B. Global Accelerator only
-- C. Multiple Regions manually
-- D. VPC endpoints
+- A. Global Accelerator only
+- B. CloudFront edge locations in front of the API
+- C. VPC endpoints
+- D. Multiple Regions manually
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Edge-optimized reduces latency via CloudFront edge locations.
 
@@ -292,6 +320,7 @@ An edge-optimized REST API serving global users must reduce latency for clients 
 
 ## Q 11-v2-14
 - domain: performance
+- task: 3.3
 - topic: api
 - difficulty: hard
 - time: 95
@@ -301,9 +330,9 @@ Choosing between REST API and HTTP API — which two are reasons to pick REST AP
 
 - A. Need API caching
 - B. Need request/response mapping templates and usage plans/API keys
-- C. Lowest cost and latency with minimal features
+- C. No need for WAF integration
 - D. Native OIDC/JWT only with no advanced features
-- E. No need for WAF integration
+- E. Lowest cost and latency with minimal features
 
 **Answer:** A, B
 
@@ -313,6 +342,7 @@ Choosing between REST API and HTTP API — which two are reasons to pick REST AP
 
 ## Q 11-v2-15
 - domain: performance
+- task: 3.5
 - topic: api
 - difficulty: hard
 - time: 70
@@ -320,11 +350,11 @@ Choosing between REST API and HTTP API — which two are reasons to pick REST AP
 
 An API integration must transform the incoming request payload before passing to the backend and reshape the response. Which REST API feature?
 
-- A. Mapping templates (integration request/response with VTL)
-- B. Usage plans
+- A. Throttling
+- B. Mapping templates (integration request/response with VTL)
 - C. Stage variables
-- D. Throttling
+- D. Usage plans
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Transform request/response payloads = mapping templates (VTL).

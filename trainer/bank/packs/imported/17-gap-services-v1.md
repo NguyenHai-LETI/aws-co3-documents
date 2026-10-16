@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 17-v1-01
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS Proxy, Lambda, RDS
 - tags: connection-pooling
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 Hundreds of Lambda functions open too many connections to an RDS database, exhausting it. Which managed service provides connection pooling and faster failover?
 
-- A. RDS Proxy
-- B. ElastiCache
-- C. Read Replica
-- D. DAX
+- A. Read Replica
+- B. RDS Proxy
+- C. DAX
+- D. ElastiCache
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Connection pooling + faster failover for Lambda+RDS = RDS Proxy.
 
@@ -37,6 +38,7 @@ Hundreds of Lambda functions open too many connections to an RDS database, exhau
 
 ## Q 17-v1-02
 - domain: secure
+- task: 1.1
 - topic: security
 - services: RAM, VPC, Transit Gateway
 - tags: subnets
@@ -47,9 +49,9 @@ Hundreds of Lambda functions open too many connections to an RDS database, exhau
 An organization wants to SHARE a centrally-managed VPC subnet (and Transit Gateway) with other accounts in its Organization. Which service?
 
 - A. AWS Resource Access Manager (RAM)
-- B. VPC Peering
+- B. PrivateLink
 - C. AWS Organizations SCP
-- D. PrivateLink
+- D. VPC Peering
 
 **Answer:** A
 
@@ -59,6 +61,7 @@ An organization wants to SHARE a centrally-managed VPC subnet (and Transit Gatew
 
 ## Q 17-v1-03
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: VPC, VPC Flow Logs
 - tags: subnets
@@ -68,12 +71,12 @@ An organization wants to SHARE a centrally-managed VPC subnet (and Transit Gatew
 
 A security team must investigate which source/destination IPs were ACCEPTED or REJECTED for traffic in a VPC subnet. Which feature provides this data?
 
-- A. VPC Flow Logs
-- B. CloudTrail
-- C. AWS Config
-- D. GuardDuty only
+- A. CloudTrail
+- B. AWS Config
+- C. GuardDuty only
+- D. VPC Flow Logs
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Accepted/Rejected IP traffic detail = VPC Flow Logs.
 
@@ -81,6 +84,7 @@ A security team must investigate which source/destination IPs were ACCEPTED or R
 
 ## Q 17-v1-04
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Route 53 Resolver, VPC
 - tags: hybrid-dns
@@ -90,41 +94,50 @@ A security team must investigate which source/destination IPs were ACCEPTED or R
 
 On-premises servers must resolve DNS names of resources in a VPC (and vice versa) for hybrid DNS. Which feature?
 
-- A. Route 53 Resolver inbound/outbound endpoints
+- A. Internet Gateway
 - B. Route 53 public hosted zone
 - C. CloudFront
-- D. Internet Gateway
+- D. Route 53 Resolver inbound/outbound endpoints
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Hybrid DNS on-prem <-> VPC = Route 53 Resolver endpoints.
 
 ---
 
 ## Q 17-v1-05
-- domain: secure
+- domain: performance
+- task: 3.5
 - topic: analytics
-- services: MSK
+- services: MSK, Kinesis Data Streams
 - tags: streaming-ingestion
 - difficulty: easy
 - time: 45
+- concept: Amazon MSK = managed Apache Kafka (Kafka-compatible APIs) for streaming ingestion
+- hint: Khi di chuyển hệ thống streaming đang chạy Kafka tự quản, dịch vụ nào giữ nguyên API Kafka mà AWS vận hành hộ?
+- enriched: 2026-10-16
 - source: practice-exams/17-gap-services-exam.md#Q5
 
 A company migrating self-managed Apache Kafka wants a managed, Kafka-compatible streaming service. Which service?
 
-- A. Amazon MSK
-- B. Amazon Kinesis Data Streams
-- C. Amazon SQS
-- D. Amazon MQ
+- A. Amazon SQS
+- B. Amazon MSK
+- C. Amazon MQ
+- D. Amazon Kinesis Data Streams
 
-**Answer:** A
+**Answer:** B
 
-**Explanation:** Managed Kafka-compatible streaming = Amazon MSK.
+**Explanation:** **Amazon MSK** runs Apache Kafka as a managed service, so existing Kafka producers, consumers and tooling keep working with little change after migration.
+- Amazon SQS: a message queue with its own API; not Kafka-compatible.
+- Amazon MQ: managed ActiveMQ/RabbitMQ for JMS/AMQP/MQTT brokers, not Kafka.
+- Kinesis Data Streams: managed streaming but with a proprietary API, so Kafka clients need rework.
+> 🇻🇳 Cần Kafka được quản lý, giữ nguyên API Kafka → Amazon MSK.
 
 ---
 
 ## Q 17-v1-06
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Network Firewall, VPC
 - difficulty: easy
@@ -133,12 +146,12 @@ A company migrating self-managed Apache Kafka wants a managed, Kafka-compatible 
 
 A VPC needs stateful, managed network firewall capabilities (intrusion prevention, domain filtering) at the VPC perimeter. Which service?
 
-- A. AWS Network Firewall
-- B. Security Groups only
-- C. AWS WAF
-- D. Amazon GuardDuty
+- A. Security Groups only
+- B. Amazon GuardDuty
+- C. AWS Network Firewall
+- D. AWS WAF
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Stateful managed VPC firewall/IPS/domain filtering = AWS Network Firewall.
 
@@ -146,6 +159,7 @@ A VPC needs stateful, managed network firewall capabilities (intrusion preventio
 
 ## Q 17-v1-07
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: GWLB, ELB
 - difficulty: easy
@@ -154,12 +168,12 @@ A VPC needs stateful, managed network firewall capabilities (intrusion preventio
 
 Traffic must be transparently inspected by third-party virtual firewall appliances before reaching applications. Which load balancer enables this insertion?
 
-- A. Gateway Load Balancer (GWLB)
-- B. Application Load Balancer
-- C. Network Load Balancer
+- A. Application Load Balancer
+- B. Network Load Balancer
+- C. Gateway Load Balancer (GWLB)
 - D. Classic Load Balancer
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Insert third-party firewall appliances transparently = Gateway Load Balancer.
 
@@ -167,6 +181,7 @@ Traffic must be transparently inspected by third-party virtual firewall applianc
 
 ## Q 17-v1-08
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: S3
 - tags: s3-storage-lens
@@ -176,12 +191,12 @@ Traffic must be transparently inspected by third-party virtual firewall applianc
 
 Which service provides organization-wide visibility and recommendations on S3 storage usage and activity to optimize cost?
 
-- A. S3 Storage Lens
+- A. Amazon Macie
 - B. S3 Inventory only
-- C. Amazon Macie
-- D. AWS Config
+- C. AWS Config
+- D. S3 Storage Lens
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Org-wide S3 usage visibility/optimization = S3 Storage Lens.
 
@@ -189,6 +204,7 @@ Which service provides organization-wide visibility and recommendations on S3 st
 
 ## Q 17-v1-09
 - domain: performance
+- task: 3.3
 - topic: database
 - services: Aurora
 - tags: aurora-serverless
@@ -198,12 +214,12 @@ Which service provides organization-wide visibility and recommendations on S3 st
 
 A serverless internal app is idle most of the time but bursts during the day; the team wants a relational DB that scales capacity automatically and quickly. Which option?
 
-- A. Aurora Serverless v2
+- A. DynamoDB on-demand
 - B. RDS Single-AZ largest instance
-- C. DynamoDB on-demand
-- D. Redshift Serverless
+- C. Redshift Serverless
+- D. Aurora Serverless v2
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Idle-then-bursty relational, fast auto-scale = Aurora Serverless v2.
 
@@ -211,6 +227,7 @@ A serverless internal app is idle most of the time but bursts during the day; th
 
 ## Q 17-v1-10
 - domain: secure
+- task: 1.3
 - topic: storage
 - services: S3, Lambda
 - tags: s3-object-lambda
@@ -220,12 +237,12 @@ A serverless internal app is idle most of the time but bursts during the day; th
 
 Which feature lets you transform and modify objects retrieved from S3 on the fly (e.g., redact PII) using a Lambda without storing copies?
 
-- A. S3 Object Lambda
-- B. S3 Select
-- C. S3 Batch Operations
-- D. S3 Inventory
+- A. S3 Select
+- B. S3 Object Lambda
+- C. S3 Inventory
+- D. S3 Batch Operations
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Modify S3 objects on retrieval via Lambda = S3 Object Lambda.
 
@@ -233,6 +250,7 @@ Which feature lets you transform and modify objects retrieved from S3 on the fly
 
 ## Q 17-v1-11
 - domain: secure
+- task: 1.2
 - topic: integration
 - services: EventBridge, SQS, DynamoDB, MSK
 - tags: dynamodb-streams, event-driven
@@ -242,12 +260,12 @@ Which feature lets you transform and modify objects retrieved from S3 on the fly
 
 Which service creates a point-to-point integration between a source (e.g., SQS, DynamoDB Streams, Kafka) and a target, with optional filtering and enrichment, with minimal code?
 
-- A. Amazon EventBridge Pipes
-- B. AWS Step Functions
-- C. Amazon SNS
+- A. AWS Step Functions
+- B. Amazon SNS
+- C. Amazon EventBridge Pipes
 - D. AWS Glue
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Point-to-point source->target w/ filter/enrich = EventBridge Pipes.
 
@@ -255,6 +273,7 @@ Which service creates a point-to-point integration between a source (e.g., SQS, 
 
 ## Q 17-v1-12
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM, Secrets Manager, Lambda, RDS Proxy
 - tags: iam-db-auth
@@ -264,12 +283,12 @@ Which service creates a point-to-point integration between a source (e.g., SQS, 
 
 A company wants IAM database authentication and to avoid storing DB passwords in Lambda. RDS Proxy supports which of these?
 
-- A. IAM authentication and Secrets Manager integration
-- B. Only username/password in code
-- C. Encryption of the database engine
-- D. Cross-Region replication
+- A. Only username/password in code
+- B. Cross-Region replication
+- C. IAM authentication and Secrets Manager integration
+- D. Encryption of the database engine
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** RDS Proxy supports IAM auth + Secrets Manager.
 
@@ -277,6 +296,7 @@ A company wants IAM database authentication and to avoid storing DB passwords in
 
 ## Q 17-v1-13
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudWatch, S3, VPC, VPC Flow Logs
 - difficulty: medium
@@ -285,13 +305,13 @@ A company wants IAM database authentication and to avoid storing DB passwords in
 
 VPC Flow Logs can be delivered to which destinations? (Choose TWO)
 
-- A. Amazon CloudWatch Logs
-- B. Amazon S3
-- C. Amazon SQS
-- D. Amazon EBS
-- E. AWS Config
+- A. Amazon S3
+- B. Amazon EBS
+- C. AWS Config
+- D. Amazon SQS
+- E. Amazon CloudWatch Logs
 
-**Answer:** A, B
+**Answer:** A, E
 
 **Explanation:** Flow Logs delivered to CloudWatch Logs and S3 (also Firehose).
 
@@ -299,6 +319,7 @@ VPC Flow Logs can be delivered to which destinations? (Choose TWO)
 
 ## Q 17-v1-14
 - domain: secure
+- task: 1.1
 - topic: security
 - services: RAM, License Manager, Route 53 Resolver
 - difficulty: easy
@@ -307,12 +328,12 @@ VPC Flow Logs can be delivered to which destinations? (Choose TWO)
 
 A company wants to centrally share License Manager configurations and Route 53 Resolver rules across accounts. Which service enables resource sharing?
 
-- A. AWS RAM
+- A. AWS Config
 - B. AWS Organizations only
-- C. AWS Config
-- D. AWS Control Tower
+- C. AWS Control Tower
+- D. AWS RAM
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Share License Manager/Resolver rules across accounts = AWS RAM.
 
@@ -320,6 +341,7 @@ A company wants to centrally share License Manager configurations and Route 53 R
 
 ## Q 17-v1-15
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Internet Gateway, NAT Gateway
 - tags: ipv6, subnets, egress-only-igw
@@ -330,8 +352,8 @@ A company wants to centrally share License Manager configurations and Route 53 R
 An IPv6-only workload in a private subnet needs outbound-only internet access. Which component is used (NAT Gateway is IPv4)?
 
 - A. Egress-only Internet Gateway
-- B. NAT Gateway
-- C. Internet Gateway
+- B. Internet Gateway
+- C. NAT Gateway
 - D. Transit Gateway
 
 **Answer:** A
@@ -342,6 +364,7 @@ An IPv6-only workload in a private subnet needs outbound-only internet access. W
 
 ## Q 17-v1-16
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Network Firewall, VPC
 - difficulty: easy
@@ -350,12 +373,12 @@ An IPv6-only workload in a private subnet needs outbound-only internet access. W
 
 Which is the BEST way to enforce that outbound traffic from a VPC can only reach an approved list of domains?
 
-- A. AWS Network Firewall with domain filtering
-- B. Security Group outbound rules by domain
-- C. NACL by domain name
-- D. Route 53 public zone
+- A. Security Group outbound rules by domain
+- B. Route 53 public zone
+- C. AWS Network Firewall with domain filtering
+- D. NACL by domain name
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Approved-domain egress filtering = Network Firewall domain filtering.
 
@@ -363,6 +386,7 @@ Which is the BEST way to enforce that outbound traffic from a VPC can only reach
 
 ## Q 17-v1-17
 - domain: secure
+- task: 1.2
 - topic: security
 - services: GuardDuty, VPC, VPC Flow Logs, CloudTrail
 - difficulty: easy
@@ -371,12 +395,12 @@ Which is the BEST way to enforce that outbound traffic from a VPC can only reach
 
 A team wants to detect threats by analyzing VPC Flow Logs, DNS logs, and CloudTrail automatically. Which service consumes these?
 
-- A. Amazon GuardDuty
-- B. AWS Config
-- C. Amazon Macie
-- D. AWS WAF
+- A. AWS Config
+- B. Amazon GuardDuty
+- C. AWS WAF
+- D. Amazon Macie
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Consumes Flow/DNS/CloudTrail logs for threats = GuardDuty.
 
@@ -384,6 +408,7 @@ A team wants to detect threats by analyzing VPC Flow Logs, DNS logs, and CloudTr
 
 ## Q 17-v1-18
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS Proxy
 - difficulty: easy
@@ -394,8 +419,8 @@ Which RDS Proxy benefit is MOST relevant to improving application resilience dur
 
 - A. It reduces failover time by managing connections and routing to the new primary
 - B. It encrypts data at rest
-- C. It adds read replicas automatically
-- D. It provides a CDN
+- C. It provides a CDN
+- D. It adds read replicas automatically
 
 **Answer:** A
 
@@ -405,6 +430,7 @@ Which RDS Proxy benefit is MOST relevant to improving application resilience dur
 
 ## Q 17-v1-19
 - domain: secure
+- task: 1.1
 - topic: networking
 - services: Transit Gateway, VPC, RAM
 - tags: subnets, vpc-sharing
@@ -414,13 +440,13 @@ Which RDS Proxy benefit is MOST relevant to improving application resilience dur
 
 Which two scenarios are ideal use cases for AWS Resource Access Manager? (Choose TWO)
 
-- A. Sharing a Transit Gateway across accounts
+- A. Encrypting S3 objects
 - B. Sharing subnets in a shared VPC
-- C. Encrypting S3 objects
+- C. Forecasting demand
 - D. Filtering web traffic for XSS
-- E. Forecasting demand
+- E. Sharing a Transit Gateway across accounts
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** RAM use cases = share Transit Gateway and shared-VPC subnets.
 
@@ -428,6 +454,7 @@ Which two scenarios are ideal use cases for AWS Resource Access Manager? (Choose
 
 ## Q 17-v1-20
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Route 53 Resolver
 - difficulty: easy
@@ -437,9 +464,9 @@ Which two scenarios are ideal use cases for AWS Resource Access Manager? (Choose
 A hybrid environment needs on-premises apps to send queries to AWS-hosted private DNS names. Which Route 53 Resolver endpoint type is used?
 
 - A. Inbound endpoint
-- B. Outbound endpoint
-- C. Public hosted zone
-- D. Health check
+- B. Public hosted zone
+- C. Health check
+- D. Outbound endpoint
 
 **Answer:** A
 

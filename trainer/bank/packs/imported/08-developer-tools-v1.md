@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 08-v1-01
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeCommit
 - difficulty: easy
@@ -23,12 +24,12 @@ created: 2026-10-16
 
 A team wants a fully managed, private Git repository in AWS integrated with other CI/CD services. Which service?
 
-- A. AWS CodeBuild
-- B. AWS CodeCommit
+- A. AWS CodeCommit
+- B. AWS CodeArtifact
 - C. AWS CodeDeploy
-- D. AWS CodeArtifact
+- D. AWS CodeBuild
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Managed private Git repo = CodeCommit.
 
@@ -36,6 +37,7 @@ A team wants a fully managed, private Git repository in AWS integrated with othe
 
 ## Q 08-v1-02
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodeBuild
 - difficulty: easy
@@ -44,12 +46,12 @@ A team wants a fully managed, private Git repository in AWS integrated with othe
 
 Which service compiles source code, runs tests, and produces deployable artifacts, charging per build minute (serverless)?
 
-- A. AWS CodeBuild
+- A. AWS CodeDeploy
 - B. AWS CodePipeline
-- C. AWS CodeDeploy
+- C. AWS CodeBuild
 - D. AWS CodeGuru
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Serverless build/test, per-minute = CodeBuild.
 
@@ -57,6 +59,7 @@ Which service compiles source code, runs tests, and produces deployable artifact
 
 ## Q 08-v1-03
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodeDeploy, EC2, Lambda, ECS
 - difficulty: easy
@@ -65,12 +68,12 @@ Which service compiles source code, runs tests, and produces deployable artifact
 
 Which service automates deploying applications to EC2, on-premises, Lambda, and ECS with rollback support?
 
-- A. AWS CodeCommit
-- B. AWS CodeDeploy
-- C. AWS CodeArtifact
-- D. AWS CloudFormation
+- A. AWS CodeArtifact
+- B. AWS CodeCommit
+- C. AWS CloudFormation
+- D. AWS CodeDeploy
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Automated deploys to EC2/Lambda/ECS w/ rollback = CodeDeploy.
 
@@ -78,6 +81,7 @@ Which service automates deploying applications to EC2, on-premises, Lambda, and 
 
 ## Q 08-v1-04
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodePipeline
 - tags: orchestration
@@ -87,12 +91,12 @@ Which service automates deploying applications to EC2, on-premises, Lambda, and 
 
 Which service orchestrates an end-to-end release pipeline (Source → Build → Test → Deploy)?
 
-- A. AWS CodePipeline
-- B. AWS CodeBuild
+- A. AWS CodeBuild
+- B. AWS CodePipeline
 - C. AWS CodeCommit
 - D. AWS Step Functions
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** End-to-end pipeline orchestration = CodePipeline.
 
@@ -100,6 +104,7 @@ Which service orchestrates an end-to-end release pipeline (Source → Build → 
 
 ## Q 08-v1-05
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeDeploy
 - tags: deployment-strategies
@@ -109,12 +114,12 @@ Which service orchestrates an end-to-end release pipeline (Source → Build → 
 
 A deployment must shift traffic to a NEW fleet and instantly roll back by swapping back if errors occur. Which CodeDeploy strategy?
 
-- A. In-place deployment
-- B. Blue/green deployment
-- C. Rolling update
-- D. Canary build
+- A. Canary build
+- B. Rolling update
+- C. Blue/green deployment
+- D. In-place deployment
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** New fleet + instant rollback by swap = Blue/green deployment.
 
@@ -122,6 +127,7 @@ A deployment must shift traffic to a NEW fleet and instantly roll back by swappi
 
 ## Q 08-v1-06
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeArtifact
 - difficulty: easy
@@ -131,9 +137,9 @@ A deployment must shift traffic to a NEW fleet and instantly roll back by swappi
 A company wants to store and share private build dependencies (npm, Maven, PyPI) and proxy public package repositories. Which service?
 
 - A. AWS CodeArtifact
-- B. Amazon S3
-- C. AWS CodeCommit
-- D. Amazon ECR
+- B. AWS CodeCommit
+- C. Amazon ECR
+- D. Amazon S3
 
 **Answer:** A
 
@@ -143,6 +149,7 @@ A company wants to store and share private build dependencies (npm, Maven, PyPI)
 
 ## Q 08-v1-07
 - domain: performance
+- task: 3.2
 - topic: devtools
 - difficulty: easy
 - time: 45
@@ -150,12 +157,12 @@ A company wants to store and share private build dependencies (npm, Maven, PyPI)
 
 Which service uses ML to provide automated code reviews and runtime performance profiling recommendations?
 
-- A. AWS CodeGuru
-- B. AWS CodeBuild
-- C. Amazon Inspector
-- D. AWS X-Ray
+- A. Amazon Inspector
+- B. AWS CodeGuru
+- C. AWS X-Ray
+- D. AWS CodeBuild
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** ML code review + profiling = CodeGuru.
 
@@ -163,6 +170,7 @@ Which service uses ML to provide automated code reviews and runtime performance 
 
 ## Q 08-v1-08
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeBuild
 - difficulty: easy
@@ -171,12 +179,12 @@ Which service uses ML to provide automated code reviews and runtime performance 
 
 Which build configuration file does CodeBuild use to define build phases and commands?
 
-- A. `appspec.yml`
-- B. `buildspec.yml`
-- C. `template.yaml`
-- D. `Dockerfile`
+- A. `buildspec.yml`
+- B. `appspec.yml`
+- C. `Dockerfile`
+- D. `template.yaml`
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** CodeBuild build phases file = buildspec.yml.
 
@@ -184,6 +192,7 @@ Which build configuration file does CodeBuild use to define build phases and com
 
 ## Q 08-v1-09
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodeDeploy
 - tags: asg-lifecycle-hooks
@@ -193,10 +202,10 @@ Which build configuration file does CodeBuild use to define build phases and com
 
 Which file does CodeDeploy use to define deployment lifecycle hooks and target locations?
 
-- A. `buildspec.yml`
+- A. `pipeline.json`
 - B. `appspec.yml`
-- C. `pipeline.json`
-- D. `taskdef.json`
+- C. `taskdef.json`
+- D. `buildspec.yml`
 
 **Answer:** B
 
@@ -206,6 +215,7 @@ Which file does CodeDeploy use to define deployment lifecycle hooks and target l
 
 ## Q 08-v1-10
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: ECR, ECS, EKS
 - difficulty: easy
@@ -215,11 +225,11 @@ Which file does CodeDeploy use to define deployment lifecycle hooks and target l
 A container image must be stored in a managed, private registry that integrates with ECS/EKS. Which service?
 
 - A. AWS CodeArtifact
-- B. Amazon Elastic Container Registry (ECR)
-- C. AWS CodeCommit
+- B. AWS CodeCommit
+- C. Amazon Elastic Container Registry (ECR)
 - D. Amazon S3
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Private container registry for ECS/EKS = Amazon ECR.
 
@@ -227,6 +237,7 @@ A container image must be stored in a managed, private registry that integrates 
 
 ## Q 08-v1-11
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeDeploy
 - difficulty: easy
@@ -235,12 +246,12 @@ A container image must be stored in a managed, private registry that integrates 
 
 Which CodeDeploy deployment configuration updates instances a few at a time to reduce risk?
 
-- A. AllAtOnce
-- B. OneAtATime / HalfAtATime
-- C. Immutable
-- D. Blue/green only
+- A. Blue/green only
+- B. Immutable
+- C. OneAtATime / HalfAtATime
+- D. AllAtOnce
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Update a few at a time = OneAtATime/HalfAtATime.
 
@@ -248,6 +259,7 @@ Which CodeDeploy deployment configuration updates instances a few at a time to r
 
 ## Q 08-v1-12
 - domain: performance
+- task: 3.4
 - topic: devtools
 - services: X-Ray
 - difficulty: easy
@@ -256,12 +268,12 @@ Which CodeDeploy deployment configuration updates instances a few at a time to r
 
 A team needs to trace requests across microservices to find latency bottlenecks. Which service?
 
-- A. AWS X-Ray
-- B. AWS CodeGuru Reviewer
-- C. AWS Config
-- D. CloudTrail
+- A. CloudTrail
+- B. AWS Config
+- C. AWS X-Ray
+- D. AWS CodeGuru Reviewer
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Distributed request tracing = AWS X-Ray.
 
@@ -269,6 +281,7 @@ A team needs to trace requests across microservices to find latency bottlenecks.
 
 ## Q 08-v1-13
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: SAM, CloudFormation
 - difficulty: easy
@@ -277,12 +290,12 @@ A team needs to trace requests across microservices to find latency bottlenecks.
 
 Which service helps deploy a serverless application defined with a simplified template (transforms to CloudFormation)?
 
-- A. AWS SAM (Serverless Application Model)
-- B. AWS CodeDeploy
-- C. AWS CodeArtifact
-- D. AWS OpsWorks
+- A. AWS CodeArtifact
+- B. AWS OpsWorks
+- C. AWS CodeDeploy
+- D. AWS SAM (Serverless Application Model)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Simplified serverless template -> CFN = AWS SAM.
 
@@ -290,6 +303,7 @@ Which service helps deploy a serverless application defined with a simplified te
 
 ## Q 08-v1-14
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeCommit, CodePipeline
 - difficulty: easy
@@ -298,12 +312,12 @@ Which service helps deploy a serverless application defined with a simplified te
 
 A pipeline should automatically start when code is pushed to the main branch. Which source integration provides this?
 
-- A. CodeCommit (or GitHub) source action in CodePipeline
+- A. Manual approval action
 - B. CodeBuild webhook only
-- C. Manual approval action
-- D. S3 versioning
+- C. S3 versioning
+- D. CodeCommit (or GitHub) source action in CodePipeline
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Auto-start on push = CodeCommit/GitHub source action in CodePipeline.
 
@@ -311,6 +325,7 @@ A pipeline should automatically start when code is pushed to the main branch. Wh
 
 ## Q 08-v1-15
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodeBuild, EC2
 - difficulty: easy
@@ -321,8 +336,8 @@ Which is a valid reason to choose CodeBuild over self-managed build servers on E
 
 - A. It avoids paying for build minutes
 - B. It is serverless with no build infrastructure to manage
-- C. It cannot run tests
-- D. It requires patching the build OS yourself
+- C. It requires patching the build OS yourself
+- D. It cannot run tests
 
 **Answer:** B
 
@@ -332,6 +347,7 @@ Which is a valid reason to choose CodeBuild over self-managed build servers on E
 
 ## Q 08-v1-16
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodePipeline
 - difficulty: easy
@@ -340,12 +356,12 @@ Which is a valid reason to choose CodeBuild over self-managed build servers on E
 
 A release process must require manual sign-off before deploying to production. Which CodePipeline feature?
 
-- A. Manual approval action
-- B. Build stage
-- C. Source stage
-- D. Test stage only
+- A. Build stage
+- B. Manual approval action
+- C. Test stage only
+- D. Source stage
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Production sign-off = Manual approval action.
 
@@ -353,6 +369,7 @@ A release process must require manual sign-off before deploying to production. W
 
 ## Q 08-v1-17
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodeCommit, CodeBuild, CodeDeploy, CodePipeline
 - tags: orchestration
@@ -362,12 +379,12 @@ A release process must require manual sign-off before deploying to production. W
 
 Which AWS service combination represents a fully native CI/CD chain?
 
-- A. CodeCommit → CodeBuild → CodeDeploy, orchestrated by CodePipeline
-- B. S3 → Lambda → DynamoDB
+- A. S3 → Lambda → DynamoDB
+- B. SNS → SQS → Lambda
 - C. EC2 → ELB → ASG
-- D. SNS → SQS → Lambda
+- D. CodeCommit → CodeBuild → CodeDeploy, orchestrated by CodePipeline
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Native CI/CD chain = CodeCommit->CodeBuild->CodeDeploy via CodePipeline.
 
@@ -375,6 +392,7 @@ Which AWS service combination represents a fully native CI/CD chain?
 
 ## Q 08-v1-18
 - domain: secure
+- task: 1.2
 - topic: devtools
 - services: Systems Manager, Secrets Manager, CodeBuild
 - difficulty: easy
@@ -384,11 +402,11 @@ Which AWS service combination represents a fully native CI/CD chain?
 Where should CodeBuild store secrets (e.g., a registry password) securely at build time?
 
 - A. Hard-coded in buildspec.yml
-- B. Systems Manager Parameter Store / Secrets Manager referenced in buildspec
+- B. In the container image layers
 - C. A public S3 bucket
-- D. In the container image layers
+- D. Systems Manager Parameter Store / Secrets Manager referenced in buildspec
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Build-time secrets = Parameter Store/Secrets Manager refs.
 
@@ -396,6 +414,7 @@ Where should CodeBuild store secrets (e.g., a registry password) securely at bui
 
 ## Q 08-v1-19
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodePipeline
 - difficulty: medium
@@ -404,13 +423,13 @@ Where should CodeBuild store secrets (e.g., a registry password) securely at bui
 
 Which two are TRUE about AWS CodePipeline? (Choose TWO)
 
-- A. It models release stages and transitions
-- B. It can integrate third-party actions (e.g., GitHub, Jenkins)
+- A. It performs DDoS protection
+- B. It models release stages and transitions
 - C. It stores container images as a registry
-- D. It is a managed Git server
-- E. It performs DDoS protection
+- D. It can integrate third-party actions (e.g., GitHub, Jenkins)
+- E. It is a managed Git server
 
-**Answer:** A, B
+**Answer:** B, D
 
 **Explanation:** CodePipeline models stages and integrates 3rd-party actions.
 
@@ -418,6 +437,7 @@ Which two are TRUE about AWS CodePipeline? (Choose TWO)
 
 ## Q 08-v1-20
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CloudFormation
 - tags: infrastructure-as-code, cfn-drift
@@ -428,8 +448,8 @@ Which two are TRUE about AWS CodePipeline? (Choose TWO)
 A company runs infrastructure as code and wants application + infra deployed together with drift detection. Which service underpins this?
 
 - A. AWS CloudFormation
-- B. AWS CodeArtifact
-- C. AWS CodeGuru
+- B. AWS CodeGuru
+- C. AWS CodeArtifact
 - D. Amazon ECR
 
 **Answer:** A

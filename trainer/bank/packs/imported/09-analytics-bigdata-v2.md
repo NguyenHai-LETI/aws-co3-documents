@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 09-v2-01
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Kinesis Data Streams
 - tags: streaming-ingestion
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 A company must ingest streaming clickstream data in real time and allow multiple applications to process the same records. Which service?
 
-- A. Kinesis Data Streams
-- B. Kinesis Data Firehose
-- C. Amazon SQS
-- D. Amazon Athena
+- A. Amazon SQS
+- B. Kinesis Data Streams
+- C. Amazon Athena
+- D. Kinesis Data Firehose
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Real-time ingest, multiple consumers, replay = Kinesis Data Streams.
 
@@ -37,6 +38,7 @@ A company must ingest streaming clickstream data in real time and allow multiple
 
 ## Q 09-v2-02
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Data Firehose, S3, Redshift
 - tags: streaming-ingestion
@@ -46,12 +48,12 @@ A company must ingest streaming clickstream data in real time and allow multiple
 
 Streaming data must be delivered to S3/Redshift with the LEAST management and near-real-time (buffered) loading, no custom consumers. Which service?
 
-- A. Kinesis Data Streams
-- B. Kinesis Data Firehose
-- C. Amazon MSK
+- A. Kinesis Data Firehose
+- B. Amazon MSK
+- C. Kinesis Data Streams
 - D. EMR
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Managed buffered delivery to S3/Redshift, no consumers = Kinesis Data Firehose.
 
@@ -59,6 +61,7 @@ Streaming data must be delivered to S3/Redshift with the LEAST management and ne
 
 ## Q 09-v2-03
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Athena, S3
 - difficulty: medium
@@ -67,12 +70,12 @@ Streaming data must be delivered to S3/Redshift with the LEAST management and ne
 
 A company wants to run SQL queries directly on data stored in S3 without loading it into a database, paying per query. Which service?
 
-- A. Amazon Athena
-- B. Amazon Redshift
-- C. Amazon RDS
-- D. Amazon EMR
+- A. Amazon Redshift
+- B. Amazon Athena
+- C. Amazon EMR
+- D. Amazon RDS
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** SQL on S3, pay per query, serverless = Amazon Athena.
 
@@ -80,6 +83,7 @@ A company wants to run SQL queries directly on data stored in S3 without loading
 
 ## Q 09-v2-04
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Glue
 - tags: etl
@@ -89,12 +93,12 @@ A company wants to run SQL queries directly on data stored in S3 without loading
 
 A serverless ETL service must crawl data, build a catalog, and transform data between stores. Which service?
 
-- A. AWS Glue
-- B. Amazon EMR
-- C. Kinesis
-- D. Athena
+- A. Amazon EMR
+- B. Athena
+- C. AWS Glue
+- D. Kinesis
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Serverless ETL + crawler + catalog = AWS Glue.
 
@@ -102,6 +106,7 @@ A serverless ETL service must crawl data, build a catalog, and transform data be
 
 ## Q 09-v2-05
 - domain: performance
+- task: 3.2
 - topic: analytics
 - services: EMR
 - difficulty: medium
@@ -110,12 +115,12 @@ A serverless ETL service must crawl data, build a catalog, and transform data be
 
 A team needs managed Hadoop/Spark clusters for large-scale big-data processing with full control. Which service?
 
-- A. Amazon EMR
-- B. AWS Glue
-- C. Athena
+- A. Athena
+- B. Amazon EMR
+- C. AWS Glue
 - D. QuickSight
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Managed Hadoop/Spark with control = Amazon EMR.
 
@@ -123,6 +128,7 @@ A team needs managed Hadoop/Spark clusters for large-scale big-data processing w
 
 ## Q 09-v2-06
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: OpenSearch
 - difficulty: medium
@@ -131,12 +137,12 @@ A team needs managed Hadoop/Spark clusters for large-scale big-data processing w
 
 A company needs a managed search and log analytics engine with dashboards (Kibana-style). Which service?
 
-- A. Amazon OpenSearch Service
-- B. Amazon Athena
+- A. Kinesis
+- B. Amazon OpenSearch Service
 - C. Amazon Redshift
-- D. Kinesis
+- D. Amazon Athena
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Search + log analytics + dashboards = Amazon OpenSearch Service.
 
@@ -144,6 +150,7 @@ A company needs a managed search and log analytics engine with dashboards (Kiban
 
 ## Q 09-v2-07
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: QuickSight
 - difficulty: medium
@@ -152,12 +159,12 @@ A company needs a managed search and log analytics engine with dashboards (Kiban
 
 Business users need interactive BI dashboards and visualizations with a managed, serverless service. Which service?
 
-- A. Amazon QuickSight
-- B. Amazon Athena
-- C. AWS Glue
-- D. OpenSearch
+- A. Amazon Athena
+- B. AWS Glue
+- C. OpenSearch
+- D. Amazon QuickSight
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Managed BI dashboards/visualizations = Amazon QuickSight.
 
@@ -165,6 +172,7 @@ Business users need interactive BI dashboards and visualizations with a managed,
 
 ## Q 09-v2-08
 - domain: cost
+- task: 4.1
 - topic: analytics
 - services: S3, Athena
 - tags: columnar-formats
@@ -174,13 +182,13 @@ Business users need interactive BI dashboards and visualizations with a managed,
 
 Athena queries on large S3 datasets are slow and expensive. Which two optimizations reduce cost and improve performance? (Choose TWO)
 
-- A. Convert data to columnar formats (Parquet/ORC)
-- B. Partition the data in S3
-- C. Store as uncompressed CSV
-- D. Query with SELECT *
-- E. Use a single large file
+- A. Store as uncompressed CSV
+- B. Use a single large file
+- C. Partition the data in S3
+- D. Convert data to columnar formats (Parquet/ORC)
+- E. Query with SELECT *
 
-**Answer:** A, B
+**Answer:** C, D
 
 **Explanation:** Cheaper/faster Athena = columnar (Parquet/ORC) + partitioning.
 
@@ -188,6 +196,7 @@ Athena queries on large S3 datasets are slow and expensive. Which two optimizati
 
 ## Q 09-v2-09
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Glue, Athena, EMR, Redshift
 - tags: redshift-spectrum
@@ -197,12 +206,12 @@ Athena queries on large S3 datasets are slow and expensive. Which two optimizati
 
 A company must catalog metadata so Athena, EMR, and Redshift Spectrum can share table definitions. Which component?
 
-- A. AWS Glue Data Catalog
+- A. CloudTrail
 - B. S3 Inventory
-- C. DynamoDB
-- D. CloudTrail
+- C. AWS Glue Data Catalog
+- D. DynamoDB
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Shared metadata catalog = AWS Glue Data Catalog.
 
@@ -210,6 +219,7 @@ A company must catalog metadata so Athena, EMR, and Redshift Spectrum can share 
 
 ## Q 09-v2-10
 - domain: performance
+- task: 3.3
 - topic: analytics
 - services: Redshift, S3
 - tags: redshift-spectrum
@@ -219,12 +229,12 @@ A company must catalog metadata so Athena, EMR, and Redshift Spectrum can share 
 
 Redshift must query data in S3 without loading it into the cluster. Which feature?
 
-- A. Redshift Spectrum
-- B. Athena federation
-- C. Glue crawler
-- D. EMR
+- A. Glue crawler
+- B. EMR
+- C. Athena federation
+- D. Redshift Spectrum
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Query S3 from Redshift without loading = Redshift Spectrum.
 
@@ -232,6 +242,7 @@ Redshift must query data in S3 without loading it into the cluster. Which featur
 
 ## Q 09-v2-11
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Managed Apache Flink
 - tags: streaming-ingestion
@@ -241,12 +252,12 @@ Redshift must query data in S3 without loading it into the cluster. Which featur
 
 A streaming pipeline must transform and enrich records in real time using SQL/Apache Flink. Which service?
 
-- A. Kinesis Data Analytics (Managed Service for Apache Flink)
+- A. Glue
 - B. Kinesis Data Firehose
-- C. Athena
-- D. Glue
+- C. Kinesis Data Analytics (Managed Service for Apache Flink)
+- D. Athena
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Real-time SQL/Flink stream processing = Kinesis Data Analytics (Managed Flink).
 
@@ -254,6 +265,7 @@ A streaming pipeline must transform and enrich records in real time using SQL/Ap
 
 ## Q 09-v2-12
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: MSK
 - difficulty: medium
@@ -262,12 +274,12 @@ A streaming pipeline must transform and enrich records in real time using SQL/Ap
 
 A company already uses Apache Kafka and wants a managed Kafka service on AWS. Which service?
 
-- A. Amazon MSK
-- B. Kinesis Data Streams
+- A. Amazon MQ
+- B. Amazon MSK
 - C. Amazon SQS
-- D. Amazon MQ
+- D. Kinesis Data Streams
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Managed Kafka = Amazon MSK.
 
@@ -275,6 +287,7 @@ A company already uses Apache Kafka and wants a managed Kafka service on AWS. Wh
 
 ## Q 09-v2-13
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Data Firehose, S3
 - tags: streaming-ingestion, columnar-formats
@@ -297,6 +310,7 @@ Firehose must deliver streaming data to S3 in Parquet format and buffer records 
 
 ## Q 09-v2-14
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Kinesis
 - tags: sharding, kinesis-shards
@@ -307,8 +321,8 @@ Firehose must deliver streaming data to S3 in Parquet format and buffer records 
 A Kinesis Data Stream is throttling on writes. Which action increases capacity?
 
 - A. Increase the number of shards (resharding/split)
-- B. Increase visibility timeout
-- C. Add a DLQ
+- B. Add a DLQ
+- C. Increase visibility timeout
 - D. Enable long polling
 
 **Answer:** A
@@ -319,28 +333,37 @@ A Kinesis Data Stream is throttling on writes. Which action increases capacity?
 
 ## Q 09-v2-15
 - domain: secure
+- task: 1.3
 - topic: analytics
-- services: Lake Formation, S3
+- services: Lake Formation, Glue, Athena, Redshift
 - tags: data-lake
 - difficulty: medium
-- time: 50
+- time: 55
+- concept: Lake Formation governs S3 data lake tables with fine-grained permissions across Athena, Redshift Spectrum, EMR
+- hint: Cần lớp quản trị dùng chung, phân quyền chi tiết cho bảng trên S3 và áp dụng cho nhiều dịch vụ phân tích.
+- enriched: 2026-10-16
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q15
 
 A company needs a governed data lake with fine-grained permissions on S3-based tables across analytics services. Which service?
 
-- A. AWS Lake Formation
-- B. Amazon Athena
-- C. AWS Glue only
-- D. Redshift
+- A. AWS Glue crawlers
+- B. Redshift data shares
+- C. AWS Lake Formation
+- D. Amazon Athena SQL
 
-**Answer:** A
+**Answer:** C
 
-**Explanation:** Governed data lake with fine-grained permissions = AWS Lake Formation.
+**Explanation:** **AWS Lake Formation** provides a governed data lake with centrally managed, fine-grained permissions on S3-based tables that are enforced across integrated analytics services.
+- AWS Glue crawlers: build the Data Catalog but do not define or enforce access policy.
+- Redshift data shares: share warehouse data between clusters; not a governance layer for the lake.
+- Amazon Athena SQL: a query engine that consumes permissions rather than providing the governance layer.
+> 🇻🇳 Data lake có quản trị + phân quyền chi tiết dùng chung nhiều dịch vụ → Lake Formation.
 
 ---
 
 ## Q 09-v2-16
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: OpenSearch
 - tags: streaming-ingestion
@@ -350,12 +373,12 @@ A company needs a governed data lake with fine-grained permissions on S3-based t
 
 Which service is BEST to visualize log data ingested from applications for near-real-time operational dashboards and full-text search?
 
-- A. Amazon OpenSearch Service
+- A. Amazon Athena
 - B. Amazon Redshift
-- C. Amazon Athena
-- D. QuickSight only
+- C. QuickSight only
+- D. Amazon OpenSearch Service
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Near-real-time log dashboards + full-text search = OpenSearch.
 
@@ -363,6 +386,7 @@ Which service is BEST to visualize log data ingested from applications for near-
 
 ## Q 09-v2-17
 - domain: cost
+- task: 4.1
 - topic: analytics
 - services: Athena, S3
 - difficulty: medium
@@ -371,12 +395,12 @@ Which service is BEST to visualize log data ingested from applications for near-
 
 A one-time ad-hoc analysis of infrequently accessed S3 logs is needed with no infrastructure to manage. Which is MOST cost-effective?
 
-- A. Amazon Athena
+- A. RDS
 - B. Amazon Redshift cluster
-- C. Amazon EMR cluster
-- D. RDS
+- C. Amazon Athena
+- D. Amazon EMR cluster
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Ad-hoc S3 log analysis, no infra = Amazon Athena.
 
@@ -384,6 +408,7 @@ A one-time ad-hoc analysis of infrequently accessed S3 logs is needed with no in
 
 ## Q 09-v2-18
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Data Firehose
 - difficulty: medium
@@ -393,9 +418,9 @@ A one-time ad-hoc analysis of infrequently accessed S3 logs is needed with no in
 Firehose vs Data Streams: which statement is TRUE?
 
 - A. Firehose is fully managed delivery with no consumer code; Data Streams requires consumers and allows replay
-- B. Firehose supports replay and shards
-- C. Data Streams delivers directly to S3 with no code
-- D. They are identical
+- B. They are identical
+- C. Firehose supports replay and shards
+- D. Data Streams delivers directly to S3 with no code
 
 **Answer:** A
 
@@ -405,6 +430,7 @@ Firehose vs Data Streams: which statement is TRUE?
 
 ## Q 09-v2-19
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Glue, S3, Redshift
 - tags: etl
@@ -414,12 +440,12 @@ Firehose vs Data Streams: which statement is TRUE?
 
 A pipeline must load transformed data into Redshift daily and support complex joins for BI. Which combination is appropriate?
 
-- A. Glue ETL to S3 → COPY into Redshift
+- A. DynamoDB Streams to Redshift directly
 - B. Athena writes directly into Redshift tables
 - C. Kinesis Firehose only, no transform
-- D. DynamoDB Streams to Redshift directly
+- D. Glue ETL to S3 → COPY into Redshift
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Daily transform + BI joins = Glue ETL to S3 then COPY to Redshift.
 
@@ -427,6 +453,7 @@ A pipeline must load transformed data into Redshift daily and support complex jo
 
 ## Q 09-v2-20
 - domain: cost
+- task: 4.2
 - topic: analytics
 - services: EMR
 - difficulty: medium
@@ -435,12 +462,12 @@ A pipeline must load transformed data into Redshift daily and support complex jo
 
 A team needs to run Spark jobs on transient clusters that spin up, process, and terminate to save cost. Which service + option?
 
-- A. EMR with transient clusters (auto-terminate)
+- A. Redshift Spectrum
 - B. EMR always-on cluster
 - C. Glue crawler only
-- D. Redshift Spectrum
+- D. EMR with transient clusters (auto-terminate)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Cost-saving Spark = EMR transient auto-terminating clusters.
 
@@ -448,6 +475,7 @@ A team needs to run Spark jobs on transient clusters that spin up, process, and 
 
 ## Q 09-v2-21
 - domain: performance
+- task: 3.3
 - topic: analytics
 - services: Kinesis
 - tags: sharding
@@ -457,12 +485,12 @@ A team needs to run Spark jobs on transient clusters that spin up, process, and 
 
 A Kinesis Data Stream must ingest 5,000 records/sec, each 2 KB. Each shard supports 1 MB/s or 1,000 records/s ingest. How many shards are needed (approximately)?
 
-- A. 1 shard
-- B. 5 shards (record-limit bound: 5,000/1,000)
-- C. 2 shards
+- A. 5 shards (record-limit bound: 5,000/1,000)
+- B. 2 shards
+- C. 1 shard
 - D. 50 shards
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** 5,000 rec/s / 1,000 per shard = ~5 shards (record limit binding).
 
@@ -470,6 +498,7 @@ A Kinesis Data Stream must ingest 5,000 records/sec, each 2 KB. Each shard suppo
 
 ## Q 09-v2-22
 - domain: performance
+- task: 3.2
 - topic: analytics
 - tags: sharding, fan-out
 - difficulty: hard
@@ -478,12 +507,12 @@ A Kinesis Data Stream must ingest 5,000 records/sec, each 2 KB. Each shard suppo
 
 Multiple independent consumers must each read the full stream at full throughput without contending for the 2 MB/s per-shard read limit. Which feature?
 
-- A. Enhanced fan-out (dedicated 2 MB/s per consumer)
+- A. Standard iterator only
 - B. More visibility timeout
-- C. Firehose delivery
-- D. Standard iterator only
+- C. Enhanced fan-out (dedicated 2 MB/s per consumer)
+- D. Firehose delivery
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Multiple full-throughput consumers = enhanced fan-out.
 
@@ -491,6 +520,7 @@ Multiple independent consumers must each read the full stream at full throughput
 
 ## Q 09-v2-23
 - domain: performance
+- task: 3.3
 - topic: analytics
 - services: Kinesis
 - tags: sharding
@@ -500,12 +530,12 @@ Multiple independent consumers must each read the full stream at full throughput
 
 An analytics platform must guarantee ordering of events per user while scaling across many users. In Kinesis, which controls which shard a record goes to?
 
-- A. Partition key
+- A. Consumer group id
 - B. Sequence number
 - C. Shard iterator
-- D. Consumer group id
+- D. Partition key
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Controls shard placement/ordering = partition key.
 
@@ -513,6 +543,7 @@ An analytics platform must guarantee ordering of events per user while scaling a
 
 ## Q 09-v2-24
 - domain: cost
+- task: 4.1
 - topic: analytics
 - services: Athena
 - tags: columnar-formats
@@ -522,13 +553,13 @@ An analytics platform must guarantee ordering of events per user while scaling a
 
 A company must minimize Athena cost on a multi-TB dataset queried by date. Which two design choices help MOST? (Choose TWO)
 
-- A. Partition by date (e.g., year/month/day prefixes)
-- B. Use columnar compressed formats (Parquet)
+- A. Always SELECT *
+- B. Partition by date (e.g., year/month/day prefixes)
 - C. Store as one giant JSON file
-- D. Always SELECT *
+- D. Use columnar compressed formats (Parquet)
 - E. Disable partition projection
 
-**Answer:** A, B
+**Answer:** B, D
 
 **Explanation:** Minimize Athena cost = partition by date + Parquet columnar.
 
@@ -536,6 +567,7 @@ A company must minimize Athena cost on a multi-TB dataset queried by date. Which
 
 ## Q 09-v2-25
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Managed Apache Flink
 - tags: streaming-ingestion
@@ -546,8 +578,8 @@ A company must minimize Athena cost on a multi-TB dataset queried by date. Which
 A streaming pipeline needs sub-second, exactly-once, stateful stream processing with windowing. Which service is BEST?
 
 - A. Managed Service for Apache Flink (Kinesis Data Analytics)
-- B. Kinesis Data Firehose
-- C. Glue crawler
+- B. Glue crawler
+- C. Kinesis Data Firehose
 - D. Athena
 
 **Answer:** A
@@ -558,6 +590,7 @@ A streaming pipeline needs sub-second, exactly-once, stateful stream processing 
 
 ## Q 09-v2-26
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: MSK, Kinesis Data Streams
 - difficulty: hard
@@ -566,13 +599,13 @@ A streaming pipeline needs sub-second, exactly-once, stateful stream processing 
 
 A company compares MSK vs Kinesis Data Streams. Which two are advantages of MSK? (Choose TWO)
 
-- A. Native Kafka API compatibility for existing Kafka apps
-- B. Configurable retention and partitions like Kafka
-- C. Fully serverless with no partition/shard concept ever
-- D. No consumer code ever needed
-- E. Automatic delivery to S3 without config
+- A. No consumer code ever needed
+- B. Native Kafka API compatibility for existing Kafka apps
+- C. Automatic delivery to S3 without config
+- D. Fully serverless with no partition/shard concept ever
+- E. Configurable retention and partitions like Kafka
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** MSK advantages = native Kafka API + configurable retention/partitions.
 
@@ -580,6 +613,7 @@ A company compares MSK vs Kinesis Data Streams. Which two are advantages of MSK?
 
 ## Q 09-v2-27
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Data Firehose, OpenSearch
 - tags: streaming-ingestion
@@ -589,12 +623,12 @@ A company compares MSK vs Kinesis Data Streams. Which two are advantages of MSK?
 
 A near-real-time dashboard must be fed from a stream, buffering and delivering to OpenSearch with transformation. Which service handles delivery with format conversion and buffering?
 
-- A. Kinesis Data Firehose (to OpenSearch)
-- B. Kinesis Data Streams alone
-- C. Glue crawler
-- D. Athena federation
+- A. Athena federation
+- B. Kinesis Data Firehose (to OpenSearch)
+- C. Kinesis Data Streams alone
+- D. Glue crawler
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Buffered transform delivery to OpenSearch = Kinesis Data Firehose.
 
@@ -602,6 +636,7 @@ A near-real-time dashboard must be fed from a stream, buffering and delivering t
 
 ## Q 09-v2-28
 - domain: cost
+- task: 4.2
 - topic: analytics
 - services: EMR
 - tags: spot-instances
@@ -611,12 +646,12 @@ A near-real-time dashboard must be fed from a stream, buffering and delivering t
 
 An EMR cluster processing sensitive data must minimize cost on task nodes while keeping core/HDFS stable. Which strategy?
 
-- A. Spot Instances for task nodes, On-Demand/Reserved for core nodes
+- A. On-Demand for everything
 - B. Spot for all nodes including core
-- C. On-Demand for everything
+- C. Spot Instances for task nodes, On-Demand/Reserved for core nodes
 - D. Task nodes on Dedicated Hosts
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** EMR cost = Spot task nodes + On-Demand/Reserved core nodes.
 
@@ -624,28 +659,37 @@ An EMR cluster processing sensitive data must minimize cost on task nodes while 
 
 ## Q 09-v2-29
 - domain: secure
+- task: 1.3
 - topic: analytics
 - services: Lake Formation, Athena, Redshift
 - tags: data-lake, redshift-spectrum
 - difficulty: hard
-- time: 70
+- time: 75
+- concept: Lake Formation column/row-level security enforced consistently across Athena and Redshift Spectrum
+- hint: Cần một lớp quản trị duy nhất áp dụng bảo mật mức cột và dòng nhất quán cho nhiều engine truy vấn.
+- enriched: 2026-10-16
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q29
 
 A data lake must enforce column- and row-level security across Athena and Redshift Spectrum consistently. Which service provides this governance layer?
 
 - A. AWS Lake Formation permissions
-- B. S3 bucket policies only
-- C. IAM only
-- D. KMS grants
+- B. IAM identity policies per role
+- C. S3 bucket policies and ACLs
+- D. KMS grants on each dataset
 
 **Answer:** A
 
-**Explanation:** Column/row-level governance across analytics = Lake Formation.
+**Explanation:** **Lake Formation permissions** define column-level and row-level (data filter) access once and enforce it consistently for Athena and Redshift Spectrum.
+- IAM identity policies: control API actions and S3 paths, but cannot express column or row filters.
+- S3 bucket policies and ACLs: work at bucket/prefix/object level only, with no column or row awareness.
+- KMS grants: delegate use of encryption keys; they do not filter data a query returns.
+> 🇻🇳 Bảo mật mức cột/dòng nhất quán cho Athena + Spectrum → Lake Formation permissions.
 
 ---
 
 ## Q 09-v2-30
 - domain: performance
+- task: 3.2
 - topic: analytics
 - services: Lambda, Data Firehose, S3
 - difficulty: hard
@@ -654,11 +698,11 @@ A data lake must enforce column- and row-level security across Athena and Redshi
 
 A Firehose stream must transform records with custom logic before delivery to S3. Which integration provides this?
 
-- A. A Lambda function invoked by Firehose for record transformation
+- A. Kinesis shard split
 - B. Athena UDF
 - C. Glue crawler
-- D. Kinesis shard split
+- D. A Lambda function invoked by Firehose for record transformation
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Firehose custom transform = Lambda transformation function.

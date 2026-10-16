@@ -1,0 +1,10 @@
+# Append-only logs written on both machines: when "⇅ Đồng bộ" (git pull --rebase) meets edits from the
+# other machine in the same place, keep both sides' lines instead of stopping with a conflict.
+trainer/bank/issues.md merge=union
+trainer/bank/ratings.md merge=union
+trainer/coach/qa/*.md merge=union
+
+# Launchers need their native line endings whatever core.autocrlf says.
+trainer/*.bat text eol=crlf
+trainer/*.sh text eol=lf
+trainer/*.command text eol=lf

@@ -2,12 +2,16 @@
 import crypto from 'node:crypto';
 import type { AppConfig } from '../config.ts';
 import type { BankState } from './bank.ts';
-import { isDue } from './stats.ts';
-import type { Plan } from '../../shared/types.ts';
+import { isMastered, reviewQueue } from './stats.ts';
+import { DAY_MS } from './time.ts';
 import { MODE_INFO } from '../../shared/labels.ts';
 import { computeTimeLimit } from '../../shared/timing.ts';
 import { applyFilters } from '../../shared/filters.ts';
-import type { BuildTestRequest, Question, QuestionState, SelectionFilters, TestSession } from '../../shared/types.ts';
+import type { Attempt, BuildTestRequest, DomainDef, Plan, Question, QuestionState, SelectionFilters, TestSession } from '../../shared/types.ts';
+
+export const PEARSON_TITLE = 'Thi thử SAA-C03 · mô phỏng Pearson VUE';
+/** Unscored pilot items in a real 65-question SAA-C03 exam. */
+export const PILOT_ITEMS = 15;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -32,32 +36,64 @@ interface Ctx {
   states: Map<string, QuestionState>;
   cfg: AppConfig;
   plans: Plan[];
+  attempts?: Attempt[]; // needed for the SRS daily cap (answers already given today)
 }
 
-/** Picks questions per domain proportionally to exam weights, least-recently-seen first. */
-function examPick(pool: Question[], n: number, ctx: Ctx): Question[] {
-  const domains = ctx.bank.taxonomy.domains;
-  const quotas = domains.map((d) => ({ id: d.id, want: Math.floor((n * d.weight) / 100), frac: ((n * d.weight) / 100) % 1 }));
+/** Largest-remainder split of `n` questions over the exam domain weights. */
+export function domainQuotas(n: number, domains: DomainDef[]): Map<string, number> {
+  const total = domains.reduce((s, d) => s + d.weight, 0) || 1;
+  const quotas = domains.map((d) => {
+    const exact = (n * d.weight) / total;
+    return { id: d.id, want: Math.floor(exact), frac: exact % 1 };
+  });
   let rest = n - quotas.reduce((s, q) => s + q.want, 0);
   for (const q of [...quotas].sort((a, b) => b.frac - a.frac)) if (rest-- > 0) q.want++;
-  const freshness = (q: Question) => {
+  return new Map(quotas.map((q) => [q.id, q.want]));
+}
+
+/**
+ * Picks questions per domain proportionally to exam weights. Preference: never seen, then least recently seen
+ * (by day), then long-form (exam-length) stems; random among equals.
+ */
+function examPick(pool: Question[], n: number, ctx: Ctx): Question[] {
+  const quotas = domainQuotas(n, ctx.bank.taxonomy.domains);
+  const seenDay = (q: Question) => {
     const s = ctx.states.get(q.id);
-    return s?.lastAt ? new Date(s.lastAt).getTime() : 0; // never seen = 0 = freshest
+    return s?.lastAt ? Math.floor(new Date(s.lastAt).getTime() / DAY_MS) : -1; // never seen = freshest
   };
+  const preferred = (list: Question[]) => shuffle(list).sort((a, b) => seenDay(a) - seenDay(b) || Number(b.longForm) - Number(a.longForm));
   const picked: Question[] = [];
   const used = new Set<string>();
-  for (const quota of quotas) {
-    const cands = shuffle(pool.filter((q) => q.domain === quota.id)).sort((a, b) => freshness(a) - freshness(b));
-    for (const q of cands.slice(0, quota.want)) {
+  for (const [domain, want] of quotas) {
+    for (const q of preferred(pool.filter((x) => x.domain === domain)).slice(0, want)) {
       picked.push(q);
       used.add(q.id);
     }
   }
-  if (picked.length < n) {
-    const fill = shuffle(pool.filter((q) => !used.has(q.id))).sort((a, b) => freshness(a) - freshness(b));
-    picked.push(...fill.slice(0, n - picked.length));
-  }
+  if (picked.length < n) picked.push(...preferred(pool.filter((q) => !used.has(q.id))).slice(0, n - picked.length));
   return shuffle(picked);
+}
+
+/**
+ * Chooses the unscored pilot items of a Pearson-style exam so that the scored part keeps the official
+ * domain weights (65 → 19/17/16/13, scored 50 → 15/13/12/10, pilots 4/4/4/3); random within a domain.
+ */
+export function pickPilots(picked: Question[], pilots: number, domains: DomainDef[]): string[] {
+  if (pilots <= 0 || !picked.length) return [];
+  const scoredQuota = domainQuotas(Math.max(0, picked.length - pilots), domains);
+  const byDomain = new Map<string, Question[]>();
+  for (const q of shuffle(picked)) byDomain.set(q.domain, [...(byDomain.get(q.domain) ?? []), q]);
+  let surplus: Question[] = [];
+  const scored: Question[] = [];
+  for (const [domain, list] of byDomain) {
+    const keep = scoredQuota.get(domain) ?? 0;
+    scored.push(...list.slice(0, keep));
+    surplus.push(...list.slice(keep));
+  }
+  surplus = shuffle(surplus);
+  if (surplus.length > pilots) surplus = surplus.slice(0, pilots);
+  else if (surplus.length < pilots) surplus.push(...shuffle(scored).slice(0, pilots - surplus.length));
+  return surplus.map((q) => q.id);
 }
 
 function weakPick(pool: Question[], n: number, ctx: Ctx): Question[] {
@@ -90,7 +126,7 @@ function weakPick(pool: Question[], n: number, ctx: Ctx): Question[] {
     let w = 0.2 + 3 * weakness;
     if (s?.lastOk === false) w += 2;
     if (s?.lastUnsure) w += 1;
-    if (s && s.box >= ctx.cfg.srs.mastered_box) w *= 0.25;
+    if (isMastered(s, ctx.cfg)) w *= 0.25;
     if (!s) w *= 0.8;
     return w;
   };
@@ -99,17 +135,21 @@ function weakPick(pool: Question[], n: number, ctx: Ctx): Question[] {
 
 export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
   const { bank, states, cfg } = ctx;
+  const tax = bank.taxonomy;
   const notes: string[] = [];
   const mode = req.mode;
+  const pearson = !!req.pearson && mode === 'exam';
   const active = bank.questions.filter((q) => q.status === 'active');
-  let pool = applyFilters(active, req.filters);
-  let count = Math.max(1, Math.min(500, req.count ?? (mode === 'exam' ? bank.taxonomy.exam.questions : mode === 'quick' ? cfg.practice.quick_count : cfg.practice.default_count)));
+  const pool = applyFilters(active, req.filters);
+  let count = pearson
+    ? tax.exam.questions
+    : Math.max(1, Math.min(500, req.count ?? (mode === 'exam' ? tax.exam.questions : mode === 'quick' ? cfg.practice.quick_count : cfg.practice.default_count)));
   let picked: Question[] = [];
-  let title = req.title ?? MODE_INFO[mode]?.label ?? mode;
-  let feedback = req.feedback ?? (mode === 'quick' ? 'practice' : 'exam');
+  let title = req.title ?? (pearson ? PEARSON_TITLE : (MODE_INFO[mode]?.label ?? mode));
+  let feedback = pearson ? 'exam' : (req.feedback ?? (mode === 'quick' ? 'practice' : 'exam'));
   let keepOrder = false;
-  let plan = req.plan;
-  let timingPreset = req.timing?.preset;
+  const plan = req.plan;
+  let timingPreset = req.timing?.preset ?? (pearson ? 'official' : undefined);
 
   const lastAtDesc = (a: Question, b: Question) => (states.get(b.id)?.lastAt ?? '').localeCompare(states.get(a.id)?.lastAt ?? '');
 
@@ -130,9 +170,14 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       picked = pool.filter((q) => states.get(q.id)?.lastOk === false).sort(lastAtDesc);
       break;
     case 'srs': {
-      const now = Date.now();
-      const overdue = (q: Question) => now - new Date(states.get(q.id)!.dueAt!).getTime();
-      picked = pool.filter((q) => isDue(states.get(q.id), now)).sort((a, b) => overdue(b) - overdue(a));
+      // due questions, lowest recall probability first, capped by srs.daily_limit (minus today's SRS answers)
+      const queue = reviewQueue(pool, states, ctx.attempts ?? [], cfg);
+      picked = queue.today;
+      if (queue.due.length && !queue.today.length) {
+        notes.push(`Bạn đã ôn đủ ${cfg.srs.daily_limit} câu hôm nay (giới hạn srs.daily_limit) — ${queue.due.length} câu đến hạn được để dành cho ngày mai.`);
+      } else if (queue.backlog) {
+        notes.push(`Giới hạn ôn ${cfg.srs.daily_limit} câu/ngày: hôm nay còn ${queue.today.length} câu, ${queue.backlog} câu tồn chuyển sang ngày sau.`);
+      }
       break;
     }
     case 'new':
@@ -144,7 +189,7 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
     case 'slow':
       picked = pool
         .filter((q) => (states.get(q.id)?.slowCount ?? 0) > 0)
-        .sort((a, b) => (states.get(b.id)!.avgTime / b.time) - (states.get(a.id)!.avgTime / a.time));
+        .sort((a, b) => states.get(b.id)!.avgTime / b.time - states.get(a.id)!.avgTime / a.time);
       break;
     case 'weak':
       picked = weakPick(pool, count, ctx);
@@ -169,6 +214,8 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
                 title: req.title ?? `🤖 ${s.title}`,
                 feedback: req.feedback ?? s.filter.feedback ?? s.feedback,
                 timing: req.timing ?? s.filter.timing ?? (s.timing ? { preset: s.timing } : undefined),
+                shuffleOptions: req.shuffleOptions ?? s.filter.shuffleOptions,
+                recallFirst: req.recallFirst ?? s.filter.recallFirst,
               },
               ctx,
             );
@@ -186,7 +233,7 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       break;
     }
     case 'quick':
-      picked = weightedSample(pool, (q) => ((states.get(q.id)?.box ?? 0) >= cfg.srs.mastered_box ? 0.3 : 1), count);
+      picked = weightedSample(pool, (q) => (isMastered(states.get(q.id), cfg) ? 0.3 : 1), count);
       break;
     case 'topic':
     case 'custom':
@@ -194,19 +241,22 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       picked = shuffle(pool);
   }
 
-  if (!req.title && mode !== 'pack' && mode !== 'coach') title = describeSelection(title, mode, req, ctx);
+  if (!req.title && !pearson && mode !== 'pack' && mode !== 'coach') title = describeSelection(title, mode, req, ctx);
   if (picked.length > count) picked = picked.slice(0, count);
   if (!keepOrder && mode !== 'exam' && mode !== 'weak') {
     if (req.shuffleQuestions !== false) picked = shuffle(picked);
   }
-  if (req.count && picked.length < req.count && !['pack', 'ids', 'coach'].includes(mode)) {
-    notes.push(`Chỉ có ${picked.length} câu phù hợp (bạn yêu cầu ${req.count}).`);
+  const wanted = pearson ? count : req.count;
+  if (wanted && picked.length < wanted && !['pack', 'ids', 'coach'].includes(mode)) {
+    notes.push(`Chỉ có ${picked.length} câu phù hợp (bạn yêu cầu ${wanted}).`);
   }
   if (!pool.length) notes.push('Bộ lọc không khớp câu nào.');
 
   const estimateTotal = picked.reduce((s, q) => s + q.time, 0);
   const preset = timingPreset ?? 'standard';
-  const timeLimit = computeTimeLimit(estimateTotal, picked.length, preset, req.timing?.minutes, bank.taxonomy.timing);
+  const timeLimit = computeTimeLimit(estimateTotal, picked.length, preset, req.timing?.minutes, tax.timing);
+  const shuffleOptions = req.shuffleOptions ?? cfg.practice.shuffle_options ?? true;
+  const pilots = pearson ? Math.min(PILOT_ITEMS, Math.round((picked.length * PILOT_ITEMS) / Math.max(1, tax.exam.questions))) : 0;
 
   return {
     sessionId: crypto.randomUUID(),
@@ -218,12 +268,14 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
     timingPreset: preset,
     questions: picked.map((q) => ({
       id: q.id,
-      ...(req.shuffleOptions ? { order: shuffle(q.options.map((o) => o.key)) } : {}),
+      ...(shuffleOptions ? { order: shuffle(q.options.map((o) => o.key)) } : {}),
     })),
     selection: { ...req, ids: mode === 'ids' || mode === 'coach' ? req.ids : undefined },
     plan,
     createdAt: new Date().toISOString(),
     notes,
+    ...(pearson ? { pearson: true, unscored: pickPilots(picked, pilots, tax.domains) } : {}),
+    ...(req.recallFirst ? { recallFirst: true } : {}),
   };
 }
 
@@ -234,6 +286,7 @@ function describeSelection(base: string, mode: string, req: BuildTestRequest, ct
   const parts: string[] = [];
   if (f.topics?.length) parts.push(f.topics.map((t) => tax.topics.find((x) => x.id === t)?.label ?? t).join(', '));
   if (f.domains?.length) parts.push(f.domains.map((d) => tax.domains.find((x) => x.id === d)?.code ?? d).join('+'));
+  if (f.tasks?.length) parts.push(`task ${f.tasks.slice(0, 4).join(', ')}`);
   if (f.services?.length) parts.push(f.services.slice(0, 3).join(', '));
   if (f.tags?.length) parts.push(f.tags.slice(0, 3).join(', '));
   if (f.difficulties?.length) parts.push(f.difficulties.map((d) => tax.difficulties.find((x) => x.id === d)?.label ?? d).join('/'));
@@ -243,14 +296,21 @@ function describeSelection(base: string, mode: string, req: BuildTestRequest, ct
   return parts.length ? `${base}: ${parts.join(' · ')}` : base;
 }
 
-/** Pool sizes for every mode, shown on the "new test" screen. */
+/**
+ * Pool sizes for every mode, shown on the "new test" screen.
+ * `srs` = due questions offered today (after srs.daily_limit), `backlog` = the rest of the due questions,
+ * `srsRemaining` = reviews still allowed today (pass to `modePool(…, { srsLimit })` on the web).
+ */
 export function modeCounts(ctx: Ctx, filters?: SelectionFilters): Record<string, number> {
   const pool = applyFilters(ctx.bank.questions.filter((q) => q.status === 'active'), filters);
   const s = ctx.states;
+  const queue = reviewQueue(pool, s, ctx.attempts ?? [], ctx.cfg);
   return {
     all: pool.length,
     'retry-wrong': pool.filter((q) => s.get(q.id)?.lastOk === false).length,
-    srs: pool.filter((q) => isDue(s.get(q.id))).length,
+    srs: queue.today.length,
+    backlog: queue.backlog,
+    srsRemaining: queue.remaining,
     new: pool.filter((q) => !s.has(q.id)).length,
     flagged: pool.filter((q) => s.get(q.id)?.lastFlag || s.get(q.id)?.lastUnsure).length,
     slow: pool.filter((q) => (s.get(q.id)?.slowCount ?? 0) > 0).length,

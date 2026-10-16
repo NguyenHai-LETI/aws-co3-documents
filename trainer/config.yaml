@@ -1,18 +1,39 @@
 # Cấu hình trainer (đọc lại mỗi request — không cần khởi động lại app)
 
 coach:
-  model: ""                 # trống = model mặc định của Claude Code; ví dụ: sonnet | opus | claude-opus-5-5
+  model: ""                 # model mặc định cho mọi tác vụ; trống = mặc định của Claude Code (vd: sonnet | opus)
+  models:                   # ghi đè theo tác vụ (trống = dùng `model`)
+    analyze: ""             # phân tích + kế hoạch (cần suy luận tốt)
+    generate: "sonnet"      # sinh câu hỏi từ tài liệu
+    enrich: "sonnet"        # bảo trì ngân hàng: giải thích, gợi ý, phân loại, cân độ dài, câu dài
+    ask: "sonnet"           # "Hỏi AI về câu này"
   effort: ""                # trống = mặc định; low | medium | high | xhigh | max
   max_budget_usd: 0         # chỉ áp dụng khi Claude Code dùng API key; 0 = không giới hạn
-  skip_if_no_new_results: true   # lượt chạy theo lịch bỏ qua nếu không có bài làm/issue mới
+  skip_if_no_new_results: true   # lượt chạy theo lịch bỏ qua phân tích nếu không có bài làm/issue mới
+  enrich_on_idle: true      # ...và khi đó chạy 1 lượt bảo trì ngân hàng (ENRICH) thay thế
+  enrich_batch_size: 20     # số câu mỗi lượt ENRICH
+  max_runs_per_day: 6       # giới hạn an toàn cho lượt chạy theo lịch
   schedule: ["08:30", "12:30", "21:00"]   # giờ chạy tự động (npm run schedule -- install)
+  hosts: []                 # tên máy được phép chạy coach theo lịch (vd ["ntqs-Mac-mini"]); [] = mọi máy
   claude_bin: ""            # đường dẫn Claude Code CLI nếu app không tự tìm thấy
   use_api_key: false        # false = luôn dùng đăng nhập claude.ai (bỏ ANTHROPIC_API_KEY khỏi môi trường của coach)
 
 srs:
-  intervals_days: [1, 3, 7, 14, 30]   # khoảng cách ôn của box 1..5 (Leitner)
-  mastered_box: 4                     # box ≥ giá trị này = "đã thuộc"
+  algorithm: fsrs           # fsrs (khuyến nghị) | leitner
+  desired_retention: 0.9    # FSRS: xác suất nhớ mục tiêu khi đến hạn ôn
+  daily_limit: 50           # tối đa số câu ôn mỗi ngày (phần dư chuyển sang hôm sau)
+  mastered_stability_days: 21   # FSRS: độ bền trí nhớ ≥ N ngày = "đã thuộc"
+  intervals_days: [1, 3, 7, 14, 30]   # chỉ dùng khi algorithm = leitner
+  mastered_box: 4                     # chỉ dùng khi algorithm = leitner
 
 practice:
   default_count: 20
   quick_count: 10
+  shuffle_options: true     # xáo thứ tự đáp án mặc định (chống nhớ vị trí)
+
+stats:
+  rushed_median_seconds: 5      # bài có thời gian trung vị/câu dưới ngưỡng = "làm vội", không tính vào thống kê
+  recency_half_life_days: 14    # mức sẵn sàng: kết quả cũ hơn N ngày có trọng số giảm một nửa
+
+sync:
+  data_paths: [trainer/results, trainer/coach, trainer/bank]   # thư mục được "⇅ Đồng bộ" commit + push

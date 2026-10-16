@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 11-v1-01
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway, Lambda
 - difficulty: easy
@@ -23,12 +24,12 @@ created: 2026-10-16
 
 A company wants a fully managed, serverless REST API backed by Lambda with throttling, authorization, and caching. Which service?
 
-- A. Amazon API Gateway + Lambda
-- B. Application Load Balancer + EC2
-- C. Amazon CloudFront only
-- D. AWS AppSync
+- A. Amazon CloudFront only
+- B. Amazon API Gateway + Lambda
+- C. AWS AppSync
+- D. Application Load Balancer + EC2
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Serverless REST API + Lambda + throttling/cache = API Gateway + Lambda.
 
@@ -36,6 +37,7 @@ A company wants a fully managed, serverless REST API backed by Lambda with throt
 
 ## Q 11-v1-02
 - domain: performance
+- task: 3.4
 - topic: api
 - services: AppSync
 - tags: streaming-ingestion
@@ -45,12 +47,12 @@ A company wants a fully managed, serverless REST API backed by Lambda with throt
 
 A mobile app needs a flexible API where clients request exactly the data they need, with real-time subscriptions and offline sync. Which service?
 
-- A. Amazon API Gateway REST API
-- B. AWS AppSync (GraphQL)
-- C. Amazon SQS
-- D. Amazon SNS
+- A. Amazon SQS
+- B. Amazon API Gateway REST API
+- C. Amazon SNS
+- D. AWS AppSync (GraphQL)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** GraphQL, exact data, real-time + offline = AppSync.
 
@@ -58,6 +60,7 @@ A mobile app needs a flexible API where clients request exactly the data they ne
 
 ## Q 11-v1-03
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway
 - difficulty: easy
@@ -67,11 +70,11 @@ A mobile app needs a flexible API where clients request exactly the data they ne
 A chat application needs persistent two-way communication between clients and the backend. Which API Gateway type?
 
 - A. REST API
-- B. HTTP API
-- C. WebSocket API
-- D. Private API
+- B. WebSocket API
+- C. Private API
+- D. HTTP API
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** Persistent two-way chat = WebSocket API.
 
@@ -79,6 +82,7 @@ A chat application needs persistent two-way communication between clients and th
 
 ## Q 11-v1-04
 - domain: performance
+- task: 3.2
 - topic: api
 - services: Lambda, API Gateway
 - difficulty: easy
@@ -87,12 +91,12 @@ A chat application needs persistent two-way communication between clients and th
 
 A team wants the lowest-cost, lowest-latency API for simple proxying to Lambda without advanced features like API keys/usage plans. Which API Gateway type?
 
-- A. REST API
-- B. HTTP API
+- A. HTTP API
+- B. REST API
 - C. WebSocket API
 - D. Edge-optimized REST API
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Cheapest/lowest-latency simple proxy = HTTP API.
 
@@ -100,49 +104,67 @@ A team wants the lowest-cost, lowest-latency API for simple proxying to Lambda w
 
 ## Q 11-v1-05
 - domain: secure
+- task: 1.2
 - topic: api
-- services: Cognito, API Gateway
+- services: API Gateway, Cognito
+- tags: cognito-authorizer
 - difficulty: easy
 - time: 45
+- concept: API Gateway Cognito user pool authorizer validates JWT tokens from the user pool
+- hint: Token JWT do user pool phát hành — kiểu authorizer nào của API Gateway được tích hợp sẵn để xác thực chúng?
+- enriched: 2026-10-16
 - source: practice-exams/11-api-integration-exam.md#Q5
 
 Which API Gateway authorization option validates JWT tokens issued by an Amazon Cognito User Pool?
 
-- A. Cognito authorizer
-- B. IAM authorization
+- A. IAM authorization
+- B. API key
 - C. Resource policy only
-- D. API key
+- D. Cognito authorizer
 
-**Answer:** A
+**Answer:** D
 
-**Explanation:** Validate Cognito JWT = Cognito authorizer.
+**Explanation:** The **Cognito authorizer** is built into API Gateway and validates the JWT tokens issued by a Cognito User Pool before the request reaches the backend.
+- IAM authorization: verifies SigV4-signed requests from IAM principals, not user pool tokens.
+- API key: identifies a client for usage plans; it is not an authentication mechanism.
+- Resource policy only: allows or denies by source IP, VPC or account, and does not validate tokens.
+> 🇻🇳 JWT của Cognito User Pool → Cognito authorizer.
 
 ---
 
 ## Q 11-v1-06
 - domain: secure
+- task: 1.2
 - topic: api
-- services: Lambda
-- tags: federation
+- services: API Gateway, Lambda
+- tags: lambda-authorizer
 - difficulty: easy
 - time: 45
+- concept: Lambda authorizer runs custom auth logic (e.g. external IdP or token check) before API Gateway allows a request
+- hint: Cần chạy code tự viết để kiểm tra yêu cầu (kể cả gọi IdP bên ngoài) trước khi cho phép gọi API.
+- enriched: 2026-10-16
 - source: practice-exams/11-api-integration-exam.md#Q6
 
 An API must enforce custom authorization logic (e.g., calling an external identity provider) before allowing requests. Which feature?
 
-- A. Lambda authorizer
-- B. Usage plan
-- C. Stage variable
-- D. Mapping template
+- A. Stage variable
+- B. Mapping template
+- C. Lambda authorizer
+- D. Usage plan
 
-**Answer:** A
+**Answer:** C
 
-**Explanation:** Custom auth logic = Lambda authorizer.
+**Explanation:** A **Lambda authorizer** runs your own function on each request (or cached result), so it can call an external identity provider and return an IAM policy allowing or denying the call.
+- Stage variable: a per-stage configuration value, not an authorization mechanism.
+- Mapping template: transforms request/response payloads; it makes no auth decision.
+- Usage plan: throttles and meters API-key clients, not custom authentication.
+> 🇻🇳 Logic xác thực tuỳ biến / gọi IdP ngoài → Lambda authorizer.
 
 ---
 
 ## Q 11-v1-07
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway
 - difficulty: easy
@@ -152,9 +174,9 @@ An API must enforce custom authorization logic (e.g., calling an external identi
 To protect a backend from traffic spikes, API Gateway should be configured with which feature?
 
 - A. Throttling (rate and burst limits)
-- B. Mutual TLS only
-- C. Canary deploy only
-- D. CORS
+- B. Canary deploy only
+- C. CORS
+- D. Mutual TLS only
 
 **Answer:** A
 
@@ -164,6 +186,7 @@ To protect a backend from traffic spikes, API Gateway should be configured with 
 
 ## Q 11-v1-08
 - domain: performance
+- task: 3.4
 - topic: api
 - services: VPC, API Gateway, ALB, NLB
 - difficulty: easy
@@ -172,12 +195,12 @@ To protect a backend from traffic spikes, API Gateway should be configured with 
 
 An API Gateway must reach private resources (an internal ALB/NLB) inside a VPC. Which integration is used?
 
-- A. VPC Link
-- B. NAT Gateway
-- C. Internet Gateway
-- D. Direct Connect
+- A. NAT Gateway
+- B. Internet Gateway
+- C. Direct Connect
+- D. VPC Link
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Reach private VPC ALB/NLB = VPC Link.
 
@@ -185,6 +208,7 @@ An API Gateway must reach private resources (an internal ALB/NLB) inside a VPC. 
 
 ## Q 11-v1-09
 - domain: performance
+- task: 3.3
 - topic: api
 - services: API Gateway
 - tags: ttl
@@ -194,12 +218,12 @@ An API Gateway must reach private resources (an internal ALB/NLB) inside a VPC. 
 
 Which feature reduces calls to the backend by storing responses for a configurable TTL in API Gateway?
 
-- A. Caching
+- A. Throttling
 - B. Usage plans
-- C. Stages
-- D. Throttling
+- C. Caching
+- D. Stages
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Cache responses by TTL = API Gateway caching.
 
@@ -207,6 +231,7 @@ Which feature reduces calls to the backend by storing responses for a configurab
 
 ## Q 11-v1-10
 - domain: cost
+- task: 4.2
 - topic: api
 - services: SES
 - difficulty: easy
@@ -216,9 +241,9 @@ Which feature reduces calls to the backend by storing responses for a configurab
 A company sends large volumes of transactional emails (receipts) and wants a scalable, cost-effective email service. Which service?
 
 - A. Amazon SES
-- B. Amazon SNS
-- C. Amazon Pinpoint journeys only
-- D. Amazon Connect
+- B. Amazon Pinpoint journeys only
+- C. Amazon Connect
+- D. Amazon SNS
 
 **Answer:** A
 
@@ -228,6 +253,7 @@ A company sends large volumes of transactional emails (receipts) and wants a sca
 
 ## Q 11-v1-11
 - domain: performance
+- task: 3.4
 - topic: api
 - services: Pinpoint
 - difficulty: easy
@@ -238,8 +264,8 @@ A marketing team needs multi-channel customer engagement (email, SMS, push) with
 
 - A. Amazon Pinpoint
 - B. Amazon SES
-- C. Amazon SNS
-- D. Amazon EventBridge
+- C. Amazon EventBridge
+- D. Amazon SNS
 
 **Answer:** A
 
@@ -249,6 +275,7 @@ A marketing team needs multi-channel customer engagement (email, SMS, push) with
 
 ## Q 11-v1-12
 - domain: performance
+- task: 3.3
 - topic: api
 - services: DynamoDB, Lambda, AppSync
 - difficulty: medium
@@ -257,13 +284,13 @@ A marketing team needs multi-channel customer engagement (email, SMS, push) with
 
 Which AppSync data sources can resolve GraphQL fields? (Choose TWO)
 
-- A. Amazon DynamoDB
-- B. AWS Lambda
-- C. Amazon EBS
+- A. AWS IAM
+- B. Amazon EBS
+- C. Amazon DynamoDB
 - D. Amazon VPC
-- E. AWS IAM
+- E. AWS Lambda
 
-**Answer:** A, B
+**Answer:** C, E
 
 **Explanation:** AppSync data sources include DynamoDB and Lambda.
 
@@ -271,6 +298,7 @@ Which AppSync data sources can resolve GraphQL fields? (Choose TWO)
 
 ## Q 11-v1-13
 - domain: performance
+- task: 3.4
 - topic: api
 - difficulty: easy
 - time: 45
@@ -278,12 +306,12 @@ Which AppSync data sources can resolve GraphQL fields? (Choose TWO)
 
 A REST API should expose different environments (dev, test, prod) with separate configuration. Which feature?
 
-- A. Stages and stage variables
-- B. Usage plans
-- C. Resource policies
-- D. Mapping templates only
+- A. Mapping templates only
+- B. Stages and stage variables
+- C. Usage plans
+- D. Resource policies
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Separate environments/config = Stages + stage variables.
 
@@ -291,6 +319,7 @@ A REST API should expose different environments (dev, test, prod) with separate 
 
 ## Q 11-v1-14
 - domain: performance
+- task: 3.4
 - topic: api
 - difficulty: easy
 - time: 45
@@ -298,12 +327,12 @@ A REST API should expose different environments (dev, test, prod) with separate 
 
 Which mechanism lets you control which client domains can call your API from a browser?
 
-- A. CORS configuration
+- A. API keys
 - B. Throttling
-- C. API keys
+- C. CORS configuration
 - D. WAF only
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Browser cross-origin control = CORS.
 
@@ -311,6 +340,7 @@ Which mechanism lets you control which client domains can call your API from a b
 
 ## Q 11-v1-15
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway
 - difficulty: easy
@@ -319,12 +349,12 @@ Which mechanism lets you control which client domains can call your API from a b
 
 A company wants to issue API keys and meter/limit usage per customer (e.g., free vs paid tiers). Which API Gateway feature?
 
-- A. Usage plans with API keys
-- B. Lambda authorizer
+- A. Lambda authorizer
+- B. Caching
 - C. VPC Link
-- D. Caching
+- D. Usage plans with API keys
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Meter/limit per customer = Usage plans + API keys.
 
@@ -332,6 +362,7 @@ A company wants to issue API keys and meter/limit usage per customer (e.g., free
 
 ## Q 11-v1-16
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway, SQS, Lambda
 - difficulty: easy
@@ -340,12 +371,12 @@ A company wants to issue API keys and meter/limit usage per customer (e.g., free
 
 Which integration lets API Gateway call AWS services (e.g., put a message in SQS) directly without Lambda?
 
-- A. AWS service integration
-- B. HTTP proxy integration
-- C. VPC Link
-- D. Mock integration
+- A. VPC Link
+- B. Mock integration
+- C. HTTP proxy integration
+- D. AWS service integration
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Call AWS services directly (e.g., SQS) = AWS service integration.
 
@@ -353,6 +384,7 @@ Which integration lets API Gateway call AWS services (e.g., put a message in SQS
 
 ## Q 11-v1-17
 - domain: performance
+- task: 3.4
 - topic: api
 - services: CloudFront, API Gateway
 - difficulty: easy
@@ -361,12 +393,12 @@ Which integration lets API Gateway call AWS services (e.g., put a message in SQS
 
 For an API serving global users with the lowest latency for cached responses, which combination is BEST?
 
-- A. CloudFront in front of API Gateway (edge-optimized)
-- B. NLB only
+- A. NLB only
+- B. CloudFront in front of API Gateway (edge-optimized)
 - C. SQS in front of the API
 - D. Direct Connect
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Global low-latency cached API = CloudFront + edge-optimized API Gateway.
 
@@ -374,28 +406,37 @@ For an API serving global users with the lowest latency for cached responses, wh
 
 ## Q 11-v1-18
 - domain: secure
+- task: 1.2
 - topic: api
-- services: API Gateway
+- services: API Gateway, ACM
 - tags: tls-termination
 - difficulty: easy
 - time: 45
+- concept: API Gateway mutual TLS (mTLS) authenticates clients with certificates, e.g. B2B partners
+- hint: Khách hàng B2B phải chứng minh danh tính bằng chứng chỉ số — cơ chế TLS hai chiều nào của API Gateway làm được?
+- enriched: 2026-10-16
 - source: practice-exams/11-api-integration-exam.md#Q18
 
 Which security feature in API Gateway authenticates clients using certificates (e.g., for B2B partners)?
 
-- A. Mutual TLS (mTLS)
+- A. CORS
 - B. API key
-- C. CORS
+- C. Mutual TLS (mTLS)
 - D. Resource policy
 
-**Answer:** A
+**Answer:** C
 
-**Explanation:** Certificate-based client auth = Mutual TLS (mTLS).
+**Explanation:** **Mutual TLS** makes API Gateway verify a client certificate against a trusted CA truststore during the TLS handshake, which suits B2B partners that must prove identity with certificates.
+- CORS: a browser cross-origin rule; it does not authenticate callers.
+- API key: a shared string for identifying and throttling clients, not certificate-based authentication.
+- Resource policy: restricts access by IP, VPC or account, and does not check client certificates.
+> 🇻🇳 Xác thực client bằng chứng chỉ → Mutual TLS (mTLS).
 
 ---
 
 ## Q 11-v1-19
 - domain: performance
+- task: 3.4
 - topic: api
 - services: API Gateway
 - difficulty: medium
@@ -404,13 +445,13 @@ Which security feature in API Gateway authenticates clients using certificates (
 
 Which two are TRUE about Amazon API Gateway? (Choose TWO)
 
-- A. It can throttle requests to protect backends
-- B. It supports REST, HTTP, and WebSocket APIs
-- C. It is a container orchestration service
-- D. It is only usable with EC2 backends
-- E. It cannot integrate with Cognito
+- A. It cannot integrate with Cognito
+- B. It can throttle requests to protect backends
+- C. It is only usable with EC2 backends
+- D. It is a container orchestration service
+- E. It supports REST, HTTP, and WebSocket APIs
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** API Gateway throttles + supports REST/HTTP/WebSocket.
 
@@ -418,6 +459,7 @@ Which two are TRUE about Amazon API Gateway? (Choose TWO)
 
 ## Q 11-v1-20
 - domain: performance
+- task: 3.4
 - topic: api
 - services: AppSync
 - tags: streaming-ingestion
@@ -427,11 +469,11 @@ Which two are TRUE about Amazon API Gateway? (Choose TWO)
 
 A serverless backend needs near-real-time data sync to mobile clients and conflict resolution when offline. Which service is purpose-built?
 
-- A. AWS AppSync
-- B. Amazon API Gateway REST
-- C. Amazon SQS
-- D. Amazon Kinesis
+- A. Amazon SQS
+- B. Amazon Kinesis
+- C. AWS AppSync
+- D. Amazon API Gateway REST
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Mobile near-real-time sync + offline conflict = AppSync.

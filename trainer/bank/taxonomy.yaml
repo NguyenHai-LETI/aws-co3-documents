@@ -29,6 +29,32 @@ domains:
   - { id: performance, code: D3, weight: 24, label: "Design High-Performing Architectures",  label_vi: "Kiến trúc hiệu năng cao" }
   - { id: cost,        code: D4, weight: 20, label: "Design Cost-Optimized Architectures",   label_vi: "Kiến trúc tối ưu chi phí" }
 
+# Mục tiêu chi tiết (task statements) trong AWS SAA-C03 Exam Guide — gắn vào câu hỏi bằng `- task: 2.2`
+tasks:
+  - { id: "1.1", domain: secure,      label: "Design secure access to AWS resources",                       label_vi: "Truy cập an toàn tới tài nguyên AWS (IAM, Organizations, federation)" }
+  - { id: "1.2", domain: secure,      label: "Design secure workloads and applications",                    label_vi: "Workload/ứng dụng an toàn (VPC security, WAF, Shield, Cognito, secrets)" }
+  - { id: "1.3", domain: secure,      label: "Determine appropriate data security controls",                label_vi: "Bảo vệ dữ liệu (mã hoá, KMS, backup/retention, compliance)" }
+  - { id: "2.1", domain: resilient,   label: "Design scalable and loosely coupled architectures",           label_vi: "Kiến trúc mở rộng & decoupled (SQS/SNS/EventBridge, serverless, scaling)" }
+  - { id: "2.2", domain: resilient,   label: "Design highly available and/or fault-tolerant architectures", label_vi: "HA / fault tolerance / DR (Multi-AZ, Multi-Region, backup)" }
+  - { id: "3.1", domain: performance, label: "Determine high-performing and/or scalable storage solutions", label_vi: "Lưu trữ hiệu năng cao (S3, EBS, EFS, FSx)" }
+  - { id: "3.2", domain: performance, label: "Design high-performing and elastic compute solutions",        label_vi: "Compute hiệu năng & co giãn (EC2, Auto Scaling, Lambda, containers)" }
+  - { id: "3.3", domain: performance, label: "Determine high-performing database solutions",                label_vi: "Database hiệu năng cao (RDS/Aurora, DynamoDB, caching)" }
+  - { id: "3.4", domain: performance, label: "Determine high-performing and/or scalable network architectures", label_vi: "Mạng hiệu năng cao (CloudFront, Global Accelerator, ELB, DX)" }
+  - { id: "3.5", domain: performance, label: "Determine high-performing data ingestion and transformation solutions", label_vi: "Thu thập & xử lý dữ liệu (Kinesis, Glue, EMR, Athena, DataSync)" }
+  - { id: "4.1", domain: cost,        label: "Design cost-optimized storage solutions",                     label_vi: "Lưu trữ tối ưu chi phí (storage class, lifecycle)" }
+  - { id: "4.2", domain: cost,        label: "Design cost-optimized compute solutions",                     label_vi: "Compute tối ưu chi phí (Spot, RI, Savings Plans, right-sizing)" }
+  - { id: "4.3", domain: cost,        label: "Design cost-optimized database solutions",                    label_vi: "Database tối ưu chi phí (serverless, capacity mode, caching)" }
+  - { id: "4.4", domain: cost,        label: "Design cost-optimized network architectures",                 label_vi: "Mạng tối ưu chi phí (data transfer, NAT, VPC endpoints)" }
+
+# Từ khoá được tô sáng khi làm bài (bật/tắt 🖍 trong màn hình làm bài). Cụm VIẾT HOA phân biệt hoa/thường.
+keywords:
+  qualifier: [MOST, LEAST, BEST, NOT, EXCEPT, FIRST, TWO, THREE]
+  cost: [MOST cost-effective, LEAST expensive, cost-effective, cost-effectively, lowest cost, cheapest, minimize cost, minimize costs, reduce cost, reduce costs, without upfront, pay only for]
+  ops: [LEAST operational overhead, operational overhead, least operational effort, minimal operational, fully managed, serverless, without managing, minimal changes, fewest changes, LEAST development effort, least amount of effort, quickly]
+  resilient: [highly available, high availability, fault-tolerant, fault tolerant, disaster recovery, failover, durable, durability, RPO, RTO, decouple, decoupled, loosely coupled, survive, outage, data loss]
+  performance: [lowest latency, low latency, high throughput, throughput, latency, performance, real-time, real time, milliseconds, microseconds, millions of requests, spiky, unpredictable, burst]
+  secure: [MOST secure, least privilege, least-privilege, encrypt, encrypted, encryption, at rest, in transit, compliance, audit, unauthorized, without traversing the internet, private connectivity, publicly accessible]
+
 difficulties:
   - { id: easy,   label: "Dễ" }
   - { id: medium, label: "Vận dụng" }
@@ -62,6 +88,7 @@ timing:
   min_seconds: 45
   max_seconds: 180
   round_to: 5
+  long_form_min_words: 55   # đề (stem) từ 55 từ trở lên = "câu dài chuẩn thi thật"
 
 services:
   # ── Compute

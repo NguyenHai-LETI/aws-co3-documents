@@ -98,39 +98,61 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 
 | Phase | Hạng mục | Trạng thái |
 |-------|----------|-----------|
-| **0. Nền tảng dữ liệu** | SCHEMA v1, taxonomy (domain/topic/service/tag/rubric), parser + serializer, validator (`--fill-time`), importer 745 câu V1+V2 với phân loại domain/service/tag tự động | ✅ xong |
-| **1. Luyện thi** | 13 chế độ, builder phía server, runner (timer Σ time, autosave, pause, phím tắt, practice/exam), chấm all-or-nothing, ghi kết quả .md, màn hình kết quả + giải thích + link notes, báo lỗi câu | ✅ xong |
-| **2. Thống kê** | readiness có trọng số domain, theo domain/topic/service/tag/độ khó, tốc độ, Leitner, heatmap, câu sai nhiều nhất, lịch sử + biểu đồ | ✅ xong |
-| **3. AI Coach** | snapshot, COACH/GENERATE, runner headless (quyền tối thiểu, SSE log, huỷ, lock), kế hoạch có phiên bấm chạy, learner profile, vòng issues, inbox, launchd, skill Claude Code, prompt Cowork | ✅ xong |
-| **4. Chất lượng & đo lường** | các mục P1 ở §7 | ⏳ đề xuất làm tiếp |
-| **5. Mở rộng** | các mục P2–P3 ở §7 | 💡 tuỳ nhu cầu |
+| **0. Nền tảng dữ liệu** | SCHEMA v1, taxonomy, parser + serializer, validator (`--fill-time`), importer 745 câu V1+V2 | ✅ v1 |
+| **1. Luyện thi** | 13 chế độ, runner (timer Σ time, autosave, pause, phím tắt, practice/exam), kết quả .md, màn hình kết quả, báo lỗi | ✅ v1 |
+| **2. Thống kê** | readiness theo domain, theo topic/service/tag/độ khó, tốc độ, Leitner, heatmap, lịch sử | ✅ v1 |
+| **3. AI Coach** | snapshot, COACH/GENERATE, runner headless, kế hoạch có phiên, learner profile, issues, inbox, lịch, skill, Cowork | ✅ v1 |
+| **4. Chất lượng dữ liệu (v2)** | #1–#5 §7 | ✅ v2 |
+| **5. Học hiệu quả hơn (v2)** | #6–#12 §7 | ✅ v2 |
+| **6. AI & vận hành (v2)** | #13–#17 §7 | ✅ v2 |
+| **7. Tiếp theo** | §7.4 | 💡 đề xuất |
 
-## 7. Đề xuất tính năng tiếp theo
+## 7. Tính năng
 
-**P1 — nên làm tiếp (tác động lớn tới hiệu quả học)**
+### 7.1 Chất lượng dữ liệu (v2)
 
-1. **“Hỏi AI về câu này”** — ở màn hình kết quả: hỏi tiếp “vì sao không phải C?” → `claude -p` với ngữ cảnh câu hỏi + notes, lưu hỏi đáp vào `coach/qa/<id>.md` (AI Coach đọc để biết chỗ còn mơ hồ).
-2. **Biểu đồ hiệu chỉnh độ tự tin (calibration)** — tỉ lệ đúng của câu “chắc chắn” vs “chưa chắc”: phát hiện tự tin sai (nguy hiểm nhất khi thi).
-3. **Phân tích chất lượng câu hỏi** — độ khó thực tế & độ phân biệt từng câu; câu mà người học giỏi vẫn sai, hoặc ai cũng chọn cùng 1 đáp án “sai” → tự tạo issue nghi đáp án sai.
-4. **Thi thử 2.0** — giống Pearson VUE: 15 câu không tính điểm, màn hình review cuối bài (đã đánh dấu/chưa trả lời), không tạm dừng, cảnh báo 15′ cuối.
-5. **Bản đồ phủ notes** — map từng mục `##/###` trong notes → số câu hỏi; mục chưa có câu → nút sinh câu cho đúng mục đó.
-6. **Ngày thi & dự báo** — đặt ngày thi trong `config.yaml`; dự báo ngày đạt readiness ≥ 75% theo xu hướng; coach ưu tiên theo thời gian còn lại.
+Đo trên 745 câu gốc trước v2: đáp án đúng **A 55 % · B 39 % · C 5 % · D 0,6 %**; đáp án đúng là đáp án dài nhất ở **62 %** câu; đề trung vị
+**18 từ** (đề thật 60–120 từ); **729/745** giải thích < 15 từ; domain gán bằng từ khoá lệch về performance (41 % so với 24 %).
 
-**P2 — tiện ích**
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 1 | Cân vị trí đáp án | `scripts/rebalance-answers.ts`: hoán vị tất định theo id, phân bố đều A–D; ghi `bank/migrations/*.json`; kết quả cũ tự chuyển đổi khi khởi động (`migrateResults`); **xáo đáp án khi hiển thị mặc định bật** (`practice.shuffle_options`) |
+| 2 | Đáp án đúng quá dài | chỉ số trong *Ngân hàng → Chất lượng*; cảnh báo validator cho pack AI/tài liệu/thủ công; ENRICH `balance` viết lại distractor |
+| 3 | Câu dài chuẩn thi thật | ENRICH `longform` sinh biến thể 60–120 từ; `longForm` tính tự động; mức sẵn sàng v2 có trọng số ×1.5; thi thử ưu tiên câu dài |
+| 4 | Giải thích sơ sài | ENRICH `explain`: lý do đúng + từng distractor **theo nội dung** + tóm tắt 🇻🇳; `hint`; chạy dần theo lô, lúc rảnh của lịch |
+| 5 | Domain & mục exam guide | `task: 1.1…4.4` trong taxonomy/metadata; `scripts/classify-tasks.ts` gán heuristic ngay; ENRICH `classify` tinh chỉnh; thống kê & lọc theo task |
 
-7. Mục tiêu hằng ngày + nhắc bằng thông báo macOS (launchd + `osascript`): “Hôm nay còn 18 câu đến hạn ôn”.
-8. Tự `git commit` kết quả/kế hoạch sau mỗi bài (tuỳ chọn) — sao lưu + lịch sử.
-9. Phát hiện câu trùng/gần trùng trong ngân hàng (so khớp văn bản/embedding) → gộp hoặc retire.
-10. Flashcard từ khoá → service (dựa `M-keywords-mapping.md`, `L-quyet-dinh-nhanh.md`) cho ôn nhanh 5 phút.
-11. Lịch ôn FSRS thay Leitner (tận dụng dữ liệu độ tự tin, khoảng ôn cá nhân hoá).
-12. Xuất/nhập Anki.
+### 7.2 Học hiệu quả hơn (v2)
 
-**P3 — mở rộng phạm vi**
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 6 | “Vì sao bạn chọn?” | ô nhập khi sai (practice) và ở màn hình kết quả → `why` trong file kết quả → snapshot → AI Coach chẩn đoán hiểu nhầm |
+| 7 | Gạch đáp án + tô từ khoá | ✕ / chuột phải / Shift+số; `elim` lưu vào kết quả; thống kê “gạch nhầm đáp án đúng”; tô qualifier theo `taxonomy.keywords` |
+| 8 | Thi thử 2.0 (Pearson VUE) | 15 câu thử nghiệm không tính điểm, màn hình Review cuối bài, không tạm dừng, cảnh báo 15′/5′, sức bền theo phần tư |
+| 9 | Nhớ trước khi xem đáp án | ẩn lựa chọn đến khi người học viết đáp án mình nghĩ; `recallHit` chấm tự động theo service/khái niệm |
+| 10 | FSRS + giới hạn ôn/ngày | FSRS-4.5 (grade theo đúng/sai, chưa chắc, gợi ý, tốc độ); ôn câu sắp quên nhất trước; `daily_limit` + tồn đọng |
+| 11 | Mức sẵn sàng v2 + lọc nhiễu | trọng số thời gian/độ khó/câu dài, prior Laplace, khoảng tin cậy 90 %, xác suất đỗ; loại bài làm vội |
+| 12 | Hỏi AI + gợi ý | `claude -p` chỉ đọc, trả lời tiếng Việt, lưu `coach/qa/<id>.md`; gợi ý (`hint`) do ENRICH soạn sẵn |
 
-13. Nhiều kỳ thi (DVA-C02, SOA-C02, SAP-C02): taxonomy theo `exam`, lọc theo pack.
-14. Truy cập từ điện thoại trong mạng LAN (opt-in, token) / PWA.
-15. Báo cáo tuần do AI viết (`coach/reports/`), so sánh tuần trước, trọng tâm tuần tới.
-16. “Giải thích lại” (explain-back): người học tự giải thích lựa chọn, AI chấm mức hiểu và ghi vào hồ sơ.
+### 7.3 AI & vận hành (v2)
+
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 13 | Chi phí & model theo tác vụ | `coach.models.{analyze,generate,enrich,ask}`; tổng lượt & chi phí quy đổi 30 ngày ở trang AI Coach |
+| 14 | Vòng chất lượng câu AI | 👍/👎 (`bank/ratings.md`), danh sách đánh giá thấp, phát hiện câu gần trùng, đo hiệu quả biến thể → snapshot → coach sửa/retire |
+| 15 | Đồng bộ 2 máy | nút ⇅ / `npm run sync` (commit dữ liệu → pull --rebase → push, không treo khi thiếu credential); `coach.hosts`; `merge=union` |
+| 16 | CI + test | GitHub Actions (`trainer/ci/trainer-ci.yml` — chuyển vào `.github/workflows/` khi token có quyền `workflow`): validate, typecheck, unit, e2e API (TRAINER_HOME tạm), UI smoke Playwright |
+| 17 | Launcher + Windows | `start.command` / `start.sh` / `start.bat`, `OPEN=1`; dò CLI trên Windows; lịch đa nền tảng (launchd / crontab / schtasks) |
+
+### 7.4 Lộ trình tiếp theo (đề xuất)
+
+1. **Bản đồ phủ notes** — mục `##/###` nào trong notes chưa có câu hỏi → sinh câu cho đúng mục đó.
+2. **Ngày thi & dự báo** — đặt ngày thi, dự báo ngày đạt mức sẵn sàng ≥ 75 %, coach ưu tiên theo thời gian còn lại; mục tiêu ngày + nhắc bằng thông báo hệ thống.
+3. **Flashcard từ khoá → service** (từ `M-keywords-mapping.md`, `L-quyet-dinh-nhanh.md`) và xuất/nhập Anki.
+4. **Báo cáo tuần do AI viết** (`coach/reports/`).
+5. **Nhiều kỳ thi** (DVA-C02, SOA-C02, SAP-C02) — taxonomy theo `exam`.
+6. **Truy cập từ điện thoại trong LAN** (opt-in, token) / PWA.
+7. **“Giải thích lại” (explain-back)** — người học tự giải thích, AI chấm mức hiểu.
 
 ## 8. Rủi ro & giảm thiểu
 
@@ -146,13 +168,17 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 
 ## 9. Kiểm thử đã thực hiện
 
-- `npm test` — 9 unit test: rubric thời gian (khớp ví dụ SCHEMA §4), parser/serializer round-trip, báo lỗi có số dòng, ví dụ trong SCHEMA parse sạch, chấm điểm, Leitner, nạp toàn bộ ngân hàng (745 câu, 0 lỗi).
-- `npm run typecheck` + `vite build` sạch.
-- E2E API trên bản sao sandbox: mô phỏng 7 bài (152 câu, 5 ngày) qua mọi chế độ → kiểm tra quota thi thử (19/17/16/13), pool SRS/câu sai/cờ/chậm, thống kê, báo lỗi, snapshot.
-- Quyền agent headless: đọc trong repo ✔, đọc ngoài repo (`/etc/hosts`) bị chặn ✔, ghi trong `trainer/bank|coach` ✔, ghi ngoài bị chặn ✔, chạy validator ✔.
-- AI Coach thật trên sandbox (model sonnet):
-  - Lượt 1 (CLI): 2,5 phút · $0.59 — 13 câu mới (7 biến thể, 3 contrast, 3 mở rộng), validate 0 lỗi/0 cảnh báo, làm giàu 2 giải thích,
-    xử lý issue đúng (giữ đáp án, giải thích vì sao), kế hoạch 4 phiên + hồ sơ người học.
-  - Lượt 2 (bấm nút trong UI, log realtime qua SSE): 2,6 phút · $0.63 — tự chạy `validate.ts --fill-time`; nhận ra bài làm vội
-    (0–1 giây/câu) và không tính vào điểm yếu; mang phiên chưa làm của kế hoạch cũ sang; 14 câu mới; tự hạn chế sinh thêm vì còn 26 câu AI chưa làm.
-- Giao diện: chụp kiểm tra 9 trang (sáng/tối, desktop + mobile 390 px): không tràn ngang, không lỗi JavaScript.
+**v1** — 9 unit test; E2E API trên sandbox (7 bài mô phỏng); quyền agent headless; 2 lượt AI Coach thật trên sandbox; chụp 9 trang.
+
+**v2** (6 sub-agent làm song song theo vùng file riêng, sau đó tích hợp):
+
+| Hạng mục | Kết quả |
+|----------|---------|
+| Typecheck · build | `tsc --noEmit` sạch · `vite build` OK |
+| Unit (`npm test`) | 48/48 — core, learning (FSRS, readiness, Pearson, recallHit, rewriteAttempt), quality (rebalance, migration, task heuristic, duplicates, ratings), ai (patch, enrich, schedule) |
+| E2E API (`npm run test:e2e`) | 32/32 — mọi chế độ, Pearson, elim/recall/why, rushed, stats, quality/ratings, issues, coach/qa chỉ đọc, đồng bộ thật với bare remote (union merge, conflict, 401/403/timeout không treo) |
+| UI smoke (`npm run test:ui`) | 19/19 — desktop, 390 px (không tràn ngang), dark; luồng tạo bài → làm → nộp → kết quả |
+| Migration trên dữ liệu thật | đáp án đúng **A 55,2 / B 38,9 / C 5,3 / D 0,6 % → A 24,2 / B 25,0 / C 25,8 / D 25,0 %**; 716 câu đổi thứ tự; **745/745 câu giữ nguyên nội dung đáp án đúng, đề và bộ lựa chọn**; 745 câu gắn task 1.1–4.4; validate 0 lỗi / 0 cảnh báo |
+| AI thật trên repo (sonnet) | ENRICH 10 câu: 10/10 áp dụng, 0 lỗi, $0.237 (tự sửa 2 câu MSK sai domain, cân độ dài 4 câu) · câu dài: 3 câu 70–85 từ, $0.215 |
+| QA giao diện | các agent UI chụp & soát > 120 ảnh (light/dark, 1440/390 px); orchestrator soát lại các trang chính với dữ liệu thật đã migration |
+| Lỗi tìm thấy & sửa trong lúc làm | thời gian từng câu luôn = 0 dưới React StrictMode (lỗi từ v1); regex nhận diện chữ cái đáp án bắt nhầm chữ thường; modal đồng bộ bị đè; tràn ngang trang Coach ở 390 px |

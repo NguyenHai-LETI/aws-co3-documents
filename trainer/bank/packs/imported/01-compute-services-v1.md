@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 01-v1-01
 - domain: cost
+- task: 4.2
 - topic: compute
 - services: EC2
 - tags: reserved-instances
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 A company runs a production web application on Amazon EC2 24/7. The workload is steady and predictable for the next 3 years. Which purchasing option is the MOST cost-effective?
 
-- A. On-Demand Instances
+- A. Standard Reserved Instances (3-year, All Upfront)
 - B. Spot Instances
-- C. Standard Reserved Instances (3-year, All Upfront)
+- C. On-Demand Instances
 - D. Dedicated Hosts
 
-**Answer:** C
+**Answer:** A
 
 **Explanation:** Steady, predictable 24/7 for 3 years = Standard RI 3-year All Upfront (highest discount).
 
@@ -37,6 +38,7 @@ A company runs a production web application on Amazon EC2 24/7. The workload is 
 
 ## Q 01-v1-02
 - domain: cost
+- task: 4.2
 - topic: compute
 - services: EC2
 - tags: spot-instances
@@ -46,12 +48,12 @@ A company runs a production web application on Amazon EC2 24/7. The workload is 
 
 A data-processing job runs nightly, can be interrupted and restarted, and must minimize cost. Which EC2 purchasing option should the architect choose?
 
-- A. On-Demand Instances
-- B. Spot Instances
-- C. Reserved Instances
-- D. Dedicated Instances
+- A. Reserved Instances
+- B. Dedicated Instances
+- C. Spot Instances
+- D. On-Demand Instances
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Interruptible + restartable + cheapest = Spot Instances (up to 90% off).
 
@@ -59,6 +61,7 @@ A data-processing job runs nightly, can be interrupted and restarted, and must m
 
 ## Q 01-v1-03
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: ECS, Fargate
 - tags: serverless-cost
@@ -68,10 +71,10 @@ A data-processing job runs nightly, can be interrupted and restarted, and must m
 
 A solutions architect needs to run a containerized microservice with NO infrastructure to manage and pay only for the resources each task uses. Which option meets the requirement with the LEAST operational overhead?
 
-- A. Amazon ECS on EC2 launch type
+- A. Amazon EKS with self-managed nodes
 - B. Amazon ECS on AWS Fargate
-- C. Amazon EKS with self-managed nodes
-- D. EC2 Auto Scaling group running Docker
+- C. EC2 Auto Scaling group running Docker
+- D. Amazon ECS on EC2 launch type
 
 **Answer:** B
 
@@ -81,6 +84,7 @@ A solutions architect needs to run a containerized microservice with NO infrastr
 
 ## Q 01-v1-04
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: Lambda, S3
 - difficulty: easy
@@ -91,8 +95,8 @@ An application processes images uploaded to Amazon S3. Processing takes about 20
 
 - A. AWS Lambda triggered by S3 events
 - B. Amazon EC2 with Auto Scaling
-- C. AWS Batch on EC2
-- D. Amazon ECS on EC2
+- C. Amazon ECS on EC2
+- D. AWS Batch on EC2
 
 **Answer:** A
 
@@ -102,6 +106,7 @@ An application processes images uploaded to Amazon S3. Processing takes about 20
 
 ## Q 01-v1-05
 - domain: performance
+- task: 3.2
 - topic: compute
 - tags: placement-groups, efa
 - difficulty: easy
@@ -111,9 +116,9 @@ An application processes images uploaded to Amazon S3. Processing takes about 20
 A company wants to run a high-performance computing (HPC) workload that requires the lowest possible network latency between instances. Which configuration should be used?
 
 - A. Spread placement group across multiple AZs
-- B. Partition placement group
+- B. Instances in different Regions behind Global Accelerator
 - C. Cluster placement group with Elastic Fabric Adapter (EFA)
-- D. Instances in different Regions behind Global Accelerator
+- D. Partition placement group
 
 **Answer:** C
 
@@ -123,6 +128,7 @@ A company wants to run a high-performance computing (HPC) workload that requires
 
 ## Q 01-v1-06
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: Fargate, AWS Batch, Lambda
 - difficulty: easy
@@ -131,12 +137,12 @@ A company wants to run a high-performance computing (HPC) workload that requires
 
 A Lambda function must run for 25 minutes to complete a large data transformation. What should the architect do?
 
-- A. Increase the Lambda memory to 10 GB
-- B. Increase the Lambda timeout to 25 minutes
-- C. Use AWS Fargate or AWS Batch instead of Lambda
-- D. Split into 2 Lambda functions chained by SNS
+- A. Increase the Lambda timeout to 25 minutes
+- B. Split into 2 Lambda functions chained by SNS
+- C. Increase the Lambda memory to 10 GB
+- D. Use AWS Fargate or AWS Batch instead of Lambda
 
-**Answer:** C
+**Answer:** D
 
 **Explanation:** Lambda max is 15 min; 25-min job needs Fargate or AWS Batch.
 
@@ -144,6 +150,7 @@ A Lambda function must run for 25 minutes to complete a large data transformatio
 
 ## Q 01-v1-07
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EC2, EC2 Auto Scaling
 - tags: scaling-policies
@@ -153,12 +160,12 @@ A Lambda function must run for 25 minutes to complete a large data transformatio
 
 A fleet of EC2 instances in an Auto Scaling group must scale to keep average CPU utilization at 60%. Which scaling policy is simplest to configure for this goal?
 
-- A. Simple scaling
-- B. Step scaling
-- C. Target tracking scaling
-- D. Scheduled scaling
+- A. Step scaling
+- B. Simple scaling
+- C. Scheduled scaling
+- D. Target tracking scaling
 
-**Answer:** C
+**Answer:** D
 
 **Explanation:** Keep a metric (CPU 60%) at target = Target tracking scaling (simplest).
 
@@ -166,6 +173,7 @@ A fleet of EC2 instances in an Auto Scaling group must scale to keep average CPU
 
 ## Q 01-v1-08
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: Elastic Beanstalk
 - difficulty: easy
@@ -174,12 +182,12 @@ A fleet of EC2 instances in an Auto Scaling group must scale to keep average CPU
 
 An Elastic Beanstalk application must be deployed with ZERO downtime and the ability to quickly roll back if the new version fails. Which deployment policy is BEST?
 
-- A. All at once
-- B. Rolling
-- C. Rolling with additional batch
-- D. Immutable
+- A. Immutable
+- B. Rolling with additional batch
+- C. Rolling
+- D. All at once
 
-**Answer:** D
+**Answer:** A
 
 **Explanation:** Zero downtime + easy rollback = Immutable (new ASG, swap if healthy).
 
@@ -187,6 +195,7 @@ An Elastic Beanstalk application must be deployed with ZERO downtime and the abi
 
 ## Q 01-v1-09
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EC2
 - tags: instance-store
@@ -196,12 +205,12 @@ An Elastic Beanstalk application must be deployed with ZERO downtime and the abi
 
 A workload needs temporary scratch storage with very high IOPS that does not need to persist after the instance stops. Which storage should be used?
 
-- A. Amazon EBS gp3
-- B. EC2 Instance Store
-- C. Amazon EFS
+- A. EC2 Instance Store
+- B. Amazon EFS
+- C. Amazon EBS gp3
 - D. Amazon S3
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Temporary, very high IOPS, no persistence = Instance Store.
 
@@ -209,6 +218,7 @@ A workload needs temporary scratch storage with very high IOPS that does not nee
 
 ## Q 01-v1-10
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EC2 Auto Scaling
 - tags: scaling-policies
@@ -218,12 +228,12 @@ A workload needs temporary scratch storage with very high IOPS that does not nee
 
 A company predicts traffic spikes every weekday at 8 AM. They want capacity ready before the spike. Which Auto Scaling approach is MOST appropriate?
 
-- A. Target tracking scaling only
-- B. Scheduled scaling (or predictive scaling)
+- A. Scheduled scaling (or predictive scaling)
+- B. Spot Fleet with diversified strategy
 - C. Manual scaling each morning
-- D. Spot Fleet with diversified strategy
+- D. Target tracking scaling only
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Known time-based spike = Scheduled scaling (predictive also valid/proactive).
 
@@ -231,6 +241,7 @@ A company predicts traffic spikes every weekday at 8 AM. They want capacity read
 
 ## Q 01-v1-11
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EKS, ECS
 - difficulty: easy
@@ -240,11 +251,11 @@ A company predicts traffic spikes every weekday at 8 AM. They want capacity read
 Which statement about Amazon EKS vs Amazon ECS is correct?
 
 - A. ECS requires you to manage a Kubernetes control plane
-- B. EKS is AWS-proprietary and not portable
-- C. EKS runs standard Kubernetes and supports multi-cloud portability
+- B. EKS runs standard Kubernetes and supports multi-cloud portability
+- C. EKS is AWS-proprietary and not portable
 - D. ECS cannot run on Fargate
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** EKS = standard Kubernetes, portable across clouds.
 
@@ -252,6 +263,7 @@ Which statement about Amazon EKS vs Amazon ECS is correct?
 
 ## Q 01-v1-12
 - domain: performance
+- task: 3.2
 - topic: compute
 - tags: dedicated-hosts
 - difficulty: easy
@@ -260,9 +272,9 @@ Which statement about Amazon EKS vs Amazon ECS is correct?
 
 A company has strict licensing requirements that need visibility and control over the physical server (sockets/cores) where instances run. Which option meets this?
 
-- A. Dedicated Instances
+- A. Spot Instances
 - B. Dedicated Hosts
-- C. Spot Instances
+- C. Dedicated Instances
 - D. Reserved Instances
 
 **Answer:** B
@@ -273,6 +285,7 @@ A company has strict licensing requirements that need visibility and control ove
 
 ## Q 01-v1-13
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: Fargate, Lambda
 - tags: savings-plans
@@ -295,6 +308,7 @@ A team wants flexible Savings on compute that applies across instance families, 
 
 ## Q 01-v1-14
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EC2 Auto Scaling
 - tags: spot-instances, on-demand-instances, launch-template
@@ -304,9 +318,9 @@ A team wants flexible Savings on compute that applies across instance families, 
 
 An application must mix Spot and On-Demand instances and use multiple instance types in one Auto Scaling group. What enables this?
 
-- A. Launch configuration
+- A. Placement group
 - B. Launch template with mixed instances policy
-- C. Placement group
+- C. Launch configuration
 - D. Capacity Reservation
 
 **Answer:** B
@@ -317,6 +331,7 @@ An application must mix Spot and On-Demand instances and use multiple instance t
 
 ## Q 01-v1-15
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: Lambda
 - tags: lambda-concurrency
@@ -327,11 +342,11 @@ An application must mix Spot and On-Demand instances and use multiple instance t
 Which Lambda feature eliminates cold-start latency for a latency-sensitive API?
 
 - A. Reserved concurrency
-- B. Provisioned concurrency
-- C. Lambda layers
-- D. Increasing the memory allocation
+- B. Lambda layers
+- C. Increasing the memory allocation
+- D. Provisioned concurrency
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Remove cold starts = Provisioned concurrency (pre-warmed).
 
@@ -339,6 +354,7 @@ Which Lambda feature eliminates cold-start latency for a latency-sensitive API?
 
 ## Q 01-v1-16
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: AWS Batch
 - difficulty: easy
@@ -347,12 +363,12 @@ Which Lambda feature eliminates cold-start latency for a latency-sensitive API?
 
 A batch workload runs Docker containers, takes several hours, and should automatically provision and scale the right compute. Which service is purpose-built for this?
 
-- A. AWS Lambda
-- B. AWS Batch
-- C. Amazon Lightsail
-- D. AWS Elastic Beanstalk
+- A. AWS Elastic Beanstalk
+- B. Amazon Lightsail
+- C. AWS Batch
+- D. AWS Lambda
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Long-running Docker batch jobs with auto provisioning = AWS Batch.
 
@@ -360,6 +376,7 @@ A batch workload runs Docker containers, takes several hours, and should automat
 
 ## Q 01-v1-17
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EC2
 - tags: placement-groups
@@ -369,12 +386,12 @@ A batch workload runs Docker containers, takes several hours, and should automat
 
 To distribute EC2 instances across distinct hardware racks to reduce correlated failures (max 7 per AZ), which placement strategy is used?
 
-- A. Cluster placement group
-- B. Spread placement group
-- C. Partition placement group
-- D. Auto Scaling group
+- A. Auto Scaling group
+- B. Cluster placement group
+- C. Spread placement group
+- D. Partition placement group
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Spread across racks, max 7/AZ = Spread placement group.
 
@@ -382,6 +399,7 @@ To distribute EC2 instances across distinct hardware racks to reduce correlated 
 
 ## Q 01-v1-18
 - domain: cost
+- task: 4.2
 - topic: compute
 - services: Lightsail
 - difficulty: easy
@@ -391,11 +409,11 @@ To distribute EC2 instances across distinct hardware racks to reduce correlated 
 A startup wants the simplest way to launch a WordPress site with predictable monthly pricing, bundled compute, storage, and networking. Which service is BEST?
 
 - A. Amazon EC2
-- B. AWS Elastic Beanstalk
-- C. Amazon Lightsail
-- D. AWS Fargate
+- B. Amazon Lightsail
+- C. AWS Fargate
+- D. AWS Elastic Beanstalk
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** Simplest, bundled, fixed monthly price = Amazon Lightsail.
 
@@ -403,6 +421,7 @@ A startup wants the simplest way to launch a WordPress site with predictable mon
 
 ## Q 01-v1-19
 - domain: resilient
+- task: 2.2
 - topic: compute
 - services: EC2 Auto Scaling, ALB, EC2
 - tags: high-availability
@@ -426,6 +445,7 @@ An EC2-based web tier must remain highly available across failures of a single A
 
 ## Q 01-v1-20
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EC2 Auto Scaling
 - tags: ami
@@ -435,11 +455,11 @@ An EC2-based web tier must remain highly available across failures of a single A
 
 A company wants to reduce Auto Scaling launch time so new instances become healthy faster during scale-out. Which action helps MOST?
 
-- A. Increase the cooldown period
-- B. Bake dependencies into a custom AMI (golden AMI)
+- A. Disable ELB health checks
+- B. Increase the cooldown period
 - C. Use Simple scaling instead of Target tracking
-- D. Disable ELB health checks
+- D. Bake dependencies into a custom AMI (golden AMI)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Faster healthy instances = pre-baked golden AMI (less bootstrap time).

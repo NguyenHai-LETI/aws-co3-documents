@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 17-v2-01
 - domain: secure
+- task: 1.1
 - topic: database
 - services: RDS Proxy, Lambda, RDS, IAM
 - difficulty: medium
@@ -23,12 +24,12 @@ created: 2026-10-16
 
 Lambda functions exhaust RDS connections during spikes and need pooling + IAM auth + fast failover. Which service?
 
-- A. RDS Proxy
-- B. ElastiCache
-- C. Read Replica
-- D. DAX
+- A. Read Replica
+- B. DAX
+- C. ElastiCache
+- D. RDS Proxy
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Lambda pooling + IAM auth + fast failover for RDS = RDS Proxy.
 
@@ -36,6 +37,7 @@ Lambda functions exhaust RDS connections during spikes and need pooling + IAM au
 
 ## Q 17-v2-02
 - domain: secure
+- task: 1.1
 - topic: security
 - services: RAM, Transit Gateway
 - tags: subnets
@@ -47,8 +49,8 @@ An organization must share private subnets and Transit Gateway across accounts w
 
 - A. AWS Resource Access Manager (RAM)
 - B. VPC Peering
-- C. Organizations SCP
-- D. PrivateLink
+- C. PrivateLink
+- D. Organizations SCP
 
 **Answer:** A
 
@@ -58,6 +60,7 @@ An organization must share private subnets and Transit Gateway across accounts w
 
 ## Q 17-v2-03
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: VPC, VPC Flow Logs
 - difficulty: medium
@@ -66,12 +69,12 @@ An organization must share private subnets and Transit Gateway across accounts w
 
 A team must troubleshoot dropped connectivity by capturing accepted/rejected IP traffic in a VPC. Which feature?
 
-- A. VPC Flow Logs
+- A. Config
 - B. CloudTrail
 - C. GuardDuty
-- D. Config
+- D. VPC Flow Logs
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Capture accept/reject IP traffic = VPC Flow Logs.
 
@@ -79,6 +82,7 @@ A team must troubleshoot dropped connectivity by capturing accepted/rejected IP 
 
 ## Q 17-v2-04
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Route 53 Resolver, Route 53
 - difficulty: medium
@@ -89,8 +93,8 @@ On-premises servers must resolve records in a Route 53 private hosted zone. Whic
 
 - A. Route 53 Resolver inbound endpoint
 - B. Public hosted zone
-- C. CloudFront
-- D. NAT Gateway
+- C. NAT Gateway
+- D. CloudFront
 
 **Answer:** A
 
@@ -99,28 +103,38 @@ On-premises servers must resolve records in a Route 53 private hosted zone. Whic
 ---
 
 ## Q 17-v2-05
-- domain: secure
+- domain: performance
+- task: 3.5
 - topic: analytics
-- services: MSK
+- services: MSK, Kinesis Data Streams
+- tags: streaming-ingestion
 - difficulty: medium
 - time: 50
+- concept: Amazon MSK = managed service with native Apache Kafka APIs
+- hint: Đề nhấn mạnh API Kafka gốc — chọn dịch vụ streaming được quản lý mà ứng dụng Kafka dùng nguyên không cần viết lại.
+- enriched: 2026-10-16
 - source: practice-exams/17-gap-services-exam-v2.md#Q5
 
 A company using Apache Kafka wants a managed service with native Kafka APIs. Which service?
 
-- A. Amazon MSK
-- B. Kinesis Data Streams
-- C. SQS
+- A. SQS
+- B. Amazon MSK
+- C. Kinesis Data Streams
 - D. Amazon MQ
 
-**Answer:** A
+**Answer:** B
 
-**Explanation:** Managed Kafka with native APIs = Amazon MSK.
+**Explanation:** **Amazon MSK** is managed Apache Kafka, exposing native Kafka APIs so existing applications connect without code changes.
+- SQS: a queue service with its own API, no Kafka protocol.
+- Kinesis Data Streams: managed streaming, but it uses AWS-specific APIs rather than Kafka's.
+- Amazon MQ: managed message broker for ActiveMQ/RabbitMQ protocols, not Kafka.
+> 🇻🇳 Cần API Kafka gốc + managed → Amazon MSK.
 
 ---
 
 ## Q 17-v2-06
 - domain: secure
+- task: 1.2
 - topic: database
 - services: DynamoDB
 - tags: ttl
@@ -131,8 +145,8 @@ A company using Apache Kafka wants a managed service with native Kafka APIs. Whi
 A DynamoDB table must auto-delete expired session records without a scheduled job. Which feature?
 
 - A. DynamoDB TTL
-- B. Streams
-- C. Global Tables
+- B. Global Tables
+- C. Streams
 - D. DAX
 
 **Answer:** A
@@ -143,6 +157,7 @@ A DynamoDB table must auto-delete expired session records without a scheduled jo
 
 ## Q 17-v2-07
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: GWLB, ELB
 - difficulty: medium
@@ -151,12 +166,12 @@ A DynamoDB table must auto-delete expired session records without a scheduled jo
 
 Traffic must be transparently inspected by a fleet of third-party firewall appliances that scale horizontally. Which load balancer?
 
-- A. Gateway Load Balancer
-- B. Application Load Balancer
+- A. Application Load Balancer
+- B. Classic Load Balancer
 - C. Network Load Balancer
-- D. Classic Load Balancer
+- D. Gateway Load Balancer
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Transparent scalable appliance inspection = Gateway Load Balancer.
 
@@ -164,6 +179,7 @@ Traffic must be transparently inspected by a fleet of third-party firewall appli
 
 ## Q 17-v2-08
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Network Firewall, VPC
 - difficulty: medium
@@ -172,12 +188,12 @@ Traffic must be transparently inspected by a fleet of third-party firewall appli
 
 A managed, stateful network firewall with intrusion prevention across a VPC is needed. Which service?
 
-- A. AWS Network Firewall
+- A. WAF only
 - B. Security Groups only
-- C. WAF only
+- C. AWS Network Firewall
 - D. NACLs only
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Managed stateful firewall + IPS for VPC = AWS Network Firewall.
 
@@ -185,6 +201,7 @@ A managed, stateful network firewall with intrusion prevention across a VPC is n
 
 ## Q 17-v2-09
 - domain: secure
+- task: 1.2
 - topic: storage
 - services: S3
 - tags: s3-storage-lens
@@ -196,8 +213,8 @@ A company wants organization-wide visibility into S3 usage and activity metrics 
 
 - A. S3 Storage Lens
 - B. S3 Inventory only
-- C. CloudTrail
-- D. Config
+- C. Config
+- D. CloudTrail
 
 **Answer:** A
 
@@ -207,6 +224,7 @@ A company wants organization-wide visibility into S3 usage and activity metrics 
 
 ## Q 17-v2-10
 - domain: secure
+- task: 1.3
 - topic: storage
 - services: S3, Lambda
 - tags: s3-object-lambda
@@ -216,12 +234,12 @@ A company wants organization-wide visibility into S3 usage and activity metrics 
 
 Objects must be transformed (e.g., redact PII) as they are retrieved via a GET, without changing the stored object. Which feature?
 
-- A. S3 Object Lambda
+- A. Byte-range fetch
 - B. S3 Select
-- C. Lifecycle rule
-- D. Byte-range fetch
+- C. S3 Object Lambda
+- D. Lifecycle rule
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Transform objects on GET without changing stored object = S3 Object Lambda.
 
@@ -229,6 +247,7 @@ Objects must be transformed (e.g., redact PII) as they are retrieved via a GET, 
 
 ## Q 17-v2-11
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: Route 53 Resolver, VPC
 - tags: hybrid-dns
@@ -239,12 +258,12 @@ Objects must be transformed (e.g., redact PII) as they are retrieved via a GET, 
 A hybrid DNS setup needs VPC resources to resolve on-premises names AND on-premises to resolve VPC private names. Which two? (Choose TWO)
 
 - A. Route 53 Resolver outbound endpoint with forwarding rules
-- B. Route 53 Resolver inbound endpoint
-- C. Public hosted zone only
-- D. Transit Gateway DNS
-- E. CloudFront
+- B. CloudFront
+- C. Route 53 Resolver inbound endpoint
+- D. Public hosted zone only
+- E. Transit Gateway DNS
 
-**Answer:** A, B
+**Answer:** A, C
 
 **Explanation:** Hybrid DNS = Resolver outbound (to on-prem) + inbound (from on-prem).
 
@@ -252,6 +271,7 @@ A hybrid DNS setup needs VPC resources to resolve on-premises names AND on-premi
 
 ## Q 17-v2-12
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: GWLB
 - difficulty: hard
@@ -260,12 +280,12 @@ A hybrid DNS setup needs VPC resources to resolve on-premises names AND on-premi
 
 A traffic-inspection architecture chains a Gateway Load Balancer with appliances. Which encapsulation protocol does GWLB use?
 
-- A. GENEVE (port 6081)
-- B. HTTP/2
+- A. BGP
+- B. GENEVE (port 6081)
 - C. TLS only
-- D. BGP
+- D. HTTP/2
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** GWLB encapsulation = GENEVE (port 6081).
 
@@ -273,6 +293,7 @@ A traffic-inspection architecture chains a Gateway Load Balancer with appliances
 
 ## Q 17-v2-13
 - domain: secure
+- task: 1.2
 - topic: integration
 - services: EventBridge, SQS
 - tags: event-driven
@@ -282,12 +303,12 @@ A traffic-inspection architecture chains a Gateway Load Balancer with appliances
 
 A serverless point-to-point integration must consume from an SQS queue, filter and enrich events, then send to a target with minimal code. Which service?
 
-- A. EventBridge Pipes
-- B. Step Functions Standard
+- A. Amazon MQ
+- B. EventBridge Pipes
 - C. SNS fan-out
-- D. Amazon MQ
+- D. Step Functions Standard
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** SQS -> filter/enrich -> target, low code = EventBridge Pipes.
 
@@ -295,6 +316,7 @@ A serverless point-to-point integration must consume from an SQS queue, filter a
 
 ## Q 17-v2-14
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS Proxy, Lambda, Aurora
 - difficulty: hard
@@ -303,13 +325,13 @@ A serverless point-to-point integration must consume from an SQS queue, filter a
 
 An RDS Proxy deployment for a Lambda + Aurora app improves resilience how? (Choose TWO)
 
-- A. Pools and reuses database connections to avoid exhaustion
+- A. Caches query results like DAX
 - B. Reduces failover time by managing connections during failover
-- C. Caches query results like DAX
-- D. Provides cross-Region replication
-- E. Replaces the need for Multi-AZ
+- C. Pools and reuses database connections to avoid exhaustion
+- D. Replaces the need for Multi-AZ
+- E. Provides cross-Region replication
 
-**Answer:** A, B
+**Answer:** B, C
 
 **Explanation:** RDS Proxy = connection pooling + reduced failover time.
 
@@ -317,6 +339,7 @@ An RDS Proxy deployment for a Lambda + Aurora app improves resilience how? (Choo
 
 ## Q 17-v2-15
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge
 - tags: decoupling, event-driven
@@ -326,11 +349,11 @@ An RDS Proxy deployment for a Lambda + Aurora app improves resilience how? (Choo
 
 A company must schedule millions of one-time and recurring tasks (cron/rate) with a managed, serverless scheduler decoupled from EventBridge buses. Which service?
 
-- A. Amazon EventBridge Scheduler
-- B. SQS delay queue
-- C. Step Functions only
-- D. CloudWatch Logs
+- A. CloudWatch Logs
+- B. Step Functions only
+- C. Amazon EventBridge Scheduler
+- D. SQS delay queue
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Managed serverless cron/rate scheduler = EventBridge Scheduler.

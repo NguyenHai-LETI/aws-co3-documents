@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 14-v1-01
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: NLB, ELB
 - difficulty: easy
@@ -23,12 +24,12 @@ created: 2026-10-16
 
 You need a load balancer that preserves the client source IP, gives a static IP, and handles TCP at extreme scale. Which one?
 
-- A. Application Load Balancer
-- B. Network Load Balancer
-- C. Gateway Load Balancer
-- D. Classic Load Balancer
+- A. Classic Load Balancer
+- B. Gateway Load Balancer
+- C. Network Load Balancer
+- D. Application Load Balancer
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Source IP + static IP + TCP at scale = NLB.
 
@@ -36,6 +37,7 @@ You need a load balancer that preserves the client source IP, gives a static IP,
 
 ## Q 14-v1-02
 - domain: performance
+- task: 3.3
 - topic: database
 - services: ElastiCache, RDS
 - difficulty: easy
@@ -44,12 +46,12 @@ You need a load balancer that preserves the client source IP, gives a static IP,
 
 Choose the service for caching frequently accessed query results to reduce RDS read load with the LEAST code change for a generic SQL DB.
 
-- A. DynamoDB DAX
-- B. Amazon ElastiCache
-- C. CloudFront
-- D. Read Replica only
+- A. Read Replica only
+- B. CloudFront
+- C. Amazon ElastiCache
+- D. DynamoDB DAX
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Generic SQL cache, least code change = ElastiCache.
 
@@ -57,6 +59,7 @@ Choose the service for caching frequently accessed query results to reduce RDS r
 
 ## Q 14-v1-03
 - domain: cost
+- task: 4.4
 - topic: networking
 - services: VPC Endpoint, S3, DynamoDB, PrivateLink
 - difficulty: medium
@@ -65,13 +68,13 @@ Choose the service for caching frequently accessed query results to reduce RDS r
 
 "Private access to S3 at no extra cost vs private access to most other AWS services." Which two endpoints correspond? (Choose TWO)
 
-- A. Gateway Endpoint → S3/DynamoDB (free)
-- B. Interface Endpoint (PrivateLink) → most services
-- C. Gateway Endpoint → all services
-- D. Interface Endpoint → S3 only
-- E. NAT Gateway → free private access
+- A. Gateway Endpoint → all services
+- B. Gateway Endpoint → S3/DynamoDB (free)
+- C. NAT Gateway → free private access
+- D. Interface Endpoint (PrivateLink) → most services
+- E. Interface Endpoint → S3 only
 
-**Answer:** A, B
+**Answer:** B, D
 
 **Explanation:** Gateway Endpoint (S3/DynamoDB, free) + Interface Endpoint (most services).
 
@@ -79,6 +82,7 @@ Choose the service for caching frequently accessed query results to reduce RDS r
 
 ## Q 14-v1-04
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: CloudFront, Global Accelerator
 - difficulty: easy
@@ -100,6 +104,7 @@ For accelerating delivery of CACHEABLE HTTP content globally vs accelerating TCP
 
 ## Q 14-v1-05
 - domain: cost
+- task: 4.3
 - topic: security
 - services: Secrets Manager, Systems Manager
 - tags: key-rotation
@@ -109,12 +114,12 @@ For accelerating delivery of CACHEABLE HTTP content globally vs accelerating TCP
 
 Choose for "automatic rotation of database credentials" vs "cheap storage of config parameters."
 
-- A. Secrets Manager vs Parameter Store
-- B. Parameter Store vs Secrets Manager
+- A. Cognito vs IAM
+- B. Secrets Manager vs Parameter Store
 - C. KMS vs ACM
-- D. Cognito vs IAM
+- D. Parameter Store vs Secrets Manager
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Auto rotate DB creds = Secrets Manager; cheap config = Parameter Store.
 
@@ -122,6 +127,7 @@ Choose for "automatic rotation of database credentials" vs "cheap storage of con
 
 ## Q 14-v1-06
 - domain: secure
+- task: 1.3
 - topic: management
 - services: CloudTrail, AWS Config
 - tags: compliance
@@ -131,12 +137,12 @@ Choose for "automatic rotation of database credentials" vs "cheap storage of con
 
 Which is correct: "Track API calls (who did what)" vs "Track resource configuration/compliance over time"?
 
-- A. CloudTrail vs AWS Config
-- B. AWS Config vs CloudTrail
-- C. CloudWatch vs CloudTrail
-- D. GuardDuty vs Macie
+- A. CloudWatch vs CloudTrail
+- B. CloudTrail vs AWS Config
+- C. GuardDuty vs Macie
+- D. AWS Config vs CloudTrail
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Who-did-what = CloudTrail; config/compliance = AWS Config.
 
@@ -144,6 +150,7 @@ Which is correct: "Track API calls (who did what)" vs "Track resource configurat
 
 ## Q 14-v1-07
 - domain: performance
+- task: 3.3
 - topic: database
 - services: RDS
 - tags: multi-az, read-replicas
@@ -153,12 +160,12 @@ Which is correct: "Track API calls (who did what)" vs "Track resource configurat
 
 For "synchronous standby for HA" vs "asynchronous copies for read scaling," which RDS pair?
 
-- A. Multi-AZ vs Read Replicas
-- B. Read Replicas vs Multi-AZ
-- C. Aurora Global vs Multi-AZ
-- D. Snapshot vs Multi-AZ
+- A. Read Replicas vs Multi-AZ
+- B. Aurora Global vs Multi-AZ
+- C. Snapshot vs Multi-AZ
+- D. Multi-AZ vs Read Replicas
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Synchronous HA standby = Multi-AZ; async read scaling = Read Replicas.
 
@@ -166,6 +173,7 @@ For "synchronous standby for HA" vs "asynchronous copies for read scaling," whic
 
 ## Q 14-v1-08
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS, SNS
 - tags: decoupling, fan-out
@@ -175,12 +183,12 @@ For "synchronous standby for HA" vs "asynchronous copies for read scaling," whic
 
 Choose for "decouple with a queue (1:1 consumer)" vs "fan-out push to many subscribers (1:N)."
 
-- A. SQS vs SNS
+- A. Kinesis vs SNS
 - B. SNS vs SQS
-- C. EventBridge vs SQS
-- D. Kinesis vs SNS
+- C. SQS vs SNS
+- D. EventBridge vs SQS
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Queue 1:1 = SQS; pub/sub 1:N = SNS.
 
@@ -188,6 +196,7 @@ Choose for "decouple with a queue (1:1 consumer)" vs "fan-out push to many subsc
 
 ## Q 14-v1-09
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Athena, Redshift, S3
 - tags: offline-transfer
@@ -197,12 +206,12 @@ Choose for "decouple with a queue (1:1 consumer)" vs "fan-out push to many subsc
 
 Which is correct for "serverless SQL over S3" vs "managed petabyte data warehouse"?
 
-- A. Athena vs Redshift
-- B. Redshift vs Athena
-- C. EMR vs Athena
+- A. EMR vs Athena
+- B. Athena vs Redshift
+- C. Redshift vs Athena
 - D. Glue vs Redshift
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Serverless SQL over S3 = Athena; warehouse = Redshift.
 
@@ -210,6 +219,7 @@ Which is correct for "serverless SQL over S3" vs "managed petabyte data warehous
 
 ## Q 14-v1-10
 - domain: performance
+- task: 3.2
 - topic: compute
 - services: EKS, ECS
 - tags: orchestration
@@ -219,12 +229,12 @@ Which is correct for "serverless SQL over S3" vs "managed petabyte data warehous
 
 "Managed Kubernetes" vs "AWS-proprietary container orchestration." Which pair?
 
-- A. EKS vs ECS
-- B. ECS vs EKS
-- C. Fargate vs EKS
-- D. Batch vs ECS
+- A. Fargate vs EKS
+- B. Batch vs ECS
+- C. ECS vs EKS
+- D. EKS vs ECS
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Managed Kubernetes = EKS; AWS-proprietary = ECS.
 
@@ -232,6 +242,7 @@ Which is correct for "serverless SQL over S3" vs "managed petabyte data warehous
 
 ## Q 14-v1-11
 - domain: performance
+- task: 3.3
 - topic: database
 - services: Neptune, DocumentDB
 - difficulty: easy
@@ -241,9 +252,9 @@ Which is correct for "serverless SQL over S3" vs "managed petabyte data warehous
 For "graph relationships" vs "MongoDB-compatible document store," choose the pair.
 
 - A. Neptune vs DocumentDB
-- B. DocumentDB vs Neptune
-- C. Keyspaces vs Neptune
-- D. QLDB vs DocumentDB
+- B. Keyspaces vs Neptune
+- C. QLDB vs DocumentDB
+- D. DocumentDB vs Neptune
 
 **Answer:** A
 
@@ -253,6 +264,7 @@ For "graph relationships" vs "MongoDB-compatible document store," choose the pai
 
 ## Q 14-v1-12
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Kinesis Data Streams, Data Firehose, S3, Redshift
 - tags: streaming-ingestion
@@ -262,12 +274,12 @@ For "graph relationships" vs "MongoDB-compatible document store," choose the pai
 
 "Real-time streaming with custom consumers/replay" vs "managed near-real-time delivery to S3/Redshift." Which pair?
 
-- A. Kinesis Data Streams vs Firehose
-- B. Firehose vs Kinesis Data Streams
-- C. SQS vs Kinesis
-- D. MSK vs Firehose
+- A. Firehose vs Kinesis Data Streams
+- B. SQS vs Kinesis
+- C. MSK vs Firehose
+- D. Kinesis Data Streams vs Firehose
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Real-time custom/replay = Kinesis Data Streams; managed delivery = Firehose.
 
@@ -275,6 +287,7 @@ For "graph relationships" vs "MongoDB-compatible document store," choose the pai
 
 ## Q 14-v1-13
 - domain: secure
+- task: 1.2
 - topic: other
 - tags: subnets, nacl, security-groups
 - difficulty: easy
@@ -283,12 +296,12 @@ For "graph relationships" vs "MongoDB-compatible document store," choose the pai
 
 Choose for "block specific IP at subnet (stateless, deny)" vs "instance-level stateful allow rules."
 
-- A. NACL vs Security Group
-- B. Security Group vs NACL
+- A. Security Group vs NACL
+- B. Shield vs Security Group
 - C. WAF vs NACL
-- D. Shield vs Security Group
+- D. NACL vs Security Group
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Subnet stateless deny = NACL; instance stateful allow = Security Group.
 
@@ -296,6 +309,7 @@ Choose for "block specific IP at subnet (stateless, deny)" vs "instance-level st
 
 ## Q 14-v1-14
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Shield, WAF
 - tags: ddos-protection, web-attacks
@@ -306,9 +320,9 @@ Choose for "block specific IP at subnet (stateless, deny)" vs "instance-level st
 "DDoS protection (L3/4, free)" vs "web exploit filtering (SQLi/XSS, L7)." Which pair?
 
 - A. Shield Standard vs WAF
-- B. WAF vs Shield
-- C. GuardDuty vs WAF
-- D. Firewall Manager vs Shield
+- B. Firewall Manager vs Shield
+- C. WAF vs Shield
+- D. GuardDuty vs WAF
 
 **Answer:** A
 
@@ -318,6 +332,7 @@ Choose for "block specific IP at subnet (stateless, deny)" vs "instance-level st
 
 ## Q 14-v1-15
 - domain: resilient
+- task: 2.2
 - topic: storage
 - services: EFS, FSx
 - tags: multi-az, fsx-windows
@@ -327,12 +342,12 @@ Choose for "block specific IP at subnet (stateless, deny)" vs "instance-level st
 
 For "shared file storage for Linux (NFS, multi-AZ)" vs "shared file storage for Windows (SMB, AD)," choose the pair.
 
-- A. EFS vs FSx for Windows
-- B. FSx for Windows vs EFS
+- A. S3 vs EFS
+- B. EFS vs FSx for Windows
 - C. EBS vs EFS
-- D. S3 vs EFS
+- D. FSx for Windows vs EFS
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Linux NFS multi-AZ = EFS; Windows SMB+AD = FSx for Windows.
 
@@ -340,6 +355,7 @@ For "shared file storage for Linux (NFS, multi-AZ)" vs "shared file storage for 
 
 ## Q 14-v1-16
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: DataSync, Snow Family
 - tags: offline-transfer
@@ -351,8 +367,8 @@ For "shared file storage for Linux (NFS, multi-AZ)" vs "shared file storage for 
 
 - A. DataSync vs Snowball
 - B. Snowball vs DataSync
-- C. Storage Gateway vs DataSync
-- D. Transfer Family vs Snowball
+- C. Transfer Family vs Snowball
+- D. Storage Gateway vs DataSync
 
 **Answer:** A
 
@@ -362,6 +378,7 @@ For "shared file storage for Linux (NFS, multi-AZ)" vs "shared file storage for 
 
 ## Q 14-v1-17
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: Application Migration Service, DMS
 - tags: cdc-replication
@@ -372,9 +389,9 @@ For "shared file storage for Linux (NFS, multi-AZ)" vs "shared file storage for 
 Choose for "lift-and-shift server migration" vs "database migration with CDC."
 
 - A. AWS MGN vs AWS DMS
-- B. AWS DMS vs AWS MGN
+- B. Snowball vs MGN
 - C. DataSync vs DMS
-- D. Snowball vs MGN
+- D. AWS DMS vs AWS MGN
 
 **Answer:** A
 
@@ -384,6 +401,7 @@ Choose for "lift-and-shift server migration" vs "database migration with CDC."
 
 ## Q 14-v1-18
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Cognito
 - difficulty: easy
@@ -392,12 +410,12 @@ Choose for "lift-and-shift server migration" vs "database migration with CDC."
 
 "Authenticate app users (sign-in)" vs "grant temporary AWS credentials to those users." Which Cognito pair?
 
-- A. User Pools vs Identity Pools
-- B. Identity Pools vs User Pools
-- C. IAM vs Cognito
+- A. Identity Pools vs User Pools
+- B. IAM vs Cognito
+- C. User Pools vs Identity Pools
 - D. STS vs User Pools
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Sign-in = User Pools; AWS creds = Identity Pools.
 
@@ -405,6 +423,7 @@ Choose for "lift-and-shift server migration" vs "database migration with CDC."
 
 ## Q 14-v1-19
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: S3 Glacier, S3
 - tags: s3-glacier-tiers
@@ -414,12 +433,12 @@ Choose for "lift-and-shift server migration" vs "database migration with CDC."
 
 For "lowest cost archive, 12h retrieval" vs "archive with millisecond retrieval," which S3 pair?
 
-- A. Glacier Deep Archive vs Glacier Instant Retrieval
-- B. Glacier Instant Retrieval vs Deep Archive
-- C. Standard-IA vs One Zone-IA
+- A. Glacier Instant Retrieval vs Deep Archive
+- B. Standard-IA vs One Zone-IA
+- C. Glacier Deep Archive vs Glacier Instant Retrieval
 - D. Intelligent-Tiering vs Standard
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** 12h cheapest archive = Deep Archive; ms archive = Glacier Instant Retrieval.
 
@@ -427,6 +446,7 @@ For "lowest cost archive, 12h retrieval" vs "archive with millisecond retrieval,
 
 ## Q 14-v1-20
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions, EventBridge
 - tags: orchestration
@@ -436,11 +456,11 @@ For "lowest cost archive, 12h retrieval" vs "archive with millisecond retrieval,
 
 "Orchestrate multi-step workflow with state/branching/retries" vs "route events by pattern to targets." Which pair?
 
-- A. Step Functions vs EventBridge
+- A. SQS vs Step Functions
 - B. EventBridge vs Step Functions
-- C. SQS vs Step Functions
-- D. SNS vs EventBridge
+- C. SNS vs EventBridge
+- D. Step Functions vs EventBridge
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Workflow orchestration = Step Functions; event routing = EventBridge.

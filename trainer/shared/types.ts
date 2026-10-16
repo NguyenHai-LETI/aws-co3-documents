@@ -32,6 +32,12 @@ export interface Question {
   refs: string[];
   created?: string;
   source?: string;
+  task?: string; // exam-guide task statement, e.g. "2.2" (taxonomy.tasks)
+  hint?: string; // one-line nudge shown on demand in practice mode (never reveals the answer)
+  enriched?: string; // YYYY-MM-DD when the ENRICH routine last improved this question
+  words: number; // computed: words in the stem
+  longForm: boolean; // computed: stem ≥ timing.long_form_min_words (exam-realistic length)
+  hash: string; // computed: short hash of stem + options + answer (patch base check, change detection)
   file: string; // path relative to trainer/
   line: number;
 }
@@ -83,6 +89,14 @@ export interface TimingRubric {
   min_seconds: number;
   max_seconds: number;
   round_to: number;
+  long_form_min_words?: number;
+}
+
+export interface TaskDef {
+  id: string; // "1.1" … "4.4"
+  domain: DomainId;
+  label: string;
+  label_vi: string;
 }
 
 export interface Taxonomy {
@@ -101,6 +115,8 @@ export interface Taxonomy {
   timing: TimingRubric;
   services: Record<string, { topic: string; match: string[] }>;
   features: Record<string, string[]>;
+  tasks: TaskDef[];
+  keywords: Record<string, string[]>; // category → phrases to highlight (qualifier, cost, ops, resilient, performance, secure)
 }
 
 // ── Tests & attempts ────────────────────────────────────────────────────────
@@ -130,6 +146,7 @@ export interface SelectionFilters {
   origins?: PackOrigin[];
   services?: string[];
   tags?: string[];
+  tasks?: string[];
   search?: string;
 }
 
@@ -143,7 +160,9 @@ export interface BuildTestRequest {
   feedback?: FeedbackMode;
   timing?: { preset: string; minutes?: number };
   shuffleQuestions?: boolean;
-  shuffleOptions?: boolean;
+  shuffleOptions?: boolean; // default: config practice.shuffle_options (true)
+  pearson?: boolean; // exam simulation 2.0: 15 unscored items, end review screen, no pause, official timing
+  recallFirst?: boolean; // hide options until the learner writes what they think the answer is
 }
 
 export interface TestQuestionRef {
@@ -164,6 +183,9 @@ export interface TestSession {
   plan?: string;
   createdAt: string;
   notes: string[]; // warnings for the UI (missing ids, pool smaller than requested, …)
+  pearson?: boolean;
+  unscored?: string[]; // ids of pilot (unscored) questions — only revealed after the test
+  recallFirst?: boolean;
 }
 
 export interface AnswerInput {
@@ -172,6 +194,10 @@ export interface AnswerInput {
   t: number; // seconds spent on the question
   flag?: boolean;
   unsure?: boolean;
+  elim?: string[]; // option keys the learner struck out
+  recall?: string; // recall-first: what the learner wrote before seeing the options
+  hinted?: boolean; // the hint was opened
+  why?: string; // learner's reason for the chosen answer (written after seeing it was wrong)
 }
 
 export interface SubmitRequest {
@@ -192,6 +218,12 @@ export interface AnswerRecord {
   est: number;
   flag?: boolean;
   unsure?: boolean;
+  elim?: string; // struck option keys, e.g. "CD"
+  recall?: string;
+  recallHit?: boolean; // recall text matched the correct option (services/features/keywords)
+  hinted?: boolean;
+  why?: string;
+  scored?: boolean; // false = pilot (unscored) question in a pearson exam
 }
 
 export interface Attempt {
@@ -214,6 +246,12 @@ export interface Attempt {
   selection?: unknown;
   answers: AnswerRecord[];
   file: string;
+  layout?: number; // 2 = written after the answer-position rebalance (letters match the current bank)
+  pearson?: boolean;
+  pilotTotal?: number; // unscored questions (pearson); total/correct/score cover scored ones only
+  pilotCorrect?: number;
+  rushed?: boolean; // computed on load: median time per answer below stats.rushed_median_seconds
+  medianTime?: number; // computed on load
 }
 
 export type AttemptSummary = Omit<Attempt, 'answers' | 'selection'> & {
@@ -234,11 +272,17 @@ export interface QuestionState {
   lastFlag?: boolean;
   everWrong: boolean;
   streak: number; // consecutive correct (confident) answers, newest first
-  box: number; // Leitner box 0 (new) .. 5 (mastered for a long time)
+  box: number; // memory level 0 (new) .. 5 — FSRS stability bucket (or Leitner box when srs.algorithm = leitner)
   dueAt?: string; // ISO date when the question should be reviewed again
   avgTime: number;
   slowCount: number; // attempts slower than 1.5 × estimate
   wrongPicks: Record<string, number>;
+  stability?: number; // FSRS: days until recall probability drops to 90 %
+  fsrsDifficulty?: number; // FSRS difficulty 1..10
+  retrievability?: number; // FSRS: estimated recall probability now (0..1)
+  lastGrade?: 1 | 2 | 3 | 4; // FSRS grade of the last answer (again/hard/good/easy)
+  lapses?: number;
+  elimCorrect?: number; // times the learner struck out the correct option
 }
 
 export interface Bucket {
@@ -270,13 +314,27 @@ export interface StatsResponse {
     readiness: number; // weighted accuracy estimate 0..100
     readinessScaled: number;
     readinessConfidence: 'low' | 'medium' | 'high';
+    readinessLow: number; // 90 % interval (percent)
+    readinessHigh: number;
+    passProbability: number; // 0..1 — P(readiness ≥ pass_pct) under a normal approximation
+    dueToday: number; // due reviews after the daily cap (srs.daily_limit)
+    backlog: number; // due reviews beyond today's cap
+    rushedAttempts: number; // attempts excluded as noise
+    longFormShare: number; // % of answers on long-form (exam-length) questions
   };
   byDomain: Bucket[];
   byTopic: Bucket[];
   byDifficulty: Bucket[];
   byService: Bucket[];
   byTag: Bucket[];
-  boxes: number[]; // count per Leitner box 0..5
+  byTask: Bucket[];
+  boxes: number[]; // questions per memory level 0..5 (labels in boxLabels)
+  boxLabels: string[];
+  calibration: { sure: { answers: number; correct: number }; unsure: { answers: number; correct: number }; hinted: { answers: number; correct: number } };
+  elimination: { answersWithElim: number; correctEliminated: number; questions: string[] };
+  recall: { answers: number; hits: number; hitAccuracy: number; missAccuracy: number };
+  lengthSplit: { long: { answers: number; correct: number }; short: { answers: number; correct: number } };
+  rushed: { id: string; title: string; finished: string; medianTime: number }[];
   trend: { id: string; finished: string; score: number; total: number; mode: TestMode; title: string }[];
   daily: { date: string; answers: number; correct: number; seconds: number }[];
   mostMissed: { id: string; wrong: number; attempts: number; topic: string; stem: string }[];
@@ -306,9 +364,11 @@ export interface Plan {
   body: string; // Markdown without front matter
 }
 
+export type CoachTask = 'analyze' | 'generate' | 'enrich' | 'longform';
+
 export interface CoachRunInfo {
   id: string;
-  task: 'analyze' | 'generate';
+  task: CoachTask;
   trigger: 'manual' | 'schedule' | 'cli';
   status: 'running' | 'success' | 'error' | 'cancelled' | 'skipped';
   startedAt: string;
@@ -334,6 +394,78 @@ export interface IssueItem {
   type: string;
   note: string;
   resolution?: string;
+}
+
+// ── Bank quality, ratings, AI helpers, sync ─────────────────────────────────
+
+export interface RatingItem {
+  line: number;
+  date: string;
+  qid: string;
+  value: 'up' | 'down';
+  note?: string;
+}
+
+export interface DuplicatePair {
+  a: string;
+  b: string;
+  score: number; // 0..1 similarity
+}
+
+export interface BankQuality {
+  version: string; // bank version the numbers were computed for
+  singleAnswer: number; // questions with exactly one correct option
+  letters: Record<string, number>; // correct-letter distribution of single-answer questions
+  lettersByOrigin: Record<string, Record<string, number>>;
+  correctLongest: number; // questions whose (a) correct option is the longest one by ≥ 15 %
+  medianStemWords: number;
+  longForm: number;
+  shortExplanations: number; // explanation < 15 words
+  withHint: number;
+  withTask: number;
+  enriched: number;
+  total: number;
+  duplicates: DuplicatePair[];
+  ratings: Record<string, { up: number; down: number }>;
+  lowRated: string[]; // ids with down ≥ 2 and down > up
+  variantEffect: { originals: number; fixedAfterVariant: number; examples: string[] };
+}
+
+export interface EnrichStatus {
+  total: number;
+  enriched: number;
+  pending: { explain: number; hint: number; classify: number; balance: number };
+  longForm: number;
+  lastRun?: CoachRunInfo;
+}
+
+export interface CostSummary {
+  days: number;
+  runs: number;
+  costUsd: number;
+  byTask: Record<string, { runs: number; costUsd: number }>;
+  asks: { count: number; costUsd: number };
+}
+
+export interface QaEntry {
+  at: string;
+  question: string;
+  answer: string;
+  pick?: string;
+  costUsd?: number;
+}
+
+export interface SyncStep {
+  cmd: string;
+  ok: boolean;
+  output: string;
+}
+
+export interface SyncResult {
+  ok: boolean;
+  message: string;
+  steps: SyncStep[];
+  host: string;
 }
 
 export interface ClaudeStatus {

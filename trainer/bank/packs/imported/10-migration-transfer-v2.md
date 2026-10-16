@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 10-v2-01
 - domain: resilient
+- task: 2.2
 - topic: migration
 - services: DMS, RDS
 - tags: cdc-replication
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 A company must migrate an on-premises MySQL database to RDS MySQL with minimal downtime and ongoing replication until cutover. Which service?
 
-- A. AWS DMS with continuous replication (CDC)
-- B. AWS DataSync
-- C. AWS Snowball
-- D. S3 Transfer Acceleration
+- A. AWS Snowball
+- B. S3 Transfer Acceleration
+- C. AWS DataSync
+- D. AWS DMS with continuous replication (CDC)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** DB migration with minimal downtime + ongoing replication = DMS with CDC.
 
@@ -37,6 +38,7 @@ A company must migrate an on-premises MySQL database to RDS MySQL with minimal d
 
 ## Q 10-v2-02
 - domain: performance
+- task: 3.3
 - topic: migration
 - services: SCT, Aurora
 - tags: heterogeneous-migration
@@ -46,12 +48,12 @@ A company must migrate an on-premises MySQL database to RDS MySQL with minimal d
 
 A heterogeneous migration from SQL Server to Aurora PostgreSQL requires converting schema and stored procedures. Which tool?
 
-- A. AWS Schema Conversion Tool (SCT)
+- A. AWS Backup
 - B. AWS DataSync
-- C. AWS Backup
+- C. AWS Schema Conversion Tool (SCT)
 - D. Storage Gateway
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Heterogeneous schema/procedure conversion = Schema Conversion Tool (SCT).
 
@@ -59,6 +61,7 @@ A heterogeneous migration from SQL Server to Aurora PostgreSQL requires converti
 
 ## Q 10-v2-03
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: Snow Family, S3
 - difficulty: medium
@@ -67,12 +70,12 @@ A heterogeneous migration from SQL Server to Aurora PostgreSQL requires converti
 
 A company must transfer 200 TB to S3 over a limited-bandwidth link within a tight deadline. Which service?
 
-- A. AWS Snowball Edge
-- B. AWS DataSync over the internet
+- A. AWS DataSync over the internet
+- B. AWS Transfer Family
 - C. Direct upload via CLI
-- D. AWS Transfer Family
+- D. AWS Snowball Edge
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** 200 TB, limited bandwidth, deadline = Snowball Edge.
 
@@ -80,6 +83,7 @@ A company must transfer 200 TB to S3 over a limited-bandwidth link within a tigh
 
 ## Q 10-v2-04
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: Transfer Family, S3
 - difficulty: medium
@@ -89,9 +93,9 @@ A company must transfer 200 TB to S3 over a limited-bandwidth link within a tigh
 Partners upload files daily using SFTP; the company wants a managed SFTP endpoint storing files in S3. Which service?
 
 - A. AWS Transfer Family
-- B. AWS DataSync
-- C. Storage Gateway
-- D. Snowcone
+- B. Snowcone
+- C. AWS DataSync
+- D. Storage Gateway
 
 **Answer:** A
 
@@ -101,6 +105,7 @@ Partners upload files daily using SFTP; the company wants a managed SFTP endpoin
 
 ## Q 10-v2-05
 - domain: resilient
+- task: 2.2
 - topic: migration
 - services: DataSync, EFS
 - difficulty: medium
@@ -109,12 +114,12 @@ Partners upload files daily using SFTP; the company wants a managed SFTP endpoin
 
 A company must continuously replicate on-premises NFS files to EFS on a schedule with integrity checks. Which service?
 
-- A. AWS DataSync
+- A. DMS
 - B. AWS Transfer Family
-- C. DMS
-- D. Snowball
+- C. Snowball
+- D. AWS DataSync
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Scheduled on-prem NFS to EFS with verification = AWS DataSync.
 
@@ -122,6 +127,7 @@ A company must continuously replicate on-premises NFS files to EFS on a schedule
 
 ## Q 10-v2-06
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: Application Discovery Service
 - difficulty: medium
@@ -130,12 +136,12 @@ A company must continuously replicate on-premises NFS files to EFS on a schedule
 
 A company needs to discover on-premises server inventory and dependencies before migrating. Which service?
 
-- A. AWS Application Discovery Service
-- B. AWS DMS
+- A. Trusted Advisor
+- B. AWS Application Discovery Service
 - C. AWS Config
-- D. Trusted Advisor
+- D. AWS DMS
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Discover server inventory + dependencies = Application Discovery Service.
 
@@ -143,6 +149,7 @@ A company needs to discover on-premises server inventory and dependencies before
 
 ## Q 10-v2-07
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: Application Migration Service, EC2
 - difficulty: medium
@@ -151,12 +158,12 @@ A company needs to discover on-premises server inventory and dependencies before
 
 A company wants to lift-and-shift (rehost) hundreds of on-premises VMs to EC2 with minimal changes. Which service?
 
-- A. AWS Application Migration Service (MGN)
-- B. AWS DMS
-- C. AWS Glue
-- D. DataSync
+- A. DataSync
+- B. AWS Application Migration Service (MGN)
+- C. AWS DMS
+- D. AWS Glue
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Lift-and-shift VMs to EC2 = Application Migration Service (MGN).
 
@@ -164,6 +171,7 @@ A company wants to lift-and-shift (rehost) hundreds of on-premises VMs to EC2 wi
 
 ## Q 10-v2-08
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: Migration Hub
 - difficulty: medium
@@ -185,6 +193,7 @@ A single dashboard must track migration progress across multiple tools and accou
 
 ## Q 10-v2-09
 - domain: performance
+- task: 3.4
 - topic: migration
 - services: DataSync, Snow Family
 - difficulty: medium
@@ -193,12 +202,12 @@ A single dashboard must track migration progress across multiple tools and accou
 
 DataSync vs Snowball: which factor MOST favors Snowball?
 
-- A. Limited network bandwidth + large data + deadline
-- B. Continuous ongoing sync
+- A. Continuous ongoing sync
+- B. Limited network bandwidth + large data + deadline
 - C. Small daily incremental transfers
 - D. Real-time replication
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Snowball favored by limited bandwidth + large data + deadline.
 
@@ -206,6 +215,7 @@ DataSync vs Snowball: which factor MOST favors Snowball?
 
 ## Q 10-v2-10
 - domain: performance
+- task: 3.3
 - topic: migration
 - services: DMS, RDS
 - tags: cdc-replication
@@ -215,12 +225,12 @@ DataSync vs Snowball: which factor MOST favors Snowball?
 
 A company must migrate an Oracle database to RDS Oracle (same engine) with minimal downtime. Which service?
 
-- A. AWS DMS (homogeneous, with CDC)
-- B. Storage Gateway
-- C. DataSync
-- D. Snowmobile
+- A. DataSync
+- B. Snowmobile
+- C. AWS DMS (homogeneous, with CDC)
+- D. Storage Gateway
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Homogeneous Oracle->RDS Oracle minimal downtime = DMS with CDC.
 
@@ -228,6 +238,7 @@ A company must migrate an Oracle database to RDS Oracle (same engine) with minim
 
 ## Q 10-v2-11
 - domain: resilient
+- task: 2.2
 - topic: migration
 - services: DMS
 - tags: cdc-replication
@@ -237,13 +248,13 @@ A company must migrate an Oracle database to RDS Oracle (same engine) with minim
 
 A migration must keep the source database fully operational and continuously replicate changes until cutover, then switch. Which two DMS concepts apply? (Choose TWO)
 
-- A. Full load + Change Data Capture (CDC)
-- B. Replication instance running the task
-- C. Schema Conversion is required for homogeneous migrations
-- D. DataSync agent
-- E. Snowball seeding is mandatory
+- A. Schema Conversion is required for homogeneous migrations
+- B. DataSync agent
+- C. Full load + Change Data Capture (CDC)
+- D. Snowball seeding is mandatory
+- E. Replication instance running the task
 
-**Answer:** A, B
+**Answer:** C, E
 
 **Explanation:** Live migration = full load + CDC on a replication instance.
 
@@ -251,6 +262,7 @@ A migration must keep the source database fully operational and continuously rep
 
 ## Q 10-v2-12
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: DMS, Snow Family
 - tags: offline-transfer, cdc-replication
@@ -260,12 +272,12 @@ A migration must keep the source database fully operational and continuously rep
 
 A very large database migration over limited bandwidth must combine offline bulk transfer with ongoing change capture. Which approach?
 
-- A. DMS with Snowball Edge for initial bulk load, then CDC over the network
+- A. Transfer Family only
 - B. DataSync only
-- C. Transfer Family only
-- D. Manual export/import once
+- C. Manual export/import once
+- D. DMS with Snowball Edge for initial bulk load, then CDC over the network
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Bulk + ongoing = DMS with Snowball Edge initial load then CDC.
 
@@ -273,6 +285,7 @@ A very large database migration over limited bandwidth must combine offline bulk
 
 ## Q 10-v2-13
 - domain: performance
+- task: 3.5
 - topic: migration
 - services: DataSync, Storage Gateway, Transfer Family
 - difficulty: hard
@@ -281,12 +294,12 @@ A very large database migration over limited bandwidth must combine offline bulk
 
 DataSync vs Storage Gateway vs Transfer Family — which statement is TRUE?
 
-- A. DataSync = one-time/scheduled bulk transfer; Storage Gateway = ongoing hybrid access; Transfer Family = managed SFTP/FTPS/FTP
-- B. All three are for real-time database replication
-- C. Transfer Family is for Hadoop clusters
-- D. Storage Gateway only does SFTP
+- A. Storage Gateway only does SFTP
+- B. Transfer Family is for Hadoop clusters
+- C. DataSync = one-time/scheduled bulk transfer; Storage Gateway = ongoing hybrid access; Transfer Family = managed SFTP/FTPS/FTP
+- D. All three are for real-time database replication
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** DataSync=bulk transfer; Storage Gateway=hybrid access; Transfer Family=managed SFTP/FTPS/FTP.
 
@@ -294,6 +307,7 @@ DataSync vs Storage Gateway vs Transfer Family — which statement is TRUE?
 
 ## Q 10-v2-14
 - domain: cost
+- task: 4.4
 - topic: migration
 - services: Migration Evaluator
 - difficulty: hard
@@ -303,8 +317,8 @@ DataSync vs Storage Gateway vs Transfer Family — which statement is TRUE?
 A company wants recommendations on the cost of running on-premises workloads in AWS before migrating. Which service?
 
 - A. AWS Migration Evaluator
-- B. AWS DMS
-- C. AWS Config
+- B. AWS Config
+- C. AWS DMS
 - D. Compute Optimizer
 
 **Answer:** A
@@ -315,6 +329,7 @@ A company wants recommendations on the cost of running on-premises workloads in 
 
 ## Q 10-v2-15
 - domain: performance
+- task: 3.3
 - topic: migration
 - services: SCT, DMS, Aurora
 - tags: cdc-replication
@@ -325,9 +340,9 @@ A company wants recommendations on the cost of running on-premises workloads in 
 A DMS migration from Oracle to Aurora PostgreSQL must minimize application downtime. Which sequence is BEST?
 
 - A. SCT to convert schema → DMS full load + CDC → validate → cutover
-- B. Snowball → restore → done
-- C. DataSync files → import → cutover
-- D. Manual dump/restore during a long maintenance window
+- B. Manual dump/restore during a long maintenance window
+- C. Snowball → restore → done
+- D. DataSync files → import → cutover
 
 **Answer:** A
 

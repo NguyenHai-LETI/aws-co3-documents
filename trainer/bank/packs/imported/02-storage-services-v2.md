@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 02-v2-01
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: S3
 - tags: s3-storage-classes
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 Objects are accessed frequently for 30 days, then rarely but must be retrievable in milliseconds when needed. Which lifecycle is MOST cost-effective?
 
-- A. S3 Standard → Glacier Deep Archive
-- B. S3 Standard → S3 Standard-IA
-- C. S3 Standard → S3 One Zone-IA immediately
-- D. Keep everything in S3 Standard
+- A. S3 Standard → S3 Standard-IA
+- B. Keep everything in S3 Standard
+- C. S3 Standard → Glacier Deep Archive
+- D. S3 Standard → S3 One Zone-IA immediately
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Frequent then rare but instant retrieval = transition to S3 Standard-IA (min 30 days first).
 
@@ -37,6 +38,7 @@ Objects are accessed frequently for 30 days, then rarely but must be retrievable
 
 ## Q 02-v2-02
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: s3-lifecycle, s3-storage-classes, s3-intelligent-tiering
@@ -47,11 +49,11 @@ Objects are accessed frequently for 30 days, then rarely but must be retrievable
 A dataset has unpredictable, changing access patterns and the team does not want to manage lifecycle rules. Which storage class is BEST?
 
 - A. S3 Standard
-- B. S3 Standard-IA
-- C. S3 Intelligent-Tiering
-- D. S3 Glacier Instant Retrieval
+- B. S3 Intelligent-Tiering
+- C. S3 Glacier Instant Retrieval
+- D. S3 Standard-IA
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** Unpredictable/changing pattern, no lifecycle management = S3 Intelligent-Tiering.
 
@@ -59,6 +61,7 @@ A dataset has unpredictable, changing access patterns and the team does not want
 
 ## Q 02-v2-03
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: S3, S3 Glacier
 - tags: s3-glacier-tiers
@@ -68,12 +71,12 @@ A dataset has unpredictable, changing access patterns and the team does not want
 
 Backups must be archived for 7 years at the LOWEST cost; retrieval within 12–48 hours is acceptable. Which class?
 
-- A. S3 Glacier Instant Retrieval
-- B. S3 Glacier Flexible Retrieval
-- C. S3 Glacier Deep Archive
-- D. S3 One Zone-IA
+- A. S3 Glacier Flexible Retrieval
+- B. S3 One Zone-IA
+- C. S3 Glacier Instant Retrieval
+- D. S3 Glacier Deep Archive
 
-**Answer:** C
+**Answer:** D
 
 **Explanation:** 7-year archive, lowest cost, 12-48h retrieval OK = Glacier Deep Archive.
 
@@ -81,6 +84,7 @@ Backups must be archived for 7 years at the LOWEST cost; retrieval within 12–4
 
 ## Q 02-v2-04
 - domain: secure
+- task: 1.3
 - topic: storage
 - services: S3
 - tags: s3-object-lock, compliance
@@ -103,6 +107,7 @@ Regulatory rules require that financial records in S3 cannot be deleted or overw
 
 ## Q 02-v2-05
 - domain: resilient
+- task: 2.2
 - topic: storage
 - services: S3
 - tags: multi-region, s3-versioning
@@ -114,8 +119,8 @@ A company must replicate S3 objects to a bucket in another Region for disaster r
 
 - A. Same-Region Replication
 - B. Versioning enabled on both buckets
-- C. Objects must be in Glacier
-- D. Buckets must have the same name
+- C. Buckets must have the same name
+- D. Objects must be in Glacier
 
 **Answer:** B
 
@@ -125,6 +130,7 @@ A company must replicate S3 objects to a bucket in another Region for disaster r
 
 ## Q 02-v2-06
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EC2, EBS
 - tags: ebs-volume-types
@@ -134,12 +140,12 @@ A company must replicate S3 objects to a bucket in another Region for disaster r
 
 A database on EC2 needs 40,000 IOPS with consistent low latency. Which EBS volume type?
 
-- A. gp2
-- B. gp3
-- C. io2
-- D. st1
+- A. io2
+- B. st1
+- C. gp2
+- D. gp3
 
-**Answer:** C
+**Answer:** A
 
 **Explanation:** 40,000 IOPS consistent low latency = io2 (Provisioned IOPS SSD).
 
@@ -147,6 +153,7 @@ A database on EC2 needs 40,000 IOPS with consistent low latency. Which EBS volum
 
 ## Q 02-v2-07
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EBS
 - tags: ebs-volume-types
@@ -156,12 +163,12 @@ A database on EC2 needs 40,000 IOPS with consistent low latency. Which EBS volum
 
 A big-data workload streams large sequential files and cares about throughput, not IOPS, at low cost. Which EBS type?
 
-- A. io1
-- B. st1
-- C. sc1
-- D. gp3
+- A. gp3
+- B. sc1
+- C. st1
+- D. io1
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Sequential large files, throughput-focused, low cost = st1 (Throughput Optimized HDD).
 
@@ -169,6 +176,7 @@ A big-data workload streams large sequential files and cares about throughput, n
 
 ## Q 02-v2-08
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EFS, EC2
 - difficulty: medium
@@ -177,12 +185,12 @@ A big-data workload streams large sequential files and cares about throughput, n
 
 Multiple Linux EC2 instances across AZs must share the same file system concurrently. Which service?
 
-- A. EBS with Multi-Attach
-- B. Amazon EFS
-- C. Instance Store
-- D. S3
+- A. S3
+- B. Instance Store
+- C. EBS with Multi-Attach
+- D. Amazon EFS
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Shared file system across AZs for Linux = Amazon EFS.
 
@@ -190,6 +198,7 @@ Multiple Linux EC2 instances across AZs must share the same file system concurre
 
 ## Q 02-v2-09
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: FSx
 - tags: fsx-windows
@@ -199,12 +208,12 @@ Multiple Linux EC2 instances across AZs must share the same file system concurre
 
 A Windows application needs a shared file system with SMB protocol and Active Directory integration. Which service?
 
-- A. Amazon EFS
-- B. FSx for Windows File Server
-- C. FSx for Lustre
-- D. S3 File Gateway
+- A. S3 File Gateway
+- B. FSx for Lustre
+- C. Amazon EFS
+- D. FSx for Windows File Server
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Windows SMB + Active Directory = FSx for Windows File Server.
 
@@ -212,6 +221,7 @@ A Windows application needs a shared file system with SMB protocol and Active Di
 
 ## Q 02-v2-10
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: FSx, S3
 - tags: fsx-lustre
@@ -221,12 +231,12 @@ A Windows application needs a shared file system with SMB protocol and Active Di
 
 An HPC/ML workload needs a high-performance file system tightly integrated with S3 for input/output. Which service?
 
-- A. FSx for Windows
-- B. FSx for Lustre
-- C. EFS
-- D. Storage Gateway (Tape)
+- A. Storage Gateway (Tape)
+- B. EFS
+- C. FSx for Windows
+- D. FSx for Lustre
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** HPC/ML high-performance FS integrated with S3 = FSx for Lustre.
 
@@ -234,6 +244,7 @@ An HPC/ML workload needs a high-performance file system tightly integrated with 
 
 ## Q 02-v2-11
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3, Storage Gateway
 - difficulty: medium
@@ -242,12 +253,12 @@ An HPC/ML workload needs a high-performance file system tightly integrated with 
 
 On-premises servers need NFS/SMB file shares backed by S3, with a local cache for hot files. Which service?
 
-- A. S3 File Gateway
-- B. Volume Gateway (Stored)
-- C. Tape Gateway
+- A. Volume Gateway (Stored)
+- B. Tape Gateway
+- C. S3 File Gateway
 - D. DataSync
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** On-prem NFS/SMB backed by S3 with local cache = S3 File Gateway.
 
@@ -255,6 +266,7 @@ On-premises servers need NFS/SMB file shares backed by S3, with a local cache fo
 
 ## Q 02-v2-12
 - domain: performance
+- task: 3.5
 - topic: storage
 - services: Snow Family
 - difficulty: medium
@@ -263,12 +275,12 @@ On-premises servers need NFS/SMB file shares backed by S3, with a local cache fo
 
 A company must migrate 500 TB to AWS but has limited network bandwidth and a tight deadline. Which is BEST?
 
-- A. AWS DataSync over the internet
-- B. AWS Snowball Edge
-- C. S3 Transfer Acceleration
-- D. Direct upload via CLI
+- A. AWS Snowball Edge
+- B. Direct upload via CLI
+- C. AWS DataSync over the internet
+- D. S3 Transfer Acceleration
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** 500 TB, limited bandwidth, deadline = Snowball Edge.
 
@@ -276,6 +288,7 @@ A company must migrate 500 TB to AWS but has limited network bandwidth and a tig
 
 ## Q 02-v2-13
 - domain: secure
+- task: 1.3
 - topic: storage
 - services: EBS
 - tags: db-encryption, snapshots
@@ -286,11 +299,11 @@ A company must migrate 500 TB to AWS but has limited network bandwidth and a tig
 An unencrypted EBS volume must be encrypted. What is the correct approach?
 
 - A. Toggle encryption on the live volume
-- B. Snapshot → copy snapshot with encryption → create new volume
-- C. Enable Multi-Attach
+- B. Enable Multi-Attach
+- C. Snapshot → copy snapshot with encryption → create new volume
 - D. Detach and reattach the volume
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Encrypt existing EBS = snapshot, copy with encryption, create new volume.
 
@@ -298,6 +311,7 @@ An unencrypted EBS volume must be encrypted. What is the correct approach?
 
 ## Q 02-v2-14
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EBS
 - tags: snapshots
@@ -307,12 +321,12 @@ An unencrypted EBS volume must be encrypted. What is the correct approach?
 
 An EBS volume in us-east-1a must be used by an instance in us-east-1b. What must be done?
 
-- A. Attach directly across AZs
-- B. Snapshot the volume, create a new volume from it in us-east-1b
-- C. Enable Multi-Attach
+- A. Snapshot the volume, create a new volume from it in us-east-1b
+- B. Enable Multi-Attach
+- C. Attach directly across AZs
 - D. Use EFS instead of moving
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Move EBS across AZ = snapshot then create volume in target AZ (EBS is AZ-locked).
 
@@ -320,6 +334,7 @@ An EBS volume in us-east-1a must be used by an instance in us-east-1b. What must
 
 ## Q 02-v2-15
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: s3-transfer-acceleration
@@ -330,11 +345,11 @@ An EBS volume in us-east-1a must be used by an instance in us-east-1b. What must
 Global users upload large files to a single S3 bucket and complain about slow uploads. Which feature helps MOST?
 
 - A. S3 Select
-- B. S3 Transfer Acceleration
-- C. Byte-range fetches
-- D. S3 Inventory
+- B. Byte-range fetches
+- C. S3 Inventory
+- D. S3 Transfer Acceleration
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Speed up global large uploads to one bucket = S3 Transfer Acceleration.
 
@@ -342,6 +357,7 @@ Global users upload large files to a single S3 bucket and complain about slow up
 
 ## Q 02-v2-16
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3, Lambda
 - tags: s3-event-notifications
@@ -351,9 +367,9 @@ Global users upload large files to a single S3 bucket and complain about slow up
 
 An application must be notified to run a Lambda function whenever a new object is created in a bucket. Which is the SIMPLEST?
 
-- A. Poll the bucket from EC2
+- A. CloudTrail data events → email
 - B. S3 Event Notification → Lambda
-- C. CloudTrail data events → email
+- C. Poll the bucket from EC2
 - D. S3 Inventory daily report
 
 **Answer:** B
@@ -364,6 +380,7 @@ An application must be notified to run a Lambda function whenever a new object i
 
 ## Q 02-v2-17
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - difficulty: medium
@@ -372,12 +389,12 @@ An application must be notified to run a Lambda function whenever a new object i
 
 A team needs to run SQL queries to retrieve only a subset of rows from large CSV objects without downloading whole files. Which feature?
 
-- A. S3 Select
+- A. S3 Transfer Acceleration
 - B. S3 Inventory
-- C. S3 Batch Operations
-- D. S3 Transfer Acceleration
+- C. S3 Select
+- D. S3 Batch Operations
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** SQL to retrieve subset from objects without full download = S3 Select.
 
@@ -385,6 +402,7 @@ A team needs to run SQL queries to retrieve only a subset of rows from large CSV
 
 ## Q 02-v2-18
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: s3-storage-classes
@@ -396,8 +414,8 @@ Dev/test data can tolerate the loss of a single AZ and must cost as little as po
 
 - A. S3 Standard
 - B. S3 One Zone-IA
-- C. S3 Glacier Deep Archive
-- D. S3 Standard-IA
+- C. S3 Standard-IA
+- D. S3 Glacier Deep Archive
 
 **Answer:** B
 
@@ -407,6 +425,7 @@ Dev/test data can tolerate the loss of a single AZ and must cost as little as po
 
 ## Q 02-v2-19
 - domain: performance
+- task: 3.5
 - topic: storage
 - services: DataSync, EFS
 - difficulty: medium
@@ -416,11 +435,11 @@ Dev/test data can tolerate the loss of a single AZ and must cost as little as po
 A company wants automated, scheduled, incremental transfer of files from on-premises NFS to EFS with integrity verification. Which service?
 
 - A. Storage Gateway (Volume)
-- B. AWS DataSync
-- C. Snowball
-- D. S3 CRR
+- B. Snowball
+- C. S3 CRR
+- D. AWS DataSync
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Scheduled incremental on-prem NFS to EFS with verification = AWS DataSync.
 
@@ -428,6 +447,7 @@ A company wants automated, scheduled, incremental transfer of files from on-prem
 
 ## Q 02-v2-20
 - domain: resilient
+- task: 2.2
 - topic: storage
 - services: Storage Gateway
 - difficulty: medium
@@ -436,12 +456,12 @@ A company wants automated, scheduled, incremental transfer of files from on-prem
 
 Backup software on-premises writes to virtual tapes that should be stored durably in AWS. Which service?
 
-- A. S3 File Gateway
-- B. Tape Gateway (VTL)
-- C. FSx for OpenZFS
-- D. EFS
+- A. Tape Gateway (VTL)
+- B. EFS
+- C. S3 File Gateway
+- D. FSx for OpenZFS
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Virtual tape backups stored in AWS = Tape Gateway (VTL).
 
@@ -449,6 +469,7 @@ Backup software on-premises writes to virtual tapes that should be stored durabl
 
 ## Q 02-v2-21
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EBS, EC2
 - tags: ebs-multi-attach, ebs-volume-types
@@ -458,13 +479,13 @@ Backup software on-premises writes to virtual tapes that should be stored durabl
 
 A clustered Linux application needs the SAME block volume attached to multiple EC2 instances in one AZ for shared-disk access. Which is required? (Choose TWO)
 
-- A. EBS Multi-Attach
+- A. Instances in different AZs
 - B. io1/io2 volume type
-- C. gp3 volume type
-- D. EFS mount targets
-- E. Instances in different AZs
+- C. EBS Multi-Attach
+- D. gp3 volume type
+- E. EFS mount targets
 
-**Answer:** A, B
+**Answer:** B, C
 
 **Explanation:** Shared block volume, multiple instances same AZ = EBS Multi-Attach on io1/io2.
 
@@ -472,6 +493,7 @@ A clustered Linux application needs the SAME block volume attached to multiple E
 
 ## Q 02-v2-22
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: iam-policies, s3-access-points
@@ -482,11 +504,11 @@ A clustered Linux application needs the SAME block volume attached to multiple E
 A bucket must allow one team read-only access to a prefix and another team read-write to a different prefix at scale, without a giant bucket policy. Which feature is BEST?
 
 - A. Multiple IAM users sharing one key
-- B. S3 Access Points, each with its own policy
+- B. One large bucket policy with many statements
 - C. Object ACLs
-- D. One large bucket policy with many statements
+- D. S3 Access Points, each with its own policy
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Per-team scoped access at scale without huge policy = S3 Access Points.
 
@@ -494,6 +516,7 @@ A bucket must allow one team read-only access to a prefix and another team read-
 
 ## Q 02-v2-23
 - domain: secure
+- task: 1.3
 - topic: storage
 - services: KMS, S3, CloudTrail
 - tags: compliance, sse-kms
@@ -503,12 +526,12 @@ A bucket must allow one team read-only access to a prefix and another team read-
 
 Objects must be encrypted with keys managed by the customer's own KMS CMK, with CloudTrail auditing of every decrypt. Under heavy load, requests are throttled. What explains this and the fix?
 
-- A. SSE-S3 limits; switch to SSE-C
-- B. KMS request quotas on SSE-KMS; request a quota increase or use S3 Bucket Keys
-- C. Object Lock throttling; disable it
-- D. Versioning overhead; suspend versioning
+- A. KMS request quotas on SSE-KMS; request a quota increase or use S3 Bucket Keys
+- B. Object Lock throttling; disable it
+- C. Versioning overhead; suspend versioning
+- D. SSE-S3 limits; switch to SSE-C
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** SSE-KMS hits KMS request quotas; fix with quota increase or S3 Bucket Keys.
 
@@ -516,6 +539,7 @@ Objects must be encrypted with keys managed by the customer's own KMS CMK, with 
 
 ## Q 02-v2-24
 - domain: resilient
+- task: 2.2
 - topic: storage
 - services: S3
 - tags: s3-replication
@@ -526,11 +550,11 @@ Objects must be encrypted with keys managed by the customer's own KMS CMK, with 
 A cross-Region replication must guarantee that 99.99% of objects replicate within 15 minutes. Which feature provides this SLA?
 
 - A. Standard CRR
-- B. S3 Replication Time Control (RTC)
-- C. Batch Replication
+- B. Batch Replication
+- C. S3 Replication Time Control (RTC)
 - D. Transfer Acceleration
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** 15-min replication SLA = S3 Replication Time Control (RTC).
 
@@ -538,6 +562,7 @@ A cross-Region replication must guarantee that 99.99% of objects replicate withi
 
 ## Q 02-v2-25
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EBS
 - tags: snapshots
@@ -547,12 +572,12 @@ A cross-Region replication must guarantee that 99.99% of objects replicate withi
 
 An application experiences slow first-read latency from newly created EBS volumes restored from snapshots. Which feature eliminates this initialization penalty?
 
-- A. EBS Multi-Attach
-- B. Fast Snapshot Restore (FSR)
-- C. EBS Snapshot Archive
-- D. gp3 provisioning
+- A. gp3 provisioning
+- B. EBS Snapshot Archive
+- C. Fast Snapshot Restore (FSR)
+- D. EBS Multi-Attach
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Remove first-read init penalty on restored volumes = Fast Snapshot Restore.
 
@@ -560,6 +585,7 @@ An application experiences slow first-read latency from newly created EBS volume
 
 ## Q 02-v2-26
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: EBS
 - tags: snapshots
@@ -569,12 +595,12 @@ An application experiences slow first-read latency from newly created EBS volume
 
 A company wants to reduce EBS snapshot storage costs for snapshots rarely restored, accepting 24–72h restore time. Which feature?
 
-- A. Fast Snapshot Restore
-- B. EBS Snapshot Archive
-- C. Recycle Bin
-- D. Multi-Attach
+- A. Recycle Bin
+- B. Multi-Attach
+- C. EBS Snapshot Archive
+- D. Fast Snapshot Restore
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Cheap storage for rarely restored snapshots, 24-72h = EBS Snapshot Archive.
 
@@ -582,6 +608,7 @@ A company wants to reduce EBS snapshot storage costs for snapshots rarely restor
 
 ## Q 02-v2-27
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: FSx, S3
 - tags: fsx-lustre
@@ -591,10 +618,10 @@ A company wants to reduce EBS snapshot storage costs for snapshots rarely restor
 
 An FSx for Lustre file system is used only for a short, throughput-intensive processing job and data is persisted in S3. Which deployment option minimizes cost?
 
-- A. Persistent deployment
+- A. NetApp ONTAP
 - B. Scratch deployment
-- C. Multi-AZ Windows
-- D. NetApp ONTAP
+- C. Persistent deployment
+- D. Multi-AZ Windows
 
 **Answer:** B
 
@@ -604,6 +631,7 @@ An FSx for Lustre file system is used only for a short, throughput-intensive pro
 
 ## Q 02-v2-28
 - domain: performance
+- task: 3.1
 - topic: storage
 - tags: tls-termination, iam-policies
 - difficulty: hard
@@ -612,12 +640,12 @@ An FSx for Lustre file system is used only for a short, throughput-intensive pro
 
 A bucket must reject any request that is not sent over HTTPS. What enforces this?
 
-- A. Default encryption
-- B. A bucket policy denying requests where aws:SecureTransport is false
-- C. S3 Block Public Access
-- D. Object Lock
+- A. A bucket policy denying requests where aws:SecureTransport is false
+- B. S3 Block Public Access
+- C. Object Lock
+- D. Default encryption
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Force HTTPS = bucket policy denying aws:SecureTransport = false.
 
@@ -625,6 +653,7 @@ A bucket must reject any request that is not sent over HTTPS. What enforces this
 
 ## Q 02-v2-29
 - domain: resilient
+- task: 2.2
 - topic: storage
 - services: S3
 - tags: cross-account-access
@@ -634,13 +663,13 @@ A bucket must reject any request that is not sent over HTTPS. What enforces this
 
 A company needs cross-account access to objects, wants the destination account to OWN replicated objects, and must replicate existing objects already in the bucket. Which two apply? (Choose TWO)
 
-- A. Replication owner override (change object ownership to destination)
-- B. S3 Batch Replication for existing objects
-- C. Object Lock Compliance mode
+- A. Object Lock Compliance mode
+- B. Transfer Acceleration for existing objects
+- C. S3 Batch Replication for existing objects
 - D. SSE-C encryption is required
-- E. Transfer Acceleration for existing objects
+- E. Replication owner override (change object ownership to destination)
 
-**Answer:** A, B
+**Answer:** C, E
 
 **Explanation:** Destination owns objects = owner override; replicate existing = S3 Batch Replication.
 
@@ -648,6 +677,7 @@ A company needs cross-account access to objects, wants the destination account t
 
 ## Q 02-v2-30
 - domain: performance
+- task: 3.5
 - topic: storage
 - services: Snow Family
 - difficulty: hard
@@ -656,9 +686,9 @@ A company needs cross-account access to objects, wants the destination account t
 
 An edge site with intermittent connectivity needs a small, rugged device to collect data and run limited compute, later shipping data to AWS. Which device?
 
-- A. Snowmobile
+- A. Snowball Edge Storage Optimized (80 TB)
 - B. Snowcone
-- C. Snowball Edge Storage Optimized (80 TB)
+- C. Snowmobile
 - D. Storage Gateway appliance
 
 **Answer:** B

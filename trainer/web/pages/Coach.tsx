@@ -6,7 +6,11 @@ import { startTest } from '../lib/start.ts';
 import { fmtDateTime, fmtDuration, fmtRelative } from '../lib/format.ts';
 import { Markdown } from '../lib/markdown.tsx';
 import { Chip, Empty, Modal, Seg, Tabs, copyText, toast, toggle } from '../components/ui.tsx';
-import type { ClaudeStatus, CoachEvent, CoachRunInfo, Plan, PlanSession } from '../../shared/types.ts';
+import { BarList } from '../components/charts.tsx';
+import { COACH_TASK_LABEL, EnrichPanel, KvRow, fmtUsd, hostListed } from '../components/insights.tsx';
+import type { ClaudeStatus, CoachEvent, CoachRunInfo, CostSummary, EnrichStatus, Plan, PlanSession } from '../../shared/types.ts';
+
+type ModelMap = { analyze: string; generate: string; enrich: string; ask: string };
 
 interface CoachInfo {
   claude: ClaudeStatus;
@@ -16,6 +20,75 @@ interface CoachInfo {
   profile: string;
   coworkPrompt: string;
   schedule: string[];
+  costs?: CostSummary; // API-equivalent cost of recent runs + asks (costUsd includes asks; subscription users are not billed this)
+  enrich?: EnrichStatus;
+  models?: ModelMap; // resolved per-task models ('' = Claude Code default)
+  host?: string;
+  hostAllowed?: boolean; // this machine may run SCHEDULED coach runs (coach.hosts)
+  blocked?: string | null; // why coach runs are refused here (TRAINER_HOME test mode)
+}
+
+const MODEL_ROWS: { id: keyof ModelMap; label: string }[] = [
+  { id: 'analyze', label: '🔍 Phân tích & kế hoạch' },
+  { id: 'generate', label: '✨ Sinh câu hỏi' },
+  { id: 'enrich', label: '🧹 ENRICH / câu dài' },
+  { id: 'ask', label: '🤖 Hỏi AI' },
+];
+
+/** Cost of recent coach runs and asks, in API-equivalent dollars, plus the resolved model per task. */
+function CostPanel({ costs, models }: { costs?: CostSummary; models?: ModelMap }) {
+  const rows = Object.entries(costs?.byTask ?? {}).map(([k, v]) => ({ key: k, label: COACH_TASK_LABEL[k] ?? k, runs: v.runs, cost: v.costUsd }));
+  if (costs?.asks?.count) rows.push({ key: 'ask', label: COACH_TASK_LABEL.ask, runs: costs.asks.count, cost: costs.asks.costUsd });
+  rows.sort((a, b) => b.cost - a.cost);
+  const max = Math.max(0.0001, ...rows.map((r) => r.cost));
+  return (
+    <div className="grid c2">
+      <div className="card stack">
+        <div className="card-head" style={{ marginBottom: 0 }}>
+          <h2>💰 Chi phí {costs?.days ?? 30} ngày (quy đổi API)</h2>
+        </div>
+        {!costs ? (
+          <div className="small muted">Server chưa báo chi phí (cần bản server mới).</div>
+        ) : (
+          <>
+            <div className="row" style={{ alignItems: 'baseline', gap: 10 }}>
+              <span className="ins-stat lg">{fmtUsd(costs.costUsd)}</span>
+              <span className="small muted">
+                {costs.runs} lượt chạy · {costs.asks?.count ?? 0} câu hỏi AI
+              </span>
+            </div>
+            {rows.length ? (
+              <BarList max={max} items={rows.map((r) => ({ key: r.key, label: r.label, value: r.cost, valueText: `${fmtUsd(r.cost)} · ${r.runs}`, title: `${r.runs} lượt · ${fmtUsd(r.cost)}` }))} />
+            ) : (
+              <div className="small muted">Chưa có lượt chạy nào trong khoảng này.</div>
+            )}
+          </>
+        )}
+        <div className="tiny muted">
+          Số liệu do Claude Code báo theo <b>giá API</b>. Khi đăng nhập bằng gói claude.ai (Pro/Max) đây chỉ là chi phí quy đổi để so sánh — không bị trừ tiền; chỉ khi dùng API
+          key mới bị tính thật (giới hạn bằng <code>coach.max_budget_usd</code>).
+        </div>
+      </div>
+      <div className="card stack">
+        <h2>🧠 Model theo tác vụ</h2>
+        {models ? (
+          <div className="stack sm small">
+            {MODEL_ROWS.map((m) => (
+              <KvRow key={m.id} k={m.label}>
+                {models[m.id] ? <code>{models[m.id]}</code> : <span className="muted">mặc định của Claude Code</span>}
+              </KvRow>
+            ))}
+          </div>
+        ) : (
+          <div className="small muted">Server chưa báo model theo tác vụ.</div>
+        )}
+        <div className="tiny muted">
+          Đổi trong <code>trainer/config.yaml</code> → <code>coach.model</code> (mặc định cho mọi tác vụ) và <code>coach.models.analyze | generate | enrich | ask</code> (ghi đè
+          từng tác vụ, vd <code>sonnet</code> cho việc khối lượng lớn, <code>opus</code> cho phân tích).
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface NoteInfo {
@@ -180,7 +253,7 @@ export function Coach() {
   const [viewRun, setViewRun] = useState<string>();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'plan' | 'generate' | 'history' | 'profile' | 'setup'>('plan');
+  const [tab, setTab] = useState<'plan' | 'generate' | 'enrich' | 'history' | 'profile' | 'costs' | 'setup'>('plan');
   const [showPrompt, setShowPrompt] = useState(false);
   const [planIdx, setPlanIdx] = useState(0);
   const running = info?.status.running;
@@ -213,7 +286,8 @@ export function Coach() {
   useServerEvent<CoachRunInfo>('coach-done', (r) => {
     reload();
     void refresh();
-    toast(r.status === 'success' ? '✅ AI Coach đã xong — kế hoạch & ngân hàng đã cập nhật.' : `AI Coach kết thúc: ${r.status}`);
+    const what = r.task === 'enrich' ? 'ENRICH' : r.task === 'longform' ? 'Sinh câu dài' : r.task === 'generate' ? 'Sinh câu hỏi' : 'AI Coach';
+    toast(r.status === 'success' ? `✅ ${what} đã xong — ${r.task === 'analyze' ? 'kế hoạch & ' : ''}ngân hàng đã cập nhật.` : `${what} kết thúc: ${r.status}`);
   });
 
   const analyze = async () => {
@@ -239,6 +313,11 @@ export function Coach() {
   const plan = plans[planIdx];
   const claude = info?.claude;
   const viewing = info?.runs.find((r) => r.id === viewRun) ?? running;
+  const coachHosts = meta.coachHosts ?? [];
+  const host = info?.host ?? meta.host;
+  const hostExcluded = info?.hostAllowed !== undefined ? !info.hostAllowed : !hostListed(host, coachHosts);
+  const blocked = info?.blocked || undefined;
+  const costs = info?.costs;
 
   return (
     <div>
@@ -268,19 +347,29 @@ export function Coach() {
           <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú cho coach (tùy chọn): ví dụ “tuần sau thi, tập trung domain 1”" />
           {running ? (
             <div className="row">
-              <span className="spinner" /> <span className="small">Đang chạy {fmtRelative(running.startedAt)}…</span>
+              <span className="spinner" />{' '}
+              <span className="small">
+                Đang chạy {COACH_TASK_LABEL[running.task] ?? ''} · bắt đầu {fmtRelative(running.startedAt)}…
+              </span>
               <span className="spacer" />
               <button className="btn danger sm" onClick={cancel}>
                 ■ Dừng
               </button>
             </div>
           ) : (
-            <button className="btn primary lg" disabled={busy || !claude?.available || !!info?.status.lockedBy} onClick={analyze}>
+            <button className="btn primary lg" disabled={busy || !claude?.available || !!info?.status.lockedBy || !!blocked} onClick={analyze}>
               🔍 Phân tích ngay
             </button>
           )}
-          {info?.status.lockedBy && !running && <div className="alert warn small">Một tiến trình khác (lịch tự động / CLI) đang chạy coach: {info.status.lockedBy.runId}</div>}
-          {claude && !claude.available && <div className="alert warn small">{claude.hint}</div>}
+          {info?.status.lockedBy && !running && <div className="ins-wrap alert warn small">Một tiến trình khác (lịch tự động / CLI) đang chạy coach: {info.status.lockedBy.runId}</div>}
+          {claude && !claude.available && <div className="ins-wrap alert warn small">{claude.hint}</div>}
+          {blocked && <div className="ins-wrap alert info small">⏸ {blocked}</div>}
+          {hostExcluded && (
+            <div className="ins-wrap alert warn small">
+              ⚠️ Máy này (<code>{host}</code>) không nằm trong <code>coach.hosts</code> ({coachHosts.join(', ')}) — lịch tự động sẽ bỏ qua AI Coach ở đây. Bấm tay vẫn chạy
+              được; đổi trong <code>trainer/config.yaml</code>.
+            </div>
+          )}
           <div className="row">
             <button className="btn sm" onClick={() => setShowPrompt(true)}>
               📋 Prompt cho Claude Cowork
@@ -290,13 +379,20 @@ export function Coach() {
             </button>
           </div>
           {claude?.available && claude.auth && !claude.auth.loggedIn && (
-            <div className="alert warn small">Claude Code chưa đăng nhập — mở terminal chạy <code>claude</code> rồi <code>/login</code>.</div>
+            <div className="ins-wrap alert warn small">Claude Code chưa đăng nhập — mở terminal chạy <code>claude</code> rồi <code>/login</code>.</div>
           )}
           {claude?.available && (
             <div className="tiny muted" title={claude.path}>
               CLI: {claude.source}
               {claude.auth?.loggedIn ? ` · đăng nhập ${claude.auth.method ?? ''}${claude.auth.plan ? ` (${claude.auth.plan})` : ''}` : ''}
+              {info?.models?.analyze ? ` · model phân tích: ${info.models.analyze}` : ''}
             </div>
+          )}
+          {costs && (
+            <button type="button" className="ins-linkish small" onClick={() => setTab('costs')} title="Chi phí theo giá API do Claude Code báo — gói claude.ai không bị trừ số này">
+              💰 {costs.days} ngày: <b>{fmtUsd(costs.costUsd)}</b> quy đổi API · {costs.runs} lượt
+              {costs.asks?.count ? ` · ${costs.asks.count} câu hỏi AI` : ''} →
+            </button>
           )}
         </div>
 
@@ -309,11 +405,11 @@ export function Coach() {
           </div>
           <Console events={events} live={!!running} />
           {viewing?.summary && viewing.status !== 'running' && (
-            <div className="alert good small">
+            <div className="ins-wrap alert good small">
               <Markdown text={viewing.summary} />
             </div>
           )}
-          {viewing?.error && <div className="alert bad small">Lỗi: {viewing.error}</div>}
+          {viewing?.error && <div className="ins-wrap alert bad small">Lỗi: {viewing.error}</div>}
         </div>
       </section>
 
@@ -324,8 +420,10 @@ export function Coach() {
           items={[
             { id: 'plan', label: `🧭 Kế hoạch${plans.length ? ` (${plans.length})` : ''}` },
             { id: 'generate', label: '✨ Sinh câu hỏi từ tài liệu' },
+            { id: 'enrich', label: `🧹 ENRICH${info?.enrich ? ` (${info.enrich.enriched}/${info.enrich.total})` : ''}` },
             { id: 'profile', label: '👤 Hồ sơ người học' },
             { id: 'history', label: `🗒️ Lượt chạy (${info?.runs.length ?? 0})` },
+            { id: 'costs', label: '💰 Chi phí & model' },
             { id: 'setup', label: '⚙️ Tự động hoá' },
           ]}
         />
@@ -340,7 +438,7 @@ export function Coach() {
               <div className="row between">
                 <div>
                   <b>{plan.summary ?? plan.id}</b>
-                  <div className="small muted">
+                  <div className="small muted ins-wrap">
                     {fmtDateTime(plan.created)} · {plan.trigger ?? 'manual'} · <code>trainer/{plan.file}</code>
                     {plan.newPacks.length ? ` · pack mới: ${plan.newPacks.join(', ')}` : ''}
                   </div>
@@ -372,7 +470,7 @@ export function Coach() {
         {tab === 'generate' && (
           <div className="card">
             <GenerateForm
-              disabled={!!running || !claude?.available}
+              disabled={!!running || !claude?.available || !!blocked}
               onStarted={() => {
                 setEvents([]);
                 reload();
@@ -381,6 +479,27 @@ export function Coach() {
             />
           </div>
         )}
+
+        {tab === 'enrich' && (
+          <div className="card stack">
+            <div className="small dim">
+              <b>ENRICH</b> là quy trình bảo trì ngân hàng chạy dần (mặc định khi lịch tự động không có bài làm mới): viết lại giải thích theo chuẩn (vì sao đúng + từng phương án
+              nhiễu + tóm tắt 🇻🇳), thêm gợi ý, phân loại domain/task, cân độ dài phương án; và sinh <b>câu dài</b> giống đề thật cho các câu bạn hay gặp/sai.
+            </div>
+            <EnrichPanel
+              running={!!running || !!info?.status.lockedBy}
+              blocked={blocked}
+              onStarted={(r) => {
+                setViewRun(r.id);
+                setEvents([]);
+                reload();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          </div>
+        )}
+
+        {tab === 'costs' && <CostPanel costs={costs} models={info?.models} />}
 
         {tab === 'profile' && (
           <div className="card pad-lg">
@@ -409,7 +528,11 @@ export function Coach() {
                     {info.runs.map((r) => (
                       <tr key={r.id}>
                         <td className="small nowrap">{fmtDateTime(r.startedAt)}</td>
-                        <td className="small">{r.task === 'analyze' ? '🔍 Phân tích' : '✨ Sinh câu hỏi'}</td>
+                        <td className="small">
+                          {COACH_TASK_LABEL[r.task] ?? r.task}
+                          {r.params && typeof r.params.size === 'number' ? <span className="tiny muted"> · {r.params.size} câu</span> : null}
+                          {r.params && typeof r.params.count === 'number' ? <span className="tiny muted"> · {r.params.count} câu</span> : null}
+                        </td>
                         <td className="small">{r.trigger}</td>
                         <td>
                           <span className={`badge ${STATUS_BADGE[r.status]}`}>{r.status}</span>
@@ -436,24 +559,38 @@ export function Coach() {
         )}
 
         {tab === 'setup' && (
-          <div className="grid c2">
+          <div className="grid c2 ins-wrap">
             <div className="card stack">
-              <h2>⏰ Chạy tự động trên máy (macOS launchd)</h2>
+              <h2>⏰ Chạy tự động trên máy</h2>
               <div className="small dim">
-                Chạy <code>claude -p</code> headless vào các giờ cố định. Lượt chạy tự bỏ qua nếu không có bài làm mới hoặc báo lỗi mới (tiết kiệm token). Giờ chạy cấu hình ở <code>trainer/config.yaml</code> →{' '}
-                <code>coach.schedule</code> (hiện tại: {info?.schedule.join(', ') ?? '—'}).
+                Chạy <code>claude -p</code> headless vào các giờ cố định (macOS launchd · Linux cron · Windows Task Scheduler). Không có bài làm/báo lỗi mới → bỏ qua phân tích và
+                chạy 1 lượt ENRICH thay thế. Giờ chạy: <code>trainer/config.yaml</code> → <code>coach.schedule</code> (hiện tại: {info?.schedule?.join(', ') ?? '—'}).
               </div>
               <pre className="console" style={{ margin: 0 }}>{`cd trainer
 npm run schedule -- install     # cài lịch
 npm run schedule -- status      # xem trạng thái
 npm run schedule -- uninstall   # gỡ
 npm run coach                   # chạy 1 lần ngay (bỏ qua nếu không có dữ liệu mới)
-npm run coach -- --force        # luôn chạy`}</pre>
-              <div className="tiny muted">Máy cần bật (launchd chạy bù khi máy thức dậy). Log: trainer/coach/runs/.</div>
+npm run coach -- --force        # luôn chạy
+npm run coach -- --enrich --size 20   # 1 lượt ENRICH
+npm run coach -- --longform --count 5 # sinh 5 câu dài`}</pre>
+              <div className="tiny muted">
+                Máy cần bật. Log: trainer/coach/runs/.{' '}
+                {coachHosts.length ? (
+                  <>
+                    Lịch chỉ chạy trên: <b>{coachHosts.join(', ')}</b>
+                    {hostExcluded ? ` — máy này (${host}) sẽ bỏ qua.` : ' (gồm máy này).'}
+                  </>
+                ) : (
+                  <>
+                    Dùng 2 máy? Đặt <code>coach.hosts: [{host || 'tên-máy'}]</code> để chỉ một máy chạy lịch, máy còn lại chỉ “⇅ Đồng bộ”.
+                  </>
+                )}
+              </div>
             </div>
             <div className="card stack">
               <h2>🧑‍💻 Claude Cowork / Claude Code</h2>
-              <ol className="small" style={{ margin: 0, paddingLeft: 20, lineHeight: 1.7 }}>
+              <ol className="small ins-wrap" style={{ margin: 0, paddingLeft: 20, lineHeight: 1.7 }}>
                 <li>
                   Mở Cowork, chọn thư mục repo <code>{meta.paths.repo}</code>.
                 </li>

@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 06-v2-01
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation, VPC, EC2, RDS
 - difficulty: medium
@@ -24,11 +25,11 @@ created: 2026-10-16
 A team wants to provision entire environments (VPC, EC2, RDS) as code, repeatable across Regions. Which service?
 
 - A. AWS Config
-- B. AWS CloudFormation
+- B. AWS OpsWorks
 - C. AWS Systems Manager
-- D. AWS OpsWorks
+- D. AWS CloudFormation
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Infrastructure as code, repeatable = AWS CloudFormation.
 
@@ -36,6 +37,7 @@ A team wants to provision entire environments (VPC, EC2, RDS) as code, repeatabl
 
 ## Q 06-v2-02
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Systems Manager, EC2
 - tags: subnets, bastion-host
@@ -58,6 +60,7 @@ Administrators must connect to EC2 instances in private subnets without opening 
 
 ## Q 06-v2-03
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudWatch, SNS, EC2
 - difficulty: medium
@@ -66,12 +69,12 @@ Administrators must connect to EC2 instances in private subnets without opening 
 
 A metric-based alarm must notify an ops team when EC2 CPU exceeds 80% for 5 minutes. Which combination?
 
-- A. CloudWatch alarm + SNS
-- B. CloudTrail + SQS
-- C. Config rule + Lambda
-- D. VPC Flow Logs + SNS
+- A. VPC Flow Logs + SNS
+- B. Config rule + Lambda
+- C. CloudTrail + SQS
+- D. CloudWatch alarm + SNS
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Metric threshold alert = CloudWatch alarm + SNS notification.
 
@@ -79,6 +82,7 @@ A metric-based alarm must notify an ops team when EC2 CPU exceeds 80% for 5 minu
 
 ## Q 06-v2-04
 - domain: secure
+- task: 1.3
 - topic: management
 - services: Systems Manager, EC2
 - tags: compliance
@@ -88,12 +92,12 @@ A metric-based alarm must notify an ops team when EC2 CPU exceeds 80% for 5 minu
 
 A company must patch hundreds of EC2 instances on a schedule with compliance reporting. Which service?
 
-- A. Systems Manager Patch Manager
-- B. AWS Config
+- A. AWS Config
+- B. Systems Manager Patch Manager
 - C. CloudFormation
 - D. Trusted Advisor
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Scheduled patching + compliance = Systems Manager Patch Manager.
 
@@ -101,6 +105,7 @@ A company must patch hundreds of EC2 instances on a schedule with compliance rep
 
 ## Q 06-v2-05
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - tags: cfn-drift
@@ -110,12 +115,12 @@ A company must patch hundreds of EC2 instances on a schedule with compliance rep
 
 A company needs to detect whether resources drift from their CloudFormation-defined configuration. Which feature?
 
-- A. Change sets
-- B. Drift detection
-- C. Nested stacks
+- A. Drift detection
+- B. Nested stacks
+- C. Change sets
 - D. StackSets
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Detect config divergence from template = Drift detection.
 
@@ -123,6 +128,7 @@ A company needs to detect whether resources drift from their CloudFormation-defi
 
 ## Q 06-v2-06
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudTrail
 - tags: compliance
@@ -132,9 +138,9 @@ A company needs to detect whether resources drift from their CloudFormation-defi
 
 Which service continuously records API activity for security auditing across the account?
 
-- A. CloudWatch Logs
+- A. AWS Config
 - B. AWS CloudTrail
-- C. AWS Config
+- C. CloudWatch Logs
 - D. Trusted Advisor
 
 **Answer:** B
@@ -145,6 +151,7 @@ Which service continuously records API activity for security auditing across the
 
 ## Q 06-v2-07
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: medium
@@ -153,12 +160,12 @@ Which service continuously records API activity for security auditing across the
 
 A company must deploy the same CloudFormation stack across multiple accounts and Regions from one place. Which feature?
 
-- A. Nested stacks
-- B. StackSets
-- C. Change sets
-- D. Drift detection
+- A. StackSets
+- B. Nested stacks
+- C. Drift detection
+- D. Change sets
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Same stack across accounts/Regions = StackSets.
 
@@ -166,6 +173,7 @@ A company must deploy the same CloudFormation stack across multiple accounts and
 
 ## Q 06-v2-08
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Trusted Advisor
 - difficulty: medium
@@ -174,12 +182,12 @@ A company must deploy the same CloudFormation stack across multiple accounts and
 
 An organization wants recommendations on cost, security, performance, and service limits. Which service?
 
-- A. AWS Trusted Advisor
-- B. AWS Config
-- C. CloudTrail
-- D. GuardDuty
+- A. GuardDuty
+- B. CloudTrail
+- C. AWS Config
+- D. AWS Trusted Advisor
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Cost/security/performance/limits recommendations = Trusted Advisor.
 
@@ -187,6 +195,7 @@ An organization wants recommendations on cost, security, performance, and servic
 
 ## Q 06-v2-09
 - domain: secure
+- task: 1.2
 - topic: management
 - services: AWS Config, S3
 - difficulty: medium
@@ -196,9 +205,9 @@ An organization wants recommendations on cost, security, performance, and servic
 A company must evaluate whether S3 buckets are ever public and auto-remediate. Which service?
 
 - A. AWS Config with rules + remediation
-- B. CloudTrail
+- B. Systems Manager Inventory
 - C. CloudWatch alarm
-- D. Systems Manager Inventory
+- D. CloudTrail
 
 **Answer:** A
 
@@ -208,6 +217,7 @@ A company must evaluate whether S3 buckets are ever public and auto-remediate. W
 
 ## Q 06-v2-10
 - domain: secure
+- task: 1.3
 - topic: management
 - services: CloudWatch, EC2
 - difficulty: medium
@@ -216,12 +226,12 @@ A company must evaluate whether S3 buckets are ever public and auto-remediate. W
 
 Application logs from EC2 must be centralized, searchable, and retained. Which service?
 
-- A. CloudWatch Logs
-- B. AWS Config
-- C. CloudTrail
-- D. S3 only
+- A. S3 only
+- B. CloudWatch Logs
+- C. AWS Config
+- D. CloudTrail
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Centralized searchable app logs = CloudWatch Logs.
 
@@ -229,6 +239,7 @@ Application logs from EC2 must be centralized, searchable, and retained. Which s
 
 ## Q 06-v2-11
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Service Catalog
 - difficulty: medium
@@ -237,12 +248,12 @@ Application logs from EC2 must be centralized, searchable, and retained. Which s
 
 A company wants a self-service catalog of approved, pre-configured products for teams to deploy. Which service?
 
-- A. AWS Service Catalog
-- B. AWS Marketplace
-- C. AWS Config
-- D. Systems Manager
+- A. Systems Manager
+- B. AWS Config
+- C. AWS Marketplace
+- D. AWS Service Catalog
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Self-service catalog of approved products = AWS Service Catalog.
 
@@ -250,6 +261,7 @@ A company wants a self-service catalog of approved, pre-configured products for 
 
 ## Q 06-v2-12
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - tags: ami
@@ -259,12 +271,12 @@ A company wants a self-service catalog of approved, pre-configured products for 
 
 A CloudFormation template must accept environment-specific values (instance size, AMI) at deploy time. Which section?
 
-- A. Resources
-- B. Parameters
-- C. Outputs
+- A. Parameters
+- B. Outputs
+- C. Resources
 - D. Mappings
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Deploy-time input values = Parameters section.
 
@@ -272,6 +284,7 @@ A CloudFormation template must accept environment-specific values (instance size
 
 ## Q 06-v2-13
 - domain: secure
+- task: 1.3
 - topic: management
 - services: CloudFormation
 - difficulty: medium
@@ -281,11 +294,11 @@ A CloudFormation template must accept environment-specific values (instance size
 A resource must NOT be deleted when its CloudFormation stack is deleted (e.g., a production database). Which attribute?
 
 - A. DependsOn
-- B. DeletionPolicy: Retain
-- C. Metadata
+- B. Metadata
+- C. DeletionPolicy: Retain
 - D. Condition
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Keep resource on stack delete = DeletionPolicy: Retain.
 
@@ -293,6 +306,7 @@ A resource must NOT be deleted when its CloudFormation stack is deleted (e.g., a
 
 ## Q 06-v2-14
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Systems Manager
 - difficulty: medium
@@ -301,12 +315,12 @@ A resource must NOT be deleted when its CloudFormation stack is deleted (e.g., a
 
 A company must run a command (e.g., install an agent) across many instances without SSH. Which SSM capability?
 
-- A. Run Command
-- B. Parameter Store
-- C. Patch Manager
-- D. Inventory
+- A. Inventory
+- B. Run Command
+- C. Parameter Store
+- D. Patch Manager
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Run commands across instances without SSH = SSM Run Command.
 
@@ -314,6 +328,7 @@ A company must run a command (e.g., install an agent) across many instances with
 
 ## Q 06-v2-15
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: medium
@@ -335,6 +350,7 @@ A team wants to preview the changes CloudFormation will make before applying an 
 
 ## Q 06-v2-16
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Health Dashboard
 - difficulty: medium
@@ -343,12 +359,12 @@ A team wants to preview the changes CloudFormation will make before applying an 
 
 A company must be alerted to scheduled maintenance and issues affecting its specific AWS resources. Which service?
 
-- A. AWS Health Dashboard (Personal Health Dashboard)
-- B. Trusted Advisor
-- C. CloudTrail
-- D. Config
+- A. Trusted Advisor
+- B. CloudTrail
+- C. Config
+- D. AWS Health Dashboard (Personal Health Dashboard)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Alerts for events affecting your resources = AWS Health Dashboard.
 
@@ -356,6 +372,7 @@ A company must be alerted to scheduled maintenance and issues affecting its spec
 
 ## Q 06-v2-17
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Compute Optimizer, EC2, EBS, Lambda
 - tags: right-sizing
@@ -365,12 +382,12 @@ A company must be alerted to scheduled maintenance and issues affecting its spec
 
 Which service provides right-sizing recommendations for EC2, EBS, Lambda, and ASGs based on utilization?
 
-- A. AWS Compute Optimizer
+- A. CloudFormation
 - B. AWS Config
-- C. Trusted Advisor only
-- D. CloudFormation
+- C. AWS Compute Optimizer
+- D. Trusted Advisor only
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Right-sizing recommendations from utilization = AWS Compute Optimizer.
 
@@ -378,6 +395,7 @@ Which service provides right-sizing recommendations for EC2, EBS, Lambda, and AS
 
 ## Q 06-v2-18
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Systems Manager
 - difficulty: medium
@@ -387,9 +405,9 @@ Which service provides right-sizing recommendations for EC2, EBS, Lambda, and AS
 A company needs to store a database connection string as a hierarchical, versioned configuration value referenced by apps. Which service?
 
 - A. Systems Manager Parameter Store
-- B. CloudFormation Outputs
-- C. AWS Config
-- D. CloudTrail
+- B. AWS Config
+- C. CloudTrail
+- D. CloudFormation Outputs
 
 **Answer:** A
 
@@ -399,6 +417,7 @@ A company needs to store a database connection string as a hierarchical, version
 
 ## Q 06-v2-19
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: medium
@@ -407,12 +426,12 @@ A company needs to store a database connection string as a hierarchical, version
 
 A CloudFormation stack must create resource B only after resource A exists. Which attribute enforces order?
 
-- A. DeletionPolicy
-- B. DependsOn
-- C. Mappings
+- A. Mappings
+- B. DeletionPolicy
+- C. DependsOn
 - D. Outputs
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Enforce creation order = DependsOn.
 
@@ -420,6 +439,7 @@ A CloudFormation stack must create resource B only after resource A exists. Whic
 
 ## Q 06-v2-20
 - domain: secure
+- task: 1.3
 - topic: management
 - services: S3, CloudTrail
 - difficulty: medium
@@ -428,13 +448,13 @@ A CloudFormation stack must create resource B only after resource A exists. Whic
 
 A company must ensure CloudTrail logs cannot be tampered with and are retained centrally for all accounts. Which two? (Choose TWO)
 
-- A. Organization trail delivering to a central S3 bucket
-- B. Enable log file validation
-- C. Disable CloudTrail in member accounts
-- D. Store logs only on EC2
-- E. Turn off encryption
+- A. Enable log file validation
+- B. Turn off encryption
+- C. Store logs only on EC2
+- D. Organization trail delivering to a central S3 bucket
+- E. Disable CloudTrail in member accounts
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** Tamper-evident central logging = Organization trail to central S3 + log file validation.
 
@@ -442,6 +462,7 @@ A company must ensure CloudTrail logs cannot be tampered with and are retained c
 
 ## Q 06-v2-21
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: hard
@@ -450,12 +471,12 @@ A company must ensure CloudTrail logs cannot be tampered with and are retained c
 
 A CloudFormation update fails midway. The team wants automatic return to the last known good state. Which behavior/feature applies?
 
-- A. Automatic rollback on stack update failure
-- B. Drift detection
-- C. StackSets
-- D. Manual deletion only
+- A. StackSets
+- B. Manual deletion only
+- C. Automatic rollback on stack update failure
+- D. Drift detection
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Return to last good state on failed update = automatic rollback.
 
@@ -463,6 +484,7 @@ A CloudFormation update fails midway. The team wants automatic return to the las
 
 ## Q 06-v2-22
 - domain: secure
+- task: 1.2
 - topic: management
 - services: VPC
 - difficulty: hard
@@ -472,12 +494,12 @@ A CloudFormation update fails midway. The team wants automatic return to the las
 A company reuses common infrastructure (a standard VPC) across many stacks and wants to reference its outputs from other stacks. Which two approaches? (Choose TWO)
 
 - A. Nested stacks
-- B. Cross-stack references via Exports/ImportValue
-- C. Copy-paste resources into each template
+- B. Copy-paste resources into each template
+- C. Change sets
 - D. Drift detection
-- E. Change sets
+- E. Cross-stack references via Exports/ImportValue
 
-**Answer:** A, B
+**Answer:** A, E
 
 **Explanation:** Reuse infra across stacks = nested stacks + cross-stack Exports/ImportValue.
 
@@ -485,6 +507,7 @@ A company reuses common infrastructure (a standard VPC) across many stacks and w
 
 ## Q 06-v2-23
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Systems Manager, S3, CloudWatch
 - tags: compliance
@@ -494,12 +517,12 @@ A company reuses common infrastructure (a standard VPC) across many stacks and w
 
 Administrators must give temporary, audited, break-glass shell access to a private instance and log every command to CloudWatch/S3. Which combination?
 
-- A. Session Manager with logging to S3/CloudWatch Logs
-- B. Open SSH port 22 to the office IP
+- A. Open SSH port 22 to the office IP
+- B. Session Manager with logging to S3/CloudWatch Logs
 - C. Bastion host with shared key
 - D. EC2 Instance Connect only
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Audited break-glass private access = Session Manager with S3/CloudWatch logging.
 
@@ -507,6 +530,7 @@ Administrators must give temporary, audited, break-glass shell access to a priva
 
 ## Q 06-v2-24
 - domain: secure
+- task: 1.3
 - topic: management
 - services: AWS Config, Systems Manager, EBS
 - tags: compliance, db-encryption
@@ -516,12 +540,12 @@ Administrators must give temporary, audited, break-glass shell access to a priva
 
 A company must automatically remediate non-compliant resources (e.g., unencrypted EBS) detected by AWS Config. Which integration?
 
-- A. Config rule + SSM Automation remediation document
+- A. GuardDuty + WAF
 - B. CloudTrail + SNS
 - C. Trusted Advisor + Lambda
-- D. GuardDuty + WAF
+- D. Config rule + SSM Automation remediation document
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Auto-remediate Config findings = Config rule + SSM Automation document.
 
@@ -529,6 +553,7 @@ A company must automatically remediate non-compliant resources (e.g., unencrypte
 
 ## Q 06-v2-25
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: hard
@@ -537,12 +562,12 @@ A company must automatically remediate non-compliant resources (e.g., unencrypte
 
 A CloudFormation deployment across 500 accounts in an Organization must be automated when new accounts are added. Which feature?
 
-- A. StackSets with automatic deployment to the OU
-- B. Nested stacks
-- C. Manual stack per account
-- D. Change sets
+- A. Manual stack per account
+- B. Change sets
+- C. StackSets with automatic deployment to the OU
+- D. Nested stacks
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Auto-deploy to new Organization accounts = StackSets with automatic OU deployment.
 
@@ -550,6 +575,7 @@ A CloudFormation deployment across 500 accounts in an Organization must be autom
 
 ## Q 06-v2-26
 - domain: performance
+- task: 3.5
 - topic: management
 - services: CloudWatch, Data Firehose, EC2
 - tags: streaming-ingestion, data-lake
@@ -560,12 +586,12 @@ A CloudFormation deployment across 500 accounts in an Organization must be autom
 A company needs to forward EC2 application logs to CloudWatch Logs and also stream them in near real-time to a data lake for analytics. Which two? (Choose TWO)
 
 - A. CloudWatch Logs subscription filter to Kinesis Data Firehose
-- B. CloudWatch agent on the instances
-- C. CloudTrail data events
-- D. Config aggregator
-- E. Trusted Advisor export
+- B. Trusted Advisor export
+- C. Config aggregator
+- D. CloudWatch agent on the instances
+- E. CloudTrail data events
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** Logs to CloudWatch + data lake = CloudWatch agent + subscription filter to Kinesis Firehose.
 
@@ -573,6 +599,7 @@ A company needs to forward EC2 application logs to CloudWatch Logs and also stre
 
 ## Q 06-v2-27
 - domain: secure
+- task: 1.2
 - topic: management
 - services: RDS, EBS
 - tags: snapshots
@@ -582,12 +609,12 @@ A company needs to forward EC2 application logs to CloudWatch Logs and also stre
 
 A stateful resource in a stack must be preserved on delete AND a snapshot taken automatically when supported. Which DeletionPolicy value fits an RDS/EBS resource?
 
-- A. DeletionPolicy: Retain only
-- B. DeletionPolicy: Snapshot
-- C. DeletionPolicy: Delete
-- D. UpdateReplacePolicy: Delete
+- A. DeletionPolicy: Snapshot
+- B. DeletionPolicy: Delete
+- C. UpdateReplacePolicy: Delete
+- D. DeletionPolicy: Retain only
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Preserve + snapshot stateful resource on delete = DeletionPolicy: Snapshot.
 
@@ -595,6 +622,7 @@ A stateful resource in a stack must be preserved on delete AND a snapshot taken 
 
 ## Q 06-v2-28
 - domain: secure
+- task: 1.1
 - topic: management
 - services: Organizations, CloudTrail
 - tags: scp
@@ -604,12 +632,12 @@ A stateful resource in a stack must be preserved on delete AND a snapshot taken 
 
 A company must enforce that member accounts cannot disable CloudTrail or leave the Organization. Which service enforces this guardrail?
 
-- A. Service Control Policies (SCPs) via AWS Organizations
-- B. IAM policies per user
-- C. Security Groups
-- D. Config rules only
+- A. Config rules only
+- B. Security Groups
+- C. Service Control Policies (SCPs) via AWS Organizations
+- D. IAM policies per user
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Prevent disabling CloudTrail / leaving org = SCPs via Organizations.
 
@@ -617,6 +645,7 @@ A company must enforce that member accounts cannot disable CloudTrail or leave t
 
 ## Q 06-v2-29
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: hard
@@ -626,11 +655,11 @@ A company must enforce that member accounts cannot disable CloudTrail or leave t
 A large template hits CloudFormation resource limits and is hard to maintain. What is the recommended structuring approach?
 
 - A. One giant template
-- B. Nested stacks (parent + child templates)
-- C. Manual console creation
-- D. StackSets for a single account
+- B. StackSets for a single account
+- C. Nested stacks (parent + child templates)
+- D. Manual console creation
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Break up large template = nested stacks.
 
@@ -638,6 +667,7 @@ A large template hits CloudFormation resource limits and is hard to maintain. Wh
 
 ## Q 06-v2-30
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudWatch
 - difficulty: hard
@@ -646,11 +676,11 @@ A large template hits CloudFormation resource limits and is hard to maintain. Wh
 
 A metric that AWS does not publish natively (e.g., app memory usage) must trigger scaling and alarms. Which approach?
 
-- A. Publish a CloudWatch custom metric (via CloudWatch agent/API)
-- B. Use CloudTrail
-- C. Use Config
-- D. Use Trusted Advisor
+- A. Use Config
+- B. Use Trusted Advisor
+- C. Use CloudTrail
+- D. Publish a CloudWatch custom metric (via CloudWatch agent/API)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Non-native metric for alarms/scaling = CloudWatch custom metric.

@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 08-v2-01
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodePipeline
 - tags: orchestration
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 A team needs a fully managed CI/CD service to orchestrate build, test, and deploy stages triggered on code changes. Which service?
 
-- A. AWS CodePipeline
+- A. AWS CodeDeploy
 - B. AWS CodeCommit
-- C. AWS CodeBuild
-- D. AWS CodeDeploy
+- C. AWS CodePipeline
+- D. AWS CodeBuild
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Orchestrate CI/CD stages = AWS CodePipeline.
 
@@ -37,6 +38,7 @@ A team needs a fully managed CI/CD service to orchestrate build, test, and deplo
 
 ## Q 08-v2-02
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeBuild
 - difficulty: medium
@@ -45,12 +47,12 @@ A team needs a fully managed CI/CD service to orchestrate build, test, and deplo
 
 A managed service must compile source code and run unit tests on demand without managing build servers. Which service?
 
-- A. CodeBuild
-- B. CodeDeploy
-- C. CodePipeline
-- D. CodeCommit
+- A. CodePipeline
+- B. CodeCommit
+- C. CodeBuild
+- D. CodeDeploy
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Managed build/test, no build servers = AWS CodeBuild.
 
@@ -58,6 +60,7 @@ A managed service must compile source code and run unit tests on demand without 
 
 ## Q 08-v2-03
 - domain: secure
+- task: 1.1
 - topic: devtools
 - services: CodeCommit, IAM
 - difficulty: medium
@@ -66,12 +69,12 @@ A managed service must compile source code and run unit tests on demand without 
 
 A company needs a private, managed Git repository integrated with AWS IAM. Which service?
 
-- A. CodeCommit
-- B. CodeArtifact
-- C. CodeGuru
-- D. Cloud9
+- A. CodeGuru
+- B. Cloud9
+- C. CodeArtifact
+- D. CodeCommit
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Private managed Git with IAM = AWS CodeCommit.
 
@@ -79,6 +82,7 @@ A company needs a private, managed Git repository integrated with AWS IAM. Which
 
 ## Q 08-v2-04
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodeDeploy, EC2, Lambda
 - difficulty: medium
@@ -87,12 +91,12 @@ A company needs a private, managed Git repository integrated with AWS IAM. Which
 
 Deployments to EC2/on-prem/Lambda must be automated with rollback on failure. Which service?
 
-- A. CodeDeploy
-- B. CodeBuild
+- A. CodeBuild
+- B. CodeDeploy
 - C. CodeCommit
 - D. CodePipeline
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Automated deploy with rollback = AWS CodeDeploy.
 
@@ -100,6 +104,7 @@ Deployments to EC2/on-prem/Lambda must be automated with rollback on failure. Wh
 
 ## Q 08-v2-05
 - domain: performance
+- task: 3.2
 - topic: devtools
 - services: X-Ray
 - difficulty: medium
@@ -109,8 +114,8 @@ Deployments to EC2/on-prem/Lambda must be automated with rollback on failure. Wh
 A team wants to distribute and troubleshoot performance of a microservices app by tracing requests across services. Which service?
 
 - A. AWS X-Ray
-- B. CloudTrail
-- C. Config
+- B. Config
+- C. CloudTrail
 - D. CodeGuru
 
 **Answer:** A
@@ -121,6 +126,7 @@ A team wants to distribute and troubleshoot performance of a microservices app b
 
 ## Q 08-v2-06
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodeArtifact
 - difficulty: medium
@@ -129,12 +135,12 @@ A team wants to distribute and troubleshoot performance of a microservices app b
 
 A managed artifact repository for storing and sharing software packages (npm, Maven, PyPI). Which service?
 
-- A. CodeArtifact
+- A. S3 only
 - B. CodeCommit
-- C. S3 only
+- C. CodeArtifact
 - D. ECR
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Managed package/artifact repo = AWS CodeArtifact.
 
@@ -142,6 +148,7 @@ A managed artifact repository for storing and sharing software packages (npm, Ma
 
 ## Q 08-v2-07
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: CodeDeploy, Lambda
 - tags: deployment-strategies
@@ -151,12 +158,12 @@ A managed artifact repository for storing and sharing software packages (npm, Ma
 
 A Lambda deployment must shift traffic gradually (canary 10% then 90%) with automatic rollback on alarms. Which service enables this?
 
-- A. CodeDeploy (Lambda deployment)
-- B. CodeBuild
-- C. CodeCommit
-- D. CloudFormation only
+- A. CodeBuild
+- B. CodeDeploy (Lambda deployment)
+- C. CloudFormation only
+- D. CodeCommit
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Lambda canary traffic shifting + rollback = CodeDeploy Lambda deployment.
 
@@ -164,6 +171,7 @@ A Lambda deployment must shift traffic gradually (canary 10% then 90%) with auto
 
 ## Q 08-v2-08
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CDK, CloudFormation
 - difficulty: medium
@@ -172,12 +180,12 @@ A Lambda deployment must shift traffic gradually (canary 10% then 90%) with auto
 
 A team defines infrastructure using familiar programming languages (TypeScript/Python) that synthesizes CloudFormation. Which tool?
 
-- A. AWS CDK
-- B. CodePipeline
-- C. CodeBuild
-- D. Cloud9
+- A. CodeBuild
+- B. Cloud9
+- C. CodePipeline
+- D. AWS CDK
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** IaC in programming languages -> CloudFormation = AWS CDK.
 
@@ -185,6 +193,7 @@ A team defines infrastructure using familiar programming languages (TypeScript/P
 
 ## Q 08-v2-09
 - domain: resilient
+- task: 2.1
 - topic: devtools
 - services: SAM, CloudFormation
 - difficulty: medium
@@ -194,9 +203,9 @@ A team defines infrastructure using familiar programming languages (TypeScript/P
 A serverless application's infrastructure (functions, APIs, tables) must be defined in a simplified template that transforms into CloudFormation. Which framework?
 
 - A. AWS SAM
-- B. AWS CDK only
-- C. Elastic Beanstalk
-- D. CodeDeploy
+- B. CodeDeploy
+- C. AWS CDK only
+- D. Elastic Beanstalk
 
 **Answer:** A
 
@@ -206,6 +215,7 @@ A serverless application's infrastructure (functions, APIs, tables) must be defi
 
 ## Q 08-v2-10
 - domain: cost
+- task: 4.2
 - topic: devtools
 - difficulty: medium
 - time: 50
@@ -213,12 +223,12 @@ A serverless application's infrastructure (functions, APIs, tables) must be defi
 
 Automated code reviews and application profiling to find the most expensive lines of code. Which service?
 
-- A. Amazon CodeGuru
+- A. Trusted Advisor
 - B. X-Ray
 - C. CodeBuild
-- D. Trusted Advisor
+- D. Amazon CodeGuru
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Automated code review + profiling = Amazon CodeGuru.
 
@@ -226,6 +236,7 @@ Automated code reviews and application profiling to find the most expensive line
 
 ## Q 08-v2-11
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: CodePipeline, CodeBuild
 - difficulty: hard
@@ -235,12 +246,12 @@ Automated code reviews and application profiling to find the most expensive line
 A pipeline must run integration tests in a build stage, then deploy to a staging environment, require manual approval, then deploy to production. Which two services combine for this? (Choose TWO)
 
 - A. CodePipeline (stages + manual approval action)
-- B. CodeBuild (test/build stage)
+- B. CodeArtifact only
 - C. CodeCommit only
 - D. X-Ray
-- E. CodeArtifact only
+- E. CodeBuild (test/build stage)
 
-**Answer:** A, B
+**Answer:** A, E
 
 **Explanation:** Pipeline with test/build + approval + deploy = CodePipeline + CodeBuild.
 
@@ -248,6 +259,7 @@ A pipeline must run integration tests in a build stage, then deploy to a staging
 
 ## Q 08-v2-12
 - domain: secure
+- task: 1.2
 - topic: devtools
 - services: ECR, ECS
 - difficulty: hard
@@ -256,12 +268,12 @@ A pipeline must run integration tests in a build stage, then deploy to a staging
 
 A container image built in CI must be stored in a managed, private registry with vulnerability scanning before ECS deploys it. Which service?
 
-- A. Amazon ECR
-- B. CodeArtifact
-- C. CodeCommit
+- A. CodeArtifact
+- B. CodeCommit
+- C. Amazon ECR
 - D. S3
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Private container registry with scanning = Amazon ECR.
 
@@ -269,6 +281,7 @@ A container image built in CI must be stored in a managed, private registry with
 
 ## Q 08-v2-13
 - domain: resilient
+- task: 2.2
 - topic: devtools
 - services: ELB, EC2, CodeDeploy
 - tags: route53-health-checks, deployment-strategies
@@ -278,12 +291,12 @@ A container image built in CI must be stored in a managed, private registry with
 
 An EC2 deployment must avoid downtime by shifting traffic to a new fleet and rolling back automatically if health checks fail. Which CodeDeploy configuration?
 
-- A. Blue/Green deployment with an ELB and automatic rollback
-- B. In-place all-at-once
-- C. Manual copy
-- D. CodeBuild only
+- A. Manual copy
+- B. CodeBuild only
+- C. In-place all-at-once
+- D. Blue/Green deployment with an ELB and automatic rollback
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Zero-downtime EC2 deploy with auto rollback = CodeDeploy Blue/Green with ELB.
 
@@ -291,6 +304,7 @@ An EC2 deployment must avoid downtime by shifting traffic to a new fleet and rol
 
 ## Q 08-v2-14
 - domain: performance
+- task: 3.2
 - topic: devtools
 - services: EventBridge, CodePipeline
 - difficulty: hard
@@ -299,12 +313,12 @@ An EC2 deployment must avoid downtime by shifting traffic to a new fleet and rol
 
 A CodePipeline must be triggered automatically on every commit to the main branch with the lowest latency. Which integration is BEST?
 
-- A. EventBridge (CloudWatch Events) rule on the repository/commit
-- B. Periodic polling only
-- C. Manual start
-- D. SNS to email then manual
+- A. Periodic polling only
+- B. EventBridge (CloudWatch Events) rule on the repository/commit
+- C. SNS to email then manual
+- D. Manual start
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Low-latency pipeline trigger on commit = EventBridge rule on the repo.
 
@@ -312,6 +326,7 @@ A CodePipeline must be triggered automatically on every commit to the main branc
 
 ## Q 08-v2-15
 - domain: performance
+- task: 3.2
 - topic: devtools
 - services: X-Ray, Lambda, API Gateway, DynamoDB
 - difficulty: hard
@@ -321,9 +336,9 @@ A CodePipeline must be triggered automatically on every commit to the main branc
 A distributed request is slow and the team must find which downstream service adds latency across Lambda, API Gateway, and DynamoDB. Which service and feature?
 
 - A. X-Ray service map and trace segments
-- B. CloudTrail data events
-- C. Config timeline
-- D. CodeGuru Reviewer
+- B. CodeGuru Reviewer
+- C. CloudTrail data events
+- D. Config timeline
 
 **Answer:** A
 

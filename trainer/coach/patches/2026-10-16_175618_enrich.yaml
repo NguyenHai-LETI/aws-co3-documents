@@ -1,0 +1,96 @@
+run_id: 2026-10-16_175618_enrich
+items:
+  - id: 09-v1-08
+    base: 3ba2482147
+    set: { domain: secure, task: "1.3", services: [Lake Formation, S3, Glue], tags: [data-lake], concept: "Lake Formation = central fine-grained permissions and governance for S3 data lakes", hint: "Đề cần một lớp quản trị tập trung, phân quyền chi tiết trên dữ liệu data lake — dịch vụ nào chuyên làm việc này?" }
+    options: { A: "AWS Config rules", C: "Amazon Macie alerts", D: "AWS Glue crawlers" }
+    explanation: |
+      **AWS Lake Formation** centralizes fine-grained permissions (database, table, column, row) and governance for data stored in S3, so one place controls access for all integrated analytics engines.
+      - AWS Config rules: track resource configuration compliance, not data access permissions.
+      - Amazon Macie alerts: discover and classify sensitive data in S3; they do not grant or restrict access.
+      - AWS Glue crawlers: populate the Data Catalog with schemas; they do not govern who can read the data.
+      > 🇻🇳 Data lake cần phân quyền tập trung, chi tiết đến cột/dòng → Lake Formation.
+  - id: 09-v2-15
+    base: cf9bc4d56e
+    set: { domain: secure, task: "1.3", services: [Lake Formation, Glue, Athena, Redshift], tags: [data-lake], concept: "Lake Formation governs S3 data lake tables with fine-grained permissions across Athena, Redshift Spectrum, EMR", hint: "Cần lớp quản trị dùng chung, phân quyền chi tiết cho bảng trên S3 và áp dụng cho nhiều dịch vụ phân tích." }
+    options: { A: "AWS Glue crawlers", B: "Redshift data shares", D: "Amazon Athena SQL" }
+    explanation: |
+      **AWS Lake Formation** provides a governed data lake with centrally managed, fine-grained permissions on S3-based tables that are enforced across integrated analytics services.
+      - AWS Glue crawlers: build the Data Catalog but do not define or enforce access policy.
+      - Redshift data shares: share warehouse data between clusters; not a governance layer for the lake.
+      - Amazon Athena SQL: a query engine that consumes permissions rather than providing the governance layer.
+      > 🇻🇳 Data lake có quản trị + phân quyền chi tiết dùng chung nhiều dịch vụ → Lake Formation.
+  - id: 09-v2-29
+    base: 2a34289813
+    set: { domain: secure, task: "1.3", services: [Lake Formation, Athena, Redshift], tags: [data-lake, redshift-spectrum], concept: "Lake Formation column/row-level security enforced consistently across Athena and Redshift Spectrum", hint: "Cần một lớp quản trị duy nhất áp dụng bảo mật mức cột và dòng nhất quán cho nhiều engine truy vấn." }
+    options: { B: "IAM identity policies per role", C: "S3 bucket policies and ACLs", D: "KMS grants on each dataset" }
+    explanation: |
+      **Lake Formation permissions** define column-level and row-level (data filter) access once and enforce it consistently for Athena and Redshift Spectrum.
+      - IAM identity policies: control API actions and S3 paths, but cannot express column or row filters.
+      - S3 bucket policies and ACLs: work at bucket/prefix/object level only, with no column or row awareness.
+      - KMS grants: delegate use of encryption keys; they do not filter data a query returns.
+      > 🇻🇳 Bảo mật mức cột/dòng nhất quán cho Athena + Spectrum → Lake Formation permissions.
+  - id: 17-v1-05
+    base: d4b7d45269
+    set: { domain: performance, task: "3.5", services: [MSK, Kinesis Data Streams], tags: [streaming-ingestion], concept: "Amazon MSK = managed Apache Kafka (Kafka-compatible APIs) for streaming ingestion", hint: "Khi di chuyển hệ thống streaming đang chạy Kafka tự quản, dịch vụ nào giữ nguyên API Kafka mà AWS vận hành hộ?" }
+    explanation: |
+      **Amazon MSK** runs Apache Kafka as a managed service, so existing Kafka producers, consumers and tooling keep working with little change after migration.
+      - Amazon SQS: a message queue with its own API; not Kafka-compatible.
+      - Amazon MQ: managed ActiveMQ/RabbitMQ for JMS/AMQP/MQTT brokers, not Kafka.
+      - Kinesis Data Streams: managed streaming but with a proprietary API, so Kafka clients need rework.
+      > 🇻🇳 Cần Kafka được quản lý, giữ nguyên API Kafka → Amazon MSK.
+  - id: 17-v2-05
+    base: 58358c8ef4
+    set: { domain: performance, task: "3.5", services: [MSK, Kinesis Data Streams], tags: [streaming-ingestion], concept: "Amazon MSK = managed service with native Apache Kafka APIs", hint: "Đề nhấn mạnh API Kafka gốc — chọn dịch vụ streaming được quản lý mà ứng dụng Kafka dùng nguyên không cần viết lại." }
+    explanation: |
+      **Amazon MSK** is managed Apache Kafka, exposing native Kafka APIs so existing applications connect without code changes.
+      - SQS: a queue service with its own API, no Kafka protocol.
+      - Kinesis Data Streams: managed streaming, but it uses AWS-specific APIs rather than Kafka's.
+      - Amazon MQ: managed message broker for ActiveMQ/RabbitMQ protocols, not Kafka.
+      > 🇻🇳 Cần API Kafka gốc + managed → Amazon MSK.
+  - id: 11-v1-05
+    base: fc09188a72
+    set: { domain: secure, task: "1.2", services: [API Gateway, Cognito], tags: [cognito-authorizer], concept: "API Gateway Cognito user pool authorizer validates JWT tokens from the user pool", hint: "Token JWT do user pool phát hành — kiểu authorizer nào của API Gateway được tích hợp sẵn để xác thực chúng?" }
+    explanation: |
+      The **Cognito authorizer** is built into API Gateway and validates the JWT tokens issued by a Cognito User Pool before the request reaches the backend.
+      - IAM authorization: verifies SigV4-signed requests from IAM principals, not user pool tokens.
+      - API key: identifies a client for usage plans; it is not an authentication mechanism.
+      - Resource policy only: allows or denies by source IP, VPC or account, and does not validate tokens.
+      > 🇻🇳 JWT của Cognito User Pool → Cognito authorizer.
+  - id: 11-v1-06
+    base: c4d77b94dd
+    set: { domain: secure, task: "1.2", services: [API Gateway, Lambda], tags: [lambda-authorizer], concept: "Lambda authorizer runs custom auth logic (e.g. external IdP or token check) before API Gateway allows a request", hint: "Cần chạy code tự viết để kiểm tra yêu cầu (kể cả gọi IdP bên ngoài) trước khi cho phép gọi API." }
+    explanation: |
+      A **Lambda authorizer** runs your own function on each request (or cached result), so it can call an external identity provider and return an IAM policy allowing or denying the call.
+      - Stage variable: a per-stage configuration value, not an authorization mechanism.
+      - Mapping template: transforms request/response payloads; it makes no auth decision.
+      - Usage plan: throttles and meters API-key clients, not custom authentication.
+      > 🇻🇳 Logic xác thực tuỳ biến / gọi IdP ngoài → Lambda authorizer.
+  - id: 11-v1-18
+    base: 480094c214
+    set: { domain: secure, task: "1.2", services: [API Gateway, ACM], tags: [tls-termination], concept: "API Gateway mutual TLS (mTLS) authenticates clients with certificates, e.g. B2B partners", hint: "Khách hàng B2B phải chứng minh danh tính bằng chứng chỉ số — cơ chế TLS hai chiều nào của API Gateway làm được?" }
+    explanation: |
+      **Mutual TLS** makes API Gateway verify a client certificate against a trusted CA truststore during the TLS handshake, which suits B2B partners that must prove identity with certificates.
+      - CORS: a browser cross-origin rule; it does not authenticate callers.
+      - API key: a shared string for identifying and throttling clients, not certificate-based authentication.
+      - Resource policy: restricts access by IP, VPC or account, and does not check client certificates.
+      > 🇻🇳 Xác thực client bằng chứng chỉ → Mutual TLS (mTLS).
+  - id: 11-v2-07
+    base: b3fec37e9a
+    set: { domain: secure, task: "1.2", services: [API Gateway, Cognito], tags: [cognito-authorizer], concept: "API Gateway Cognito authorizer authorizes requests using Cognito user pool tokens", hint: "Đề dùng token từ user pool để cho phép request — tính năng authorizer nào của API Gateway khớp?" }
+    options: { A: "Stage variable maps", B: "Usage plan throttling", C: "API key validation" }
+    explanation: |
+      The **Cognito authorizer** checks the user pool token on each request and rejects invalid ones before the backend is invoked.
+      - Stage variable maps: pass per-stage configuration to integrations; they do not authorize callers.
+      - Usage plan throttling: sets rate and quota limits per API key, not identity checks.
+      - API key validation: identifies a client application but does not validate user identity or tokens.
+      > 🇻🇳 Cho phép request bằng token Cognito user pool → Cognito authorizer.
+  - id: 11-v2-12
+    base: 52f43c3b25
+    set: { domain: secure, task: "1.2", services: [API Gateway, S3], tags: [tls-termination], concept: "API Gateway mTLS needs mutual TLS enabled on a custom domain plus a client-CA truststore stored in S3", hint: "Xác thực bằng chứng chỉ client cần hai thành phần: bật TLS hai chiều ở tên miền và nơi lưu danh sách CA tin cậy." }
+    explanation: |
+      Mutual TLS on API Gateway needs two parts: **enable mTLS on the custom domain**, and supply a **truststore of client CA certificates in S3** that API Gateway uses to validate client certificates.
+      - API keys only: identify callers but do not authenticate with certificates.
+      - CloudFront signed cookies: restrict access to CloudFront content, not client-cert authentication of an API.
+      - WAF rate rule: throttles request rates and does not verify client identity.
+      > 🇻🇳 mTLS = bật mTLS trên custom domain + truststore CA của client trong S3.

@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 16-v1-01
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: EC2
 - tags: reserved-instances, savings-plans
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 A steady production workload runs 24/7 for 3 years. The MOST cost-effective EC2 purchase option is:
 
-- A. On-Demand
-- B. Spot
-- C. 3-year Standard Reserved Instances / Savings Plans
-- D. Dedicated Hosts
+- A. 3-year Standard Reserved Instances / Savings Plans
+- B. Dedicated Hosts
+- C. Spot
+- D. On-Demand
 
-**Answer:** C
+**Answer:** A
 
 **Explanation:** Steady 24/7 for 3 years = 3-year Reserved Instances / Savings Plans.
 
@@ -37,6 +38,7 @@ A steady production workload runs 24/7 for 3 years. The MOST cost-effective EC2 
 
 ## Q 16-v1-02
 - domain: cost
+- task: 4.2
 - topic: cost
 - tags: high-availability, spot-instances
 - difficulty: easy
@@ -46,11 +48,11 @@ A steady production workload runs 24/7 for 3 years. The MOST cost-effective EC2 
 A fault-tolerant, interruptible batch job should minimize compute cost. Which option?
 
 - A. On-Demand
-- B. Spot Instances
+- B. Dedicated Instances
 - C. Reserved Instances
-- D. Dedicated Instances
+- D. Spot Instances
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Interruptible batch, cheapest = Spot Instances.
 
@@ -58,6 +60,7 @@ A fault-tolerant, interruptible batch job should minimize compute cost. Which op
 
 ## Q 16-v1-03
 - domain: cost
+- task: 4.1
 - topic: cost
 - services: S3
 - tags: s3-storage-classes, s3-intelligent-tiering
@@ -68,11 +71,11 @@ A fault-tolerant, interruptible batch job should minimize compute cost. Which op
 A bucket stores data with unknown/changing access patterns; the company wants automatic cost savings with no retrieval fees. Which storage class?
 
 - A. S3 Standard
-- B. S3 Intelligent-Tiering
-- C. S3 Standard-IA
+- B. S3 Standard-IA
+- C. S3 Intelligent-Tiering
 - D. S3 Glacier Deep Archive
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Unknown/changing access, no retrieval fee = S3 Intelligent-Tiering.
 
@@ -80,6 +83,7 @@ A bucket stores data with unknown/changing access patterns; the company wants au
 
 ## Q 16-v1-04
 - domain: cost
+- task: 4.1
 - topic: cost
 - services: S3
 - tags: s3-lifecycle
@@ -89,12 +93,12 @@ A bucket stores data with unknown/changing access patterns; the company wants au
 
 Which approach automatically transitions S3 objects to cheaper classes and expires them over time?
 
-- A. S3 Lifecycle policies
+- A. S3 Transfer Acceleration
 - B. S3 Versioning
-- C. S3 Transfer Acceleration
+- C. S3 Lifecycle policies
 - D. Cross-Region Replication
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Auto-transition + expire objects = S3 Lifecycle policies.
 
@@ -102,6 +106,7 @@ Which approach automatically transitions S3 objects to cheaper classes and expir
 
 ## Q 16-v1-05
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: Compute Optimizer, EC2, EBS, Lambda
 - tags: right-sizing
@@ -111,12 +116,12 @@ Which approach automatically transitions S3 objects to cheaper classes and expir
 
 Which service gives ML-based right-sizing recommendations to reduce EC2/EBS/Lambda costs?
 
-- A. AWS Compute Optimizer
+- A. AWS CloudTrail
 - B. AWS Budgets
-- C. AWS CloudTrail
-- D. Amazon Inspector
+- C. Amazon Inspector
+- D. AWS Compute Optimizer
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** ML right-sizing recommendations = Compute Optimizer.
 
@@ -124,6 +129,7 @@ Which service gives ML-based right-sizing recommendations to reduce EC2/EBS/Lamb
 
 ## Q 16-v1-06
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: AWS Budgets
 - difficulty: easy
@@ -132,12 +138,12 @@ Which service gives ML-based right-sizing recommendations to reduce EC2/EBS/Lamb
 
 A finance team wants to be alerted when costs exceed or are forecast to exceed a threshold. Which service?
 
-- A. AWS Budgets
+- A. Trusted Advisor
 - B. AWS Cost Explorer
-- C. AWS Config
-- D. Trusted Advisor
+- C. AWS Budgets
+- D. AWS Config
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Alert on cost threshold/forecast = AWS Budgets.
 
@@ -145,6 +151,7 @@ A finance team wants to be alerted when costs exceed or are forecast to exceed a
 
 ## Q 16-v1-07
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: Fargate, Lambda
 - tags: savings-plans
@@ -154,12 +161,12 @@ A finance team wants to be alerted when costs exceed or are forecast to exceed a
 
 A company wants the most FLEXIBLE commitment-based discount that applies across instance families, Regions, Fargate, and Lambda. Which option?
 
-- A. Standard Reserved Instances
-- B. Compute Savings Plans
-- C. EC2 Instance Savings Plans
-- D. Spot
+- A. Spot
+- B. Standard Reserved Instances
+- C. Compute Savings Plans
+- D. EC2 Instance Savings Plans
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Most flexible commitment discount = Compute Savings Plans.
 
@@ -167,6 +174,7 @@ A company wants the most FLEXIBLE commitment-based discount that applies across 
 
 ## Q 16-v1-08
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: Lambda, API Gateway, EC2 Auto Scaling
 - difficulty: easy
@@ -175,10 +183,10 @@ A company wants the most FLEXIBLE commitment-based discount that applies across 
 
 Which is the MOST cost-effective way to run a website's variable traffic so you only pay for what you use, with no idle servers?
 
-- A. Always-on large EC2 instance
+- A. Dedicated Hosts
 - B. Serverless (Lambda + API Gateway) or Auto Scaling
-- C. Reserved Instances at peak capacity 24/7
-- D. Dedicated Hosts
+- C. Always-on large EC2 instance
+- D. Reserved Instances at peak capacity 24/7
 
 **Answer:** B
 
@@ -188,6 +196,7 @@ Which is the MOST cost-effective way to run a website's variable traffic so you 
 
 ## Q 16-v1-09
 - domain: cost
+- task: 4.4
 - topic: cost
 - services: VPC, NAT Gateway, S3, DynamoDB
 - difficulty: easy
@@ -196,12 +205,12 @@ Which is the MOST cost-effective way to run a website's variable traffic so you 
 
 To reduce NAT Gateway data-processing charges for private instances that only need S3/DynamoDB access, use:
 
-- A. Gateway VPC Endpoints (free) instead of routing via NAT
-- B. A bigger NAT Gateway
-- C. Internet Gateway directly
-- D. A second NAT instance
+- A. A second NAT instance
+- B. Internet Gateway directly
+- C. Gateway VPC Endpoints (free) instead of routing via NAT
+- D. A bigger NAT Gateway
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Avoid NAT charges for S3/DynamoDB = Gateway VPC Endpoints (free).
 
@@ -209,6 +218,7 @@ To reduce NAT Gateway data-processing charges for private instances that only ne
 
 ## Q 16-v1-10
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: EC2 Auto Scaling, DynamoDB
 - tags: dynamodb-capacity
@@ -218,12 +228,12 @@ To reduce NAT Gateway data-processing charges for private instances that only ne
 
 A database has predictable steady usage; the cheapest DynamoDB option is:
 
-- A. On-demand capacity
-- B. Provisioned capacity with auto scaling (and reserved capacity)
-- C. DAX only
+- A. Provisioned capacity with auto scaling (and reserved capacity)
+- B. DAX only
+- C. On-demand capacity
 - D. Global Tables
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Predictable steady DynamoDB cheapest = Provisioned + auto scaling (+ reserved).
 
@@ -231,6 +241,7 @@ A database has predictable steady usage; the cheapest DynamoDB option is:
 
 ## Q 16-v1-11
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: RDS
 - difficulty: easy
@@ -239,12 +250,12 @@ A database has predictable steady usage; the cheapest DynamoDB option is:
 
 Which reduces RDS cost for a non-production database used only during business hours?
 
-- A. Stop/start the instance when not in use
-- B. Enable Multi-AZ
+- A. Enable Multi-AZ
+- B. Stop/start the instance when not in use
 - C. Add read replicas
 - D. Use Provisioned IOPS
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Non-prod business-hours DB = stop/start instance.
 
@@ -252,6 +263,7 @@ Which reduces RDS cost for a non-production database used only during business h
 
 ## Q 16-v1-12
 - domain: cost
+- task: 4.1
 - topic: cost
 - services: EBS
 - tags: right-sizing, ebs-volume-types
@@ -262,9 +274,9 @@ Which reduces RDS cost for a non-production database used only during business h
 A company over-provisioned EBS gp2 volumes. What reduces cost while keeping/raising performance?
 
 - A. Migrate to gp3 and provision only the IOPS/throughput needed
-- B. Switch to io2 Block Express
-- C. Move to Instance Store
-- D. Increase volume size
+- B. Increase volume size
+- C. Switch to io2 Block Express
+- D. Move to Instance Store
 
 **Answer:** A
 
@@ -274,6 +286,7 @@ A company over-provisioned EBS gp2 volumes. What reduces cost while keeping/rais
 
 ## Q 16-v1-13
 - domain: cost
+- task: 4.1
 - topic: cost
 - services: S3, S3 Glacier
 - tags: s3-glacier-tiers
@@ -283,12 +296,12 @@ A company over-provisioned EBS gp2 volumes. What reduces cost while keeping/rais
 
 Which lowers cost for archived data that is rarely accessed and tolerates 12-hour retrieval?
 
-- A. S3 Glacier Deep Archive
+- A. S3 One Zone-IA
 - B. S3 Standard
 - C. S3 Standard-IA
-- D. S3 One Zone-IA
+- D. S3 Glacier Deep Archive
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Rarely accessed, 12h ok, cheapest = Glacier Deep Archive.
 
@@ -296,6 +309,7 @@ Which lowers cost for archived data that is rarely accessed and tolerates 12-hou
 
 ## Q 16-v1-14
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: Organizations
 - tags: reserved-instances, savings-plans
@@ -305,12 +319,12 @@ Which lowers cost for archived data that is rarely accessed and tolerates 12-hou
 
 A multi-account organization wants aggregated volume discounts and shared Reserved Instance/Savings Plan benefits. Which feature?
 
-- A. AWS Organizations consolidated billing
-- B. Separate bills per account
-- C. AWS Config
-- D. AWS Budgets only
+- A. Separate bills per account
+- B. AWS Organizations consolidated billing
+- C. AWS Budgets only
+- D. AWS Config
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Volume discounts + shared RI/SP = Organizations consolidated billing.
 
@@ -318,6 +332,7 @@ A multi-account organization wants aggregated volume discounts and shared Reserv
 
 ## Q 16-v1-15
 - domain: cost
+- task: 4.1
 - topic: cost
 - services: Athena, S3
 - difficulty: easy
@@ -327,8 +342,8 @@ A multi-account organization wants aggregated volume discounts and shared Reserv
 Which is the cheapest way to query infrequently accessed data in S3 without running a cluster?
 
 - A. Amazon Athena (pay per query)
-- B. Always-on Redshift cluster
-- C. Always-on EMR cluster
+- B. Always-on EMR cluster
+- C. Always-on Redshift cluster
 - D. Provisioned Kinesis
 
 **Answer:** A
@@ -339,6 +354,7 @@ Which is the cheapest way to query infrequently accessed data in S3 without runn
 
 ## Q 16-v1-16
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: Trusted Advisor
 - tags: right-sizing, reserved-instances
@@ -348,12 +364,12 @@ Which is the cheapest way to query infrequently accessed data in S3 without runn
 
 Which service identifies idle/underutilized resources and Reserved Instance opportunities as part of best-practice checks?
 
-- A. AWS Trusted Advisor
-- B. AWS CloudTrail
-- C. Amazon GuardDuty
+- A. Amazon GuardDuty
+- B. AWS Trusted Advisor
+- C. AWS CloudTrail
 - D. AWS Shield
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Idle resources + RI opportunities = Trusted Advisor.
 
@@ -361,6 +377,7 @@ Which service identifies idle/underutilized resources and Reserved Instance oppo
 
 ## Q 16-v1-17
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: EC2 Auto Scaling
 - tags: spot-instances
@@ -371,9 +388,9 @@ Which service identifies idle/underutilized resources and Reserved Instance oppo
 To cost-optimize a fleet that can tolerate interruptions but needs some baseline guaranteed capacity, which is BEST?
 
 - A. Mix On-Demand (baseline) + Spot (burst) via Auto Scaling mixed instances policy
-- B. All On-Demand
-- C. All Dedicated Hosts
-- D. All Reserved at peak
+- B. All Reserved at peak
+- C. All On-Demand
+- D. All Dedicated Hosts
 
 **Answer:** A
 
@@ -383,6 +400,7 @@ To cost-optimize a fleet that can tolerate interruptions but needs some baseline
 
 ## Q 16-v1-18
 - domain: cost
+- task: 4.4
 - topic: cost
 - services: CloudFront
 - difficulty: easy
@@ -391,12 +409,12 @@ To cost-optimize a fleet that can tolerate interruptions but needs some baseline
 
 Which CloudFront benefit also reduces ORIGIN cost?
 
-- A. Caching at edge reduces requests/data transfer to the origin
-- B. It increases origin load
-- C. It removes the need for TLS
-- D. It replaces S3 storage
+- A. It increases origin load
+- B. It removes the need for TLS
+- C. It replaces S3 storage
+- D. Caching at edge reduces requests/data transfer to the origin
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Edge caching reduces origin requests/transfer cost.
 
@@ -404,6 +422,7 @@ Which CloudFront benefit also reduces ORIGIN cost?
 
 ## Q 16-v1-19
 - domain: cost
+- task: 4.4
 - topic: cost
 - services: CloudFront, VPC
 - difficulty: medium
@@ -412,13 +431,13 @@ Which CloudFront benefit also reduces ORIGIN cost?
 
 Which two actions reduce data-transfer costs? (Choose TWO)
 
-- A. Use CloudFront to serve cacheable content
+- A. Route all internal traffic through the public internet
 - B. Keep traffic within the same AZ/Region and use VPC endpoints
-- C. Route all internal traffic through the public internet
-- D. Cross-AZ chatty traffic for everything
-- E. Disable caching
+- C. Cross-AZ chatty traffic for everything
+- D. Disable caching
+- E. Use CloudFront to serve cacheable content
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** CloudFront caching + keep traffic in-Region/VPC endpoints.
 
@@ -426,6 +445,7 @@ Which two actions reduce data-transfer costs? (Choose TWO)
 
 ## Q 16-v1-20
 - domain: cost
+- task: 4.2
 - topic: cost
 - services: Cost Anomaly Detection
 - tags: threat-detection
@@ -435,11 +455,11 @@ Which two actions reduce data-transfer costs? (Choose TWO)
 
 A company wants to automatically detect unusual spend spikes and get root-cause insights. Which service?
 
-- A. AWS Cost Anomaly Detection
+- A. CloudTrail
 - B. AWS Config
-- C. CloudTrail
-- D. Compute Optimizer
+- C. Compute Optimizer
+- D. AWS Cost Anomaly Detection
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Detect unusual spend + root cause = Cost Anomaly Detection.

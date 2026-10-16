@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 12-v1-01
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Rekognition
 - difficulty: easy
@@ -24,9 +25,9 @@ created: 2026-10-16
 An application must detect objects, faces, and inappropriate content in user-uploaded images and videos. Which service?
 
 - A. Amazon Rekognition
-- B. Amazon Comprehend
+- B. Amazon Polly
 - C. Amazon Textract
-- D. Amazon Polly
+- D. Amazon Comprehend
 
 **Answer:** A
 
@@ -36,6 +37,7 @@ An application must detect objects, faces, and inappropriate content in user-upl
 
 ## Q 12-v1-02
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Comprehend
 - difficulty: easy
@@ -44,12 +46,12 @@ An application must detect objects, faces, and inappropriate content in user-upl
 
 A company wants sentiment analysis and key-phrase/entity extraction from customer reviews. Which service?
 
-- A. Amazon Comprehend
-- B. Amazon Translate
-- C. Amazon Lex
-- D. Amazon Transcribe
+- A. Amazon Transcribe
+- B. Amazon Lex
+- C. Amazon Comprehend
+- D. Amazon Translate
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Sentiment + entity/key-phrase from text = Comprehend.
 
@@ -57,6 +59,7 @@ A company wants sentiment analysis and key-phrase/entity extraction from custome
 
 ## Q 12-v1-03
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Transcribe
 - difficulty: easy
@@ -65,12 +68,12 @@ A company wants sentiment analysis and key-phrase/entity extraction from custome
 
 Which service converts speech in audio files into text (e.g., for call-center transcripts)?
 
-- A. Amazon Transcribe
-- B. Amazon Polly
+- A. Amazon Polly
+- B. Amazon Transcribe
 - C. Amazon Comprehend
 - D. Amazon Kendra
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Speech-to-text = Transcribe.
 
@@ -78,6 +81,7 @@ Which service converts speech in audio files into text (e.g., for call-center tr
 
 ## Q 12-v1-04
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Polly
 - difficulty: easy
@@ -86,12 +90,12 @@ Which service converts speech in audio files into text (e.g., for call-center tr
 
 Which service converts text into lifelike speech (text-to-speech)?
 
-- A. Amazon Polly
+- A. Amazon Translate
 - B. Amazon Transcribe
-- C. Amazon Translate
-- D. Amazon Lex
+- C. Amazon Lex
+- D. Amazon Polly
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Text-to-speech = Polly.
 
@@ -99,6 +103,7 @@ Which service converts text into lifelike speech (text-to-speech)?
 
 ## Q 12-v1-05
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Translate
 - difficulty: easy
@@ -107,12 +112,12 @@ Which service converts text into lifelike speech (text-to-speech)?
 
 Which service provides neural machine translation between languages?
 
-- A. Amazon Translate
+- A. Amazon Rekognition
 - B. Amazon Comprehend
 - C. Amazon Polly
-- D. Amazon Rekognition
+- D. Amazon Translate
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Neural translation = Translate.
 
@@ -120,6 +125,7 @@ Which service provides neural machine translation between languages?
 
 ## Q 12-v1-06
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Lex
 - difficulty: easy
@@ -141,6 +147,7 @@ A team must build a conversational chatbot with automatic speech recognition and
 
 ## Q 12-v1-07
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: SageMaker
 - difficulty: easy
@@ -149,12 +156,12 @@ A team must build a conversational chatbot with automatic speech recognition and
 
 A data science team needs to build, train, tune, and deploy custom ML models with notebooks and managed infrastructure. Which service?
 
-- A. Amazon SageMaker
-- B. Amazon Rekognition
-- C. Amazon Comprehend
+- A. Amazon Rekognition
+- B. Amazon Comprehend
+- C. Amazon SageMaker
 - D. AWS Glue
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Build/train/deploy custom models = SageMaker.
 
@@ -162,6 +169,7 @@ A data science team needs to build, train, tune, and deploy custom ML models wit
 
 ## Q 12-v1-08
 - domain: performance
+- task: 3.5
 - topic: ml
 - services: Personalize
 - tags: streaming-ingestion
@@ -172,9 +180,9 @@ A data science team needs to build, train, tune, and deploy custom ML models wit
 An e-commerce site wants real-time personalized product recommendations without building ML from scratch. Which service?
 
 - A. Amazon Personalize
-- B. Amazon Forecast
-- C. Amazon Comprehend
-- D. Amazon Kendra
+- B. Amazon Comprehend
+- C. Amazon Kendra
+- D. Amazon Forecast
 
 **Answer:** A
 
@@ -184,6 +192,7 @@ An e-commerce site wants real-time personalized product recommendations without 
 
 ## Q 12-v1-09
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Forecast
 - difficulty: easy
@@ -192,12 +201,12 @@ An e-commerce site wants real-time personalized product recommendations without 
 
 A retailer needs accurate time-series demand forecasting using ML. Which service?
 
-- A. Amazon Forecast
+- A. Amazon Rekognition
 - B. Amazon Personalize
-- C. Amazon Rekognition
-- D. Amazon Timestream
+- C. Amazon Timestream
+- D. Amazon Forecast
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Time-series demand forecasting = Forecast.
 
@@ -205,6 +214,7 @@ A retailer needs accurate time-series demand forecasting using ML. Which service
 
 ## Q 12-v1-10
 - domain: performance
+- task: 3.3
 - topic: ml
 - services: Textract
 - difficulty: easy
@@ -214,8 +224,8 @@ A retailer needs accurate time-series demand forecasting using ML. Which service
 A company must extract text, forms, and tables from scanned documents (e.g., invoices, PDFs). Which service?
 
 - A. Amazon Textract
-- B. Amazon Rekognition
-- C. Amazon Comprehend
+- B. Amazon Comprehend
+- C. Amazon Rekognition
 - D. Amazon Transcribe
 
 **Answer:** A
@@ -226,6 +236,7 @@ A company must extract text, forms, and tables from scanned documents (e.g., inv
 
 ## Q 12-v1-11
 - domain: performance
+- task: 3.3
 - topic: ml
 - services: Kendra
 - difficulty: easy
@@ -234,12 +245,12 @@ A company must extract text, forms, and tables from scanned documents (e.g., inv
 
 An enterprise needs an intelligent, ML-powered internal search engine over documents with natural-language queries. Which service?
 
-- A. Amazon Kendra
-- B. Amazon OpenSearch
-- C. Amazon Comprehend
-- D. Amazon Athena
+- A. Amazon OpenSearch
+- B. Amazon Athena
+- C. Amazon Kendra
+- D. Amazon Comprehend
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** ML-powered NL enterprise search = Kendra.
 
@@ -247,6 +258,7 @@ An enterprise needs an intelligent, ML-powered internal search engine over docum
 
 ## Q 12-v1-12
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Bedrock
 - difficulty: easy
@@ -255,12 +267,12 @@ An enterprise needs an intelligent, ML-powered internal search engine over docum
 
 A company wants to add generative AI (foundation models) to an app via a managed API without managing infrastructure. Which service?
 
-- A. Amazon Bedrock
-- B. Amazon SageMaker Ground Truth
-- C. Amazon Rekognition
-- D. Amazon Lex
+- A. Amazon Rekognition
+- B. Amazon Bedrock
+- C. Amazon Lex
+- D. Amazon SageMaker Ground Truth
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Generative AI foundation models via API = Bedrock.
 
@@ -268,6 +280,7 @@ A company wants to add generative AI (foundation models) to an app via a managed
 
 ## Q 12-v1-13
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Comprehend
 - difficulty: easy
@@ -276,12 +289,12 @@ A company wants to add generative AI (foundation models) to an app via a managed
 
 A healthcare app must extract medical entities (medications, conditions) from clinical text. Which service?
 
-- A. Amazon Comprehend Medical
-- B. Amazon Translate
-- C. Amazon Polly
-- D. Amazon Transcribe Medical only
+- A. Amazon Polly
+- B. Amazon Comprehend Medical
+- C. Amazon Transcribe Medical only
+- D. Amazon Translate
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Medical entity extraction from text = Comprehend Medical.
 
@@ -289,6 +302,7 @@ A healthcare app must extract medical entities (medications, conditions) from cl
 
 ## Q 12-v1-14
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Fraud Detector
 - difficulty: easy
@@ -297,12 +311,12 @@ A healthcare app must extract medical entities (medications, conditions) from cl
 
 A bank wants to detect potentially fraudulent online transactions using ML with minimal data science effort. Which service?
 
-- A. Amazon Fraud Detector
-- B. Amazon GuardDuty
-- C. Amazon Macie
-- D. AWS WAF
+- A. Amazon Macie
+- B. AWS WAF
+- C. Amazon Fraud Detector
+- D. Amazon GuardDuty
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** ML fraud detection, low effort = Amazon Fraud Detector.
 
@@ -310,6 +324,7 @@ A bank wants to detect potentially fraudulent online transactions using ML with 
 
 ## Q 12-v1-15
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: SageMaker
 - difficulty: easy
@@ -318,12 +333,12 @@ A bank wants to detect potentially fraudulent online transactions using ML with 
 
 Which service would you use to label/annotate training datasets with human reviewers?
 
-- A. Amazon SageMaker Ground Truth
+- A. Amazon Rekognition
 - B. Amazon Mechanical Turk only
-- C. Amazon Rekognition
-- D. Amazon Comprehend
+- C. Amazon Comprehend
+- D. Amazon SageMaker Ground Truth
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Human-labeled training data = SageMaker Ground Truth.
 
@@ -331,6 +346,7 @@ Which service would you use to label/annotate training datasets with human revie
 
 ## Q 12-v1-16
 - domain: performance
+- task: 3.5
 - topic: ml
 - services: Transcribe
 - tags: streaming-ingestion
@@ -340,12 +356,12 @@ Which service would you use to label/annotate training datasets with human revie
 
 A live streaming platform must automatically caption audio to text in real time. Which service?
 
-- A. Amazon Transcribe (streaming)
+- A. Amazon Kendra
 - B. Amazon Polly
 - C. Amazon Translate
-- D. Amazon Kendra
+- D. Amazon Transcribe (streaming)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Real-time captions = Transcribe streaming.
 
@@ -353,6 +369,7 @@ A live streaming platform must automatically caption audio to text in real time.
 
 ## Q 12-v1-17
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Polly
 - difficulty: easy
@@ -361,12 +378,12 @@ A live streaming platform must automatically caption audio to text in real time.
 
 Which AI service pairing would convert a foreign-language article to English speech? (Pick the correct chain)
 
-- A. Translate → Polly
-- B. Transcribe → Comprehend
-- C. Rekognition → Lex
+- A. Rekognition → Lex
+- B. Translate → Polly
+- C. Transcribe → Comprehend
 - D. Textract → Translate
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Foreign text -> English speech = Translate then Polly.
 
@@ -374,6 +391,7 @@ Which AI service pairing would convert a foreign-language article to English spe
 
 ## Q 12-v1-18
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: SageMaker
 - difficulty: easy
@@ -382,12 +400,12 @@ Which AI service pairing would convert a foreign-language article to English spe
 
 Which is the BEST choice when a fully custom model and full control of training are required?
 
-- A. Amazon SageMaker
-- B. Amazon Rekognition
+- A. Amazon Personalize
+- B. Amazon SageMaker
 - C. Amazon Comprehend
-- D. Amazon Personalize
+- D. Amazon Rekognition
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Full custom model/control = SageMaker.
 
@@ -395,6 +413,7 @@ Which is the BEST choice when a fully custom model and full control of training 
 
 ## Q 12-v1-19
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Rekognition, Comprehend
 - difficulty: medium
@@ -405,9 +424,9 @@ Which two are managed AI services that require NO ML expertise to use via API? (
 
 - A. Amazon Rekognition
 - B. Amazon Comprehend
-- C. Amazon SageMaker (training your own model)
-- D. Amazon EMR
-- E. Amazon Redshift
+- C. Amazon Redshift
+- D. Amazon SageMaker (training your own model)
+- E. Amazon EMR
 
 **Answer:** A, B
 
@@ -417,6 +436,7 @@ Which two are managed AI services that require NO ML expertise to use via API? (
 
 ## Q 12-v1-20
 - domain: performance
+- task: 3.2
 - topic: ml
 - services: Transcribe, Comprehend
 - difficulty: easy
@@ -425,11 +445,11 @@ Which two are managed AI services that require NO ML expertise to use via API? (
 
 A contact center wants to transcribe calls, then analyze sentiment and redact PII. Which combination is BEST?
 
-- A. Amazon Transcribe + Amazon Comprehend
+- A. Amazon Rekognition + Amazon Kendra
 - B. Amazon Polly + Amazon Translate
-- C. Amazon Rekognition + Amazon Kendra
+- C. Amazon Transcribe + Amazon Comprehend
 - D. Amazon Lex + Amazon Forecast
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Transcribe calls + analyze/redact = Transcribe + Comprehend.

@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 14-v2-01
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: decoupling, sqs-fifo
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 Decouple with ordered, exactly-once queue processing → which service (vs the alternatives)?
 
-- A. SQS FIFO
-- B. SNS
+- A. SNS
+- B. SQS FIFO
 - C. Kinesis Data Streams
 - D. EventBridge
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Ordered, exactly-once queue = SQS FIFO.
 
@@ -37,6 +38,7 @@ Decouple with ordered, exactly-once queue processing → which service (vs the a
 
 ## Q 14-v2-02
 - domain: performance
+- task: 3.2
 - topic: integration
 - services: SNS
 - tags: fan-out
@@ -46,12 +48,12 @@ Decouple with ordered, exactly-once queue processing → which service (vs the a
 
 Fan-out one message to many subscribers → which service?
 
-- A. SNS
-- B. SQS
-- C. Step Functions
-- D. Amazon MQ
+- A. Amazon MQ
+- B. Step Functions
+- C. SQS
+- D. SNS
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Fan-out to many subscribers = SNS.
 
@@ -59,6 +61,7 @@ Fan-out one message to many subscribers → which service?
 
 ## Q 14-v2-03
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: CloudFront, Global Accelerator
 - difficulty: medium
@@ -67,12 +70,12 @@ Fan-out one message to many subscribers → which service?
 
 Cache near users for static content (HTTP) vs route to nearest healthy endpoint (TCP/UDP, static IP) — which pair is CORRECT?
 
-- A. CloudFront = static content caching; Global Accelerator = nearest endpoint with static anycast IPs
-- B. Both do the same thing
-- C. Route 53 = caching; CloudFront = routing
-- D. Global Accelerator caches HTML
+- A. Global Accelerator caches HTML
+- B. Route 53 = caching; CloudFront = routing
+- C. CloudFront = static content caching; Global Accelerator = nearest endpoint with static anycast IPs
+- D. Both do the same thing
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** CloudFront caches static content; Global Accelerator routes to nearest endpoint via static anycast IPs.
 
@@ -80,6 +83,7 @@ Cache near users for static content (HTTP) vs route to nearest healthy endpoint 
 
 ## Q 14-v2-04
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: VPC Endpoint, S3, DynamoDB, PrivateLink
 - difficulty: medium
@@ -88,12 +92,12 @@ Cache near users for static content (HTTP) vs route to nearest healthy endpoint 
 
 Gateway endpoint vs Interface endpoint — which is TRUE?
 
-- A. Gateway endpoint = S3/DynamoDB; Interface endpoint (PrivateLink) = most other services via ENI
+- A. Interface endpoint is only for S3
 - B. Gateway endpoint uses ENIs
-- C. Interface endpoint is only for S3
-- D. They are identical
+- C. They are identical
+- D. Gateway endpoint = S3/DynamoDB; Interface endpoint (PrivateLink) = most other services via ENI
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Gateway endpoint = S3/DynamoDB; Interface endpoint (PrivateLink) = other services via ENI.
 
@@ -101,6 +105,7 @@ Gateway endpoint vs Interface endpoint — which is TRUE?
 
 ## Q 14-v2-05
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: ElastiCache
 - tags: redis-vs-memcached
@@ -112,8 +117,8 @@ ElastiCache Redis vs Memcached — which favors Redis?
 
 - A. Persistence, replication, sorted sets, pub/sub
 - B. Pure simple multithreaded caching only
-- C. No failover needed
-- D. Sharding only, no data structures
+- C. Sharding only, no data structures
+- D. No failover needed
 
 **Answer:** A
 
@@ -123,6 +128,7 @@ ElastiCache Redis vs Memcached — which favors Redis?
 
 ## Q 14-v2-06
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3, Athena, Redshift
 - difficulty: medium
@@ -131,12 +137,12 @@ ElastiCache Redis vs Memcached — which favors Redis?
 
 Athena vs Redshift — which favors Athena?
 
-- A. Ad-hoc SQL on S3, serverless, pay per query
-- B. Petabyte data warehouse with heavy concurrent BI
-- C. Constant complex joins 24/7
-- D. Sub-second dashboards for thousands of users
+- A. Petabyte data warehouse with heavy concurrent BI
+- B. Ad-hoc SQL on S3, serverless, pay per query
+- C. Sub-second dashboards for thousands of users
+- D. Constant complex joins 24/7
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Athena favored by ad-hoc serverless SQL on S3, pay per query.
 
@@ -144,6 +150,7 @@ Athena vs Redshift — which favors Athena?
 
 ## Q 14-v2-07
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EFS, FSx
 - tags: fsx-windows
@@ -153,12 +160,12 @@ Athena vs Redshift — which favors Athena?
 
 EFS vs FSx for Windows — which favors FSx for Windows?
 
-- A. SMB + Active Directory for Windows apps
-- B. Linux NFS shared storage
-- C. HPC S3 integration
-- D. Object storage
+- A. Linux NFS shared storage
+- B. HPC S3 integration
+- C. Object storage
+- D. SMB + Active Directory for Windows apps
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** FSx for Windows favored by SMB + Active Directory.
 
@@ -166,6 +173,7 @@ EFS vs FSx for Windows — which favors FSx for Windows?
 
 ## Q 14-v2-08
 - domain: performance
+- task: 3.3
 - topic: database
 - services: DynamoDB, RDS
 - difficulty: medium
@@ -174,12 +182,12 @@ EFS vs FSx for Windows — which favors FSx for Windows?
 
 DynamoDB vs RDS — which favors DynamoDB?
 
-- A. Key-value/document, massive scale, single-digit ms, serverless
-- B. Complex multi-table joins and transactions across schemas
-- C. Strong relational integrity with SQL joins
-- D. OLAP reporting
+- A. Complex multi-table joins and transactions across schemas
+- B. Key-value/document, massive scale, single-digit ms, serverless
+- C. OLAP reporting
+- D. Strong relational integrity with SQL joins
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** DynamoDB favored by key-value/document, massive scale, serverless.
 
@@ -187,6 +195,7 @@ DynamoDB vs RDS — which favors DynamoDB?
 
 ## Q 14-v2-09
 - domain: performance
+- task: 3.4
 - topic: migration
 - services: Snow Family, DataSync
 - difficulty: medium
@@ -208,6 +217,7 @@ Snowball vs DataSync — which favors DataSync?
 
 ## Q 14-v2-10
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions, SQS
 - tags: orchestration
@@ -217,12 +227,12 @@ Snowball vs DataSync — which favors DataSync?
 
 Step Functions vs SQS — which favors Step Functions?
 
-- A. Orchestrating multi-step workflow with branching/retries/state
-- B. Simple buffering of messages
-- C. Storing millions of messages
-- D. Fan-out to subscribers
+- A. Simple buffering of messages
+- B. Orchestrating multi-step workflow with branching/retries/state
+- C. Fan-out to subscribers
+- D. Storing millions of messages
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Step Functions favored by multi-step workflow orchestration.
 
@@ -230,6 +240,7 @@ Step Functions vs SQS — which favors Step Functions?
 
 ## Q 14-v2-11
 - domain: performance
+- task: 3.5
 - topic: analytics
 - services: Data Firehose, S3, Redshift, OpenSearch, SQS, Kinesis Data Streams
 - tags: streaming-ingestion, sharding, decoupling
@@ -239,12 +250,12 @@ Step Functions vs SQS — which favors Step Functions?
 
 Kinesis Data Streams vs Kinesis Data Firehose vs SQS — which statement set is CORRECT?
 
-- A. Data Streams = real-time, replay, multiple consumers, shards; Firehose = managed buffered delivery to S3/Redshift/OpenSearch; SQS = decoupling queue, no replay
-- B. All three replay data
-- C. Firehose supports multiple consumer replay
-- D. SQS delivers directly to S3 with no code
+- A. Firehose supports multiple consumer replay
+- B. SQS delivers directly to S3 with no code
+- C. All three replay data
+- D. Data Streams = real-time, replay, multiple consumers, shards; Firehose = managed buffered delivery to S3/Redshift/OpenSearch; SQS = decoupling queue, no replay
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Data Streams=real-time/replay/shards; Firehose=managed delivery; SQS=decoupling, no replay.
 
@@ -252,6 +263,7 @@ Kinesis Data Streams vs Kinesis Data Firehose vs SQS — which statement set is 
 
 ## Q 14-v2-12
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: NAT Gateway, EC2, Internet Gateway
 - tags: egress-only-igw, ipv6
@@ -263,8 +275,8 @@ NAT Gateway vs NAT Instance vs Egress-Only IGW — which is TRUE?
 
 - A. NAT Gateway = managed IPv4 outbound; NAT Instance = self-managed EC2; Egress-Only IGW = IPv6 outbound-only
 - B. Egress-Only IGW is for IPv4
-- C. NAT Gateway supports inbound connections
-- D. NAT Instance requires no management
+- C. NAT Instance requires no management
+- D. NAT Gateway supports inbound connections
 
 **Answer:** A
 
@@ -274,6 +286,7 @@ NAT Gateway vs NAT Instance vs Egress-Only IGW — which is TRUE?
 
 ## Q 14-v2-13
 - domain: performance
+- task: 3.3
 - topic: database
 - services: Aurora, DynamoDB
 - tags: aurora-global-database, dynamodb-global-tables, multi-region
@@ -283,12 +296,12 @@ NAT Gateway vs NAT Instance vs Egress-Only IGW — which is TRUE?
 
 Aurora Global Database vs DynamoDB Global Tables — which favors Aurora Global Database?
 
-- A. Relational (SQL) workload needing cross-Region reads + fast DR
-- B. Multi-Region active-active NoSQL key-value writes
-- C. Schemaless massive-scale writes everywhere
-- D. Single-digit ms NoSQL with no SQL needs
+- A. Multi-Region active-active NoSQL key-value writes
+- B. Single-digit ms NoSQL with no SQL needs
+- C. Relational (SQL) workload needing cross-Region reads + fast DR
+- D. Schemaless massive-scale writes everywhere
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Aurora Global DB favored by relational cross-Region reads + fast DR.
 
@@ -296,6 +309,7 @@ Aurora Global Database vs DynamoDB Global Tables — which favors Aurora Global 
 
 ## Q 14-v2-14
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Cognito
 - difficulty: hard
@@ -304,12 +318,12 @@ Aurora Global Database vs DynamoDB Global Tables — which favors Aurora Global 
 
 Cognito User Pools vs Identity Pools — which is TRUE?
 
-- A. User Pools = authentication (sign-in, tokens); Identity Pools = authorization to AWS resources via temporary credentials
-- B. Identity Pools handle sign-up UI
-- C. User Pools grant IAM credentials directly
-- D. They are the same
+- A. Identity Pools handle sign-up UI
+- B. They are the same
+- C. User Pools = authentication (sign-in, tokens); Identity Pools = authorization to AWS resources via temporary credentials
+- D. User Pools grant IAM credentials directly
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** User Pools=authentication; Identity Pools=authorize AWS resources via temp credentials.
 
@@ -317,6 +331,7 @@ Cognito User Pools vs Identity Pools — which is TRUE?
 
 ## Q 14-v2-15
 - domain: secure
+- task: 1.2
 - topic: security
 - services: WAF, Shield
 - tags: security-groups, web-attacks, ddos-protection
@@ -326,11 +341,11 @@ Cognito User Pools vs Identity Pools — which is TRUE?
 
 WAF vs Shield vs Security Group — which mapping is CORRECT?
 
-- A. WAF = Layer 7 filtering (SQLi/XSS/rate); Shield = DDoS protection; Security Group = stateful instance firewall
-- B. Shield = SQL injection filtering
-- C. Security Group = Layer 7 web rules
-- D. WAF = DDoS-only
+- A. WAF = DDoS-only
+- B. Security Group = Layer 7 web rules
+- C. WAF = Layer 7 filtering (SQLi/XSS/rate); Shield = DDoS protection; Security Group = stateful instance firewall
+- D. Shield = SQL injection filtering
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** WAF=Layer 7 filtering; Shield=DDoS; Security Group=stateful instance firewall.

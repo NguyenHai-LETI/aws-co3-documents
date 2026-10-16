@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 07-v2-01
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: decoupling
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 A web tier must decouple from a slower processing tier to absorb spikes and process work asynchronously. Which service?
 
-- A. Amazon SQS
-- B. Amazon SNS
-- C. AWS Step Functions
-- D. Amazon Kinesis
+- A. Amazon Kinesis
+- B. Amazon SQS
+- C. Amazon SNS
+- D. AWS Step Functions
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Decouple + absorb spikes + async processing = Amazon SQS.
 
@@ -37,6 +38,7 @@ A web tier must decouple from a slower processing tier to absorb spikes and proc
 
 ## Q 07-v2-02
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-fifo
@@ -47,11 +49,11 @@ A web tier must decouple from a slower processing tier to absorb spikes and proc
 Order processing must preserve strict message order and process each message exactly once. Which SQS type?
 
 - A. Standard queue
-- B. FIFO queue
-- C. SNS standard topic
+- B. SNS standard topic
+- C. FIFO queue
 - D. Kinesis stream
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Strict ordering + exactly-once = SQS FIFO queue.
 
@@ -59,6 +61,7 @@ Order processing must preserve strict message order and process each message exa
 
 ## Q 07-v2-03
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS, Lambda, SQS
 - tags: fan-out
@@ -81,6 +84,7 @@ One event must be delivered to multiple subscribers (email, Lambda, SQS) simulta
 
 ## Q 07-v2-04
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-visibility-timeout
@@ -90,12 +94,12 @@ One event must be delivered to multiple subscribers (email, Lambda, SQS) simulta
 
 A consumer needs time to process an SQS message; other consumers must not see it during processing. Which setting?
 
-- A. Delay seconds
-- B. Visibility timeout
-- C. Message retention
-- D. Long polling
+- A. Long polling
+- B. Message retention
+- C. Visibility timeout
+- D. Delay seconds
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Hide message during processing = Visibility timeout.
 
@@ -103,6 +107,7 @@ A consumer needs time to process an SQS message; other consumers must not see it
 
 ## Q 07-v2-05
 - domain: resilient
+- task: 2.1
 - topic: integration
 - tags: sqs-dlq
 - difficulty: medium
@@ -124,6 +129,7 @@ Messages that repeatedly fail processing must be moved aside for later analysis 
 
 ## Q 07-v2-06
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-long-polling
@@ -133,12 +139,12 @@ Messages that repeatedly fail processing must be moved aside for later analysis 
 
 To reduce empty SQS responses and cost while waiting for messages, which should be enabled?
 
-- A. Short polling
-- B. Long polling
-- C. Delay seconds
+- A. Delay seconds
+- B. Short polling
+- C. Long polling
 - D. Visibility timeout increase
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Reduce empty responses/cost = Long polling.
 
@@ -146,6 +152,7 @@ To reduce empty SQS responses and cost while waiting for messages, which should 
 
 ## Q 07-v2-07
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions, Lambda
 - tags: orchestration
@@ -155,12 +162,12 @@ To reduce empty SQS responses and cost while waiting for messages, which should 
 
 A serverless workflow must orchestrate multiple Lambda functions with branching, retries, and error handling. Which service?
 
-- A. AWS Step Functions
-- B. Amazon SQS
+- A. Amazon SQS
+- B. AWS Step Functions
 - C. Amazon SNS
 - D. EventBridge only
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Orchestrate Lambdas with branching/retries = Step Functions.
 
@@ -168,6 +175,7 @@ A serverless workflow must orchestrate multiple Lambda functions with branching,
 
 ## Q 07-v2-08
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge
 - tags: event-driven
@@ -177,12 +185,12 @@ A serverless workflow must orchestrate multiple Lambda functions with branching,
 
 An event-driven architecture must route events from many AWS services and SaaS apps to targets based on content rules. Which service?
 
-- A. Amazon EventBridge
-- B. Amazon SQS
+- A. Amazon SQS
+- B. AWS Batch
 - C. Amazon MQ
-- D. AWS Batch
+- D. Amazon EventBridge
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Content-based routing from AWS/SaaS events = EventBridge.
 
@@ -190,6 +198,7 @@ An event-driven architecture must route events from many AWS services and SaaS a
 
 ## Q 07-v2-09
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Amazon MQ
 - difficulty: medium
@@ -198,12 +207,12 @@ An event-driven architecture must route events from many AWS services and SaaS a
 
 A company migrating from on-premises apps that use standard AMQP/MQTT messaging wants minimal code change. Which service?
 
-- A. Amazon SQS
-- B. Amazon MQ
-- C. Amazon SNS
-- D. EventBridge
+- A. Amazon MQ
+- B. EventBridge
+- C. Amazon SQS
+- D. Amazon SNS
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Standard AMQP/MQTT with minimal change = Amazon MQ.
 
@@ -211,6 +220,7 @@ A company migrating from on-premises apps that use standard AMQP/MQTT messaging 
 
 ## Q 07-v2-10
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS
 - tags: sns-filtering
@@ -220,12 +230,12 @@ A company migrating from on-premises apps that use standard AMQP/MQTT messaging 
 
 SNS must deliver only messages matching certain attributes to a specific subscriber. Which feature?
 
-- A. Message filtering (filter policies)
-- B. FIFO
-- C. DLQ
-- D. Fan-out
+- A. DLQ
+- B. Fan-out
+- C. FIFO
+- D. Message filtering (filter policies)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Deliver only matching messages = SNS message filtering.
 
@@ -233,6 +243,7 @@ SNS must deliver only messages matching certain attributes to a specific subscri
 
 ## Q 07-v2-11
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge, Lambda
 - tags: event-driven
@@ -242,12 +253,12 @@ SNS must deliver only messages matching certain attributes to a specific subscri
 
 A cron-like schedule must trigger a Lambda every 15 minutes with minimal setup. Which service?
 
-- A. EventBridge Scheduler / scheduled rule
+- A. SNS
 - B. SQS delay queue
 - C. Step Functions
-- D. SNS
+- D. EventBridge Scheduler / scheduled rule
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Cron trigger for Lambda = EventBridge Scheduler/scheduled rule.
 
@@ -255,6 +266,7 @@ A cron-like schedule must trigger a Lambda every 15 minutes with minimal setup. 
 
 ## Q 07-v2-12
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - difficulty: medium
@@ -263,12 +275,12 @@ A cron-like schedule must trigger a Lambda every 15 minutes with minimal setup. 
 
 SQS messages must be delayed 5 minutes before becoming available to consumers. Which setting?
 
-- A. Visibility timeout
-- B. Delay queue (DelaySeconds)
-- C. Long polling
-- D. Retention period
+- A. Long polling
+- B. Visibility timeout
+- C. Retention period
+- D. Delay queue (DelaySeconds)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Delay availability of messages = Delay queue (DelaySeconds).
 
@@ -276,6 +288,7 @@ SQS messages must be delayed 5 minutes before becoming available to consumers. W
 
 ## Q 07-v2-13
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions
 - tags: orchestration
@@ -285,12 +298,12 @@ SQS messages must be delayed 5 minutes before becoming available to consumers. W
 
 A workflow has thousands of short, high-volume state transitions per second at low cost. Which Step Functions type?
 
-- A. Standard workflows
-- B. Express workflows
-- C. Activity workers only
+- A. Express workflows
+- B. Activity workers only
+- C. Standard workflows
 - D. Standard with .sync
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** High-volume short transitions, low cost = Step Functions Express.
 
@@ -298,6 +311,7 @@ A workflow has thousands of short, high-volume state transitions per second at l
 
 ## Q 07-v2-14
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS, SQS
 - tags: fan-out, decoupling
@@ -307,12 +321,12 @@ A workflow has thousands of short, high-volume state transitions per second at l
 
 SNS + SQS fan-out: multiple queues subscribe to one topic so each service processes its own copy. What is the main benefit?
 
-- A. Ordered processing
-- B. Decoupled parallel processing with independent consumers
-- C. Lower durability
-- D. Synchronous responses
+- A. Synchronous responses
+- B. Lower durability
+- C. Decoupled parallel processing with independent consumers
+- D. Ordered processing
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Fan-out benefit = decoupled parallel processing with independent consumers.
 
@@ -320,6 +334,7 @@ SNS + SQS fan-out: multiple queues subscribe to one topic so each service proces
 
 ## Q 07-v2-15
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS, S3
 - tags: sqs-large-messages
@@ -329,10 +344,10 @@ SNS + SQS fan-out: multiple queues subscribe to one topic so each service proces
 
 A message larger than the SQS 256 KB limit must be sent. Which approach?
 
-- A. Split manually and hope
+- A. Compress to under 256 KB always
 - B. SQS Extended Client Library storing payload in S3
 - C. Use SNS instead
-- D. Compress to under 256 KB always
+- D. Split manually and hope
 
 **Answer:** B
 
@@ -342,6 +357,7 @@ A message larger than the SQS 256 KB limit must be sent. Which approach?
 
 ## Q 07-v2-16
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EC2, EventBridge
 - tags: event-driven
@@ -364,6 +380,7 @@ EventBridge must trigger a target when an EC2 instance changes to "stopped" stat
 
 ## Q 07-v2-17
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-fifo
@@ -373,12 +390,12 @@ EventBridge must trigger a target when an EC2 instance changes to "stopped" stat
 
 A FIFO SQS queue must guarantee ordering only within a logical group while allowing parallelism across groups. Which attribute?
 
-- A. MessageGroupId
-- B. Visibility timeout
-- C. DelaySeconds
-- D. ReceiveCount
+- A. Visibility timeout
+- B. ReceiveCount
+- C. MessageGroupId
+- D. DelaySeconds
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Ordering within group, parallel across groups = MessageGroupId.
 
@@ -386,6 +403,7 @@ A FIFO SQS queue must guarantee ordering only within a logical group while allow
 
 ## Q 07-v2-18
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: decoupling
@@ -397,8 +415,8 @@ A decoupled system must retain messages up to 14 days if consumers are down. Whi
 
 - A. Visibility timeout
 - B. Message retention period
-- C. Long polling
-- D. Redrive policy
+- C. Redrive policy
+- D. Long polling
 
 **Answer:** B
 
@@ -408,6 +426,7 @@ A decoupled system must retain messages up to 14 days if consumers are down. Whi
 
 ## Q 07-v2-19
 - domain: performance
+- task: 3.2
 - topic: integration
 - services: SQS
 - difficulty: medium
@@ -416,12 +435,12 @@ A decoupled system must retain messages up to 14 days if consumers are down. Whi
 
 An application needs guaranteed at-least-once delivery and can tolerate occasional duplicates and out-of-order messages for maximum throughput. Which SQS type?
 
-- A. FIFO queue
-- B. Standard queue
-- C. SNS FIFO
-- D. Kinesis
+- A. Standard queue
+- B. FIFO queue
+- C. Kinesis
+- D. SNS FIFO
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** At-least-once, high throughput, dup/out-of-order OK = Standard queue.
 
@@ -429,6 +448,7 @@ An application needs guaranteed at-least-once delivery and can tolerate occasion
 
 ## Q 07-v2-20
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge, SQS, Kinesis
 - tags: event-driven
@@ -438,12 +458,12 @@ An application needs guaranteed at-least-once delivery and can tolerate occasion
 
 A company wants point-to-point integration to pull from a source (SQS/Kinesis), optionally filter/enrich, and deliver to a target with minimal code. Which service?
 
-- A. EventBridge Pipes
-- B. Step Functions Standard
+- A. Amazon MQ
+- B. EventBridge Pipes
 - C. SNS
-- D. Amazon MQ
+- D. Step Functions Standard
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Point-to-point source->filter/enrich->target, low code = EventBridge Pipes.
 
@@ -451,6 +471,7 @@ A company wants point-to-point integration to pull from a source (SQS/Kinesis), 
 
 ## Q 07-v2-21
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-visibility-timeout
@@ -460,13 +481,13 @@ A company wants point-to-point integration to pull from a source (SQS/Kinesis), 
 
 An SQS consumer sometimes takes longer than the visibility timeout, causing duplicate processing. Which two mitigations are appropriate? (Choose TWO)
 
-- A. Increase the visibility timeout or extend it (ChangeMessageVisibility)
-- B. Make processing idempotent
-- C. Switch to short polling
-- D. Reduce retention period
-- E. Delete the DLQ
+- A. Make processing idempotent
+- B. Delete the DLQ
+- C. Reduce retention period
+- D. Increase the visibility timeout or extend it (ChangeMessageVisibility)
+- E. Switch to short polling
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** Avoid duplicate processing = increase/extend visibility timeout + idempotent processing.
 
@@ -474,6 +495,7 @@ An SQS consumer sometimes takes longer than the visibility timeout, causing dupl
 
 ## Q 07-v2-22
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS, SQS
 - tags: fan-out, sqs-fifo
@@ -483,12 +505,12 @@ An SQS consumer sometimes takes longer than the visibility timeout, causing dupl
 
 A fan-out design must guarantee ordered, deduplicated delivery to multiple consumers. Which combination?
 
-- A. SNS Standard + SQS Standard
-- B. SNS FIFO topic + SQS FIFO queues
-- C. Kinesis + Lambda
-- D. EventBridge + SQS Standard
+- A. EventBridge + SQS Standard
+- B. Kinesis + Lambda
+- C. SNS Standard + SQS Standard
+- D. SNS FIFO topic + SQS FIFO queues
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Ordered + deduped fan-out = SNS FIFO + SQS FIFO.
 
@@ -496,6 +518,7 @@ A fan-out design must guarantee ordered, deduplicated delivery to multiple consu
 
 ## Q 07-v2-23
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions
 - tags: orchestration
@@ -505,12 +528,12 @@ A fan-out design must guarantee ordered, deduplicated delivery to multiple consu
 
 A Step Functions workflow must wait for an external human approval that may take days, then continue. Which pattern?
 
-- A. Express workflow with polling
-- B. Standard workflow with a callback task (waitForTaskToken)
+- A. Standard workflow with a callback task (waitForTaskToken)
+- B. Express workflow with polling
 - C. SQS delay queue
 - D. SNS retry
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Wait for external approval for days = Standard workflow callback (waitForTaskToken).
 
@@ -518,6 +541,7 @@ A Step Functions workflow must wait for an external human approval that may take
 
 ## Q 07-v2-24
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge
 - tags: event-driven, sqs-dlq
@@ -528,12 +552,12 @@ A Step Functions workflow must wait for an external human approval that may take
 An event-driven pipeline must ensure that events failing all delivery attempts to a target are not lost. Which two EventBridge features help? (Choose TWO)
 
 - A. Dead-letter queue on the target
-- B. Retry policy with maximum attempts
-- C. Short polling
-- D. FIFO ordering
-- E. Message group id
+- B. Message group id
+- C. FIFO ordering
+- D. Short polling
+- E. Retry policy with maximum attempts
 
-**Answer:** A, B
+**Answer:** A, E
 
 **Explanation:** Prevent event loss = target DLQ + retry policy with max attempts.
 
@@ -541,6 +565,7 @@ An event-driven pipeline must ensure that events failing all delivery attempts t
 
 ## Q 07-v2-25
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS, Lambda
 - difficulty: hard
@@ -549,10 +574,10 @@ An event-driven pipeline must ensure that events failing all delivery attempts t
 
 A company must throttle downstream calls: buffer bursts and process at a steady rate with Lambda. Which design is BEST?
 
-- A. SNS directly to Lambda
+- A. Step Functions Express only
 - B. SQS as a buffer with Lambda event source mapping and controlled concurrency
-- C. EventBridge to Lambda directly
-- D. Step Functions Express only
+- C. SNS directly to Lambda
+- D. EventBridge to Lambda directly
 
 **Answer:** B
 
@@ -562,6 +587,7 @@ A company must throttle downstream calls: buffer bursts and process at a steady 
 
 ## Q 07-v2-26
 - domain: resilient
+- task: 2.1
 - topic: integration
 - tags: sqs-fifo
 - difficulty: hard
@@ -570,12 +596,12 @@ A company must throttle downstream calls: buffer bursts and process at a steady 
 
 A FIFO queue must avoid processing duplicate messages sent within a 5-minute window. Which mechanism handles this?
 
-- A. Content-based deduplication / MessageDeduplicationId
-- B. Visibility timeout
-- C. DLQ
-- D. Long polling
+- A. Long polling
+- B. DLQ
+- C. Content-based deduplication / MessageDeduplicationId
+- D. Visibility timeout
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** FIFO dedup within 5 min = content-based dedup / MessageDeduplicationId.
 
@@ -583,6 +609,7 @@ A FIFO queue must avoid processing duplicate messages sent within a 5-minute win
 
 ## Q 07-v2-27
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS
 - difficulty: hard
@@ -591,12 +618,12 @@ A FIFO queue must avoid processing duplicate messages sent within a 5-minute win
 
 Sensitive PII flowing through SNS must be scanned and blocked/masked before delivery. Which feature?
 
-- A. SNS message data protection (data protection policies)
+- A. SQS DLQ
 - B. SNS filter policy
-- C. SQS DLQ
-- D. KMS only
+- C. KMS only
+- D. SNS message data protection (data protection policies)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Scan/mask PII in SNS = message data protection policies.
 
@@ -604,6 +631,7 @@ Sensitive PII flowing through SNS must be scanned and blocked/masked before deli
 
 ## Q 07-v2-28
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions
 - tags: orchestration, compliance
@@ -613,12 +641,12 @@ Sensitive PII flowing through SNS must be scanned and blocked/masked before deli
 
 A workflow orchestrating microservices needs exactly-once execution semantics, visual auditing, and long-running steps up to a year. Which service/type?
 
-- A. Step Functions Standard workflows
-- B. Step Functions Express workflows
-- C. SQS FIFO
-- D. EventBridge rules
+- A. EventBridge rules
+- B. SQS FIFO
+- C. Step Functions Standard workflows
+- D. Step Functions Express workflows
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Exactly-once, auditable, up to 1 year = Step Functions Standard.
 
@@ -626,6 +654,7 @@ A workflow orchestrating microservices needs exactly-once execution semantics, v
 
 ## Q 07-v2-29
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge
 - tags: cross-account-access, event-driven, iam-policies
@@ -635,13 +664,13 @@ A workflow orchestrating microservices needs exactly-once execution semantics, v
 
 An EventBridge rule must deliver events cross-account to another team's event bus. Which two are required? (Choose TWO)
 
-- A. Resource-based policy on the target event bus allowing the source
-- B. A rule with the target bus as target
-- C. VPC peering
-- D. SQS DLQ mandatory
-- E. FIFO topic
+- A. FIFO topic
+- B. Resource-based policy on the target event bus allowing the source
+- C. SQS DLQ mandatory
+- D. VPC peering
+- E. A rule with the target bus as target
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** Cross-account EventBridge = target bus resource policy allow + rule targeting that bus.
 
@@ -649,6 +678,7 @@ An EventBridge rule must deliver events cross-account to another team's event bu
 
 ## Q 07-v2-30
 - domain: performance
+- task: 3.5
 - topic: integration
 - services: Kinesis Data Streams, SQS
 - tags: streaming-ingestion
@@ -659,10 +689,10 @@ An EventBridge rule must deliver events cross-account to another team's event bu
 A high-throughput ingestion needs ordered, replayable streaming to multiple independent consumers reading at their own pace, retaining data for hours. Which service (vs SQS)?
 
 - A. Amazon SQS Standard
-- B. Amazon Kinesis Data Streams
+- B. Amazon MQ
 - C. Amazon SNS
-- D. Amazon MQ
+- D. Amazon Kinesis Data Streams
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Ordered, replayable, multi-consumer streaming with retention = Kinesis Data Streams.

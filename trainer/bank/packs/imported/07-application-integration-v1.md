@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 07-v1-01
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: decoupling
@@ -25,11 +26,11 @@ created: 2026-10-16
 A web tier produces work faster than a processing tier can handle, causing dropped requests during spikes. Which service decouples them and buffers the load?
 
 - A. Amazon SNS
-- B. Amazon SQS
+- B. Amazon Kinesis Data Streams
 - C. AWS Step Functions
-- D. Amazon Kinesis Data Streams
+- D. Amazon SQS
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Decouple + buffer spikes = Amazon SQS.
 
@@ -37,6 +38,7 @@ A web tier produces work faster than a processing tier can handle, causing dropp
 
 ## Q 07-v1-02
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-fifo
@@ -46,12 +48,12 @@ A web tier produces work faster than a processing tier can handle, causing dropp
 
 An order-processing system must process messages in EXACT order and guarantee no duplicates. Which SQS queue type?
 
-- A. Standard queue
-- B. FIFO queue
-- C. Dead-letter queue
-- D. Delay queue
+- A. Delay queue
+- B. Standard queue
+- C. FIFO queue
+- D. Dead-letter queue
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Exact order + no duplicates = SQS FIFO.
 
@@ -59,6 +61,7 @@ An order-processing system must process messages in EXACT order and guarantee no
 
 ## Q 07-v1-03
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: S3, SNS, SQS
 - tags: fan-out
@@ -70,8 +73,8 @@ When an S3 object is uploaded, three independent pipelines must each receive the
 
 - A. S3 → single SQS queue
 - B. S3 → SNS topic → three SQS queues (fan-out)
-- C. S3 → Lambda only
-- D. S3 → Kinesis Firehose
+- C. S3 → Kinesis Firehose
+- D. S3 → Lambda only
 
 **Answer:** B
 
@@ -81,6 +84,7 @@ When an S3 object is uploaded, three independent pipelines must each receive the
 
 ## Q 07-v1-04
 - domain: resilient
+- task: 2.1
 - topic: integration
 - tags: sqs-dlq
 - difficulty: easy
@@ -89,12 +93,12 @@ When an S3 object is uploaded, three independent pipelines must each receive the
 
 Messages that repeatedly fail processing should be moved aside for later inspection instead of blocking the queue. Which feature?
 
-- A. Visibility timeout
-- B. Dead-letter queue (DLQ)
+- A. Dead-letter queue (DLQ)
+- B. Visibility timeout
 - C. Long polling
 - D. Message filtering
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Isolate repeatedly failing messages = Dead-letter queue.
 
@@ -102,6 +106,7 @@ Messages that repeatedly fail processing should be moved aside for later inspect
 
 ## Q 07-v1-05
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-visibility-timeout
@@ -112,11 +117,11 @@ Messages that repeatedly fail processing should be moved aside for later inspect
 Which SQS setting prevents other consumers from receiving a message while it is being processed?
 
 - A. Message retention period
-- B. Visibility timeout
-- C. Delay seconds
+- B. Delay seconds
+- C. Visibility timeout
 - D. Long polling wait time
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Hide in-flight message from other consumers = Visibility timeout.
 
@@ -124,6 +129,7 @@ Which SQS setting prevents other consumers from receiving a message while it is 
 
 ## Q 07-v1-06
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: sqs-long-polling
@@ -133,12 +139,12 @@ Which SQS setting prevents other consumers from receiving a message while it is 
 
 A company wants to reduce empty SQS receive responses and lower API costs. Which should be enabled?
 
-- A. Short polling
-- B. Long polling
-- C. FIFO queue
-- D. Delay queue
+- A. Long polling
+- B. FIFO queue
+- C. Delay queue
+- D. Short polling
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Fewer empty receives, lower cost = Long polling.
 
@@ -146,6 +152,7 @@ A company wants to reduce empty SQS receive responses and lower API costs. Which
 
 ## Q 07-v1-07
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge
 - tags: event-driven
@@ -156,11 +163,11 @@ A company wants to reduce empty SQS receive responses and lower API costs. Which
 An event-driven architecture must route AWS service events and third-party SaaS events to multiple targets based on event patterns. Which service?
 
 - A. Amazon SQS
-- B. Amazon EventBridge
-- C. AWS Step Functions
-- D. Amazon MQ
+- B. AWS Step Functions
+- C. Amazon MQ
+- D. Amazon EventBridge
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Route AWS + SaaS events by pattern = EventBridge.
 
@@ -168,6 +175,7 @@ An event-driven architecture must route AWS service events and third-party SaaS 
 
 ## Q 07-v1-08
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions, Lambda
 - tags: orchestration
@@ -177,12 +185,12 @@ An event-driven architecture must route AWS service events and third-party SaaS 
 
 A workflow must orchestrate multiple Lambda functions with branching, retries, and error handling, and may run for hours. Which service and type?
 
-- A. Step Functions Standard workflow
-- B. Step Functions Express workflow
-- C. SQS FIFO
+- A. SQS FIFO
+- B. Step Functions Standard workflow
+- C. Step Functions Express workflow
 - D. EventBridge rules only
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Long-running orchestration with retries = Step Functions Standard.
 
@@ -190,6 +198,7 @@ A workflow must orchestrate multiple Lambda functions with branching, retries, a
 
 ## Q 07-v1-09
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Amazon MQ
 - difficulty: easy
@@ -200,10 +209,10 @@ A company is migrating an on-premises application that uses industry-standard me
 
 - A. Amazon SQS
 - B. Amazon SNS
-- C. Amazon MQ
-- D. Amazon Kinesis
+- C. Amazon Kinesis
+- D. Amazon MQ
 
-**Answer:** C
+**Answer:** D
 
 **Explanation:** On-prem AMQP/MQTT/STOMP, minimal change = Amazon MQ.
 
@@ -211,6 +220,7 @@ A company is migrating an on-premises application that uses industry-standard me
 
 ## Q 07-v1-10
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS
 - difficulty: easy
@@ -219,12 +229,12 @@ A company is migrating an on-premises application that uses industry-standard me
 
 Which messaging pattern does Amazon SNS implement?
 
-- A. Pull-based queue (1:1)
-- B. Publish/subscribe push (1:many)
+- A. Publish/subscribe push (1:many)
+- B. Request/response
 - C. Stream processing
-- D. Request/response
+- D. Pull-based queue (1:1)
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** SNS = pub/sub push (1:many).
 
@@ -232,6 +242,7 @@ Which messaging pattern does Amazon SNS implement?
 
 ## Q 07-v1-11
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS
 - tags: sns-filtering
@@ -241,12 +252,12 @@ Which messaging pattern does Amazon SNS implement?
 
 SNS subscribers should each receive only a subset of messages relevant to them based on message attributes. Which feature?
 
-- A. Message filtering with filter policies
-- B. Dead-letter queue
+- A. Dead-letter queue
+- B. Message filtering with filter policies
 - C. FIFO topic
 - D. Message deduplication
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Subset per subscriber = SNS message filtering policies.
 
@@ -254,6 +265,7 @@ SNS subscribers should each receive only a subset of messages relevant to them b
 
 ## Q 07-v1-12
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: EventBridge, Lambda
 - difficulty: easy
@@ -262,12 +274,12 @@ SNS subscribers should each receive only a subset of messages relevant to them b
 
 A scheduled job must run a Lambda function every day at 2 AM UTC. Which is the simplest serverless approach?
 
-- A. EC2 cron job
-- B. EventBridge rule with a cron/schedule expression
-- C. SQS delay queue
-- D. Step Functions wait state loop
+- A. SQS delay queue
+- B. Step Functions wait state loop
+- C. EventBridge rule with a cron/schedule expression
+- D. EC2 cron job
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Daily serverless schedule = EventBridge cron rule.
 
@@ -275,6 +287,7 @@ A scheduled job must run a Lambda function every day at 2 AM UTC. Which is the s
 
 ## Q 07-v1-13
 - domain: performance
+- task: 3.2
 - topic: integration
 - services: SQS
 - difficulty: easy
@@ -283,12 +296,12 @@ A scheduled job must run a Lambda function every day at 2 AM UTC. Which is the s
 
 Which is TRUE about SQS Standard queues?
 
-- A. Guaranteed ordering and exactly-once
-- B. Nearly unlimited throughput with at-least-once delivery
-- C. Limited to 300 TPS
-- D. Names must end with `.fifo`
+- A. Names must end with `.fifo`
+- B. Limited to 300 TPS
+- C. Guaranteed ordering and exactly-once
+- D. Nearly unlimited throughput with at-least-once delivery
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Standard = high throughput, at-least-once.
 
@@ -296,6 +309,7 @@ Which is TRUE about SQS Standard queues?
 
 ## Q 07-v1-14
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SNS
 - difficulty: easy
@@ -317,6 +331,7 @@ A retail app must send order confirmations via email and SMS to customers. Which
 
 ## Q 07-v1-15
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS, S3
 - tags: sqs-large-messages
@@ -326,12 +341,12 @@ A retail app must send order confirmations via email and SMS to customers. Which
 
 A producer must send messages larger than 256 KB through SQS. What is the recommended approach?
 
-- A. Compress and hope it fits
-- B. Use the SQS Extended Client Library with payloads stored in S3
-- C. Switch to SNS
-- D. Use a FIFO queue
+- A. Use the SQS Extended Client Library with payloads stored in S3
+- B. Switch to SNS
+- C. Use a FIFO queue
+- D. Compress and hope it fits
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** >256 KB messages = SQS Extended Client + S3.
 
@@ -339,6 +354,7 @@ A producer must send messages larger than 256 KB through SQS. What is the recomm
 
 ## Q 07-v1-16
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS
 - tags: decoupling, sqs-dlq
@@ -348,12 +364,12 @@ A producer must send messages larger than 256 KB through SQS. What is the recomm
 
 Which combination implements a durable, decoupled async architecture where a failed consumer does not lose messages?
 
-- A. SNS only
-- B. SQS queue with message retention and a DLQ
-- C. EventBridge bus only
-- D. Direct Lambda invocation
+- A. Direct Lambda invocation
+- B. EventBridge bus only
+- C. SQS queue with message retention and a DLQ
+- D. SNS only
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Durable decoupling, no message loss = SQS with retention + DLQ.
 
@@ -361,6 +377,7 @@ Which combination implements a durable, decoupled async architecture where a fai
 
 ## Q 07-v1-17
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Step Functions
 - tags: orchestration
@@ -370,12 +387,12 @@ Which combination implements a durable, decoupled async architecture where a fai
 
 A human-approval step is needed in an automated workflow before continuing. Which service supports waiting for an external callback/approval?
 
-- A. AWS Step Functions (task token / wait for callback)
+- A. Amazon MQ
 - B. Amazon SQS FIFO
-- C. Amazon SNS
-- D. Amazon MQ
+- C. AWS Step Functions (task token / wait for callback)
+- D. Amazon SNS
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Wait for human approval/callback = Step Functions task token.
 
@@ -383,6 +400,7 @@ A human-approval step is needed in an automated workflow before continuing. Whic
 
 ## Q 07-v1-18
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: AppFlow, S3, Redshift
 - difficulty: easy
@@ -404,6 +422,7 @@ Which service is BEST to integrate SaaS data (e.g., Salesforce) into Amazon S3 o
 
 ## Q 07-v1-19
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: SQS, Lambda, SNS
 - difficulty: medium
@@ -412,13 +431,13 @@ Which service is BEST to integrate SaaS data (e.g., Salesforce) into Amazon S3 o
 
 Which two are valid SNS subscriber/target types? (Choose TWO)
 
-- A. Amazon SQS queue
-- B. AWS Lambda function
-- C. Amazon EBS volume
-- D. Amazon EC2 instance store
-- E. Amazon VPC subnet
+- A. Amazon EC2 instance store
+- B. Amazon SQS queue
+- C. Amazon VPC subnet
+- D. Amazon EBS volume
+- E. AWS Lambda function
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** SNS targets include SQS and Lambda.
 
@@ -426,6 +445,7 @@ Which two are valid SNS subscriber/target types? (Choose TWO)
 
 ## Q 07-v1-20
 - domain: resilient
+- task: 2.1
 - topic: integration
 - services: Kinesis Data Streams
 - tags: streaming-ingestion
@@ -435,10 +455,10 @@ Which two are valid SNS subscriber/target types? (Choose TWO)
 
 A streaming analytics pipeline must ingest high-volume, ordered records and allow multiple consumers to replay data within a retention window. Which service fits BEST?
 
-- A. Amazon SQS Standard
+- A. Amazon MQ
 - B. Amazon Kinesis Data Streams
-- C. Amazon SNS
-- D. Amazon MQ
+- C. Amazon SQS Standard
+- D. Amazon SNS
 
 **Answer:** B
 

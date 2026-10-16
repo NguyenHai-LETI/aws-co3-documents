@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 15-v1-01
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo, dr-backup-restore
 - difficulty: easy
@@ -23,12 +24,12 @@ created: 2026-10-16
 
 Which DR strategy has the LOWEST cost but the LONGEST recovery time (RTO), restoring infrastructure only after a disaster?
 
-- A. Backup & Restore
+- A. Warm Standby
 - B. Pilot Light
-- C. Warm Standby
+- C. Backup & Restore
 - D. Multi-Site Active-Active
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Lowest cost, longest RTO = Backup & Restore.
 
@@ -36,6 +37,7 @@ Which DR strategy has the LOWEST cost but the LONGEST recovery time (RTO), resto
 
 ## Q 15-v1-02
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: dr-warm-standby
 - difficulty: easy
@@ -44,12 +46,12 @@ Which DR strategy has the LOWEST cost but the LONGEST recovery time (RTO), resto
 
 Which DR strategy keeps a scaled-down but fully functional copy always running, ready to scale up on failover?
 
-- A. Backup & Restore
-- B. Pilot Light
-- C. Warm Standby
-- D. Multi-Site Active-Active
+- A. Multi-Site Active-Active
+- B. Backup & Restore
+- C. Pilot Light
+- D. Warm Standby
 
-**Answer:** C
+**Answer:** D
 
 **Explanation:** Scaled-down but running, scale up on failover = Warm Standby.
 
@@ -57,6 +59,7 @@ Which DR strategy keeps a scaled-down but fully functional copy always running, 
 
 ## Q 15-v1-03
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo, dr-multi-site
 - difficulty: easy
@@ -65,8 +68,8 @@ Which DR strategy keeps a scaled-down but fully functional copy always running, 
 
 Which DR strategy runs full production capacity in two or more Regions simultaneously, giving near-zero RTO/RPO?
 
-- A. Backup & Restore
-- B. Pilot Light
+- A. Pilot Light
+- B. Backup & Restore
 - C. Warm Standby
 - D. Multi-Site Active-Active
 
@@ -78,6 +81,7 @@ Which DR strategy runs full production capacity in two or more Regions simultane
 
 ## Q 15-v1-04
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Aurora
 - tags: rto-rpo, aurora-global-database
@@ -87,12 +91,12 @@ Which DR strategy runs full production capacity in two or more Regions simultane
 
 A company needs the recovery POINT objective (RPO) to be near zero for a relational database across Regions. Which solution is BEST?
 
-- A. Daily RDS snapshots copied cross-Region
-- B. Aurora Global Database
-- C. EBS snapshots
-- D. S3 versioning
+- A. S3 versioning
+- B. EBS snapshots
+- C. Aurora Global Database
+- D. Daily RDS snapshots copied cross-Region
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Near-zero RPO relational cross-Region = Aurora Global Database.
 
@@ -100,6 +104,7 @@ A company needs the recovery POINT objective (RPO) to be near zero for a relatio
 
 ## Q 15-v1-05
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: EC2 Auto Scaling, ALB
 - tags: route53-health-checks
@@ -110,12 +115,12 @@ A company needs the recovery POINT objective (RPO) to be near zero for a relatio
 A web tier must remain available if a single AZ fails. Which design achieves this? (Choose TWO)
 
 - A. Auto Scaling group spanning at least two AZs
-- B. ALB across multiple AZs with health checks
-- C. Single large instance in one AZ
-- D. Vertical scaling only
-- E. Storing the app on Instance Store
+- B. Storing the app on Instance Store
+- C. ALB across multiple AZs with health checks
+- D. Single large instance in one AZ
+- E. Vertical scaling only
 
-**Answer:** A, B
+**Answer:** A, C
 
 **Explanation:** AZ-failure HA = multi-AZ ASG + multi-AZ ALB w/ health checks.
 
@@ -123,6 +128,7 @@ A web tier must remain available if a single AZ fails. Which design achieves thi
 
 ## Q 15-v1-06
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo
 - difficulty: easy
@@ -131,9 +137,9 @@ A web tier must remain available if a single AZ fails. Which design achieves thi
 
 Which term describes the maximum acceptable amount of DATA LOSS measured in time?
 
-- A. RTO (Recovery Time Objective)
+- A. MTTR
 - B. RPO (Recovery Point Objective)
-- C. MTTR
+- C. RTO (Recovery Time Objective)
 - D. SLA
 
 **Answer:** B
@@ -144,6 +150,7 @@ Which term describes the maximum acceptable amount of DATA LOSS measured in time
 
 ## Q 15-v1-07
 - domain: resilient
+- task: 2.1
 - topic: resilience
 - services: ELB, EC2 Auto Scaling, ALB
 - tags: route53-health-checks
@@ -154,8 +161,8 @@ Which term describes the maximum acceptable amount of DATA LOSS measured in time
 A stateless application behind an ALB needs automatic replacement of unhealthy instances. What provides this?
 
 - A. ELB health checks + Auto Scaling group
-- B. Larger instance type
-- C. Multi-AZ RDS
+- B. Multi-AZ RDS
+- C. Larger instance type
 - D. CloudFront
 
 **Answer:** A
@@ -166,6 +173,7 @@ A stateless application behind an ALB needs automatic replacement of unhealthy i
 
 ## Q 15-v1-08
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: S3
 - tags: s3-versioning, mfa
@@ -175,12 +183,12 @@ A stateless application behind an ALB needs automatic replacement of unhealthy i
 
 To protect against accidental deletion of critical S3 data and enable recovery of prior versions, enable:
 
-- A. S3 Versioning (optionally with MFA Delete)
-- B. S3 Transfer Acceleration
-- C. S3 Select
-- D. Requester Pays
+- A. S3 Select
+- B. Requester Pays
+- C. S3 Transfer Acceleration
+- D. S3 Versioning (optionally with MFA Delete)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Protect/recover S3 data = Versioning (+ MFA Delete).
 
@@ -188,6 +196,7 @@ To protect against accidental deletion of critical S3 data and enable recovery o
 
 ## Q 15-v1-09
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: DynamoDB
 - tags: multi-region, dynamodb-global-tables
@@ -198,9 +207,9 @@ To protect against accidental deletion of critical S3 data and enable recovery o
 A DynamoDB table must be globally available with low-latency local reads/writes and automatic multi-Region replication. Which feature?
 
 - A. DynamoDB Global Tables
-- B. DynamoDB Streams only
-- C. DAX
-- D. On-demand capacity
+- B. On-demand capacity
+- C. DynamoDB Streams only
+- D. DAX
 
 **Answer:** A
 
@@ -210,6 +219,7 @@ A DynamoDB table must be globally available with low-latency local reads/writes 
 
 ## Q 15-v1-10
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Route 53
 - tags: route53-health-checks, route53-routing
@@ -219,12 +229,12 @@ A DynamoDB table must be globally available with low-latency local reads/writes 
 
 Which Route 53 routing policy with health checks provides active-passive failover between a primary and a standby site?
 
-- A. Failover routing
-- B. Weighted routing
-- C. Simple routing
-- D. Geolocation routing
+- A. Geolocation routing
+- B. Failover routing
+- C. Weighted routing
+- D. Simple routing
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Active-passive failover = Failover routing + health checks.
 
@@ -232,6 +242,7 @@ Which Route 53 routing policy with health checks provides active-passive failove
 
 ## Q 15-v1-11
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: AWS Backup, EC2, EBS, RDS, DynamoDB, EFS
 - tags: automated-backups
@@ -254,6 +265,7 @@ A company wants centralized, automated backups with defined retention across EC2
 
 ## Q 15-v1-12
 - domain: resilient
+- task: 2.1
 - topic: resilience
 - services: SQS
 - tags: decoupling, high-availability, sqs-dlq
@@ -264,8 +276,8 @@ A company wants centralized, automated backups with defined retention across EC2
 To make an SQS-decoupled processing tier fault tolerant so a consumer crash does not lose work, which design is BEST?
 
 - A. Messages remain in the queue until successfully processed; failures go to a DLQ
-- B. Delete messages immediately on receipt
-- C. Use a single consumer with no retries
+- B. Use a single consumer with no retries
+- C. Delete messages immediately on receipt
 - D. Disable visibility timeout
 
 **Answer:** A
@@ -276,6 +288,7 @@ To make an SQS-decoupled processing tier fault tolerant so a consumer crash does
 
 ## Q 15-v1-13
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: RDS
 - tags: multi-az
@@ -286,11 +299,11 @@ To make an SQS-decoupled processing tier fault tolerant so a consumer crash does
 A multi-AZ RDS primary fails. What happens?
 
 - A. Manual promotion of a read replica is required
-- B. RDS automatically fails over to the standby in another AZ via DNS
-- C. The application must change the connection string
-- D. Data is lost since replication is asynchronous
+- B. Data is lost since replication is asynchronous
+- C. RDS automatically fails over to the standby in another AZ via DNS
+- D. The application must change the connection string
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Multi-AZ RDS auto-fails over to standby via DNS.
 
@@ -298,6 +311,7 @@ A multi-AZ RDS primary fails. What happens?
 
 ## Q 15-v1-14
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: read-replicas
 - difficulty: easy
@@ -306,12 +320,12 @@ A multi-AZ RDS primary fails. What happens?
 
 A pilot-light DR setup for a database typically keeps which component running in the DR Region?
 
-- A. A continuously replicated database (e.g., read replica) that can be promoted
-- B. Nothing at all
-- C. Full production fleet at scale
-- D. Only S3 backups
+- A. Full production fleet at scale
+- B. A continuously replicated database (e.g., read replica) that can be promoted
+- C. Only S3 backups
+- D. Nothing at all
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Pilot Light DB = continuously replicated DB ready to promote.
 
@@ -319,6 +333,7 @@ A pilot-light DR setup for a database typically keeps which component running in
 
 ## Q 15-v1-15
 - domain: resilient
+- task: 2.1
 - topic: resilience
 - services: SQS, EC2 Auto Scaling
 - tags: decoupling
@@ -328,13 +343,13 @@ A pilot-light DR setup for a database typically keeps which component running in
 
 Which combination decouples and adds resilience so traffic spikes don't overwhelm a backend? (Choose TWO)
 
-- A. Amazon SQS to buffer requests
-- B. Auto Scaling on the consumer tier
-- C. A single fixed-size EC2 instance
-- D. Synchronous tight coupling
-- E. Disabling retries
+- A. Auto Scaling on the consumer tier
+- B. Synchronous tight coupling
+- C. Disabling retries
+- D. Amazon SQS to buffer requests
+- E. A single fixed-size EC2 instance
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** Resilience to spikes = SQS buffer + Auto Scaling consumers.
 
@@ -342,6 +357,7 @@ Which combination decouples and adds resilience so traffic spikes don't overwhel
 
 ## Q 15-v1-16
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: S3
 - tags: multi-region, compliance, s3-replication, s3-versioning
@@ -351,12 +367,12 @@ Which combination decouples and adds resilience so traffic spikes don't overwhel
 
 To achieve cross-Region disaster recovery for objects in S3 with compliance and lower-latency reads in a second Region, use:
 
-- A. S3 Cross-Region Replication (with versioning)
-- B. S3 One Zone-IA
-- C. S3 Transfer Acceleration
-- D. S3 Object Lock only
+- A. S3 One Zone-IA
+- B. S3 Object Lock only
+- C. S3 Cross-Region Replication (with versioning)
+- D. S3 Transfer Acceleration
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Cross-Region DR + compliance for S3 = CRR with versioning.
 
@@ -364,6 +380,7 @@ To achieve cross-Region disaster recovery for objects in S3 with compliance and 
 
 ## Q 15-v1-17
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Route 53
 - tags: rto-rpo, dr-multi-site, route53-routing
@@ -373,12 +390,12 @@ To achieve cross-Region disaster recovery for objects in S3 with compliance and 
 
 A company wants near-zero RTO for an entire stateless application across two Regions. Which approach fits a Multi-Site Active-Active design?
 
-- A. Route 53 latency/weighted routing to full stacks in both Regions + global data layer
-- B. A single Region with Multi-AZ only
-- C. Nightly backups restored on demand
-- D. Pilot Light with manual scale-up
+- A. Pilot Light with manual scale-up
+- B. Nightly backups restored on demand
+- C. A single Region with Multi-AZ only
+- D. Route 53 latency/weighted routing to full stacks in both Regions + global data layer
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Active-Active = Route 53 to full stacks in both Regions + global data.
 
@@ -386,6 +403,7 @@ A company wants near-zero RTO for an entire stateless application across two Reg
 
 ## Q 15-v1-18
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: EC2 Auto Scaling
 - difficulty: easy
@@ -394,12 +412,12 @@ A company wants near-zero RTO for an entire stateless application across two Reg
 
 Which AWS feature improves application resilience by distributing instances across multiple AZs automatically and replacing failures?
 
-- A. EC2 Auto Scaling with multiple AZs
-- B. Placement group (cluster)
-- C. Dedicated Host
-- D. Spot Fleet only
+- A. Spot Fleet only
+- B. EC2 Auto Scaling with multiple AZs
+- C. Placement group (cluster)
+- D. Dedicated Host
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Distribute + replace across AZs = EC2 Auto Scaling multi-AZ.
 
@@ -407,6 +425,7 @@ Which AWS feature improves application resilience by distributing instances acro
 
 ## Q 15-v1-19
 - domain: cost
+- task: 4.1
 - topic: resilience
 - tags: rto-rpo, dr-backup-restore, snapshots
 - difficulty: easy
@@ -415,19 +434,20 @@ Which AWS feature improves application resilience by distributing instances acro
 
 A company has RTO of 1 hour and RPO of 15 minutes for a workload. Which strategy is the MOST cost-effective fit?
 
-- A. Backup & Restore with frequent snapshots/replication
-- B. Multi-Site Active-Active
+- A. Multi-Site Active-Active
+- B. Backup & Restore with frequent snapshots/replication
 - C. Warm Standby at full scale
 - D. No backups, rebuild manually
 
-**Answer:** A
+**Answer:** B
 
-**Explanation:** RTO 1h/RPO 15m cost-effective = Backup & Restore w/ frequent replication (Pilot Light also acceptable; cheapest = A).
+**Explanation:** RTO 1h/RPO 15m cost-effective = Backup & Restore w/ frequent replication (Pilot Light also acceptable; cheapest = “Backup & Restore with frequent snapshots/replication”).
 
 ---
 
 ## Q 15-v1-20
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: high-availability, multi-az
 - difficulty: medium
@@ -437,11 +457,11 @@ A company has RTO of 1 hour and RPO of 15 minutes for a workload. Which strategy
 Which two practices increase fault tolerance for a 3-tier web app? (Choose TWO)
 
 - A. Deploy each tier across multiple AZs
-- B. Use Multi-AZ for the database
+- B. Use a single NAT instance with no redundancy
 - C. Put all tiers on one EC2 instance
-- D. Use a single NAT instance with no redundancy
+- D. Use Multi-AZ for the database
 - E. Store session state only in instance memory
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** Fault tolerance = multi-AZ tiers + Multi-AZ database.

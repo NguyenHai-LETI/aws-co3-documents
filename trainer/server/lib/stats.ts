@@ -1,41 +1,72 @@
 import type { AppConfig } from '../config.ts';
 import type { BankState } from './bank.ts';
 import { DAY_MS, localDateKey } from './time.ts';
+import { FSRS_LEVEL_LABELS, gradeAnswer, intervalDays, memoryLevel, retrievability, review, type MemoryState } from './fsrs.ts';
+import { compareDue, isMasteredState } from '../../shared/filters.ts';
 import { pct, scaledScore } from '../../shared/scoring.ts';
-import type { Attempt, Bucket, Question, QuestionState, StatsResponse } from '../../shared/types.ts';
+import type { Attempt, Bucket, Difficulty, DomainDef, Question, QuestionState, StatsResponse } from '../../shared/types.ts';
+
+const round = (x: number, digits = 2) => Math.round(x * 10 ** digits) / 10 ** digits;
+const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+
+function timeOf(iso: string | undefined): number {
+  const t = iso ? new Date(iso).getTime() : NaN;
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** True when the learner struck out (one of) the correct option(s). */
+export function struckCorrect(r: { elim?: string; key: string }): boolean {
+  return !!r.elim && [...r.elim].some((k) => r.key.includes(k));
+}
 
 /**
- * Leitner spaced repetition, recomputed from the full answer history (no database):
- *   wrong            → box 1 (review tomorrow)
- *   correct + unsure → stays (min box 1), streak reset
- *   correct          → first time: box 2, else box + 1 (max 5)
- *   due = last answer + intervals[box - 1] days
+ * Learning state per question, recomputed from the full answer history (no database).
+ * Rushed attempts (median answer time below stats.rushed_median_seconds) are ignored.
+ *
+ * srs.algorithm = fsrs (default): FSRS-4.5 memory model (see fsrs.ts) — `box` = memory level by stability,
+ *   due = last answer + max(1, interval(S, desired_retention)) days.
+ * srs.algorithm = leitner:
+ *   wrong → box 1 · correct + unsure/hinted → stays (min box 1) · correct → first time box 2, else box + 1 (max 5)
+ *   due = last answer + intervals[box − 1] days
  */
-export function computeStates(attempts: Attempt[], cfg: AppConfig): Map<string, QuestionState> {
+export function computeStates(attempts: Attempt[], cfg: AppConfig, now = Date.now()): Map<string, QuestionState> {
+  const fsrs = cfg.srs.algorithm !== 'leitner';
   const states = new Map<string, QuestionState>();
   const timeSum = new Map<string, number>();
-  for (const a of attempts) {
+  const memory = new Map<string, MemoryState & { at: number }>();
+  const ordered = attempts
+    .filter((a) => !a.rushed)
+    .map((a, i) => ({ a, i, at: timeOf(a.finished) }))
+    .sort((x, y) => x.at - y.at || x.i - y.i);
+  for (const { a, at } of ordered) {
     for (const r of a.answers) {
       let s = states.get(r.q);
       if (!s) {
         s = { id: r.q, attempts: 0, correct: 0, everWrong: false, streak: 0, box: 0, avgTime: 0, slowCount: 0, wrongPicks: {} };
         states.set(r.q, s);
       }
+      const grade = gradeAnswer(r);
+      if (fsrs) {
+        const m = memory.get(r.q);
+        memory.set(r.q, { ...review(m, grade, m ? (at - m.at) / DAY_MS : 0), at });
+      }
+      if (!r.ok && s.correct > 0) s.lapses = (s.lapses ?? 0) + 1;
+      if (struckCorrect(r)) s.elimCorrect = (s.elimCorrect ?? 0) + 1;
       s.attempts++;
       timeSum.set(r.q, (timeSum.get(r.q) ?? 0) + r.t);
       if (r.est && r.t > r.est * 1.5) s.slowCount++;
       if (r.ok) {
         s.correct++;
-        if (r.unsure) {
-          s.box = Math.max(1, s.box);
+        if (r.unsure || r.hinted) {
+          if (!fsrs) s.box = Math.max(1, s.box);
           s.streak = 0;
         } else {
-          s.box = s.box === 0 ? 2 : Math.min(5, s.box + 1);
+          if (!fsrs) s.box = s.box === 0 ? 2 : Math.min(5, s.box + 1);
           s.streak++;
         }
       } else {
         s.everWrong = true;
-        s.box = 1;
+        if (!fsrs) s.box = 1;
         s.streak = 0;
         if (r.pick) s.wrongPicks[r.pick] = (s.wrongPicks[r.pick] ?? 0) + 1;
       }
@@ -44,12 +75,21 @@ export function computeStates(attempts: Attempt[], cfg: AppConfig): Map<string, 
       s.lastPick = r.pick;
       s.lastUnsure = !!r.unsure;
       s.lastFlag = !!r.flag;
+      s.lastGrade = grade;
     }
   }
   const intervals = cfg.srs.intervals_days;
   for (const s of states.values()) {
     s.avgTime = Math.round((timeSum.get(s.id) ?? 0) / Math.max(1, s.attempts));
-    if (s.lastAt && s.box > 0) {
+    const m = memory.get(s.id);
+    if (fsrs && m) {
+      s.stability = round(m.stability, 2);
+      s.fsrsDifficulty = round(m.difficulty, 2);
+      s.retrievability = round(retrievability((now - m.at) / DAY_MS, m.stability), 3);
+      s.box = memoryLevel(m.stability);
+      const days = Math.max(1, intervalDays(m.stability, cfg.srs.desired_retention));
+      s.dueAt = new Date(m.at + days * DAY_MS).toISOString();
+    } else if (!fsrs && s.lastAt && s.box > 0) {
       const days = intervals[Math.min(s.box, intervals.length) - 1] ?? 1;
       s.dueAt = new Date(new Date(s.lastAt).getTime() + days * DAY_MS).toISOString();
     }
@@ -61,9 +101,125 @@ export function isDue(s: QuestionState | undefined, now = Date.now()): boolean {
   return !!s?.dueAt && new Date(s.dueAt).getTime() <= now;
 }
 
+/** FSRS: stability ≥ srs.mastered_stability_days · Leitner: box ≥ srs.mastered_box. */
 export function isMastered(s: QuestionState | undefined, cfg: AppConfig): boolean {
-  return !!s && s.box >= cfg.srs.mastered_box;
+  return isMasteredState(s, cfg.srs);
 }
+
+/** Labels for the memory levels 0..5 (`StatsResponse.boxes`). */
+export function boxLabels(cfg: AppConfig): string[] {
+  if (cfg.srs.algorithm !== 'leitner') return [...FSRS_LEVEL_LABELS];
+  const iv = cfg.srs.intervals_days;
+  return ['Chưa học', ...[1, 2, 3, 4, 5].map((b) => `Box ${b} · ${iv[Math.min(b, iv.length) - 1] ?? 1} ngày`)];
+}
+
+// ── daily review cap ────────────────────────────────────────────────────────
+
+/** Answers given today (local date) in SRS-mode tests — they count against srs.daily_limit. */
+export function srsAnswersToday(attempts: Attempt[], now = Date.now()): number {
+  const today = localDateKey(new Date(now));
+  return attempts.filter((a) => !a.rushed && a.mode === 'srs' && localDateKey(a.finished) === today).reduce((n, a) => n + a.answers.length, 0);
+}
+
+export interface ReviewQueue {
+  due: Question[]; // every due question of the pool, lowest recall probability first
+  today: Question[]; // the share offered today (srs.daily_limit minus SRS answers already given today)
+  backlog: number; // due questions beyond today's cap
+  remaining: number; // reviews still allowed today
+}
+
+export function reviewQueue(pool: Question[], states: Map<string, QuestionState>, attempts: Attempt[], cfg: AppConfig, now = Date.now()): ReviewQueue {
+  const due = pool.filter((q) => isDue(states.get(q.id), now)).sort((a, b) => compareDue(states.get(a.id), states.get(b.id)));
+  const cap = cfg.srs.daily_limit;
+  const remaining = cap > 0 ? Math.max(0, cap - srsAnswersToday(attempts, now)) : due.length;
+  const today = due.slice(0, remaining);
+  return { due, today, backlog: due.length - today.length, remaining };
+}
+
+// ── readiness v2 ────────────────────────────────────────────────────────────
+
+export interface ReadinessItem {
+  domain: string;
+  ok: boolean;
+  ageDays: number;
+  longForm: boolean;
+  difficulty: Difficulty;
+}
+
+export interface Readiness {
+  readiness: number; // percent, 1 decimal
+  low: number; // 90 % interval, percent
+  high: number;
+  sigma: number; // standard deviation, percent points
+  passProbability: number; // 0..1
+  confidence: 'low' | 'medium' | 'high';
+}
+
+const DIFFICULTY_WEIGHT: Record<Difficulty, number> = { easy: 0.8, medium: 1, hard: 1.2 };
+
+/** Evidence weight of one answer: recency half-life × long-form bonus × difficulty. */
+export function answerWeight(it: Pick<ReadinessItem, 'ageDays' | 'longForm' | 'difficulty'>, halfLifeDays: number): number {
+  const recency = halfLifeDays > 0 ? Math.pow(0.5, Math.max(0, it.ageDays) / halfLifeDays) : 1;
+  return recency * (it.longForm ? 1.5 : 1) * (DIFFICULTY_WEIGHT[it.difficulty] ?? 1);
+}
+
+/** Standard normal CDF (erfc approximation, |error| < 1.2e-7). */
+export function normalCdf(z: number): number {
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.5 * x);
+  const erfc =
+    t *
+    Math.exp(
+      -x * x -
+        1.26551223 +
+        t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))),
+    );
+  return z >= 0 ? 1 - erfc / 2 : erfc / 2;
+}
+
+/**
+ * Exam-weighted readiness with a Beta(1,1) prior per domain:
+ *   p_d = (Σw·ok + 1) / (Σw + 2), n_eff = (Σw)² / Σw², readiness = Σ f_d·p_d (f_d = exam weight fraction),
+ *   var = Σ f_d²·p_d(1 − p_d) / max(n_eff, 1) → 90 % interval ± 1.645σ, P(pass) = 1 − Φ((pass − readiness)/σ).
+ */
+export function computeReadiness(items: ReadinessItem[], domains: DomainDef[], passPct: number, halfLifeDays: number): Readiness {
+  if (!items.length || !domains.length) return { readiness: 0, low: 0, high: 0, sigma: 0, passProbability: 0, confidence: 'low' };
+  const totalWeight = domains.reduce((s, d) => s + d.weight, 0) || 1;
+  const acc = new Map<string, { w: number; w2: number; ok: number }>();
+  for (const it of items) {
+    const w = answerWeight(it, halfLifeDays);
+    const g = acc.get(it.domain) ?? { w: 0, w2: 0, ok: 0 };
+    g.w += w;
+    g.w2 += w * w;
+    if (it.ok) g.ok += w;
+    acc.set(it.domain, g);
+  }
+  let mean = 0;
+  let variance = 0;
+  for (const d of domains) {
+    const g = acc.get(d.id) ?? { w: 0, w2: 0, ok: 0 };
+    const p = (g.ok + 1) / (g.w + 2);
+    const nEff = g.w2 > 0 ? (g.w * g.w) / g.w2 : 0;
+    const f = d.weight / totalWeight;
+    mean += f * p;
+    variance += (f * f * p * (1 - p)) / Math.max(nEff, 1);
+  }
+  const readiness = 100 * mean;
+  const sigma = 100 * Math.sqrt(variance);
+  const half = 1.645 * sigma;
+  const passProbability = sigma > 0 ? 1 - normalCdf((passPct - readiness) / sigma) : readiness >= passPct ? 1 : 0;
+  const width = 2 * half;
+  return {
+    readiness: round(readiness, 1),
+    low: round(clamp(readiness - half, 0, 100), 1),
+    high: round(clamp(readiness + half, 0, 100), 1),
+    sigma: round(sigma, 2),
+    passProbability: round(passProbability, 3),
+    confidence: width < 8 ? 'high' : width < 15 ? 'medium' : 'low',
+  };
+}
+
+// ── aggregate statistics ────────────────────────────────────────────────────
 
 interface Acc {
   attempts: number;
@@ -73,11 +229,7 @@ interface Acc {
   est: number;
 }
 
-function bucketize(
-  map: Map<string, Acc>,
-  bankCount: Map<string, number>,
-  label: (k: string) => string,
-): Bucket[] {
+function bucketize(map: Map<string, Acc>, bankCount: Map<string, number>, label: (k: string) => string): Bucket[] {
   const keys = new Set([...map.keys(), ...bankCount.keys()]);
   return [...keys].map((key) => {
     const a = map.get(key) ?? { attempts: 0, correct: 0, qs: new Set<string>(), time: 0, est: 0 };
@@ -95,8 +247,19 @@ function bucketize(
   });
 }
 
-export function computeStats(attempts: Attempt[], bank: BankState, states: Map<string, QuestionState>, cfg: AppConfig): StatsResponse {
+interface Tally {
+  answers: number;
+  correct: number;
+}
+
+function tally(t: Tally, ok: boolean) {
+  t.answers++;
+  if (ok) t.correct++;
+}
+
+export function computeStats(attempts: Attempt[], bank: BankState, states: Map<string, QuestionState>, cfg: AppConfig, now = Date.now()): StatsResponse {
   const tax = bank.taxonomy;
+  const used = attempts.filter((a) => !a.rushed);
   const active = bank.questions.filter((q) => q.status === 'active');
   const dims: Record<string, (q: Question) => string[]> = {
     domain: (q) => [q.domain],
@@ -104,6 +267,7 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     difficulty: (q) => [q.difficulty],
     service: (q) => q.services,
     tag: (q) => q.tags,
+    task: (q) => (q.task ? [q.task] : []),
   };
   const acc: Record<string, Map<string, Acc>> = {};
   const bankCount: Record<string, Map<string, number>> = {};
@@ -111,20 +275,25 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     acc[d] = new Map();
     bankCount[d] = new Map();
   }
+  for (const t of tax.tasks ?? []) bankCount.task.set(t.id, 0);
   for (const q of active) for (const [d, f] of Object.entries(dims)) for (const k of f(q)) bankCount[d].set(k, (bankCount[d].get(k) ?? 0) + 1);
 
   let answers = 0;
   let correct = 0;
   let studySeconds = 0;
   const daily = new Map<string, { answers: number; correct: number; seconds: number }>();
-  const recentCut = Date.now() - 30 * DAY_MS;
-  const recentDomain = new Map<string, { t: number; c: number }>();
-  for (const a of attempts) {
+  const calibration = { sure: { answers: 0, correct: 0 }, unsure: { answers: 0, correct: 0 }, hinted: { answers: 0, correct: 0 } };
+  const elimination = { answersWithElim: 0, correctEliminated: 0, questions: [] as string[] };
+  const elimQs: string[] = [];
+  const recall = { answers: 0, hits: 0, hitCorrect: 0, missCorrect: 0 };
+  const lengthSplit = { long: { answers: 0, correct: 0 }, short: { answers: 0, correct: 0 } };
+  const readinessItems: ReadinessItem[] = [];
+  for (const a of used) {
     const day = localDateKey(a.finished);
     const dd = daily.get(day) ?? { answers: 0, correct: 0, seconds: 0 };
     dd.seconds += a.timeUsed;
     studySeconds += a.timeUsed;
-    const recent = new Date(a.finished).getTime() >= recentCut;
+    const ageDays = Math.max(0, (now - timeOf(a.finished)) / DAY_MS);
     for (const r of a.answers) {
       answers++;
       dd.answers++;
@@ -132,8 +301,26 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
         correct++;
         dd.correct++;
       }
+      if (r.hinted) tally(calibration.hinted, r.ok);
+      else if (r.unsure) tally(calibration.unsure, r.ok);
+      else if (r.pick) tally(calibration.sure, r.ok);
+      if (r.elim) {
+        elimination.answersWithElim++;
+        if (struckCorrect(r)) {
+          elimination.correctEliminated++;
+          elimQs.push(r.q);
+        }
+      }
+      if (r.recall) {
+        recall.answers++;
+        if (r.recallHit) {
+          recall.hits++;
+          if (r.ok) recall.hitCorrect++;
+        } else if (r.ok) recall.missCorrect++;
+      }
       const q = bank.byId.get(r.q);
       if (!q) continue;
+      tally(q.longForm ? lengthSplit.long : lengthSplit.short, r.ok);
       for (const [d, f] of Object.entries(dims)) {
         for (const k of f(q)) {
           const x = acc[d].get(k) ?? { attempts: 0, correct: 0, qs: new Set<string>(), time: 0, est: 0 };
@@ -145,49 +332,40 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
           acc[d].set(k, x);
         }
       }
-      if (recent) {
-        const g = recentDomain.get(q.domain) ?? { t: 0, c: 0 };
-        g.t++;
-        if (r.ok) g.c++;
-        recentDomain.set(q.domain, g);
-      }
+      if (q.status !== 'retired') readinessItems.push({ domain: q.domain, ok: r.ok, ageDays, longForm: q.longForm, difficulty: q.difficulty });
     }
     daily.set(day, dd);
   }
+  elimination.questions = [...new Set(elimQs.reverse())].slice(0, 30);
 
-  // readiness = exam-weighted accuracy over the last 30 days (falls back to all-time per domain)
+  const domainOrder = (k: string) => tax.domains.findIndex((d) => d.id === k);
   const byDomain = bucketize(acc.domain, bankCount.domain, (k) => {
     const d = tax.domains.find((x) => x.id === k);
     return d ? `${d.code} · ${d.label_vi}` : k;
-  }).sort((a, b) => tax.domains.findIndex((d) => d.id === a.key) - tax.domains.findIndex((d) => d.id === b.key));
-  let readiness = 0;
-  let weightSeen = 0;
-  let minSample = Infinity;
-  for (const d of tax.domains) {
-    const r = recentDomain.get(d.id);
-    const all = acc.domain.get(d.id);
-    const [t, c] = r && r.t >= 10 ? [r.t, r.c] : all ? [all.attempts, all.correct] : [0, 0];
-    minSample = Math.min(minSample, t);
-    if (t) {
-      readiness += (d.weight * c) / t;
-      weightSeen += d.weight;
-    }
-  }
-  readiness = weightSeen ? Math.round((readiness / weightSeen) * 1000) / 10 : 0;
-  const confidence = minSample >= 40 ? 'high' : minSample >= 15 ? 'medium' : 'low';
+  }).sort((a, b) => domainOrder(a.key) - domainOrder(b.key));
+  const taskOrder = (k: string) => {
+    const i = (tax.tasks ?? []).findIndex((t) => t.id === k);
+    return i < 0 ? 999 : i;
+  };
+  const byTask = bucketize(acc.task, bankCount.task, (k) => {
+    const t = tax.tasks?.find((x) => x.id === k);
+    return t ? `${t.id} · ${t.label_vi}` : k;
+  }).sort((a, b) => taskOrder(a.key) - taskOrder(b.key) || a.key.localeCompare(b.key));
+
+  const ready = computeReadiness(readinessItems, tax.domains, tax.exam.pass_pct, cfg.stats.recency_half_life_days);
 
   // study streak: consecutive days with activity ending today or yesterday
   let streakDays = 0;
-  const today = new Date();
   for (let i = 0; i < 400; i++) {
-    const key = localDateKey(new Date(today.getTime() - i * DAY_MS));
+    const key = localDateKey(new Date(now - i * DAY_MS));
     if (daily.has(key)) streakDays++;
     else if (i > 0) break;
   }
 
   const stateList = [...states.values()].filter((s) => bank.byId.get(s.id)?.status === 'active');
   const boxes = [0, 0, 0, 0, 0, 0];
-  for (const q of active) boxes[states.get(q.id)?.box ?? 0]++;
+  for (const q of active) boxes[Math.min(5, Math.max(0, states.get(q.id)?.box ?? 0))]++;
+  const queue = reviewQueue(active, states, attempts, cfg, now);
 
   const topicLabel = (k: string) => {
     const t = tax.topics.find((x) => x.id === k);
@@ -204,31 +382,55 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
       return { id: s.id, wrong: s.attempts - s.correct, attempts: s.attempts, topic: q.topic, stem: q.stem.slice(0, 160) };
     });
 
+  const rushed = attempts
+    .filter((a) => a.rushed)
+    .map((a) => ({ id: a.id, title: a.title, finished: a.finished, medianTime: a.medianTime ?? 0 }))
+    .reverse();
+
   return {
     totals: {
-      attempts: attempts.length,
+      attempts: used.length,
       answers,
       correct,
       accuracy: pct(correct, answers),
       distinctSeen: stateList.length,
       bankActive: active.length,
-      mastered: stateList.filter((s) => s.box >= cfg.srs.mastered_box).length,
-      due: stateList.filter((s) => isDue(s)).length,
+      mastered: stateList.filter((s) => isMastered(s, cfg)).length,
+      due: queue.due.length,
       wrongOpen: stateList.filter((s) => s.lastOk === false).length,
       flagged: stateList.filter((s) => s.lastFlag || s.lastUnsure).length,
       studySeconds,
       streakDays,
-      readiness,
-      readinessScaled: scaledScore(readiness),
-      readinessConfidence: confidence,
+      readiness: ready.readiness,
+      readinessScaled: scaledScore(ready.readiness),
+      readinessConfidence: ready.confidence,
+      readinessLow: ready.low,
+      readinessHigh: ready.high,
+      passProbability: ready.passProbability,
+      dueToday: queue.today.length,
+      backlog: queue.backlog,
+      rushedAttempts: rushed.length,
+      longFormShare: pct(lengthSplit.long.answers, lengthSplit.long.answers + lengthSplit.short.answers),
     },
     byDomain,
     byTopic: bucketize(acc.topic, bankCount.topic, topicLabel).sort((a, b) => b.bank - a.bank),
     byDifficulty: bucketize(acc.difficulty, bankCount.difficulty, diffLabel),
     byService: bucketize(acc.service, bankCount.service, (k) => k).filter((b) => b.attempts > 0).sort((a, b) => b.attempts - a.attempts),
     byTag: bucketize(acc.tag, bankCount.tag, (k) => k).filter((b) => b.attempts > 0).sort((a, b) => b.attempts - a.attempts),
+    byTask,
     boxes,
-    trend: attempts.slice(-40).map((a) => ({ id: a.id, finished: a.finished, score: a.score, total: a.total, mode: a.mode, title: a.title })),
+    boxLabels: boxLabels(cfg),
+    calibration,
+    elimination,
+    recall: {
+      answers: recall.answers,
+      hits: recall.hits,
+      hitAccuracy: pct(recall.hitCorrect, recall.hits),
+      missAccuracy: pct(recall.missCorrect, recall.answers - recall.hits),
+    },
+    lengthSplit,
+    rushed,
+    trend: used.slice(-40).map((a) => ({ id: a.id, finished: a.finished, score: a.score, total: a.total, mode: a.mode, title: a.title })),
     daily: [...daily].map(([date, v]) => ({ date, ...v })).sort((a, b) => a.date.localeCompare(b.date)),
     mostMissed,
   };

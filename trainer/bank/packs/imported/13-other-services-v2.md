@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 13-v2-01
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: WorkSpaces
 - difficulty: medium
@@ -24,9 +25,9 @@ created: 2026-10-16
 A company must provide managed virtual desktops (DaaS) to remote employees. Which service?
 
 - A. Amazon WorkSpaces
-- B. Amazon AppStream 2.0
-- C. Amazon EC2
-- D. AWS Outposts
+- B. Amazon EC2
+- C. AWS Outposts
+- D. Amazon AppStream 2.0
 
 **Answer:** A
 
@@ -36,6 +37,7 @@ A company must provide managed virtual desktops (DaaS) to remote employees. Whic
 
 ## Q 13-v2-02
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: AppStream 2.0
 - difficulty: medium
@@ -44,12 +46,12 @@ A company must provide managed virtual desktops (DaaS) to remote employees. Whic
 
 A company must stream a desktop application to users' browsers without installing it locally. Which service?
 
-- A. Amazon AppStream 2.0
-- B. Amazon WorkSpaces
+- A. Amazon WorkSpaces
+- B. Amazon AppStream 2.0
 - C. Lightsail
 - D. WorkDocs
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Stream desktop app to browser = Amazon AppStream 2.0.
 
@@ -57,6 +59,7 @@ A company must stream a desktop application to users' browsers without installin
 
 ## Q 13-v2-03
 - domain: performance
+- task: 3.2
 - topic: other
 - services: Outposts
 - difficulty: medium
@@ -65,12 +68,12 @@ A company must stream a desktop application to users' browsers without installin
 
 A company needs AWS infrastructure (compute/storage) running physically in its own data center for low latency and data residency. Which service?
 
-- A. AWS Outposts
-- B. AWS Local Zones
-- C. AWS Wavelength
-- D. Snowball
+- A. AWS Local Zones
+- B. Snowball
+- C. AWS Outposts
+- D. AWS Wavelength
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** AWS infra in your data center, residency = AWS Outposts.
 
@@ -78,6 +81,7 @@ A company needs AWS infrastructure (compute/storage) running physically in its o
 
 ## Q 13-v2-04
 - domain: performance
+- task: 3.4
 - topic: other
 - services: Local Zones
 - difficulty: medium
@@ -86,12 +90,12 @@ A company needs AWS infrastructure (compute/storage) running physically in its o
 
 An application needs single-digit millisecond latency to end users in a specific metro area near, but not in, an AWS Region. Which service?
 
-- A. AWS Local Zones
+- A. CloudFront
 - B. AWS Outposts
 - C. Global Accelerator
-- D. CloudFront
+- D. AWS Local Zones
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Low latency in metro near a Region = AWS Local Zones.
 
@@ -99,6 +103,7 @@ An application needs single-digit millisecond latency to end users in a specific
 
 ## Q 13-v2-05
 - domain: performance
+- task: 3.4
 - topic: other
 - services: Wavelength
 - difficulty: medium
@@ -108,9 +113,9 @@ An application needs single-digit millisecond latency to end users in a specific
 A mobile app requires ultra-low latency by running compute at the edge of 5G networks. Which service?
 
 - A. AWS Wavelength
-- B. AWS Outposts
-- C. Local Zones
-- D. Direct Connect
+- B. Local Zones
+- C. Direct Connect
+- D. AWS Outposts
 
 **Answer:** A
 
@@ -120,6 +125,7 @@ A mobile app requires ultra-low latency by running compute at the edge of 5G net
 
 ## Q 13-v2-06
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: AWS Backup, EBS, RDS, DynamoDB, EFS
 - difficulty: medium
@@ -129,9 +135,9 @@ A mobile app requires ultra-low latency by running compute at the edge of 5G net
 A company wants a centralized, policy-based backup service across EBS, RDS, DynamoDB, EFS, and more. Which service?
 
 - A. AWS Backup
-- B. EBS snapshots only
-- C. S3 lifecycle
-- D. Storage Gateway
+- B. Storage Gateway
+- C. EBS snapshots only
+- D. S3 lifecycle
 
 **Answer:** A
 
@@ -141,6 +147,7 @@ A company wants a centralized, policy-based backup service across EBS, RDS, Dyna
 
 ## Q 13-v2-07
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: Elastic Disaster Recovery
 - difficulty: medium
@@ -149,12 +156,12 @@ A company wants a centralized, policy-based backup service across EBS, RDS, Dyna
 
 A company needs disaster recovery that continuously replicates on-premises servers to AWS for fast failover. Which service?
 
-- A. AWS Elastic Disaster Recovery (DRS)
-- B. AWS Backup
-- C. DataSync
-- D. Snowball
+- A. Snowball
+- B. DataSync
+- C. AWS Elastic Disaster Recovery (DRS)
+- D. AWS Backup
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Continuous replication DR for on-prem servers = Elastic Disaster Recovery (DRS).
 
@@ -162,6 +169,7 @@ A company needs disaster recovery that continuously replicates on-premises serve
 
 ## Q 13-v2-08
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: Amazon Connect
 - difficulty: medium
@@ -170,12 +178,12 @@ A company needs disaster recovery that continuously replicates on-premises serve
 
 A company wants a managed cloud contact center for customer service. Which service?
 
-- A. Amazon Connect
-- B. Amazon Chime
-- C. Amazon Pinpoint
-- D. WorkMail
+- A. Amazon Pinpoint
+- B. Amazon Connect
+- C. WorkMail
+- D. Amazon Chime
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Managed cloud contact center = Amazon Connect.
 
@@ -183,6 +191,7 @@ A company wants a managed cloud contact center for customer service. Which servi
 
 ## Q 13-v2-09
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: IoT Core
 - difficulty: medium
@@ -191,12 +200,12 @@ A company wants a managed cloud contact center for customer service. Which servi
 
 A company must connect and manage millions of IoT devices sending telemetry. Which service?
 
-- A. AWS IoT Core
-- B. Kinesis only
-- C. SQS
-- D. AppSync
+- A. Kinesis only
+- B. SQS
+- C. AppSync
+- D. AWS IoT Core
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Connect/manage millions of IoT devices = AWS IoT Core.
 
@@ -204,6 +213,7 @@ A company must connect and manage millions of IoT devices sending telemetry. Whi
 
 ## Q 13-v2-10
 - domain: resilient
+- task: 2.2
 - topic: other
 - difficulty: medium
 - time: 50
@@ -211,12 +221,12 @@ A company must connect and manage millions of IoT devices sending telemetry. Whi
 
 A company wants managed business email and calendaring. Which service?
 
-- A. Amazon WorkMail
-- B. Amazon WorkDocs
-- C. Amazon Connect
-- D. SES
+- A. SES
+- B. Amazon Connect
+- C. Amazon WorkMail
+- D. Amazon WorkDocs
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Managed email + calendaring = Amazon WorkMail.
 
@@ -224,6 +234,7 @@ A company wants managed business email and calendaring. Which service?
 
 ## Q 13-v2-11
 - domain: performance
+- task: 3.2
 - topic: other
 - services: Outposts, Local Zones
 - difficulty: hard
@@ -232,10 +243,10 @@ A company wants managed business email and calendaring. Which service?
 
 A regulated workload must keep data on-premises for residency but use AWS APIs/services locally, with a consistent hybrid experience. Which two are appropriate? (Choose TWO)
 
-- A. AWS Outposts (rack/servers)
-- B. Local Zones for metro low latency
-- C. Snowmobile
-- D. CloudFront
+- A. Local Zones for metro low latency
+- B. AWS Outposts (rack/servers)
+- C. CloudFront
+- D. Snowmobile
 - E. Global Accelerator
 
 **Answer:** A, B
@@ -246,6 +257,7 @@ A regulated workload must keep data on-premises for residency but use AWS APIs/s
 
 ## Q 13-v2-12
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: AWS Backup
 - tags: s3-object-lock, compliance
@@ -255,12 +267,12 @@ A regulated workload must keep data on-premises for residency but use AWS APIs/s
 
 AWS Backup must enforce that backups cannot be deleted before a retention period, even by admins (ransomware protection). Which feature?
 
-- A. AWS Backup Vault Lock (compliance mode)
-- B. S3 Object Lock only
-- C. IAM policy only
-- D. KMS grant
+- A. S3 Object Lock only
+- B. IAM policy only
+- C. KMS grant
+- D. AWS Backup Vault Lock (compliance mode)
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Immutable backups vs ransomware = AWS Backup Vault Lock (compliance mode).
 
@@ -268,6 +280,7 @@ AWS Backup must enforce that backups cannot be deleted before a retention period
 
 ## Q 13-v2-13
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: Organizations, AWS Backup
 - tags: multi-region, cross-account-access
@@ -277,13 +290,13 @@ AWS Backup must enforce that backups cannot be deleted before a retention period
 
 A company needs cross-Region, cross-account centralized backups with a single policy. Which two AWS Backup features apply? (Choose TWO)
 
-- A. Backup plans with cross-Region copy
+- A. Storage Gateway tapes
 - B. Cross-account backup via Organizations
-- C. Manual snapshots per resource only
-- D. Storage Gateway tapes
-- E. EFS lifecycle only
+- C. EFS lifecycle only
+- D. Manual snapshots per resource only
+- E. Backup plans with cross-Region copy
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** Central backups = cross-Region copy + cross-account via Organizations.
 
@@ -291,6 +304,7 @@ A company needs cross-Region, cross-account centralized backups with a single po
 
 ## Q 13-v2-14
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: Elastic Disaster Recovery
 - difficulty: hard
@@ -299,12 +313,12 @@ A company needs cross-Region, cross-account centralized backups with a single po
 
 Elastic Disaster Recovery (DRS) minimizes cost during steady state. How does it achieve low-cost standby?
 
-- A. Continuous block-level replication into low-cost staging, launching full instances only on failover/drill
-- B. Running full-size duplicate instances 24/7
+- A. Running full-size duplicate instances 24/7
+- B. Continuous block-level replication into low-cost staging, launching full instances only on failover/drill
 - C. Taking daily snapshots only
 - D. Using Snowball for replication
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** DRS low-cost standby = continuous block replication to cheap staging, full instances only on failover.
 
@@ -312,6 +326,7 @@ Elastic Disaster Recovery (DRS) minimizes cost during steady state. How does it 
 
 ## Q 13-v2-15
 - domain: resilient
+- task: 2.2
 - topic: other
 - services: AppStream 2.0, WorkSpaces
 - tags: streaming-ingestion
@@ -321,11 +336,11 @@ Elastic Disaster Recovery (DRS) minimizes cost during steady state. How does it 
 
 A company must give contractors temporary, non-persistent virtual desktops that reset after each session. Which WorkSpaces/related option fits?
 
-- A. Non-persistent streaming (AppStream 2.0) or WorkSpaces with rebuild
-- B. Persistent WorkSpaces only
-- C. EC2 with manual reset
-- D. Outposts desktops
+- A. EC2 with manual reset
+- B. Non-persistent streaming (AppStream 2.0) or WorkSpaces with rebuild
+- C. Outposts desktops
+- D. Persistent WorkSpaces only
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Temporary reset-after-session desktops = non-persistent AppStream 2.0 / WorkSpaces rebuild.

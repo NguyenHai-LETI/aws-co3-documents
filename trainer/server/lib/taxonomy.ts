@@ -15,6 +15,8 @@ export function loadTaxonomy(): Taxonomy {
     timing: { ...DEFAULT_RUBRIC, ...(raw.timing ?? {}) },
     services: raw.services ?? {},
     features: raw.features ?? {},
+    tasks: raw.tasks ?? [],
+    keywords: raw.keywords ?? {},
   };
   cache = { mtime, tax };
   return tax;

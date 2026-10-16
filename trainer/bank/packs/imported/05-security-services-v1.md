@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 05-v1-01
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM, EC2, S3
 - tags: iam-roles
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 An EC2 instance must read objects from an S3 bucket. What is the MOST secure way to grant access?
 
-- A. Store IAM access keys in the application config
-- B. Attach an IAM role to the EC2 instance
-- C. Make the bucket public
-- D. Use the root account credentials
+- A. Attach an IAM role to the EC2 instance
+- B. Make the bucket public
+- C. Use the root account credentials
+- D. Store IAM access keys in the application config
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** EC2 -> S3 securely = IAM role on the instance (never store keys).
 
@@ -37,6 +38,7 @@ An EC2 instance must read objects from an S3 bucket. What is the MOST secure way
 
 ## Q 05-v1-02
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Secrets Manager, RDS
 - tags: key-rotation
@@ -46,10 +48,10 @@ An EC2 instance must read objects from an S3 bucket. What is the MOST secure way
 
 A company needs to automatically rotate RDS database credentials every 30 days. Which service is purpose-built for this?
 
-- A. Systems Manager Parameter Store (Standard)
+- A. AWS Config
 - B. AWS Secrets Manager
 - C. AWS KMS
-- D. AWS Config
+- D. Systems Manager Parameter Store (Standard)
 
 **Answer:** B
 
@@ -59,6 +61,7 @@ A company needs to automatically rotate RDS database credentials every 30 days. 
 
 ## Q 05-v1-03
 - domain: secure
+- task: 1.2
 - topic: security
 - services: GuardDuty, CloudTrail, VPC, VPC Flow Logs
 - difficulty: easy
@@ -68,11 +71,11 @@ A company needs to automatically rotate RDS database credentials every 30 days. 
 Which service provides intelligent threat detection by analyzing CloudTrail, VPC Flow Logs, and DNS logs with machine learning?
 
 - A. Amazon Inspector
-- B. Amazon GuardDuty
-- C. Amazon Macie
-- D. AWS Config
+- B. Amazon Macie
+- C. AWS Config
+- D. Amazon GuardDuty
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** ML threat detection from CloudTrail/Flow/DNS logs = GuardDuty.
 
@@ -80,6 +83,7 @@ Which service provides intelligent threat detection by analyzing CloudTrail, VPC
 
 ## Q 05-v1-04
 - domain: secure
+- task: 1.3
 - topic: security
 - services: Macie, S3
 - tags: compliance
@@ -89,12 +93,12 @@ Which service provides intelligent threat detection by analyzing CloudTrail, VPC
 
 A team must discover and classify PII (personally identifiable information) stored in Amazon S3 for compliance. Which service?
 
-- A. Amazon Macie
+- A. AWS WAF
 - B. Amazon GuardDuty
-- C. AWS WAF
-- D. Amazon Inspector
+- C. Amazon Inspector
+- D. Amazon Macie
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Discover/classify PII in S3 = Amazon Macie.
 
@@ -102,6 +106,7 @@ A team must discover and classify PII (personally identifiable information) stor
 
 ## Q 05-v1-05
 - domain: secure
+- task: 1.3
 - topic: security
 - services: AWS Config, EBS
 - tags: compliance
@@ -111,12 +116,12 @@ A team must discover and classify PII (personally identifiable information) stor
 
 A compliance rule requires that all EBS volumes are encrypted, with automatic detection of non-compliant resources. Which service?
 
-- A. AWS CloudTrail
-- B. AWS Config with managed rules
-- C. Amazon GuardDuty
-- D. AWS Trusted Advisor
+- A. AWS Config with managed rules
+- B. Amazon GuardDuty
+- C. AWS Trusted Advisor
+- D. AWS CloudTrail
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Detect non-compliant resources (EBS encrypted) = AWS Config rules.
 
@@ -124,6 +129,7 @@ A compliance rule requires that all EBS volumes are encrypted, with automatic de
 
 ## Q 05-v1-06
 - domain: secure
+- task: 1.2
 - topic: security
 - services: CloudTrail, EC2
 - tags: compliance
@@ -133,12 +139,12 @@ A compliance rule requires that all EBS volumes are encrypted, with automatic de
 
 You must identify WHO terminated a specific EC2 instance and WHEN. Which service provides this audit trail?
 
-- A. Amazon CloudWatch
-- B. AWS CloudTrail
-- C. AWS Config
-- D. VPC Flow Logs
+- A. VPC Flow Logs
+- B. Amazon CloudWatch
+- C. AWS CloudTrail
+- D. AWS Config
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Who/when of API actions = CloudTrail.
 
@@ -146,6 +152,7 @@ You must identify WHO terminated a specific EC2 instance and WHEN. Which service
 
 ## Q 05-v1-07
 - domain: secure
+- task: 1.3
 - topic: security
 - services: KMS
 - tags: key-rotation, iam-policies, compliance
@@ -155,12 +162,12 @@ You must identify WHO terminated a specific EC2 instance and WHEN. Which service
 
 A company wants centrally managed encryption keys with full control over rotation and key policies, plus an audit trail of key usage. Which service?
 
-- A. AWS KMS Customer Managed Key
-- B. AWS Secrets Manager
-- C. AWS Certificate Manager
+- A. AWS Secrets Manager
+- B. AWS Certificate Manager
+- C. AWS KMS Customer Managed Key
 - D. SSE-S3
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Full control of keys + usage audit = KMS Customer Managed Key.
 
@@ -168,6 +175,7 @@ A company wants centrally managed encryption keys with full control over rotatio
 
 ## Q 05-v1-08
 - domain: secure
+- task: 1.1
 - topic: security
 - tags: permission-boundaries, scp
 - difficulty: easy
@@ -176,12 +184,12 @@ A company wants centrally managed encryption keys with full control over rotatio
 
 Which approach enforces a maximum permission boundary across ALL accounts in an AWS Organization (even if account admins grant more)?
 
-- A. IAM policies in each account
-- B. Service Control Policies (SCPs)
-- C. Resource-based policies
-- D. Permissions boundary on a single role
+- A. Service Control Policies (SCPs)
+- B. Permissions boundary on a single role
+- C. IAM policies in each account
+- D. Resource-based policies
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Max permission guardrail across accounts = SCPs.
 
@@ -189,6 +197,7 @@ Which approach enforces a maximum permission boundary across ALL accounts in an 
 
 ## Q 05-v1-09
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Cognito
 - difficulty: easy
@@ -197,12 +206,12 @@ Which approach enforces a maximum permission boundary across ALL accounts in an 
 
 A mobile app must authenticate users (sign-up/sign-in) and then grant them temporary access to AWS resources. Which combination?
 
-- A. Cognito User Pool for auth + Identity Pool for AWS credentials
-- B. IAM users for each mobile user
-- C. KMS + Secrets Manager
-- D. Directory Service only
+- A. KMS + Secrets Manager
+- B. Cognito User Pool for auth + Identity Pool for AWS credentials
+- C. Directory Service only
+- D. IAM users for each mobile user
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Auth + temporary AWS creds = Cognito User Pool + Identity Pool.
 
@@ -210,6 +219,7 @@ A mobile app must authenticate users (sign-up/sign-in) and then grant them tempo
 
 ## Q 05-v1-10
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Shield, CloudFront, ALB
 - tags: ddos-protection
@@ -219,10 +229,10 @@ A mobile app must authenticate users (sign-up/sign-in) and then grant them tempo
 
 A web application behind CloudFront and an ALB needs protection from large-scale Layer 3/4 DDoS attacks with 24/7 support and cost protection. Which service?
 
-- A. AWS Shield Standard
+- A. AWS WAF only
 - B. AWS Shield Advanced
-- C. AWS WAF only
-- D. Security Groups
+- C. Security Groups
+- D. AWS Shield Standard
 
 **Answer:** B
 
@@ -232,6 +242,7 @@ A web application behind CloudFront and an ALB needs protection from large-scale
 
 ## Q 05-v1-11
 - domain: secure
+- task: 1.3
 - topic: security
 - services: ACM, ALB, CloudFront
 - tags: tls-termination
@@ -241,12 +252,12 @@ A web application behind CloudFront and an ALB needs protection from large-scale
 
 Which service issues FREE public SSL/TLS certificates that auto-renew and integrate with ALB and CloudFront?
 
-- A. AWS KMS
-- B. AWS Certificate Manager (ACM)
+- A. AWS Certificate Manager (ACM)
+- B. AWS KMS
 - C. AWS Secrets Manager
 - D. IAM
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Free auto-renewing public certs = ACM.
 
@@ -254,6 +265,7 @@ Which service issues FREE public SSL/TLS certificates that auto-renew and integr
 
 ## Q 05-v1-12
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM, STS
 - tags: compliance, iam-roles, cross-account-access, least-privilege
@@ -263,10 +275,10 @@ Which service issues FREE public SSL/TLS certificates that auto-renew and integr
 
 A company must give an external auditor read-only access to its account without creating long-term credentials. Which approach is BEST?
 
-- A. Create an IAM user with access keys
+- A. Share the root password
 - B. Use an IAM role with cross-account AssumeRole and least privilege
-- C. Share the root password
-- D. Add the auditor to an admin group
+- C. Add the auditor to an admin group
+- D. Create an IAM user with access keys
 
 **Answer:** B
 
@@ -276,6 +288,7 @@ A company must give an external auditor read-only access to its account without 
 
 ## Q 05-v1-13
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Security Hub, GuardDuty, Inspector, Macie
 - tags: compliance
@@ -285,12 +298,12 @@ A company must give an external auditor read-only access to its account without 
 
 Which service centralizes and aggregates security findings from GuardDuty, Inspector, and Macie, and runs compliance standard checks?
 
-- A. AWS Security Hub
+- A. AWS Organizations
 - B. AWS Config
-- C. AWS Organizations
+- C. AWS Security Hub
 - D. Amazon Detective
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Aggregate findings + compliance checks = Security Hub.
 
@@ -298,6 +311,7 @@ Which service centralizes and aggregates security findings from GuardDuty, Inspe
 
 ## Q 05-v1-14
 - domain: secure
+- task: 1.3
 - topic: security
 - services: KMS
 - tags: envelope-encryption
@@ -307,12 +321,12 @@ Which service centralizes and aggregates security findings from GuardDuty, Inspe
 
 To encrypt data larger than 4 KB efficiently while minimizing KMS API calls, which technique is used?
 
-- A. Directly encrypting with the CMK
-- B. Envelope encryption with a data key
-- C. SSE-C
-- D. Client-side hashing
+- A. Client-side hashing
+- B. Directly encrypting with the CMK
+- C. Envelope encryption with a data key
+- D. SSE-C
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Encrypt large data, fewer KMS calls = envelope encryption (data key).
 
@@ -320,6 +334,7 @@ To encrypt data larger than 4 KB efficiently while minimizing KMS API calls, whi
 
 ## Q 05-v1-15
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Inspector, EC2, ECR, Lambda
 - difficulty: easy
@@ -328,12 +343,12 @@ To encrypt data larger than 4 KB efficiently while minimizing KMS API calls, whi
 
 Which service performs automated vulnerability (CVE) scanning of EC2 instances, container images in ECR, and Lambda functions?
 
-- A. Amazon Inspector
-- B. Amazon Macie
-- C. AWS WAF
-- D. AWS Shield
+- A. AWS WAF
+- B. AWS Shield
+- C. Amazon Inspector
+- D. Amazon Macie
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** CVE scanning of EC2/ECR/Lambda = Amazon Inspector.
 
@@ -341,6 +356,7 @@ Which service performs automated vulnerability (CVE) scanning of EC2 instances, 
 
 ## Q 05-v1-16
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Firewall Manager, WAF, Shield
 - difficulty: easy
@@ -350,9 +366,9 @@ Which service performs automated vulnerability (CVE) scanning of EC2 instances, 
 A company wants to centrally manage WAF rules and Shield Advanced protections across many accounts in its Organization. Which service?
 
 - A. AWS Firewall Manager
-- B. AWS Config
-- C. AWS WAF only
-- D. Security Hub
+- B. Security Hub
+- C. AWS Config
+- D. AWS WAF only
 
 **Answer:** A
 
@@ -362,6 +378,7 @@ A company wants to centrally manage WAF rules and Shield Advanced protections ac
 
 ## Q 05-v1-17
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM
 - tags: mfa
@@ -372,11 +389,11 @@ A company wants to centrally manage WAF rules and Shield Advanced protections ac
 Which IAM best practice should be applied to the AWS account root user?
 
 - A. Use it for daily administrative tasks
-- B. Enable MFA and avoid using it for everyday work
-- C. Create access keys for automation
-- D. Share it across the admin team
+- B. Create access keys for automation
+- C. Share it across the admin team
+- D. Enable MFA and avoid using it for everyday work
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Root user = enable MFA, don't use daily.
 
@@ -384,6 +401,7 @@ Which IAM best practice should be applied to the AWS account root user?
 
 ## Q 05-v1-18
 - domain: secure
+- task: 1.2
 - topic: security
 - services: PrivateLink, EC2, KMS
 - tags: subnets
@@ -406,6 +424,7 @@ An application on EC2 in a private subnet needs to call AWS APIs (e.g., KMS) wit
 
 ## Q 05-v1-19
 - domain: secure
+- task: 1.2
 - topic: security
 - services: WAF
 - tags: web-attacks
@@ -415,13 +434,13 @@ An application on EC2 in a private subnet needs to call AWS APIs (e.g., KMS) wit
 
 Which two are TRUE about AWS WAF? (Choose TWO)
 
-- A. It protects against SQL injection and cross-site scripting
-- B. It can apply rate-based rules to limit requests from an IP
-- C. It is a network-layer DDoS scrubbing appliance
-- D. It only works with EC2 instances
-- E. It replaces IAM for authentication
+- A. It can apply rate-based rules to limit requests from an IP
+- B. It is a network-layer DDoS scrubbing appliance
+- C. It replaces IAM for authentication
+- D. It protects against SQL injection and cross-site scripting
+- E. It only works with EC2 instances
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** WAF blocks SQLi/XSS and supports rate-based rules.
 
@@ -429,6 +448,7 @@ Which two are TRUE about AWS WAF? (Choose TWO)
 
 ## Q 05-v1-20
 - domain: secure
+- task: 1.1
 - topic: security
 - services: Directory Service, EC2
 - difficulty: easy
@@ -437,11 +457,11 @@ Which two are TRUE about AWS WAF? (Choose TWO)
 
 A company needs to integrate its existing on-premises Microsoft Active Directory so Windows EC2 instances can join the domain, while keeping a trust to on-premises AD. Which option?
 
-- A. Simple AD
-- B. AWS Managed Microsoft AD (with trust)
-- C. Amazon Cognito
-- D. IAM Identity Center only
+- A. Amazon Cognito
+- B. Simple AD
+- C. IAM Identity Center only
+- D. AWS Managed Microsoft AD (with trust)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Domain join + trust to on-prem AD = AWS Managed Microsoft AD.

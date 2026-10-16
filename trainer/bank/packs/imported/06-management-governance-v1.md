@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 06-v1-01
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: easy
@@ -23,12 +24,12 @@ created: 2026-10-16
 
 A team wants to provision identical infrastructure repeatably across Regions using version-controlled templates. Which service?
 
-- A. AWS Systems Manager
-- B. AWS CloudFormation
-- C. AWS Config
-- D. AWS OpsWorks
+- A. AWS OpsWorks
+- B. AWS Systems Manager
+- C. AWS CloudFormation
+- D. AWS Config
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Repeatable, version-controlled IaC = CloudFormation.
 
@@ -36,6 +37,7 @@ A team wants to provision identical infrastructure repeatably across Regions usi
 
 ## Q 06-v1-02
 - domain: secure
+- task: 1.1
 - topic: management
 - services: Organizations
 - difficulty: easy
@@ -44,12 +46,12 @@ A team wants to provision identical infrastructure repeatably across Regions usi
 
 A company manages 50 AWS accounts and wants a single consolidated bill plus the ability to restrict services per account. Which service?
 
-- A. AWS Organizations
-- B. AWS Control Tower
-- C. AWS Budgets
-- D. AWS Cost Explorer
+- A. AWS Budgets
+- B. AWS Cost Explorer
+- C. AWS Organizations
+- D. AWS Control Tower
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Consolidated billing + restrict services = AWS Organizations.
 
@@ -57,6 +59,7 @@ A company manages 50 AWS accounts and wants a single consolidated bill plus the 
 
 ## Q 06-v1-03
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Systems Manager, EC2
 - difficulty: easy
@@ -65,12 +68,12 @@ A company manages 50 AWS accounts and wants a single consolidated bill plus the 
 
 An administrator must run OS patching on 200 EC2 instances on a schedule, without SSH access. Which Systems Manager capability?
 
-- A. Session Manager
-- B. Patch Manager with Maintenance Windows
-- C. Parameter Store
-- D. Run Command only
+- A. Parameter Store
+- B. Run Command only
+- C. Session Manager
+- D. Patch Manager with Maintenance Windows
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Scheduled OS patching at scale = Patch Manager + Maintenance Windows.
 
@@ -78,6 +81,7 @@ An administrator must run OS patching on 200 EC2 instances on a schedule, withou
 
 ## Q 06-v1-04
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Systems Manager, EC2
 - tags: subnets, bastion-host, compliance
@@ -87,12 +91,12 @@ An administrator must run OS patching on 200 EC2 instances on a schedule, withou
 
 A team needs secure shell access to EC2 instances in private subnets WITHOUT bastion hosts, open SSH ports, or SSH keys, with full audit logging. Which solution?
 
-- A. SSH over the internet
-- B. Systems Manager Session Manager
-- C. Direct Connect
-- D. EC2 Instance Connect over public IP
+- A. EC2 Instance Connect over public IP
+- B. Direct Connect
+- C. SSH over the internet
+- D. Systems Manager Session Manager
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** No-bastion, no-SSH, audited shell = Session Manager.
 
@@ -100,6 +104,7 @@ A team needs secure shell access to EC2 instances in private subnets WITHOUT bas
 
 ## Q 06-v1-05
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: easy
@@ -109,11 +114,11 @@ A team needs secure shell access to EC2 instances in private subnets WITHOUT bas
 Which CloudFormation feature lets you PREVIEW the changes a stack update will make before applying them?
 
 - A. Drift detection
-- B. Change sets
-- C. Nested stacks
-- D. Stack policies
+- B. Nested stacks
+- C. Stack policies
+- D. Change sets
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Preview stack update changes = Change sets.
 
@@ -121,6 +126,7 @@ Which CloudFormation feature lets you PREVIEW the changes a stack update will ma
 
 ## Q 06-v1-06
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - tags: cfn-drift
@@ -130,12 +136,12 @@ Which CloudFormation feature lets you PREVIEW the changes a stack update will ma
 
 Which CloudFormation feature detects when resources were changed manually outside of CloudFormation?
 
-- A. Change sets
-- B. Drift detection
+- A. Drift detection
+- B. Change sets
 - C. StackSets
 - D. Rollback triggers
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Detect manual/out-of-band changes = Drift detection.
 
@@ -143,6 +149,7 @@ Which CloudFormation feature detects when resources were changed manually outsid
 
 ## Q 06-v1-07
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudFormation
 - difficulty: easy
@@ -152,11 +159,11 @@ Which CloudFormation feature detects when resources were changed manually outsid
 A company wants to deploy the same CloudFormation stack across multiple accounts and Regions from a central place. Which feature?
 
 - A. Nested stacks
-- B. StackSets
-- C. Change sets
+- B. Change sets
+- C. StackSets
 - D. Cross-stack references
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Deploy stack to many accounts/Regions = StackSets.
 
@@ -164,6 +171,7 @@ A company wants to deploy the same CloudFormation stack across multiple accounts
 
 ## Q 06-v1-08
 - domain: secure
+- task: 1.1
 - topic: management
 - services: Organizations, CloudTrail
 - tags: scp
@@ -175,8 +183,8 @@ A central security team wants to enforce that no member account can disable Clou
 
 - A. IAM policy in each account
 - B. Service Control Policy (SCP) via AWS Organizations
-- C. AWS Config rule
-- D. CloudFormation StackSet
+- C. CloudFormation StackSet
+- D. AWS Config rule
 
 **Answer:** B
 
@@ -186,6 +194,7 @@ A central security team wants to enforce that no member account can disable Clou
 
 ## Q 06-v1-09
 - domain: secure
+- task: 1.1
 - topic: management
 - services: Control Tower
 - difficulty: easy
@@ -194,10 +203,10 @@ A central security team wants to enforce that no member account can disable Clou
 
 A company wants an automated landing zone with multi-account best practices, guardrails, and an account factory. Which service?
 
-- A. AWS Organizations only
+- A. AWS Service Catalog
 - B. AWS Control Tower
-- C. AWS Service Catalog
-- D. AWS Systems Manager
+- C. AWS Systems Manager
+- D. AWS Organizations only
 
 **Answer:** B
 
@@ -207,6 +216,7 @@ A company wants an automated landing zone with multi-account best practices, gua
 
 ## Q 06-v1-10
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Trusted Advisor
 - tags: high-availability
@@ -217,9 +227,9 @@ A company wants an automated landing zone with multi-account best practices, gua
 Which service provides best-practice recommendations across cost, performance, security, fault tolerance, and service limits?
 
 - A. AWS Trusted Advisor
-- B. AWS Config
+- B. AWS Health Dashboard
 - C. Amazon Inspector
-- D. AWS Health Dashboard
+- D. AWS Config
 
 **Answer:** A
 
@@ -229,6 +239,7 @@ Which service provides best-practice recommendations across cost, performance, s
 
 ## Q 06-v1-11
 - domain: cost
+- task: 4.1
 - topic: management
 - services: Systems Manager
 - difficulty: easy
@@ -237,12 +248,12 @@ Which service provides best-practice recommendations across cost, performance, s
 
 A company wants to store application configuration values and reference encrypted secrets cost-effectively for low-volume usage. Which service?
 
-- A. AWS Secrets Manager
-- B. Systems Manager Parameter Store
-- C. Amazon S3
-- D. AWS KMS only
+- A. AWS KMS only
+- B. Amazon S3
+- C. AWS Secrets Manager
+- D. Systems Manager Parameter Store
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Cheap config + encrypted refs, low volume = Parameter Store.
 
@@ -250,6 +261,7 @@ A company wants to store application configuration values and reference encrypte
 
 ## Q 06-v1-12
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Compute Optimizer, EC2, EBS, Lambda, EC2 Auto Scaling
 - tags: right-sizing
@@ -260,9 +272,9 @@ A company wants to store application configuration values and reference encrypte
 Which service gives ML-based right-sizing recommendations for EC2, EBS, Lambda, and Auto Scaling groups?
 
 - A. AWS Compute Optimizer
-- B. AWS Trusted Advisor
+- B. AWS Budgets
 - C. Amazon CloudWatch
-- D. AWS Budgets
+- D. AWS Trusted Advisor
 
 **Answer:** A
 
@@ -272,6 +284,7 @@ Which service gives ML-based right-sizing recommendations for EC2, EBS, Lambda, 
 
 ## Q 06-v1-13
 - domain: cost
+- task: 4.2
 - topic: management
 - services: Cost Explorer
 - difficulty: easy
@@ -293,6 +306,7 @@ A team must visualize and forecast historical AWS spend and filter by tag/servic
 
 ## Q 06-v1-14
 - domain: secure
+- task: 1.2
 - topic: management
 - services: AWS Budgets
 - difficulty: easy
@@ -302,11 +316,11 @@ A team must visualize and forecast historical AWS spend and filter by tag/servic
 A finance team wants an alert when monthly spend is forecast to exceed $10,000. Which service?
 
 - A. AWS Cost Explorer
-- B. AWS Budgets
-- C. AWS Trusted Advisor
-- D. CloudWatch Logs
+- B. CloudWatch Logs
+- C. AWS Budgets
+- D. AWS Trusted Advisor
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Alert on forecast spend threshold = AWS Budgets.
 
@@ -314,6 +328,7 @@ A finance team wants an alert when monthly spend is forecast to exceed $10,000. 
 
 ## Q 06-v1-15
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudWatch, EC2
 - difficulty: easy
@@ -323,9 +338,9 @@ A finance team wants an alert when monthly spend is forecast to exceed $10,000. 
 Which service collects system-level metrics (memory, disk) and application logs from EC2 and on-premises servers?
 
 - A. CloudWatch Agent
-- B. AWS Config
-- C. CloudTrail
-- D. AWS X-Ray
+- B. AWS X-Ray
+- C. AWS Config
+- D. CloudTrail
 
 **Answer:** A
 
@@ -335,6 +350,7 @@ Which service collects system-level metrics (memory, disk) and application logs 
 
 ## Q 06-v1-16
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Service Catalog, CloudFormation
 - difficulty: easy
@@ -343,12 +359,12 @@ Which service collects system-level metrics (memory, disk) and application logs 
 
 A company wants self-service provisioning of approved, standardized products (CloudFormation templates) for its teams. Which service?
 
-- A. AWS Service Catalog
+- A. AWS Marketplace
 - B. AWS Control Tower
-- C. AWS Marketplace
-- D. AWS Organizations
+- C. AWS Organizations
+- D. AWS Service Catalog
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Self-service approved products = Service Catalog.
 
@@ -356,6 +372,7 @@ A company wants self-service provisioning of approved, standardized products (Cl
 
 ## Q 06-v1-17
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudWatch, SNS, EC2 Auto Scaling
 - difficulty: easy
@@ -364,12 +381,12 @@ A company wants self-service provisioning of approved, standardized products (Cl
 
 Which CloudWatch component triggers an action (e.g., SNS or Auto Scaling) when a metric crosses a threshold?
 
-- A. Dashboard
-- B. Alarm
+- A. Alarm
+- B. Dashboard
 - C. Log group
 - D. Metric filter
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Metric threshold action = CloudWatch Alarm.
 
@@ -377,6 +394,7 @@ Which CloudWatch component triggers an action (e.g., SNS or Auto Scaling) when a
 
 ## Q 06-v1-18
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Health Dashboard, EC2
 - difficulty: easy
@@ -385,12 +403,12 @@ Which CloudWatch component triggers an action (e.g., SNS or Auto Scaling) when a
 
 An operations team needs to be notified about AWS events specifically affecting THEIR account's resources (e.g., scheduled EC2 maintenance). Which service?
 
-- A. Service Health Dashboard (public)
-- B. AWS Health Dashboard (Personal/account-level)
-- C. AWS Config
-- D. CloudTrail
+- A. AWS Config
+- B. CloudTrail
+- C. AWS Health Dashboard (Personal/account-level)
+- D. Service Health Dashboard (public)
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Account-specific events/maintenance = AWS Health (Personal) Dashboard.
 
@@ -398,6 +416,7 @@ An operations team needs to be notified about AWS events specifically affecting 
 
 ## Q 06-v1-19
 - domain: secure
+- task: 1.2
 - topic: management
 - services: Systems Manager
 - tags: bastion-host
@@ -409,8 +428,8 @@ Which two are valid uses of AWS Systems Manager? (Choose TWO)
 
 - A. Centrally store parameters and secrets
 - B. Provide port forwarding/shell access without bastions
-- C. Provide DDoS scrubbing
-- D. Issue public TLS certificates
+- C. Issue public TLS certificates
+- D. Provide DDoS scrubbing
 - E. Detect PII in S3
 
 **Answer:** A, B
@@ -421,6 +440,7 @@ Which two are valid uses of AWS Systems Manager? (Choose TWO)
 
 ## Q 06-v1-20
 - domain: secure
+- task: 1.2
 - topic: management
 - services: CloudWatch
 - tags: centralized-logging
@@ -430,11 +450,11 @@ Which two are valid uses of AWS Systems Manager? (Choose TWO)
 
 A company needs to extract specific structured fields from CloudWatch Logs and query them with a purpose-built query language. Which feature?
 
-- A. CloudWatch Logs Insights
-- B. CloudWatch Dashboards
-- C. CloudTrail Insights
-- D. Athena federated query
+- A. Athena federated query
+- B. CloudWatch Logs Insights
+- C. CloudWatch Dashboards
+- D. CloudTrail Insights
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Query logs with purpose-built language = CloudWatch Logs Insights.

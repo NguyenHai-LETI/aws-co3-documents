@@ -7,12 +7,12 @@ export interface ModeInfo {
 }
 
 export const MODE_INFO: Record<TestMode, ModeInfo> = {
-  exam: { icon: '🎯', label: 'Thi thử SAA-C03', desc: '65 câu phân bổ theo trọng số 4 domain (30/26/24/20), ưu tiên câu lâu chưa gặp.' },
+  exam: { icon: '🎯', label: 'Thi thử SAA-C03', desc: '65 câu theo trọng số 4 domain (30/26/24/20); mô phỏng Pearson VUE: 15 câu thử nghiệm, màn hình Review cuối bài.' },
   topic: { icon: '📚', label: 'Theo chủ đề', desc: 'Chọn 1 hoặc nhiều chủ đề (Compute, Storage, Database…), lấy ngẫu nhiên.' },
   pack: { icon: '📦', label: 'Theo bộ đề', desc: 'Làm lại nguyên 1 bộ đề (V1, V2, bộ AI sinh, bộ từ tài liệu…).' },
   custom: { icon: '🛠️', label: 'Tùy chỉnh', desc: 'Lọc tự do theo domain, chủ đề, độ khó, service, tag, nguồn câu hỏi.' },
   'retry-wrong': { icon: '🔁', label: 'Làm lại câu sai', desc: 'Các câu mà lần làm gần nhất bạn trả lời sai.' },
-  srs: { icon: '🧠', label: 'Ôn tập ngắt quãng', desc: 'Câu đến hạn ôn theo lịch Leitner (1 → 3 → 7 → 14 → 30 ngày).' },
+  srs: { icon: '🧠', label: 'Ôn tập ngắt quãng', desc: 'Câu đến hạn ôn theo FSRS — câu sắp quên nhất trước, có giới hạn số câu mỗi ngày.' },
   new: { icon: '🆕', label: 'Câu chưa làm', desc: 'Chỉ lấy câu bạn chưa từng gặp — tăng độ phủ ngân hàng.' },
   flagged: { icon: '🚩', label: 'Đánh dấu / chưa chắc', desc: 'Câu bạn đã cắm cờ hoặc chọn “chưa chắc” ở lần gần nhất.' },
   weak: { icon: '💪', label: 'Củng cố điểm yếu', desc: 'Ưu tiên chủ đề/khái niệm có tỉ lệ đúng thấp và câu chưa thuộc.' },

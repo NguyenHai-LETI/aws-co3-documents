@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 03-v2-01
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS
 - tags: multi-az
@@ -24,9 +25,9 @@ created: 2026-10-16
 
 A MySQL RDS database must survive an AZ outage with automatic failover and no manual intervention. Which feature?
 
-- A. Read Replicas
+- A. Cross-Region snapshots
 - B. Multi-AZ deployment
-- C. Cross-Region snapshots
+- C. Read Replicas
 - D. Aurora Global Database
 
 **Answer:** B
@@ -37,6 +38,7 @@ A MySQL RDS database must survive an AZ outage with automatic failover and no ma
 
 ## Q 03-v2-02
 - domain: performance
+- task: 3.3
 - topic: database
 - services: RDS
 - tags: read-replicas
@@ -46,12 +48,12 @@ A MySQL RDS database must survive an AZ outage with automatic failover and no ma
 
 A read-heavy reporting workload is slowing down the primary PostgreSQL RDS instance. What offloads reads with LEAST impact on writes?
 
-- A. Enable Multi-AZ
-- B. Add Read Replicas
-- C. Increase storage size
-- D. Enable RDS Proxy
+- A. Enable RDS Proxy
+- B. Increase storage size
+- C. Add Read Replicas
+- D. Enable Multi-AZ
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Offload reads with least write impact = Read Replicas.
 
@@ -59,6 +61,7 @@ A read-heavy reporting workload is slowing down the primary PostgreSQL RDS insta
 
 ## Q 03-v2-03
 - domain: resilient
+- task: 2.1
 - topic: database
 - services: RDS Proxy, Lambda, RDS
 - difficulty: medium
@@ -80,6 +83,7 @@ Hundreds of Lambda functions open too many connections and exhaust the RDS conne
 
 ## Q 03-v2-04
 - domain: performance
+- task: 3.3
 - topic: database
 - services: Aurora
 - tags: multi-region, rto-rpo, aurora-global-database
@@ -89,12 +93,12 @@ Hundreds of Lambda functions open too many connections and exhaust the RDS conne
 
 A globally distributed app needs a relational database with low-latency reads in multiple Regions and fast cross-Region DR (RPO near zero). Which is BEST?
 
-- A. RDS Multi-AZ
-- B. Aurora Global Database
-- C. DynamoDB Global Tables
-- D. Cross-Region Read Replica of RDS MySQL
+- A. DynamoDB Global Tables
+- B. Cross-Region Read Replica of RDS MySQL
+- C. RDS Multi-AZ
+- D. Aurora Global Database
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Global relational, low-latency multi-Region reads, near-zero RPO DR = Aurora Global Database.
 
@@ -102,6 +106,7 @@ A globally distributed app needs a relational database with low-latency reads in
 
 ## Q 03-v2-05
 - domain: performance
+- task: 3.3
 - topic: database
 - services: DynamoDB
 - tags: dynamodb-capacity
@@ -111,12 +116,12 @@ A globally distributed app needs a relational database with low-latency reads in
 
 A NoSQL workload has spiky, unpredictable traffic and the team wants no capacity planning with single-digit ms latency. Which choice?
 
-- A. DynamoDB provisioned capacity
-- B. DynamoDB on-demand capacity
-- C. RDS MySQL
-- D. Redshift
+- A. RDS MySQL
+- B. Redshift
+- C. DynamoDB on-demand capacity
+- D. DynamoDB provisioned capacity
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Spiky NoSQL, no capacity planning, single-digit ms = DynamoDB on-demand.
 
@@ -124,6 +129,7 @@ A NoSQL workload has spiky, unpredictable traffic and the team wants no capacity
 
 ## Q 03-v2-06
 - domain: performance
+- task: 3.3
 - topic: database
 - services: DAX, DynamoDB
 - difficulty: medium
@@ -132,10 +138,10 @@ A NoSQL workload has spiky, unpredictable traffic and the team wants no capacity
 
 A DynamoDB workload needs microsecond read latency for repeated reads with minimal app changes. Which service?
 
-- A. ElastiCache for Memcached
+- A. Global Secondary Index
 - B. DynamoDB Accelerator (DAX)
-- C. Global Secondary Index
-- D. DynamoDB Streams
+- C. DynamoDB Streams
+- D. ElastiCache for Memcached
 
 **Answer:** B
 
@@ -145,6 +151,7 @@ A DynamoDB workload needs microsecond read latency for repeated reads with minim
 
 ## Q 03-v2-07
 - domain: performance
+- task: 3.3
 - topic: database
 - services: ElastiCache
 - tags: redis-vs-memcached
@@ -154,9 +161,9 @@ A DynamoDB workload needs microsecond read latency for repeated reads with minim
 
 A gaming leaderboard needs an in-memory store with sorted sets and persistence. Which engine?
 
-- A. ElastiCache for Memcached
+- A. DynamoDB
 - B. ElastiCache for Redis
-- C. DynamoDB
+- C. ElastiCache for Memcached
 - D. Neptune
 
 **Answer:** B
@@ -167,6 +174,7 @@ A gaming leaderboard needs an in-memory store with sorted sets and persistence. 
 
 ## Q 03-v2-08
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Redshift
 - tags: offline-transfer
@@ -177,11 +185,11 @@ A gaming leaderboard needs an in-memory store with sorted sets and persistence. 
 A company needs a petabyte-scale data warehouse for complex OLAP queries over structured data. Which service?
 
 - A. RDS
-- B. Aurora
-- C. Redshift
-- D. DynamoDB
+- B. DynamoDB
+- C. Aurora
+- D. Redshift
 
-**Answer:** C
+**Answer:** D
 
 **Explanation:** Petabyte OLAP data warehouse = Amazon Redshift.
 
@@ -189,6 +197,7 @@ A company needs a petabyte-scale data warehouse for complex OLAP queries over st
 
 ## Q 03-v2-09
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: SCT, DMS, Aurora
 - difficulty: medium
@@ -197,12 +206,12 @@ A company needs a petabyte-scale data warehouse for complex OLAP queries over st
 
 An Oracle database must be migrated to Aurora PostgreSQL (different engine) with minimal downtime. Which combination?
 
-- A. DataSync only
+- A. Schema Conversion Tool (SCT) + DMS
 - B. DMS only
-- C. Schema Conversion Tool (SCT) + DMS
-- D. Native Data Pump only
+- C. Native Data Pump only
+- D. DataSync only
 
-**Answer:** C
+**Answer:** A
 
 **Explanation:** Heterogeneous migration (Oracle->Aurora PG) = SCT + DMS.
 
@@ -210,6 +219,7 @@ An Oracle database must be migrated to Aurora PostgreSQL (different engine) with
 
 ## Q 03-v2-10
 - domain: cost
+- task: 4.3
 - topic: database
 - services: Aurora
 - tags: aurora-serverless
@@ -220,11 +230,11 @@ An Oracle database must be migrated to Aurora PostgreSQL (different engine) with
 An internal Aurora app is idle most nights/weekends with bursts during business hours; minimize cost while staying relational. Which is BEST?
 
 - A. Aurora provisioned largest instance
-- B. Aurora Serverless v2
-- C. RDS Single-AZ
+- B. RDS Single-AZ
+- C. Aurora Serverless v2
 - D. DynamoDB on-demand
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Idle-then-bursty Aurora cost optimization = Aurora Serverless v2.
 
@@ -232,6 +242,7 @@ An internal Aurora app is idle most nights/weekends with bursts during business 
 
 ## Q 03-v2-11
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Neptune
 - difficulty: medium
@@ -240,12 +251,12 @@ An internal Aurora app is idle most nights/weekends with bursts during business 
 
 A workload stores highly connected data for a recommendation/fraud engine using graph queries. Which service?
 
-- A. Neptune
-- B. DocumentDB
-- C. Keyspaces
-- D. Timestream
+- A. Timestream
+- B. Keyspaces
+- C. DocumentDB
+- D. Neptune
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Highly connected/graph queries = Amazon Neptune.
 
@@ -253,6 +264,7 @@ A workload stores highly connected data for a recommendation/fraud engine using 
 
 ## Q 03-v2-12
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Timestream
 - difficulty: medium
@@ -261,12 +273,12 @@ A workload stores highly connected data for a recommendation/fraud engine using 
 
 IoT sensors send time-stamped metrics needing efficient storage and time-series analytics at scale. Which service?
 
-- A. Timestream
-- B. RDS
-- C. Neptune
-- D. QLDB
+- A. QLDB
+- B. Timestream
+- C. RDS
+- D. Neptune
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Time-series IoT metrics = Amazon Timestream.
 
@@ -274,6 +286,7 @@ IoT sensors send time-stamped metrics needing efficient storage and time-series 
 
 ## Q 03-v2-13
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: QLDB
 - difficulty: medium
@@ -284,8 +297,8 @@ A company wants an immutable, cryptographically verifiable ledger of financial t
 
 - A. QLDB
 - B. Aurora
-- C. DynamoDB
-- D. Redshift
+- C. Redshift
+- D. DynamoDB
 
 **Answer:** A
 
@@ -295,6 +308,7 @@ A company wants an immutable, cryptographically verifiable ledger of financial t
 
 ## Q 03-v2-14
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: DocumentDB
 - difficulty: medium
@@ -303,12 +317,12 @@ A company wants an immutable, cryptographically verifiable ledger of financial t
 
 A MongoDB workload should move to a managed, MongoDB-compatible database reusing existing drivers. Which service?
 
-- A. Keyspaces
-- B. DocumentDB
+- A. DocumentDB
+- B. Keyspaces
 - C. Neptune
 - D. RDS PostgreSQL
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** MongoDB-compatible managed DB = DocumentDB.
 
@@ -316,6 +330,7 @@ A MongoDB workload should move to a managed, MongoDB-compatible database reusing
 
 ## Q 03-v2-15
 - domain: resilient
+- task: 2.1
 - topic: database
 - services: Keyspaces
 - difficulty: medium
@@ -324,12 +339,12 @@ A MongoDB workload should move to a managed, MongoDB-compatible database reusing
 
 A Cassandra workload must move to a fully managed, serverless, Cassandra-compatible (CQL) database. Which service?
 
-- A. Keyspaces
-- B. DynamoDB
-- C. DocumentDB
-- D. Redshift
+- A. DocumentDB
+- B. Keyspaces
+- C. Redshift
+- D. DynamoDB
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Serverless Cassandra-compatible (CQL) = Amazon Keyspaces.
 
@@ -337,6 +352,7 @@ A Cassandra workload must move to a fully managed, serverless, Cassandra-compati
 
 ## Q 03-v2-16
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: DynamoDB
 - tags: dynamodb-indexes
@@ -346,12 +362,12 @@ A Cassandra workload must move to a fully managed, serverless, Cassandra-compati
 
 A DynamoDB table needs to query on a completely different partition/sort key, added after creation. Which index?
 
-- A. Local Secondary Index (LSI)
-- B. Global Secondary Index (GSI)
-- C. DynamoDB Streams
+- A. Global Secondary Index (GSI)
+- B. DynamoDB Streams
+- C. Local Secondary Index (LSI)
 - D. Composite primary key
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Different PK/SK, added after creation = Global Secondary Index (GSI).
 
@@ -359,6 +375,7 @@ A DynamoDB table needs to query on a completely different partition/sort key, ad
 
 ## Q 03-v2-17
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS
 - tags: db-encryption, encryption-at-rest
@@ -368,12 +385,12 @@ A DynamoDB table needs to query on a completely different partition/sort key, ad
 
 An RDS instance was created unencrypted; it must now be encrypted at rest. Correct approach?
 
-- A. Toggle encryption on the running instance
-- B. Create an encrypted snapshot copy and restore a new instance
-- C. SSL/TLS encrypts at rest
-- D. Enable Multi-AZ
+- A. Create an encrypted snapshot copy and restore a new instance
+- B. Enable Multi-AZ
+- C. Toggle encryption on the running instance
+- D. SSL/TLS encrypts at rest
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Encrypt existing RDS = encrypted snapshot copy -> restore new instance.
 
@@ -381,6 +398,7 @@ An RDS instance was created unencrypted; it must now be encrypted at rest. Corre
 
 ## Q 03-v2-18
 - domain: performance
+- task: 3.3
 - topic: database
 - tags: caching-strategies
 - difficulty: medium
@@ -389,12 +407,12 @@ An RDS instance was created unencrypted; it must now be encrypted at rest. Corre
 
 Which caching strategy loads data into the cache only on a cache miss?
 
-- A. Write-through
-- B. Lazy loading (cache-aside)
-- C. Write-behind
-- D. TTL-only
+- A. TTL-only
+- B. Write-behind
+- C. Write-through
+- D. Lazy loading (cache-aside)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Cache only on miss = Lazy loading (cache-aside).
 
@@ -402,6 +420,7 @@ Which caching strategy loads data into the cache only on a cache miss?
 
 ## Q 03-v2-19
 - domain: cost
+- task: 4.3
 - topic: database
 - services: DynamoDB
 - tags: ttl
@@ -411,12 +430,12 @@ Which caching strategy loads data into the cache only on a cache miss?
 
 DynamoDB must automatically delete expired session items to save cost without a scheduled job. Which feature?
 
-- A. DynamoDB Streams
-- B. Time to Live (TTL)
-- C. Global tables
-- D. On-demand backup
+- A. On-demand backup
+- B. Global tables
+- C. Time to Live (TTL)
+- D. DynamoDB Streams
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Auto-delete expired items with no job = DynamoDB TTL.
 
@@ -424,6 +443,7 @@ DynamoDB must automatically delete expired session items to save cost without a 
 
 ## Q 03-v2-20
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS
 - tags: multi-az, read-replicas
@@ -433,13 +453,13 @@ DynamoDB must automatically delete expired session items to save cost without a 
 
 Which two are TRUE about RDS Multi-AZ vs Read Replicas? (Choose TWO)
 
-- A. Multi-AZ standby is readable to offload queries
-- B. Multi-AZ uses synchronous replication for HA
-- C. Read Replicas use asynchronous replication and can be promoted
-- D. Read Replicas provide automatic failover
+- A. Read Replicas provide automatic failover
+- B. Multi-AZ standby is readable to offload queries
+- C. Multi-AZ uses synchronous replication for HA
+- D. Read Replicas use asynchronous replication and can be promoted
 - E. Multi-AZ is primarily a read-scaling feature
 
-**Answer:** B, C
+**Answer:** C, D
 
 **Explanation:** Multi-AZ = synchronous HA; Read Replicas = async, promotable.
 
@@ -447,6 +467,7 @@ Which two are TRUE about RDS Multi-AZ vs Read Replicas? (Choose TWO)
 
 ## Q 03-v2-21
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS Proxy, IAM, Lambda, RDS
 - tags: iam-db-auth, connection-pooling
@@ -456,13 +477,13 @@ Which two are TRUE about RDS Multi-AZ vs Read Replicas? (Choose TWO)
 
 A serverless app on Lambda + RDS must survive DB failover quickly, pool connections, and authenticate without storing DB passwords. Which two features address this? (Choose TWO)
 
-- A. RDS Proxy with IAM authentication
+- A. DynamoDB DAX
 - B. Storing the password in Lambda env variables
-- C. RDS Proxy connection pooling with faster failover
-- D. DynamoDB DAX
-- E. Read Replica promotion
+- C. Read Replica promotion
+- D. RDS Proxy connection pooling with faster failover
+- E. RDS Proxy with IAM authentication
 
-**Answer:** A, C
+**Answer:** D, E
 
 **Explanation:** Lambda+RDS: RDS Proxy with IAM auth (no stored password) + pooling with faster failover.
 
@@ -470,6 +491,7 @@ A serverless app on Lambda + RDS must survive DB failover quickly, pool connecti
 
 ## Q 03-v2-22
 - domain: performance
+- task: 3.3
 - topic: database
 - services: DynamoDB
 - tags: multi-region, dr-multi-site, dynamodb-global-tables
@@ -492,6 +514,7 @@ A DynamoDB table serves a global user base needing multi-Region, active-active r
 
 ## Q 03-v2-23
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: DAX, DynamoDB
 - tags: sharding
@@ -501,13 +524,13 @@ A DynamoDB table serves a global user base needing multi-Region, active-active r
 
 A DynamoDB partition receives far more traffic than others causing throttling on a small set of hot keys. Which two mitigate this? (Choose TWO)
 
-- A. Add write sharding / high-cardinality partition key design
-- B. Use DAX to absorb hot read traffic
+- A. Reduce provisioned capacity
+- B. Enable Multi-AZ
 - C. Switch to a single partition key value
-- D. Enable Multi-AZ
-- E. Reduce provisioned capacity
+- D. Add write sharding / high-cardinality partition key design
+- E. Use DAX to absorb hot read traffic
 
-**Answer:** A, B
+**Answer:** D, E
 
 **Explanation:** Hot partition fix = write sharding/high-cardinality key + DAX for hot reads.
 
@@ -515,6 +538,7 @@ A DynamoDB partition receives far more traffic than others causing throttling on
 
 ## Q 03-v2-24
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Aurora
 - tags: aurora-endpoints
@@ -524,13 +548,13 @@ A DynamoDB partition receives far more traffic than others causing throttling on
 
 An Aurora cluster needs near-instant read scaling and automatic replacement of the writer without changing the application endpoint. Which two are relevant? (Choose TWO)
 
-- A. Aurora reader endpoint for load-balanced reads
+- A. Manually updating the app to the new IP after failover
 - B. Aurora cluster (writer) endpoint that always points to the primary
-- C. Manually updating the app to the new IP after failover
-- D. DynamoDB Streams
-- E. RDS Proxy is mandatory for failover
+- C. DynamoDB Streams
+- D. RDS Proxy is mandatory for failover
+- E. Aurora reader endpoint for load-balanced reads
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** Reader endpoint for load-balanced reads + writer/cluster endpoint auto-tracks primary after failover.
 
@@ -538,6 +562,7 @@ An Aurora cluster needs near-instant read scaling and automatic replacement of t
 
 ## Q 03-v2-25
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS
 - tags: automated-backups, pitr
@@ -547,12 +572,12 @@ An Aurora cluster needs near-instant read scaling and automatic replacement of t
 
 A regulated database must retain automated backups and enable point-in-time recovery to any second within the retention window. Which RDS capability provides this?
 
-- A. Manual snapshots only
-- B. Automated backups with transaction logs (PITR)
-- C. Read Replicas
-- D. Multi-AZ standby
+- A. Read Replicas
+- B. Manual snapshots only
+- C. Multi-AZ standby
+- D. Automated backups with transaction logs (PITR)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** PITR to any second = automated backups + transaction logs.
 
@@ -560,6 +585,7 @@ A regulated database must retain automated backups and enable point-in-time reco
 
 ## Q 03-v2-26
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Aurora
 - tags: multi-region, aurora-global-database
@@ -570,11 +596,11 @@ A regulated database must retain automated backups and enable point-in-time reco
 An Aurora database must tolerate the loss of an entire Region with minimal downtime and allow promoting a secondary Region to primary in under a minute. Which feature?
 
 - A. Aurora Multi-AZ
-- B. Aurora Global Database with managed planned failover / unplanned failover
-- C. RDS cross-Region snapshot copy
-- D. DynamoDB Global Tables
+- B. RDS cross-Region snapshot copy
+- C. DynamoDB Global Tables
+- D. Aurora Global Database with managed planned failover / unplanned failover
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Region loss, sub-minute promotion = Aurora Global Database failover.
 
@@ -582,6 +608,7 @@ An Aurora database must tolerate the loss of an entire Region with minimal downt
 
 ## Q 03-v2-27
 - domain: resilient
+- task: 2.1
 - topic: database
 - services: DynamoDB, Kinesis Data Streams, Lambda
 - tags: dynamodb-streams
@@ -591,12 +618,12 @@ An Aurora database must tolerate the loss of an entire Region with minimal downt
 
 A DynamoDB-based system must trigger a Lambda function for every item-level change to update a search index. Which feature integrates natively?
 
-- A. DynamoDB TTL
-- B. DynamoDB Streams (or Kinesis Data Streams for DynamoDB)
-- C. Global Secondary Index
+- A. Global Secondary Index
+- B. DynamoDB TTL
+- C. DynamoDB Streams (or Kinesis Data Streams for DynamoDB)
 - D. DAX
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Trigger Lambda per item change = DynamoDB Streams.
 
@@ -604,6 +631,7 @@ A DynamoDB-based system must trigger a Lambda function for every item-level chan
 
 ## Q 03-v2-28
 - domain: performance
+- task: 3.3
 - topic: database
 - tags: caching-strategies
 - difficulty: hard
@@ -612,12 +640,12 @@ A DynamoDB-based system must trigger a Lambda function for every item-level chan
 
 A read-heavy relational workload needs caching where the cache is always consistent with the DB on writes, accepting higher write latency. Which strategy?
 
-- A. Lazy loading only
-- B. Write-through caching
-- C. TTL-only
-- D. No caching
+- A. TTL-only
+- B. No caching
+- C. Write-through caching
+- D. Lazy loading only
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Cache always consistent on writes, higher write latency = write-through.
 
@@ -625,6 +653,7 @@ A read-heavy relational workload needs caching where the cache is always consist
 
 ## Q 03-v2-29
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Redshift, S3
 - tags: redshift-spectrum
@@ -635,8 +664,8 @@ A read-heavy relational workload needs caching where the cache is always consist
 A company runs Redshift and must query large amounts of infrequently accessed data in S3 without loading it into the cluster. Which feature?
 
 - A. Redshift Spectrum
-- B. Redshift RA3 managed storage only
-- C. DynamoDB export
+- B. DynamoDB export
+- C. Redshift RA3 managed storage only
 - D. Aurora parallel query
 
 **Answer:** A
@@ -647,6 +676,7 @@ A company runs Redshift and must query large amounts of infrequently accessed da
 
 ## Q 03-v2-30
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: ElastiCache
 - tags: redis-vs-memcached, multi-az
@@ -656,11 +686,11 @@ A company runs Redshift and must query large amounts of infrequently accessed da
 
 An ElastiCache for Redis deployment must survive an AZ failure with automatic failover to a replica and minimal data loss. Which configuration?
 
-- A. Single-node cluster
-- B. Multi-AZ with automatic failover (replication group with replicas)
-- C. Memcached multi-node
-- D. Cluster mode disabled, single node
+- A. Cluster mode disabled, single node
+- B. Memcached multi-node
+- C. Multi-AZ with automatic failover (replication group with replicas)
+- D. Single-node cluster
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Redis AZ failover with minimal loss = Multi-AZ replication group with automatic failover.

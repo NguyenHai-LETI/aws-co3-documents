@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 05-v2-01
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM, EC2, S3
 - tags: iam-roles
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 An EC2 application needs to access S3 without storing long-term credentials on the instance. What is BEST practice?
 
-- A. Store an IAM user's access keys on the instance
-- B. Attach an IAM role to the EC2 instance
-- C. Hardcode keys in the app
-- D. Use the root account keys
+- A. Hardcode keys in the app
+- B. Use the root account keys
+- C. Store an IAM user's access keys on the instance
+- D. Attach an IAM role to the EC2 instance
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** EC2 access to S3 without stored keys = attach IAM role to instance.
 
@@ -37,6 +38,7 @@ An EC2 application needs to access S3 without storing long-term credentials on t
 
 ## Q 05-v2-02
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM, STS
 - tags: cross-account-access, iam-roles
@@ -46,12 +48,12 @@ An EC2 application needs to access S3 without storing long-term credentials on t
 
 A company must grant a third-party AWS account temporary access to specific resources. Which mechanism?
 
-- A. Share IAM user credentials
-- B. Cross-account IAM role with sts:AssumeRole
-- C. Make resources public
-- D. Root account access
+- A. Root account access
+- B. Make resources public
+- C. Share IAM user credentials
+- D. Cross-account IAM role with sts:AssumeRole
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Temporary cross-account access = cross-account IAM role + sts:AssumeRole.
 
@@ -59,6 +61,7 @@ A company must grant a third-party AWS account temporary access to specific reso
 
 ## Q 05-v2-03
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Secrets Manager
 - tags: key-rotation
@@ -68,12 +71,12 @@ A company must grant a third-party AWS account temporary access to specific reso
 
 Sensitive application secrets (DB passwords) need automatic rotation and secure storage. Which service?
 
-- A. Systems Manager Parameter Store (standard)
-- B. AWS Secrets Manager
-- C. S3 with encryption
-- D. IAM policy
+- A. AWS Secrets Manager
+- B. IAM policy
+- C. Systems Manager Parameter Store (standard)
+- D. S3 with encryption
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Secrets with automatic rotation = AWS Secrets Manager.
 
@@ -81,6 +84,7 @@ Sensitive application secrets (DB passwords) need automatic rotation and secure 
 
 ## Q 05-v2-04
 - domain: secure
+- task: 1.3
 - topic: security
 - services: KMS
 - tags: encryption-at-rest, compliance
@@ -90,12 +94,12 @@ Sensitive application secrets (DB passwords) need automatic rotation and secure 
 
 Data at rest must be encrypted with customer-managed keys and full audit of key usage. Which service?
 
-- A. AWS KMS
-- B. AWS Certificate Manager
-- C. IAM
-- D. AWS Config
+- A. IAM
+- B. AWS KMS
+- C. AWS Config
+- D. AWS Certificate Manager
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Customer-managed keys + key-usage audit = AWS KMS.
 
@@ -103,6 +107,7 @@ Data at rest must be encrypted with customer-managed keys and full audit of key 
 
 ## Q 05-v2-05
 - domain: secure
+- task: 1.2
 - topic: security
 - services: WAF
 - tags: web-attacks
@@ -112,12 +117,12 @@ Data at rest must be encrypted with customer-managed keys and full audit of key 
 
 A web application must be protected against SQL injection and cross-site scripting at the HTTP layer. Which service?
 
-- A. AWS Shield
-- B. AWS WAF
-- C. GuardDuty
-- D. Security Groups
+- A. GuardDuty
+- B. AWS Shield
+- C. Security Groups
+- D. AWS WAF
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** SQLi/XSS protection at HTTP layer = AWS WAF.
 
@@ -125,6 +130,7 @@ A web application must be protected against SQL injection and cross-site scripti
 
 ## Q 05-v2-06
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Shield
 - tags: ddos-protection
@@ -135,11 +141,11 @@ A web application must be protected against SQL injection and cross-site scripti
 An application needs protection against large-scale DDoS attacks with 24/7 support and cost protection. Which service?
 
 - A. AWS WAF only
-- B. AWS Shield Advanced
-- C. GuardDuty
-- D. Network ACLs
+- B. Network ACLs
+- C. AWS Shield Advanced
+- D. GuardDuty
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Large DDoS + 24/7 + cost protection = AWS Shield Advanced.
 
@@ -147,6 +153,7 @@ An application needs protection against large-scale DDoS attacks with 24/7 suppo
 
 ## Q 05-v2-07
 - domain: secure
+- task: 1.2
 - topic: security
 - services: GuardDuty, VPC, VPC Flow Logs, CloudTrail
 - tags: threat-detection
@@ -156,10 +163,10 @@ An application needs protection against large-scale DDoS attacks with 24/7 suppo
 
 A company wants continuous threat detection analyzing VPC Flow Logs, DNS logs, and CloudTrail for malicious activity. Which service?
 
-- A. Amazon Inspector
+- A. AWS Config
 - B. Amazon GuardDuty
-- C. AWS Config
-- D. Amazon Macie
+- C. Amazon Macie
+- D. Amazon Inspector
 
 **Answer:** B
 
@@ -169,6 +176,7 @@ A company wants continuous threat detection analyzing VPC Flow Logs, DNS logs, a
 
 ## Q 05-v2-08
 - domain: secure
+- task: 1.3
 - topic: security
 - services: Macie, S3
 - difficulty: medium
@@ -177,12 +185,12 @@ A company wants continuous threat detection analyzing VPC Flow Logs, DNS logs, a
 
 A company must discover and classify sensitive PII stored in S3 buckets automatically. Which service?
 
-- A. Amazon Macie
-- B. Amazon GuardDuty
-- C. AWS WAF
-- D. AWS Config
+- A. AWS WAF
+- B. AWS Config
+- C. Amazon Macie
+- D. Amazon GuardDuty
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Discover/classify PII in S3 = Amazon Macie.
 
@@ -190,6 +198,7 @@ A company must discover and classify sensitive PII stored in S3 buckets automati
 
 ## Q 05-v2-09
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Inspector, EC2
 - difficulty: medium
@@ -199,9 +208,9 @@ A company must discover and classify sensitive PII stored in S3 buckets automati
 EC2 instances and container images must be scanned for software vulnerabilities and unintended network exposure. Which service?
 
 - A. Amazon Inspector
-- B. Amazon Macie
-- C. AWS Shield
-- D. AWS WAF
+- B. AWS Shield
+- C. AWS WAF
+- D. Amazon Macie
 
 **Answer:** A
 
@@ -211,6 +220,7 @@ EC2 instances and container images must be scanned for software vulnerabilities 
 
 ## Q 05-v2-10
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Cognito
 - tags: federation
@@ -220,12 +230,12 @@ EC2 instances and container images must be scanned for software vulnerabilities 
 
 A mobile app needs user sign-up, sign-in, and federated identity (Google/Facebook) with tokens. Which service?
 
-- A. IAM users
-- B. Amazon Cognito User Pools
-- C. AWS Directory Service
-- D. AWS SSO only
+- A. Amazon Cognito User Pools
+- B. AWS SSO only
+- C. IAM users
+- D. AWS Directory Service
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** User sign-up/sign-in + federation + tokens = Cognito User Pools.
 
@@ -233,6 +243,7 @@ A mobile app needs user sign-up, sign-in, and federated identity (Google/Faceboo
 
 ## Q 05-v2-11
 - domain: secure
+- task: 1.1
 - topic: security
 - services: Organizations
 - tags: scp
@@ -242,13 +253,13 @@ A mobile app needs user sign-up, sign-in, and federated identity (Google/Faceboo
 
 A company wants to centrally manage multiple AWS accounts and apply guardrails restricting which services can be used. Which two? (Choose TWO)
 
-- A. AWS Organizations
-- B. Service Control Policies (SCPs)
-- C. Security Groups
-- D. NACLs
-- E. IAM access keys
+- A. Service Control Policies (SCPs)
+- B. NACLs
+- C. AWS Organizations
+- D. IAM access keys
+- E. Security Groups
 
-**Answer:** A, B
+**Answer:** A, C
 
 **Explanation:** Central multi-account guardrails = AWS Organizations + SCPs.
 
@@ -256,6 +267,7 @@ A company wants to centrally manage multiple AWS accounts and apply guardrails r
 
 ## Q 05-v2-12
 - domain: secure
+- task: 1.3
 - topic: security
 - services: ACM, ALB
 - tags: tls-termination
@@ -265,10 +277,10 @@ A company wants to centrally manage multiple AWS accounts and apply guardrails r
 
 TLS certificates for an ALB must be provisioned and auto-renewed at no additional cost. Which service?
 
-- A. AWS KMS
+- A. CloudHSM
 - B. AWS Certificate Manager (ACM)
-- C. CloudHSM
-- D. Secrets Manager
+- C. Secrets Manager
+- D. AWS KMS
 
 **Answer:** B
 
@@ -278,6 +290,7 @@ TLS certificates for an ALB must be provisioned and auto-renewed at no additiona
 
 ## Q 05-v2-13
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM
 - tags: mfa, iam-policies
@@ -287,12 +300,12 @@ TLS certificates for an ALB must be provisioned and auto-renewed at no additiona
 
 An organization must enforce MFA for all IAM users performing sensitive actions. Which approach?
 
-- A. Enable MFA and use IAM policy conditions requiring aws:MultiFactorAuthPresent
+- A. Disable programmatic access
 - B. Rely on strong passwords
-- C. Use root MFA only
-- D. Disable programmatic access
+- C. Enable MFA and use IAM policy conditions requiring aws:MultiFactorAuthPresent
+- D. Use root MFA only
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Enforce MFA on sensitive actions = MFA + policy condition aws:MultiFactorAuthPresent.
 
@@ -300,6 +313,7 @@ An organization must enforce MFA for all IAM users performing sensitive actions.
 
 ## Q 05-v2-14
 - domain: secure
+- task: 1.3
 - topic: security
 - services: CloudHSM
 - difficulty: medium
@@ -310,8 +324,8 @@ A regulated workload requires a dedicated, single-tenant hardware security modul
 
 - A. AWS KMS (multi-tenant)
 - B. AWS CloudHSM
-- C. Secrets Manager
-- D. ACM
+- C. ACM
+- D. Secrets Manager
 
 **Answer:** B
 
@@ -321,6 +335,7 @@ A regulated workload requires a dedicated, single-tenant hardware security modul
 
 ## Q 05-v2-15
 - domain: secure
+- task: 1.3
 - topic: security
 - services: AWS Config
 - tags: compliance
@@ -330,12 +345,12 @@ A regulated workload requires a dedicated, single-tenant hardware security modul
 
 A company needs to record and evaluate resource configurations against compliance rules over time. Which service?
 
-- A. AWS Config
-- B. CloudTrail
-- C. GuardDuty
-- D. Inspector
+- A. CloudTrail
+- B. AWS Config
+- C. Inspector
+- D. GuardDuty
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Record/evaluate config compliance over time = AWS Config.
 
@@ -343,6 +358,7 @@ A company needs to record and evaluate resource configurations against complianc
 
 ## Q 05-v2-16
 - domain: secure
+- task: 1.2
 - topic: security
 - services: CloudTrail
 - tags: compliance
@@ -352,12 +368,12 @@ A company needs to record and evaluate resource configurations against complianc
 
 Which service records API calls and management events for auditing "who did what" in the account?
 
-- A. AWS Config
-- B. AWS CloudTrail
-- C. VPC Flow Logs
-- D. GuardDuty
+- A. VPC Flow Logs
+- B. GuardDuty
+- C. AWS CloudTrail
+- D. AWS Config
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Record API calls / who did what = AWS CloudTrail.
 
@@ -365,6 +381,7 @@ Which service records API calls and management events for auditing "who did what
 
 ## Q 05-v2-17
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Security Hub, GuardDuty, Inspector, Macie
 - difficulty: medium
@@ -373,12 +390,12 @@ Which service records API calls and management events for auditing "who did what
 
 A company wants to aggregate and prioritize security findings from GuardDuty, Inspector, and Macie in one place. Which service?
 
-- A. AWS Security Hub
+- A. Trusted Advisor
 - B. AWS Config
-- C. CloudWatch
-- D. Trusted Advisor
+- C. AWS Security Hub
+- D. CloudWatch
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Aggregate/prioritize security findings = AWS Security Hub.
 
@@ -386,6 +403,7 @@ A company wants to aggregate and prioritize security findings from GuardDuty, In
 
 ## Q 05-v2-18
 - domain: secure
+- task: 1.1
 - topic: security
 - services: Directory Service
 - difficulty: medium
@@ -395,11 +413,11 @@ A company wants to aggregate and prioritize security findings from GuardDuty, In
 Employees should use existing corporate Active Directory credentials to access AWS. Which service integrates on-prem AD?
 
 - A. Cognito User Pools
-- B. AWS Directory Service (AD Connector / Managed Microsoft AD)
-- C. IAM users
-- D. Secrets Manager
+- B. Secrets Manager
+- C. AWS Directory Service (AD Connector / Managed Microsoft AD)
+- D. IAM users
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Integrate on-prem AD with AWS = AWS Directory Service (AD Connector / Managed Microsoft AD).
 
@@ -407,6 +425,7 @@ Employees should use existing corporate Active Directory credentials to access A
 
 ## Q 05-v2-19
 - domain: secure
+- task: 1.2
 - topic: security
 - services: Systems Manager
 - tags: s3-versioning
@@ -416,12 +435,12 @@ Employees should use existing corporate Active Directory credentials to access A
 
 A parameter (non-secret config value) must be stored free of charge with hierarchy and versioning. Which service?
 
-- A. Secrets Manager
-- B. Systems Manager Parameter Store
-- C. KMS
+- A. Systems Manager Parameter Store
+- B. KMS
+- C. Secrets Manager
 - D. S3
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Free hierarchical versioned config values = SSM Parameter Store.
 
@@ -429,6 +448,7 @@ A parameter (non-secret config value) must be stored free of charge with hierarc
 
 ## Q 05-v2-20
 - domain: secure
+- task: 1.3
 - topic: security
 - services: S3
 - tags: sse-s3
@@ -439,11 +459,11 @@ A parameter (non-secret config value) must be stored free of charge with hierarc
 An S3 bucket must be encrypted so that AWS manages the keys with no extra cost and no key management by the customer. Which option?
 
 - A. SSE-KMS with customer-managed key
-- B. SSE-S3
-- C. SSE-C
-- D. Client-side encryption
+- B. SSE-C
+- C. Client-side encryption
+- D. SSE-S3
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** AWS-managed keys, no cost, no key mgmt = SSE-S3.
 
@@ -451,6 +471,7 @@ An S3 bucket must be encrypted so that AWS manages the keys with no extra cost a
 
 ## Q 05-v2-21
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM
 - tags: permission-boundaries
@@ -462,8 +483,8 @@ A team's IAM permissions are granted by their identity policy, but administrator
 
 - A. Service Control Policy on the user
 - B. IAM permissions boundary
-- C. Resource-based policy
-- D. Session policy only
+- C. Session policy only
+- D. Resource-based policy
 
 **Answer:** B
 
@@ -473,6 +494,7 @@ A team's IAM permissions are granted by their identity policy, but administrator
 
 ## Q 05-v2-22
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM
 - tags: scp
@@ -484,8 +506,8 @@ An IAM principal has an identity policy allowing an action, but an SCP on the ac
 
 - A. Allowed, identity policy wins
 - B. Denied — an explicit deny / SCP restriction always overrides an allow
-- C. Depends on resource policy
-- D. Allowed if MFA present
+- C. Allowed if MFA present
+- D. Depends on resource policy
 
 **Answer:** B
 
@@ -495,6 +517,7 @@ An IAM principal has an identity policy allowing an action, but an SCP on the ac
 
 ## Q 05-v2-23
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM, KMS
 - tags: iam-policies
@@ -504,11 +527,11 @@ An IAM principal has an identity policy allowing an action, but an SCP on the ac
 
 A KMS customer-managed key must be usable by another AWS account for decrypting shared objects. Which two are required? (Choose TWO)
 
-- A. Key policy granting the external account access
-- B. IAM policy in the external account allowing kms:Decrypt
-- C. Making the key public
-- D. Rotating the key hourly
-- E. SSE-S3 on the bucket
+- A. IAM policy in the external account allowing kms:Decrypt
+- B. Key policy granting the external account access
+- C. Rotating the key hourly
+- D. SSE-S3 on the bucket
+- E. Making the key public
 
 **Answer:** A, B
 
@@ -518,6 +541,7 @@ A KMS customer-managed key must be usable by another AWS account for decrypting 
 
 ## Q 05-v2-24
 - domain: secure
+- task: 1.3
 - topic: security
 - services: KMS
 - tags: key-rotation
@@ -527,12 +551,12 @@ A KMS customer-managed key must be usable by another AWS account for decrypting 
 
 A company wants automatic annual rotation of a KMS customer-managed symmetric key with no application changes. What happens to old data?
 
-- A. Old ciphertext becomes unreadable
-- B. KMS retains old key material and can still decrypt old ciphertext
-- C. Data must be re-encrypted manually
-- D. Rotation is not supported
+- A. KMS retains old key material and can still decrypt old ciphertext
+- B. Data must be re-encrypted manually
+- C. Rotation is not supported
+- D. Old ciphertext becomes unreadable
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** KMS rotation keeps old key material to decrypt old ciphertext (transparent).
 
@@ -540,6 +564,7 @@ A company wants automatic annual rotation of a KMS customer-managed symmetric ke
 
 ## Q 05-v2-25
 - domain: secure
+- task: 1.1
 - topic: security
 - services: IAM, STS
 - tags: iam-roles
@@ -549,12 +574,12 @@ A company wants automatic annual rotation of a KMS customer-managed symmetric ke
 
 An application running on-premises must call AWS APIs with temporary credentials without embedding long-term keys. Which is BEST?
 
-- A. IAM user access keys stored in a file
-- B. IAM Roles Anywhere / STS with a trusted identity source
-- C. Root credentials
-- D. Hardcoded keys in code
+- A. Root credentials
+- B. IAM user access keys stored in a file
+- C. Hardcoded keys in code
+- D. IAM Roles Anywhere / STS with a trusted identity source
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** On-prem temporary AWS creds without long-term keys = IAM Roles Anywhere / STS.
 
@@ -562,6 +587,7 @@ An application running on-premises must call AWS APIs with temporary credentials
 
 ## Q 05-v2-26
 - domain: secure
+- task: 1.1
 - topic: security
 - services: S3
 - tags: cross-account-access, iam-policies, scp
@@ -572,12 +598,12 @@ An application running on-premises must call AWS APIs with temporary credentials
 A cross-account S3 access must work even though the bucket policy allows the role but the role's account SCP is restrictive. Which two must ALIGN for access? (Choose TWO)
 
 - A. The resource-based (bucket) policy must allow the principal
-- B. The principal's identity policy (and SCP) must allow the action
-- C. Only the bucket policy matters
-- D. Only the IAM policy matters
-- E. Public access must be enabled
+- B. Only the bucket policy matters
+- C. Public access must be enabled
+- D. The principal's identity policy (and SCP) must allow the action
+- E. Only the IAM policy matters
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** Cross-account access needs both resource policy allow AND principal identity/SCP allow.
 
@@ -585,6 +611,7 @@ A cross-account S3 access must work even though the bucket policy allows the rol
 
 ## Q 05-v2-27
 - domain: secure
+- task: 1.2
 - topic: security
 - services: WAF
 - tags: web-attacks
@@ -594,12 +621,12 @@ A cross-account S3 access must work even though the bucket policy allows the rol
 
 A WAF must block requests exceeding a request-rate threshold from a single IP to mitigate HTTP floods. Which rule type?
 
-- A. Geo match rule
-- B. Rate-based rule
+- A. Rate-based rule
+- B. IP reputation only
 - C. Managed rule for SQLi only
-- D. IP reputation only
+- D. Geo match rule
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Block per-IP request floods = WAF rate-based rule.
 
@@ -607,6 +634,7 @@ A WAF must block requests exceeding a request-rate threshold from a single IP to
 
 ## Q 05-v2-28
 - domain: secure
+- task: 1.1
 - topic: security
 - tags: mfa
 - difficulty: hard
@@ -615,13 +643,13 @@ A WAF must block requests exceeding a request-rate threshold from a single IP to
 
 A company must ensure that developers can assume a role only from within the corporate network and only with MFA. Which two policy conditions? (Choose TWO)
 
-- A. aws:SourceIp condition on the trust/permission policy
-- B. aws:MultiFactorAuthPresent condition
-- C. Making the role public
-- D. s3:x-amz-acl condition
-- E. kms:ViaService only
+- A. s3:x-amz-acl condition
+- B. aws:SourceIp condition on the trust/permission policy
+- C. kms:ViaService only
+- D. Making the role public
+- E. aws:MultiFactorAuthPresent condition
 
-**Answer:** A, B
+**Answer:** B, E
 
 **Explanation:** Restrict assume-role to corp network + MFA = aws:SourceIp + aws:MultiFactorAuthPresent.
 
@@ -629,6 +657,7 @@ A company must ensure that developers can assume a role only from within the cor
 
 ## Q 05-v2-29
 - domain: secure
+- task: 1.1
 - topic: security
 - services: Control Tower
 - tags: centralized-logging
@@ -639,11 +668,11 @@ A company must ensure that developers can assume a role only from within the cor
 An organization wants new accounts to automatically have baseline guardrails, a landing zone, and centralized logging with minimal setup. Which service?
 
 - A. AWS Config only
-- B. AWS Control Tower
-- C. IAM Identity Center only
+- B. IAM Identity Center only
+- C. AWS Control Tower
 - D. CloudFormation StackSets only
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Landing zone + baseline guardrails + central logging = AWS Control Tower.
 
@@ -651,6 +680,7 @@ An organization wants new accounts to automatically have baseline guardrails, a 
 
 ## Q 05-v2-30
 - domain: secure
+- task: 1.3
 - topic: security
 - services: KMS
 - tags: envelope-encryption
@@ -660,11 +690,11 @@ An organization wants new accounts to automatically have baseline guardrails, a 
 
 A company needs envelope encryption for large objects: encrypt data locally with a data key while protecting the data key with KMS. Which KMS operation generates the data key?
 
-- A. kms:Encrypt on the whole object
-- B. kms:GenerateDataKey (returns plaintext + encrypted data key)
-- C. kms:Decrypt only
-- D. kms:CreateGrant
+- A. kms:Decrypt only
+- B. kms:Encrypt on the whole object
+- C. kms:CreateGrant
+- D. kms:GenerateDataKey (returns plaintext + encrypted data key)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Envelope encryption data key = kms:GenerateDataKey (plaintext + encrypted copy).

@@ -15,9 +15,24 @@ import type { Attempt } from '../shared/types.ts';
 
 const tax = loadTaxonomy();
 const cfg: AppConfig = {
-  coach: { model: '', effort: '', max_budget_usd: 0, skip_if_no_new_results: true, schedule: [], claude_bin: '', use_api_key: false },
-  srs: { intervals_days: [1, 3, 7, 14, 30], mastered_box: 4 },
-  practice: { default_count: 20, quick_count: 10 },
+  coach: {
+    model: '',
+    models: { analyze: '', generate: '', enrich: '', ask: '' },
+    effort: '',
+    max_budget_usd: 0,
+    skip_if_no_new_results: true,
+    schedule: [],
+    claude_bin: '',
+    use_api_key: false,
+    hosts: [],
+    enrich_on_idle: false,
+    enrich_batch_size: 20,
+    max_runs_per_day: 6,
+  },
+  srs: { algorithm: 'leitner', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4 },
+  practice: { default_count: 20, quick_count: 10, shuffle_options: true },
+  stats: { rushed_median_seconds: 5, recency_half_life_days: 14 },
+  sync: { data_paths: [] },
 };
 
 const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');

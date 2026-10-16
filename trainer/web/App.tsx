@@ -3,6 +3,7 @@ import { useRoute, href } from './lib/router.ts';
 import { useData } from './lib/store.tsx';
 import { loadActive } from './lib/session.ts';
 import { ToastHost, Loading, ErrorBox } from './components/ui.tsx';
+import { SyncButton } from './components/SyncButton.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
 import { NewTest } from './pages/NewTest.tsx';
 import { Runner } from './pages/Runner.tsx';
@@ -91,17 +92,24 @@ export function App() {
             <span className="ico">{n.icon}</span>
             {n.label}
             {counts[n.path] ? <span className="count">{counts[n.path]}</span> : null}
-            {n.path === '/new' && state?.counts.srs ? <span className="count" title="Câu đến hạn ôn">{state.counts.srs}</span> : null}
+            {n.path === '/new' && state?.counts.srs ? (
+              <span className="count" title={`Câu đến hạn ôn hôm nay${state.counts.backlog ? ` (+${state.counts.backlog} tồn đọng)` : ''}`}>
+                {state.counts.srs}
+              </span>
+            ) : null}
           </a>
         ))}
-        <div className="sidebar-foot">
-          <select value={theme} onChange={(e) => setTheme(e.target.value as Theme)} aria-label="Giao diện" style={{ padding: '3px 6px', fontSize: 12 }}>
-            <option value="system">🖥 Theo hệ thống</option>
-            <option value="light">☀️ Sáng</option>
-            <option value="dark">🌙 Tối</option>
-          </select>
-          <span className="spacer" />
-          <span title="Chỉ chạy ở máy bạn (127.0.0.1)">🔒 local</span>
+        <div className="sidebar-foot ins-foot">
+          <SyncButton />
+          <div className="row nowrap ins-foot-row">
+            <select value={theme} onChange={(e) => setTheme(e.target.value as Theme)} aria-label="Giao diện sáng/tối" title="Giao diện: theo hệ thống, sáng hoặc tối" style={{ padding: '3px 6px', fontSize: 12 }}>
+              <option value="system">🖥 Hệ thống</option>
+              <option value="light">☀️ Sáng</option>
+              <option value="dark">🌙 Tối</option>
+            </select>
+            <span className="spacer" />
+            <span title={`Chỉ chạy ở máy bạn (127.0.0.1)${meta?.host ? ` · máy: ${meta.host}` : ''}`}>🔒 local</span>
+          </div>
         </div>
       </nav>
       {focus ? (

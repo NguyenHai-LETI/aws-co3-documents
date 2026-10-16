@@ -1,0 +1,335 @@
+// ENRICH routine helpers: which questions still need maintenance (explanation, hint, classification,
+// option-length balance), the batch file handed to the AI (coach/enrich/<runId>-batch.md), long-form
+// targets (short questions the learner meets/misses often) and the progress counters for the UI.
+import fs from 'node:fs';
+import path from 'node:path';
+import { DATA_DIR, ENRICH_DIR, PATCHES_DIR, REPO_DIR, RUNS_DIR } from '../config.ts';
+import type { BankState } from './bank.ts';
+import { correctIsLongest } from './patch.ts';
+import { localIso } from './time.ts';
+import { countWords } from '../../shared/timing.ts';
+import type { Attempt, CoachRunInfo, EnrichStatus, Question, QuestionState } from '../../shared/types.ts';
+
+export type EnrichTodo = 'explain' | 'hint' | 'classify' | 'balance';
+export const ENRICH_TODOS: readonly EnrichTodo[] = ['explain', 'hint', 'classify', 'balance'];
+export const MIN_EXPLANATION_WORDS = 25;
+export const MAX_BATCH = 60;
+export const MAX_LONGFORM = 20;
+
+const TODO_LABEL: Record<EnrichTodo, string> = {
+  explain: 'explain — viết lại giải thích (EN + từng distractor theo nội dung + 🇻🇳)',
+  hint: 'hint — 1 dòng gợi ý tiếng Việt, không lộ đáp án',
+  classify: 'classify — domain + task + services/tags + concept',
+  balance: 'balance — đáp án đúng dài hơn mọi distractor ≥ 15 %: viết lại distractor cho cân',
+};
+
+/** Work still pending for one question (ENRICH.md). */
+export function pendingTodos(q: Question): EnrichTodo[] {
+  const out: EnrichTodo[] = [];
+  if (!q.enriched || countWords(q.explanation) < MIN_EXPLANATION_WORDS) out.push('explain');
+  if (!q.hint) out.push('hint');
+  if (!q.enriched) out.push('classify');
+  if (correctIsLongest(q.options, q.answer)) out.push('balance');
+  return out;
+}
+
+/** `tasks` may mix todo kinds ("explain,hint") and exam-guide task ids ("2.2") to narrow the batch. */
+export function parseTasks(tasks: unknown): { todos: EnrichTodo[]; examTasks: string[] } {
+  const list = (Array.isArray(tasks) ? tasks.map(String) : typeof tasks === 'string' ? tasks.split(',') : []).map((t) => t.trim().toLowerCase()).filter(Boolean);
+  const todos = list.filter((t): t is EnrichTodo => (ENRICH_TODOS as readonly string[]).includes(t));
+  const examTasks = list.filter((t) => /^[1-4]\.[1-9]$/.test(t));
+  return { todos: todos.length ? todos : [...ENRICH_TODOS], examTasks };
+}
+
+const clampInt = (v: unknown, min: number, max: number, dflt: number) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 ? Math.min(max, Math.max(min, n)) : dflt;
+};
+
+export interface BatchItem {
+  q: Question;
+  todo: EnrichTodo[];
+  tier: 'wrong' | 'seen' | 'unseen';
+  state?: QuestionState;
+}
+
+const TIER_RANK = { wrong: 0, seen: 1, unseen: 2 } as const;
+
+function domainWeight(bank: BankState, q: Question): number {
+  return bank.taxonomy.domains.find((d) => d.id === q.domain)?.weight ?? 0;
+}
+
+/**
+ * Picks the next ENRICH batch: non-retired questions with pending work, ordered by
+ * learner relevance (answered wrong before > seen > unseen), then exam weight of the domain,
+ * then how often they were missed; ties stay grouped by topic so one batch shares notes.
+ */
+export function selectBatch(bank: BankState, states: Map<string, QuestionState>, opts: { size?: number; tasks?: unknown } = {}): BatchItem[] {
+  const { todos, examTasks } = parseTasks(opts.tasks);
+  const size = clampInt(opts.size, 1, MAX_BATCH, 20);
+  const items: BatchItem[] = [];
+  for (const q of bank.questions) {
+    if (q.status === 'retired') continue;
+    if (examTasks.length && !examTasks.includes(q.task ?? '')) continue;
+    const todo = pendingTodos(q).filter((t) => todos.includes(t));
+    if (!todo.length) continue;
+    const s = states.get(q.id);
+    const tier = s?.everWrong ? 'wrong' : s && s.attempts > 0 ? 'seen' : 'unseen';
+    items.push({ q, todo, tier, state: s });
+  }
+  const wrong = (s?: QuestionState) => (s ? s.attempts - s.correct : 0);
+  items.sort(
+    (a, b) =>
+      TIER_RANK[a.tier] - TIER_RANK[b.tier] ||
+      domainWeight(bank, b.q) - domainWeight(bank, a.q) ||
+      wrong(b.state) - wrong(a.state) ||
+      (b.state?.attempts ?? 0) - (a.state?.attempts ?? 0) ||
+      a.q.topic.localeCompare(b.q.topic) ||
+      a.q.id.localeCompare(b.q.id, 'en', { numeric: true }),
+  );
+  return items.slice(0, size);
+}
+
+// ── long-form targets ───────────────────────────────────────────────────────
+
+export interface LongformTarget {
+  q: Question;
+  state?: QuestionState;
+  variants: string[]; // existing variant ids
+  score: number;
+}
+
+/**
+ * Short questions worth an exam-length variant: met/missed often, high exam weight, and no long-form
+ * variant yet (max 3 variants per original, SCHEMA §5). At most 2 per topic unless the pool runs dry.
+ */
+export function longformTargets(bank: BankState, states: Map<string, QuestionState>, count = 5): LongformTarget[] {
+  const n = clampInt(count, 1, MAX_LONGFORM, 5);
+  const variants = new Map<string, Question[]>();
+  for (const v of bank.questions) for (const o of v.variantOf) variants.set(o, [...(variants.get(o) ?? []), v]);
+  const pool: LongformTarget[] = [];
+  for (const q of bank.questions) {
+    if (q.status !== 'active' || q.longForm) continue;
+    const vs = variants.get(q.id) ?? [];
+    if (vs.length >= 3 || vs.some((v) => v.longForm)) continue;
+    const s = states.get(q.id);
+    const wrong = s ? s.attempts - s.correct : 0;
+    const usage = (s?.attempts ?? 0) + wrong * 3 + (s?.lastOk === false ? 2 : 0) + (s?.lastUnsure ? 1 : 0);
+    const diff = q.difficulty === 'hard' ? 1.1 : q.difficulty === 'easy' ? 0.85 : 1;
+    pool.push({ q, state: s, variants: vs.map((v) => v.id), score: Math.round((usage + 0.5) * (domainWeight(bank, q) / 30) * diff * 1000) / 1000 });
+  }
+  pool.sort((a, b) => b.score - a.score || a.q.id.localeCompare(b.q.id, 'en', { numeric: true }));
+  const picked: LongformTarget[] = [];
+  const perTopic = new Map<string, number>();
+  for (const t of pool) {
+    if (picked.length >= n) break;
+    if ((perTopic.get(t.q.topic) ?? 0) >= 2) continue;
+    picked.push(t);
+    perTopic.set(t.q.topic, (perTopic.get(t.q.topic) ?? 0) + 1);
+  }
+  for (const t of pool) {
+    if (picked.length >= n) break;
+    if (!picked.includes(t)) picked.push(t);
+  }
+  return picked;
+}
+
+// ── status ──────────────────────────────────────────────────────────────────
+
+/** Run records in coach/runs/*.json, newest first. */
+export function readRunInfos(limit = Infinity): CoachRunInfo[] {
+  if (!fs.existsSync(RUNS_DIR)) return [];
+  const out: CoachRunInfo[] = [];
+  for (const f of fs.readdirSync(RUNS_DIR).filter((x) => x.endsWith('.json')).sort().reverse()) {
+    if (out.length >= limit) break;
+    try {
+      const j = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, f), 'utf8')) as CoachRunInfo;
+      if (j && typeof j.id === 'string' && typeof j.startedAt === 'string') out.push(j);
+    } catch {
+      // partial write or foreign file
+    }
+  }
+  return out;
+}
+
+export function enrichStatus(bank: BankState, runs: CoachRunInfo[] = readRunInfos(200)): EnrichStatus & { longFormCandidates: number } {
+  const qs = bank.questions.filter((q) => q.status !== 'retired');
+  const pending = { explain: 0, hint: 0, classify: 0, balance: 0 };
+  for (const q of qs) for (const t of pendingTodos(q)) pending[t]++;
+  const variants = new Map<string, Question[]>();
+  for (const v of bank.questions) for (const o of v.variantOf) variants.set(o, [...(variants.get(o) ?? []), v]);
+  const longFormCandidates = qs.filter((q) => q.status === 'active' && !q.longForm && !(variants.get(q.id) ?? []).some((v) => v.longForm)).length;
+  return {
+    total: qs.length,
+    enriched: qs.filter((q) => q.enriched).length,
+    pending,
+    longForm: qs.filter((q) => q.longForm).length,
+    lastRun: runs.find((r) => r.task === 'enrich' || r.task === 'longform'),
+    longFormCandidates,
+  };
+}
+
+// ── batch files ─────────────────────────────────────────────────────────────
+
+/** Path as the AI sees it (cwd = repo root), forward slashes; absolute when outside the repo (TRAINER_HOME copies). */
+export function repoRel(abs: string): string {
+  const r = path.relative(REPO_DIR, abs);
+  return (r.startsWith('..') || path.isAbsolute(r) ? abs : r).split(path.sep).join('/');
+}
+
+export function batchPath(runId: string): string {
+  return path.join(ENRICH_DIR, `${runId}-batch.md`);
+}
+
+export function patchPath(runId: string): string {
+  return path.join(PATCHES_DIR, `${runId}.yaml`);
+}
+
+function notesFor(bank: BankState, q: Question): string[] {
+  const topic = bank.taxonomy.topics.find((t) => t.id === q.topic)?.notes ?? [];
+  return [...new Set([...q.refs.map((r) => r.split('#')[0]), ...topic])].filter(Boolean);
+}
+
+function learnerLine(s: QuestionState | undefined): string {
+  if (!s || !s.attempts) return 'chưa làm';
+  const picks = Object.entries(s.wrongPicks ?? {})
+    .map(([k, n]) => `${k}×${n}`)
+    .join(', ');
+  return `sai ${s.attempts - s.correct}/${s.attempts} lượt${picks ? ` · đã chọn sai: ${picks}` : ''}${s.lastOk === false ? ' · lần gần nhất sai' : ''}`;
+}
+
+function questionSection(bank: BankState, q: Question, opts: { n: number; title: string; lengths: boolean; state?: QuestionState; extra?: string[] }): string[] {
+  const o: string[] = [];
+  const v = (x: string | undefined) => (x ? `\`${x}\`` : '—');
+  o.push('---', '', `## ${opts.n}. \`${q.id}\` — ${opts.title}`, '');
+  o.push(`- base: \`${q.hash}\` · file: \`${fileForAi(q)}\` (dòng ${q.line})`);
+  o.push(
+    `- hiện tại: domain ${v(q.domain)} · task ${v(q.task)} · topic ${v(q.topic)} · difficulty ${v(q.difficulty)} · time ${q.time}s · services ${q.services.length ? q.services.map((s) => `\`${s}\``).join(', ') : '—'} · tags ${q.tags.length ? q.tags.map((s) => `\`${s}\``).join(', ') : '—'}`,
+  );
+  o.push(`- concept: ${q.concept ?? '—'} · hint: ${q.hint ?? '—'} · enriched: ${q.enriched ?? '—'}${q.variantOf.length ? ` · variant_of: ${q.variantOf.join(', ')}` : ''}`);
+  o.push(`- người học: ${learnerLine(opts.state)} · notes: ${notesFor(bank, q).map((n) => `\`${n}\``).join(', ') || '—'}`);
+  for (const e of opts.extra ?? []) o.push(`- ${e}`);
+  o.push('', `**Stem** (${q.words} từ):`, '', q.stem.trim(), '', `**Options**${opts.lengths ? ' (số ký tự)' : ''}:`, '');
+  for (const opt of q.options) {
+    const ok = q.answer.includes(opt.key);
+    o.push(`- ${opt.key}. ${opt.text}${opts.lengths ? `  ⟨${opt.text.length}⟩` : ''}${ok ? '  ✅' : ''}`);
+  }
+  o.push('', `**Answer:** ${q.answer.join(', ')}`, '', `**Explanation hiện tại** (${countWords(q.explanation)} từ):`, '', q.explanation.trim() || '_(trống)_', '');
+  return o;
+}
+
+/** Latest "vì sao bạn chọn?" notes per question (newest first, ≤ `max` each) — explanations should answer them. */
+export function learnerNotes(attempts: Attempt[], ids: Iterable<string>, max = 2): Map<string, string[]> {
+  const want = new Set(ids);
+  const out = new Map<string, string[]>();
+  for (let i = attempts.length - 1; i >= 0; i--) {
+    for (const r of attempts[i].answers) {
+      if (!r.why || !want.has(r.q)) continue;
+      const list = out.get(r.q) ?? [];
+      if (list.length >= max) continue;
+      list.push(`đã chọn ${r.pick || '—'} (đúng: ${r.key}): “${r.why.replace(/\s+/g, ' ').trim().slice(0, 300)}”`);
+      out.set(r.q, list);
+    }
+  }
+  return out;
+}
+
+/** Path of the question's pack relative to the repo root (what the AI opens). */
+export function fileForAi(q: Question): string {
+  return repoRel(path.join(DATA_DIR, q.file));
+}
+
+function taskTable(bank: BankState): string[] {
+  return bank.taxonomy.tasks.map((t) => `- \`${t.id}\` (${t.domain}) ${t.label} — ${t.label_vi}`);
+}
+
+/** Writes coach/enrich/<runId>-batch.md for an ENRICH batch; returns the absolute path. */
+export function writeBatchFile(runId: string, items: BatchItem[], bank: BankState, opts: { todos?: EnrichTodo[]; notes?: Map<string, string[]> } = {}): string {
+  const todos = opts.todos ?? [...ENRICH_TODOS];
+  const file = batchPath(runId);
+  const patch = repoRel(patchPath(runId));
+  const o: string[] = [
+    '---',
+    'kind: enrich-batch',
+    `run_id: ${runId}`,
+    `created: ${localIso()}`,
+    `size: ${items.length}`,
+    `todo: [${todos.join(', ')}]`,
+    `patch: ${patch}`,
+    '---',
+    '',
+    `# 🧰 Lô ENRICH \`${runId}\` — ${items.length} câu`,
+    '',
+    '> File tự sinh bởi trainer app — đầu vào cho phần **A** của `trainer/coach/ENRICH.md` (đọc file đó trước).',
+    `> Viết patch vào \`${patch}\` (khung ở cuối file này), rồi chạy \`node trainer/scripts/apply-patch.ts ${patch}\``,
+    '> và sửa/chạy lại đến khi không còn ❌. Mỗi câu bên dưới phải có đúng **một** item trong patch.',
+    '',
+    '**Todo:**',
+    ...todos.map((t) => `- ${TODO_LABEL[t]}`),
+    '',
+    '**Task statements (exam guide) — `task` phải cùng domain:**',
+    ...taskTable(bank),
+    '',
+  ];
+  items.forEach((it, i) => {
+    const why = (opts.notes?.get(it.q.id) ?? []).map((w) => `🗣️ người học ${w} → giải thích phải gỡ đúng hiểu lầm này`);
+    o.push(...questionSection(bank, it.q, { n: i + 1, title: `todo: ${it.todo.join(' · ')}`, lengths: it.todo.includes('balance'), state: it.state, extra: why }));
+  });
+  o.push('---', '', '## Khung patch', '', '```yaml', `run_id: ${runId}`, 'items:');
+  for (const it of items) {
+    o.push(`  - id: ${it.q.id}        # ${it.todo.join(', ')}`, `    base: ${it.q.hash}`);
+  }
+  o.push('```', '');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, o.join('\n'));
+  return file;
+}
+
+export interface LongformPlan {
+  count: number;
+  packFile: string; // repo-relative, contains <slug>
+  packId: string;
+  idPrefix: string; // question ids: <idPrefix><nn>
+}
+
+/** Writes coach/enrich/<runId>-batch.md listing long-form targets; returns the absolute path. */
+export function writeLongformFile(runId: string, targets: LongformTarget[], bank: BankState, plan: LongformPlan): string {
+  const file = batchPath(runId);
+  const minWords = bank.taxonomy.timing.long_form_min_words ?? 55;
+  const o: string[] = [
+    '---',
+    'kind: longform-batch',
+    `run_id: ${runId}`,
+    `created: ${localIso()}`,
+    `count: ${plan.count}`,
+    `pack_file: ${plan.packFile}`,
+    `pack_id: ${plan.packId}`,
+    `id_prefix: ${plan.idPrefix}`,
+    '---',
+    '',
+    `# 📏 Câu dài chuẩn đề thi \`${runId}\` — ${plan.count} câu`,
+    '',
+    '> File tự sinh bởi trainer app — đầu vào cho phần **B** của `trainer/coach/ENRICH.md` (đọc file đó trước).',
+    `> Viết **${plan.count}** câu mới (mỗi câu là biến thể dài của một câu gốc bên dưới, \`variant_of: <id gốc>\`) vào pack mới`,
+    `> \`${plan.packFile}\` (thay \`<slug>\` bằng 2–4 từ kebab-case), pack id \`${plan.packId}\`, id câu \`${plan.idPrefix}01\`, \`${plan.idPrefix}02\`, …`,
+    `> Stem 60–120 từ (≥ ${minWords} từ mới được tính là câu dài). Sau đó chạy \`node trainer/scripts/validate.ts ${plan.packFile.replace(/^trainer\//, '').replace(/^bank\//, '')} --fill-time\`.`,
+    '',
+    '**Task statements (exam guide):**',
+    ...taskTable(bank),
+    '',
+  ];
+  targets.forEach((t, i) => {
+    o.push(
+      ...questionSection(bank, t.q, {
+        n: i + 1,
+        title: `câu gốc (điểm ưu tiên ${t.score})`,
+        lengths: false,
+        state: t.state,
+        extra: [`biến thể đã có: ${t.variants.length ? t.variants.join(', ') : 'chưa có'} (tối đa 3)`],
+      }),
+    );
+  });
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, o.join('\n'));
+  return file;
+}

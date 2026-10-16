@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 02-v1-01
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: S3, S3 Glacier
 - tags: s3-storage-classes, s3-glacier-tiers
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 Logs are accessed frequently for 30 days, then rarely but must be retrievable within milliseconds for 1 year, then archived for 7 years where 12-hour retrieval is acceptable. Which lifecycle is MOST cost-effective?
 
-- A. S3 Standard → S3 One Zone-IA → S3 Glacier Deep Archive
-- B. S3 Standard → S3 Standard-IA → S3 Glacier Deep Archive
+- A. S3 Standard → S3 Standard-IA → S3 Glacier Deep Archive
+- B. S3 Intelligent-Tiering → S3 Standard → Glacier Flexible Retrieval
 - C. S3 Standard → S3 Glacier Instant Retrieval → S3 Standard-IA
-- D. S3 Intelligent-Tiering → S3 Standard → Glacier Flexible Retrieval
+- D. S3 Standard → S3 One Zone-IA → S3 Glacier Deep Archive
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Frequent→IA (ms access for a year)→Deep Archive (12h ok, cheapest long-term).
 
@@ -37,6 +38,7 @@ Logs are accessed frequently for 30 days, then rarely but must be retrievable wi
 
 ## Q 02-v1-02
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: s3-storage-classes, s3-intelligent-tiering
@@ -46,10 +48,10 @@ Logs are accessed frequently for 30 days, then rarely but must be retrievable wi
 
 A bucket stores data with unknown and changing access patterns. The company wants automatic cost optimization without performance impact or retrieval fees. Which storage class is BEST?
 
-- A. S3 Standard
+- A. S3 One Zone-IA
 - B. S3 Standard-IA
 - C. S3 Intelligent-Tiering
-- D. S3 One Zone-IA
+- D. S3 Standard
 
 **Answer:** C
 
@@ -59,6 +61,7 @@ A bucket stores data with unknown and changing access patterns. The company want
 
 ## Q 02-v1-03
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EFS, EC2
 - tags: compliance
@@ -68,12 +71,12 @@ A bucket stores data with unknown and changing access patterns. The company want
 
 Multiple Linux EC2 instances across AZs need a shared, POSIX-compliant file system that scales automatically. Which service?
 
-- A. Amazon EBS Multi-Attach
-- B. Amazon EFS
-- C. Amazon FSx for Windows File Server
-- D. Amazon S3
+- A. Amazon S3
+- B. Amazon FSx for Windows File Server
+- C. Amazon EFS
+- D. Amazon EBS Multi-Attach
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Shared multi-AZ POSIX file system for Linux = Amazon EFS.
 
@@ -81,6 +84,7 @@ Multiple Linux EC2 instances across AZs need a shared, POSIX-compliant file syst
 
 ## Q 02-v1-04
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EC2, EBS
 - tags: ebs-volume-types
@@ -91,11 +95,11 @@ Multiple Linux EC2 instances across AZs need a shared, POSIX-compliant file syst
 A relational database on EC2 needs a volume delivering 50,000 IOPS with consistent low latency. Which EBS volume type?
 
 - A. gp2
-- B. gp3
-- C. io2 / io2 Block Express
-- D. st1
+- B. io2 / io2 Block Express
+- C. st1
+- D. gp3
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** 50k IOPS consistent low latency = io2 / io2 Block Express.
 
@@ -103,6 +107,7 @@ A relational database on EC2 needs a volume delivering 50,000 IOPS with consiste
 
 ## Q 02-v1-05
 - domain: secure
+- task: 1.3
 - topic: storage
 - services: S3
 - tags: s3-object-lock, compliance
@@ -112,12 +117,12 @@ A relational database on EC2 needs a volume delivering 50,000 IOPS with consiste
 
 To meet a regulatory requirement that objects cannot be deleted or overwritten by anyone (including root) for 5 years, which feature should be enabled?
 
-- A. S3 Versioning only
-- B. S3 Object Lock in Compliance mode
-- C. S3 Object Lock in Governance mode
-- D. MFA Delete
+- A. MFA Delete
+- B. S3 Object Lock in Governance mode
+- C. S3 Versioning only
+- D. S3 Object Lock in Compliance mode
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Cannot delete even by root = S3 Object Lock Compliance mode.
 
@@ -125,6 +130,7 @@ To meet a regulatory requirement that objects cannot be deleted or overwritten b
 
 ## Q 02-v1-06
 - domain: resilient
+- task: 2.2
 - topic: storage
 - services: S3
 - tags: multi-region, compliance, s3-versioning
@@ -134,12 +140,12 @@ To meet a regulatory requirement that objects cannot be deleted or overwritten b
 
 A company must replicate S3 objects to another Region for disaster recovery and compliance. What is REQUIRED for replication?
 
-- A. Object Lock enabled
-- B. Versioning enabled on source and destination buckets
-- C. Transfer Acceleration enabled
-- D. The buckets must be in the same account
+- A. Versioning enabled on source and destination buckets
+- B. Transfer Acceleration enabled
+- C. The buckets must be in the same account
+- D. Object Lock enabled
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Replication requires Versioning on both source and destination.
 
@@ -147,6 +153,7 @@ A company must replicate S3 objects to another Region for disaster recovery and 
 
 ## Q 02-v1-07
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3, Storage Gateway
 - difficulty: easy
@@ -156,11 +163,11 @@ A company must replicate S3 objects to another Region for disaster recovery and 
 An on-premises application uses NFS/SMB and needs low-latency local access while storing data durably in Amazon S3. Which solution?
 
 - A. AWS DataSync
-- B. Amazon S3 File Gateway
-- C. AWS Snowball Edge
+- B. AWS Snowball Edge
+- C. Amazon S3 File Gateway
 - D. Volume Gateway (Stored)
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** On-prem NFS/SMB with local cache backed by S3 = S3 File Gateway.
 
@@ -168,6 +175,7 @@ An on-premises application uses NFS/SMB and needs low-latency local access while
 
 ## Q 02-v1-08
 - domain: performance
+- task: 3.5
 - topic: storage
 - services: Snow Family
 - difficulty: easy
@@ -176,12 +184,12 @@ An on-premises application uses NFS/SMB and needs low-latency local access while
 
 A company must transfer 600 TB to AWS within two weeks over a 200 Mbps internet link. Which solution is MOST appropriate?
 
-- A. AWS DataSync over the internet
-- B. S3 Transfer Acceleration
-- C. AWS Snowball Edge Storage Optimized
+- A. AWS Snowball Edge Storage Optimized
+- B. AWS DataSync over the internet
+- C. S3 Transfer Acceleration
 - D. AWS Storage Gateway
 
-**Answer:** C
+**Answer:** A
 
 **Explanation:** 600 TB in 2 weeks over slow link = Snowball Edge Storage Optimized.
 
@@ -189,6 +197,7 @@ A company must transfer 600 TB to AWS within two weeks over a 200 Mbps internet 
 
 ## Q 02-v1-09
 - domain: secure
+- task: 1.3
 - topic: storage
 - services: EBS
 - tags: db-encryption, snapshots
@@ -198,12 +207,12 @@ A company must transfer 600 TB to AWS within two weeks over a 200 Mbps internet 
 
 Which approach lets you move an unencrypted EBS volume's data to an encrypted volume?
 
-- A. Toggle encryption on the existing volume
-- B. Create a snapshot, copy it with encryption enabled, then create a new volume
-- C. Use EBS Multi-Attach
-- D. Detach and re-attach the volume
+- A. Detach and re-attach the volume
+- B. Use EBS Multi-Attach
+- C. Toggle encryption on the existing volume
+- D. Create a snapshot, copy it with encryption enabled, then create a new volume
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Snapshot -> copy with encryption -> new encrypted volume.
 
@@ -211,6 +220,7 @@ Which approach lets you move an unencrypted EBS volume's data to an encrypted vo
 
 ## Q 02-v1-10
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: FSx, S3
 - tags: fsx-lustre
@@ -220,10 +230,10 @@ Which approach lets you move an unencrypted EBS volume's data to an encrypted vo
 
 An HPC and machine-learning workload needs a high-throughput, sub-millisecond file system tightly integrated with data in Amazon S3. Which service?
 
-- A. Amazon EFS
+- A. Amazon FSx for Windows File Server
 - B. Amazon FSx for Lustre
-- C. Amazon FSx for Windows File Server
-- D. Amazon EBS st1
+- C. Amazon EBS st1
+- D. Amazon EFS
 
 **Answer:** B
 
@@ -233,6 +243,7 @@ An HPC and machine-learning workload needs a high-throughput, sub-millisecond fi
 
 ## Q 02-v1-11
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: FSx
 - tags: fsx-windows
@@ -243,11 +254,11 @@ An HPC and machine-learning workload needs a high-throughput, sub-millisecond fi
 A Windows-based application needs shared storage over SMB with Active Directory integration. Which service?
 
 - A. Amazon EFS
-- B. Amazon FSx for Windows File Server
+- B. Instance Store
 - C. Amazon S3
-- D. Instance Store
+- D. Amazon FSx for Windows File Server
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Windows SMB + Active Directory = FSx for Windows File Server.
 
@@ -255,6 +266,7 @@ A Windows-based application needs shared storage over SMB with Active Directory 
 
 ## Q 02-v1-12
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: s3-transfer-acceleration
@@ -264,10 +276,10 @@ A Windows-based application needs shared storage over SMB with Active Directory 
 
 To speed up uploads of large files from users worldwide to a single S3 bucket, which feature should be used?
 
-- A. S3 Cross-Region Replication
+- A. Byte-range fetches
 - B. S3 Transfer Acceleration
 - C. S3 Select
-- D. Byte-range fetches
+- D. S3 Cross-Region Replication
 
 **Answer:** B
 
@@ -277,6 +289,7 @@ To speed up uploads of large files from users worldwide to a single S3 bucket, w
 
 ## Q 02-v1-13
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: columnar-formats
@@ -286,12 +299,12 @@ To speed up uploads of large files from users worldwide to a single S3 bucket, w
 
 Which design retrieves only specific rows/columns from large CSV/Parquet objects in S3 using SQL, reducing data scanned?
 
-- A. S3 Inventory
-- B. S3 Select
+- A. S3 Storage Lens
+- B. S3 Inventory
 - C. S3 Batch Operations
-- D. S3 Storage Lens
+- D. S3 Select
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** SQL to retrieve subset from one object = S3 Select.
 
@@ -299,6 +312,7 @@ Which design retrieves only specific rows/columns from large CSV/Parquet objects
 
 ## Q 02-v1-14
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3, Lambda, EventBridge
 - tags: s3-event-notifications
@@ -308,10 +322,10 @@ Which design retrieves only specific rows/columns from large CSV/Parquet objects
 
 An object-processing pipeline must trigger a Lambda function whenever a new object is created in a bucket. Which is the simplest configuration?
 
-- A. CloudTrail data events polled by Lambda
+- A. S3 Replication to a processing bucket
 - B. S3 Event Notification to Lambda (or via EventBridge)
 - C. A scheduled Lambda that lists the bucket
-- D. S3 Replication to a processing bucket
+- D. CloudTrail data events polled by Lambda
 
 **Answer:** B
 
@@ -321,6 +335,7 @@ An object-processing pipeline must trigger a Lambda function whenever a new obje
 
 ## Q 02-v1-15
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: S3
 - tags: s3-storage-classes
@@ -330,12 +345,12 @@ An object-processing pipeline must trigger a Lambda function whenever a new obje
 
 A non-critical, easily reproducible dataset can tolerate the loss of a single AZ and must be stored at the lowest cost for infrequent access. Which storage class?
 
-- A. S3 Standard-IA
-- B. S3 One Zone-IA
-- C. S3 Glacier Instant Retrieval
-- D. S3 Standard
+- A. S3 Glacier Instant Retrieval
+- B. S3 Standard
+- C. S3 One Zone-IA
+- D. S3 Standard-IA
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Single-AZ tolerant, infrequent, lowest cost = S3 One Zone-IA.
 
@@ -343,6 +358,7 @@ A non-critical, easily reproducible dataset can tolerate the loss of a single AZ
 
 ## Q 02-v1-16
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: s3-storage-classes, s3-lifecycle
@@ -352,12 +368,12 @@ A non-critical, easily reproducible dataset can tolerate the loss of a single AZ
 
 What is the minimum number of days an object must stay in S3 Standard before a lifecycle rule can transition it to S3 Standard-IA?
 
-- A. 0 days
-- B. 1 day
-- C. 30 days
-- D. 90 days
+- A. 1 day
+- B. 90 days
+- C. 0 days
+- D. 30 days
 
-**Answer:** C
+**Answer:** D
 
 **Explanation:** Minimum 30 days in Standard before transition to Standard-IA.
 
@@ -365,6 +381,7 @@ What is the minimum number of days an object must stay in S3 Standard before a l
 
 ## Q 02-v1-17
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: S3
 - tags: s3-versioning
@@ -374,12 +391,12 @@ What is the minimum number of days an object must stay in S3 Standard before a l
 
 A company wants to protect S3 objects against accidental deletion and keep previous copies for rollback. Which feature should be enabled?
 
-- A. Cross-Region Replication
-- B. Versioning
-- C. Transfer Acceleration
-- D. Requester Pays
+- A. Versioning
+- B. Requester Pays
+- C. Cross-Region Replication
+- D. Transfer Acceleration
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Protect against accidental delete + rollback = Versioning.
 
@@ -387,6 +404,7 @@ A company wants to protect S3 objects against accidental deletion and keep previ
 
 ## Q 02-v1-18
 - domain: performance
+- task: 3.1
 - topic: storage
 - services: EBS, EC2
 - tags: ebs-volume-types, ebs-multi-attach
@@ -409,6 +427,7 @@ A clustered application needs the SAME EBS volume attached to multiple EC2 insta
 
 ## Q 02-v1-19
 - domain: performance
+- task: 3.5
 - topic: storage
 - services: DataSync, Storage Gateway
 - difficulty: medium
@@ -417,13 +436,13 @@ A clustered application needs the SAME EBS volume attached to multiple EC2 insta
 
 Which two AWS services let an on-premises data center perform an automated, scheduled, incremental data transfer into AWS storage? (Choose TWO)
 
-- A. AWS DataSync
-- B. Amazon S3 Transfer Acceleration
-- C. AWS Storage Gateway
-- D. AWS Snowmobile
-- E. Amazon Macie
+- A. Amazon S3 Transfer Acceleration
+- B. Amazon Macie
+- C. AWS Snowmobile
+- D. AWS DataSync
+- E. AWS Storage Gateway
 
-**Answer:** A, C
+**Answer:** D, E
 
 **Explanation:** Automated scheduled incremental transfer = DataSync and Storage Gateway.
 
@@ -431,6 +450,7 @@ Which two AWS services let an on-premises data center perform an automated, sche
 
 ## Q 02-v1-20
 - domain: cost
+- task: 4.1
 - topic: storage
 - services: S3, S3 Glacier
 - tags: s3-storage-classes, s3-glacier-tiers
@@ -440,11 +460,11 @@ Which two AWS services let an on-premises data center perform an automated, sche
 
 A company stores backups that are rarely accessed but, when needed, must be available within minutes a few times per year, at the lowest cost. Which storage class?
 
-- A. S3 Glacier Deep Archive
-- B. S3 Glacier Flexible Retrieval (Expedited/Standard)
-- C. S3 Standard-IA
+- A. S3 Standard-IA
+- B. S3 Glacier Deep Archive
+- C. S3 Glacier Flexible Retrieval (Expedited/Standard)
 - D. S3 Intelligent-Tiering Frequent Access tier
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Rarely accessed, retrieve in minutes, low cost = Glacier Flexible Retrieval.

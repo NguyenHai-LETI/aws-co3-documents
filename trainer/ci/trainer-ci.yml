@@ -1,0 +1,86 @@
+# CI for the SAA-C03 trainer app (trainer/): question-bank validation, typecheck, unit tests,
+# end-to-end API test against a sandbox server, and a Playwright UI smoke test.
+# Pushes that only carry synced learner data (results, coach output, issue/rating logs) are skipped.
+name: trainer-ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'trainer/**'
+      - '!trainer/results/**'
+      - '!trainer/coach/**'
+      - '!trainer/bank/issues.md'
+      - '!trainer/bank/ratings.md'
+      - '.gitattributes'
+      - '.github/workflows/trainer-ci.yml'
+  pull_request:
+    paths:
+      - 'trainer/**'
+      - '!trainer/results/**'
+      - '!trainer/coach/**'
+      - '!trainer/bank/issues.md'
+      - '!trainer/bank/ratings.md'
+      - '.gitattributes'
+      - '.github/workflows/trainer-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trainer-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: trainer
+
+jobs:
+  test:
+    name: validate · typecheck · unit · e2e API
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: trainer/package-lock.json
+      - run: npm ci
+      - name: Validate question bank
+        run: npm run validate
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: E2E API test (sandbox server + local git remote)
+        run: npm run test:e2e
+
+  ui:
+    name: UI smoke (Playwright Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: trainer/package-lock.json
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: UI smoke test
+        run: npm run test:ui
+        env:
+          SMOKE_OUT: ${{ runner.temp }}/ui-smoke
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-smoke-screenshots
+          path: ${{ runner.temp }}/ui-smoke
+          retention-days: 7
+          if-no-files-found: ignore

@@ -152,3 +152,227 @@ export function classifyDomain(text: string, fallback: DomainId, fallbackBonus =
   }
   return best;
 }
+
+
+// ── Exam-guide task statements (1.1 … 4.4) ──────────────────────────────────
+// Heuristic only (the ENRICH routine refines it with AI). The domain picks the task family; then
+// performance/cost use the service family of the correct option(s) first, then the stem, then the
+// metadata; secure/resilient score cue words/services/tags (resilient weighs the stem's requirement
+// wording — "highly available" vs "decouple" — more, because the options mostly name services).
+
+export interface TaskInput {
+  stem: string;
+  options: { key: string; text: string }[];
+  answer: string[];
+  domain: string;
+  topic?: string;
+  services?: string[];
+  tags?: string[];
+}
+
+/** Coarse service family used for the performance (3.x) and cost (4.x) tasks. */
+type Kind = 'storage' | 'compute' | 'integration' | 'database' | 'network' | 'api' | 'analytics' | 'migration';
+
+const KIND_BY_TOPIC: Record<string, Kind> = {
+  storage: 'storage',
+  compute: 'compute',
+  integration: 'integration',
+  database: 'database',
+  networking: 'network',
+  api: 'api',
+  analytics: 'analytics',
+  migration: 'migration',
+};
+
+// services whose taxonomy topic is too coarse (or "other") for the task mapping
+const KIND_BY_SERVICE: Record<string, Kind> = {
+  'AWS Backup': 'storage',
+  'Storage Gateway': 'storage',
+  DMS: 'database',
+  SCT: 'database',
+  EMR: 'compute',
+  'Local Zones': 'network',
+  Wavelength: 'network',
+  Outposts: 'compute',
+  WorkSpaces: 'compute',
+  'AppStream 2.0': 'compute',
+  'IoT Core': 'analytics',
+  'Compute Optimizer': 'compute',
+};
+
+const KIND_BY_TAG: [RegExp, Kind][] = [
+  [/^(s3-|sse-|ebs-|fsx-|sgw-|snapshots$|instance-store$|client-side-encryption$)/, 'storage'],
+  [/^(spot-|reserved-|savings-|on-demand-|dedicated-|capacity-|placement-|efa$|ec2-|launch-|asg-|scaling-|user-data$|ami$|lambda-|right-sizing$|serverless-cost$)/, 'compute'],
+  [/^(sqs-|sns-|fan-out$|decoupling$|orchestration$|event-driven$)/, 'integration'],
+  [/^(multi-az$|read-replicas$|aurora-|dynamodb-|ttl$|pitr$|automated-backups$|db-|iam-db-auth$|connection-pooling$|caching-strategies$|redis-vs-memcached$|sharding$)/, 'database'],
+  [/^(subnets$|security-groups$|nacl$|egress-only-igw$|elastic-ip$|ipv6$|hybrid-dns$|vpc-sharing$|dx-|route53-|alias-records$|cloudfront-|signed-urls-cookies$|elb-|tls-termination$|data-transfer-cost$)/, 'network'],
+  [/^(streaming-ingestion$|data-lake$|etl$|columnar-formats$|redshift-spectrum$|kinesis-)/, 'analytics'],
+  [/^(cdc-replication$|heterogeneous-migration$|offline-transfer$)/, 'migration'],
+];
+
+const KIND_WORDS: [Kind, RegExp][] = [
+  ['storage', /\b(storage class(es)?|object storage|file (system|share)s?|block storage|archiv\w*|buckets?|volumes?|IOPS|lifecycle)\b/i],
+  ['compute', /\b(instances?|servers?|compute|vCPUs?|containers?|fleet|Spot|Reserved|Savings Plans?|batch jobs?|functions?)\b/i],
+  ['database', /\b(databases?|DB|tables?|SQL|NoSQL|relational|read replicas?|cach(e|ing)|key-value|queries)\b/i],
+  ['network', /\b(latency|edge locations?|CDN|global(ly)? (users|customers|audience)|DNS|bandwidth|data transfer|egress|NAT|VPCs?|load balanc\w+|connectivity)\b/i],
+  ['analytics', /\b(stream(s|ing)?|ingest\w*|real[- ]time|clickstreams?|ETL|transform\w*|data lakes?|analytics|big data|dashboards?)\b/i],
+  ['migration', /\b(migrat\w+|transfer (\d+ )?(TB|PB|terabytes|petabytes)|on-premises data)\b/i],
+];
+
+const TASK_BY_KIND: Record<'performance' | 'cost', Record<Kind, string>> = {
+  performance: { storage: '3.1', compute: '3.2', integration: '3.2', database: '3.3', network: '3.4', api: '3.4', analytics: '3.5', migration: '3.5' },
+  cost: { storage: '4.1', compute: '4.2', integration: '4.2', api: '4.2', database: '4.3', network: '4.4', migration: '4.4', analytics: '4.1' },
+};
+const KIND_PRIORITY: Kind[] = ['compute', 'storage', 'database', 'network', 'analytics', 'migration', 'integration', 'api'];
+
+interface TaskCue {
+  task: string;
+  services: string[];
+  tags: RegExp;
+  words: RegExp; // must use the `g` flag (counted with String#match)
+}
+
+const SECURE_CUES: TaskCue[] = [
+  {
+    task: '1.3',
+    services: ['KMS', 'CloudHSM', 'Macie', 'ACM', 'AWS Backup', 'Lake Formation'],
+    tags: /^(sse-|client-side-encryption$|envelope-encryption$|key-rotation$|encryption-|s3-object-lock$|db-encryption$|s3-versioning$|pitr$|automated-backups$)/,
+    words: /\b(en|de)crypt\w*|\bKMS\b|CloudHSM|Macie|\bACM\b|Certificate Manager|\bSSE-[A-Z]+|key rotation|rotat\w+ (the )?(encryption )?keys?|customer[- ]managed keys?|Object Lock|\bWORM\b|Vault Lock|MFA Delete|retention|retain\w*|sensitive data|\bPII\b|personally identifiable|classif\w+ (the )?data|\bTLS\b|\bSSL\b|\bHTTPS\b|in transit|at rest|complian\w+|governance|(column|row)[- ]level/gi,
+  },
+  {
+    task: '1.1',
+    services: ['IAM', 'IAM Identity Center', 'STS', 'Organizations', 'Control Tower', 'RAM', 'Directory Service'],
+    tags: /^(iam-roles$|iam-policies$|permission-boundaries$|scp$|least-privilege$|mfa$|cross-account-access$|federation$)/,
+    words: /\bIAM\b|\bSTS\b|AssumeRole|\bOrganizations\b|\bSCPs?\b|service control polic\w*|federat\w*|\bSAML\b|\bOIDC\b|cross-account|\bMFA\b|multi-factor|Identity Center|single sign-on|\bSSO\b|Resource Access Manager|AWS RAM|least[- ]privilege|permissions? boundar\w*|root user|access keys?|identity provider|Active Directory|Control Tower/gi,
+  },
+  {
+    task: '1.2',
+    services: ['WAF', 'Shield', 'GuardDuty', 'Inspector', 'Cognito', 'Secrets Manager', 'Network Firewall', 'Firewall Manager', 'Security Hub', 'Detective', 'PrivateLink', 'VPC Endpoint'],
+    tags: /^(security-groups$|nacl$|ddos-protection$|web-attacks$|threat-detection$|bastion-host$|cloudfront-origin-security$|signed-urls-cookies$|s3-presigned-url$)/,
+    words: /\bWAF\b|\bShield\b|GuardDuty|Inspector|Cognito|Secrets Manager|Parameter Store|security groups?|network ACLs?|\bNACLs?\b|DDoS|SQL injection|cross-site scripting|\bXSS\b|bastion|VPC endpoints?|PrivateLink|Network Firewall|Firewall Manager|malicious|threats?|vulnerabilit\w+|credentials?|pre-?signed|signed (URL|cookie)s?|Origin Access/gi,
+  },
+];
+
+const RESILIENT_CUES: TaskCue[] = [
+  {
+    task: '2.1',
+    services: ['SQS', 'SNS', 'EventBridge', 'Step Functions', 'Amazon MQ', 'SWF', 'API Gateway', 'Lambda', 'Fargate', 'ECS', 'EKS', 'App Runner', 'EC2 Auto Scaling'],
+    tags: /^(decoupling$|fan-out$|sqs-|sns-|event-driven$|orchestration$|lambda-concurrency$|scaling-policies$|asg-)/,
+    words: /decoupl\w*|loosely coupled|queues?\b|queuing|asynchronous(ly)?|event-driven|fan[- ]?out|publish|subscri\w+|serverless|Auto Scaling|scal(e|es|ing) (out|in|automatically|horizontally)|horizontal(ly)? scal\w*|scalab\w+|stateless|microservices?|buffer\w*|spik(e|es|y)|bursts?|overwhelm\w*|workflows?|orchestrat\w*/gi,
+  },
+  {
+    task: '2.2',
+    services: ['Route 53', 'AWS Backup', 'Elastic Disaster Recovery', 'RDS Proxy'],
+    tags: /^(multi-az$|multi-region$|aurora-global-database$|dynamodb-global-tables$|pitr$|automated-backups$|snapshots$|dr-|rto-rpo$|high-availability$|route53-health-checks$|s3-replication$|dx-resiliency$)/,
+    words: /highly available|high availability|toleran\w*|failover|fail over|failures?|disaster|\bDR\b|\bRTO\b|\bRPO\b|backups?\b|restore|snapshots?|replicat\w*|Multi-AZ|Availability Zones?|\bAZs?\b|multi-Region|cross-Region|another Region|second(ary)? Region|outage|surviv\w*|redundan\w*|durab\w*|pilot light|warm standby|active[- ](active|passive)|health checks?|self-heal\w*|recover\w*/gi,
+  },
+];
+
+interface Layer {
+  text: string;
+  services: string[];
+  lead: string[]; // first-named service of each text part (counts more)
+  tags: string[];
+  topic?: string;
+  weight: number; // multiplier for services/tags (the metadata layer counts less)
+  wordWeight: number; // multiplier for cue words
+}
+
+function kindOfService(name: string, tax: Taxonomy): Kind | undefined {
+  return KIND_BY_SERVICE[name] ?? KIND_BY_TOPIC[tax.services[name]?.topic ?? ''];
+}
+
+function kindOfTag(tag: string): Kind | undefined {
+  return KIND_BY_TAG.find(([re]) => re.test(tag))?.[1];
+}
+
+function scoreKinds(layer: Layer, tax: Taxonomy): Map<Kind, number> {
+  const s = new Map<Kind, number>();
+  const add = (k: Kind | undefined, w: number) => {
+    if (k) s.set(k, (s.get(k) ?? 0) + w);
+  };
+  for (const name of layer.services) add(kindOfService(name, tax), (layer.lead.includes(name) ? 3 : 2) * layer.weight);
+  for (const t of layer.tags) add(kindOfTag(t), layer.weight);
+  if (layer.text) for (const [k, re] of KIND_WORDS) if (re.test(layer.text)) add(k, 0.5 * layer.wordWeight);
+  if (layer.topic) add(KIND_BY_TOPIC[layer.topic], 1);
+  return s;
+}
+
+function scoreCues(layer: Layer, cues: TaskCue[]): Map<string, number> {
+  const s = new Map<string, number>();
+  for (const c of cues) {
+    let n = 0;
+    for (const name of layer.services) if (c.services.includes(name)) n += 2 * layer.weight;
+    for (const t of layer.tags) if (c.tags.test(t)) n += layer.weight;
+    const hits = layer.text ? (layer.text.match(c.words)?.length ?? 0) : 0;
+    if (hits) n += (1 + Math.min(2, hits - 1) * 0.5) * layer.wordWeight; // 1st cue word 1, each extra 0.5 (max +1)
+    if (n) s.set(c.task, n);
+  }
+  return s;
+}
+
+/** Unique best key of a score map (restricted to `pool`), or the tied best keys. */
+function best<K>(scores: Map<K, number>, pool?: K[]): K[] {
+  let out: K[] = [];
+  let max = 0;
+  for (const k of pool ?? [...scores.keys()]) {
+    const v = scores.get(k) ?? 0;
+    if (v > max) [out, max] = [[k], v];
+    else if (v === max && v > 0) out.push(k);
+  }
+  return out;
+}
+
+/** The first layer with a unique best candidate wins; ties carry over (restricted) to the next layer. */
+function decide<K>(scored: Map<K, number>[], priority: K[]): K | undefined {
+  let candidates: K[] | undefined;
+  for (const scores of scored) {
+    const top = best(scores, candidates);
+    if (top.length === 1) return top[0];
+    if (top.length > 1) candidates = top;
+  }
+  return candidates ? (priority.find((k) => candidates.includes(k)) ?? candidates[0]) : undefined;
+}
+
+function sum<K>(...maps: Map<K, number>[]): Map<K, number> {
+  const out = new Map<K, number>();
+  for (const m of maps) for (const [k, v] of m) out.set(k, (out.get(k) ?? 0) + v);
+  return out;
+}
+
+/**
+ * Best-guess exam-guide task statement (`task` metadata, taxonomy.yaml → tasks) for a question.
+ * Undefined when the domain is unknown or the taxonomy has no tasks for it.
+ */
+export function guessTask(q: TaskInput, tax: Taxonomy): string | undefined {
+  const domain = q.domain as DomainId;
+  const valid = (tax.tasks ?? []).filter((t) => t.domain === domain).map((t) => t.id);
+  if (!valid.length) return undefined;
+  // correct options sorted by text: the result must not depend on the option order (answer rebalance)
+  const correctTexts = q.options.filter((o) => q.answer.includes(o.key)).map((o) => o.text).sort();
+  const perOption = correctTexts.map((t) => detectServices(t, tax));
+  const correctText = correctTexts.join('\n');
+  const correct: Layer = {
+    text: correctText,
+    services: [...new Set(perOption.flat())],
+    lead: perOption.map((x) => x[0]).filter(Boolean),
+    tags: detectFeatures(correctText, tax),
+    weight: 1,
+    wordWeight: 1,
+  };
+  const stemServices = detectServices(q.stem, tax);
+  const stem: Layer = { text: q.stem, services: stemServices, lead: stemServices.slice(0, 1), tags: detectFeatures(q.stem, tax), weight: 1, wordWeight: 1 };
+  const meta: Layer = { text: '', services: q.services ?? [], lead: (q.services ?? []).slice(0, 1), tags: q.tags ?? [], topic: q.topic, weight: 0.5, wordWeight: 0 };
+  let task: string | undefined;
+  if (domain === 'secure') {
+    task = decide([correct, stem, meta].map((l) => scoreCues(l, SECURE_CUES)), ['1.3', '1.1', '1.2']) ?? '1.2';
+  } else if (domain === 'resilient') {
+    const options = scoreCues(correct, RESILIENT_CUES);
+    const requirement = scoreCues({ ...stem, wordWeight: 2 }, RESILIENT_CUES);
+    task = decide([sum(options, requirement), scoreCues(meta, RESILIENT_CUES)], ['2.1', '2.2']) ?? (q.topic === 'integration' ? '2.1' : '2.2');
+  } else if (domain === 'performance' || domain === 'cost') {
+    const kind = decide([correct, stem, meta].map((l) => scoreKinds(l, tax)), KIND_PRIORITY);
+    task = kind ? TASK_BY_KIND[domain][kind] : domain === 'performance' ? '3.2' : '4.2';
+  }
+  return task && valid.includes(task) ? task : valid[0];
+}

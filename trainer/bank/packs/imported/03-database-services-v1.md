@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 03-v1-01
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS
 - tags: multi-az
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 A production MySQL database on Amazon RDS must survive an Availability Zone failure with automatic failover and minimal downtime. Which feature should be enabled?
 
-- A. Read Replicas
-- B. Multi-AZ deployment
-- C. Cross-Region snapshots
-- D. RDS Proxy
+- A. RDS Proxy
+- B. Cross-Region snapshots
+- C. Read Replicas
+- D. Multi-AZ deployment
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** AZ failure + automatic failover for RDS = Multi-AZ deployment.
 
@@ -37,6 +38,7 @@ A production MySQL database on Amazon RDS must survive an Availability Zone fail
 
 ## Q 03-v1-02
 - domain: performance
+- task: 3.3
 - topic: database
 - tags: read-replicas
 - difficulty: easy
@@ -45,10 +47,10 @@ A production MySQL database on Amazon RDS must survive an Availability Zone fail
 
 A PostgreSQL database is read-heavy; reporting queries are slowing down transactions. What scales reads with the LEAST impact on the primary?
 
-- A. Enable Multi-AZ
+- A. Increase instance size only
 - B. Add Read Replicas
-- C. Increase instance size only
-- D. Switch to On-Demand DynamoDB
+- C. Switch to On-Demand DynamoDB
+- D. Enable Multi-AZ
 
 **Answer:** B
 
@@ -58,6 +60,7 @@ A PostgreSQL database is read-heavy; reporting queries are slowing down transact
 
 ## Q 03-v1-03
 - domain: performance
+- task: 3.3
 - topic: database
 - services: DynamoDB
 - tags: dynamodb-capacity
@@ -67,12 +70,12 @@ A PostgreSQL database is read-heavy; reporting queries are slowing down transact
 
 A serverless application needs a NoSQL database with single-digit millisecond latency and unpredictable, spiky traffic with no capacity planning. Which choice is BEST?
 
-- A. DynamoDB with provisioned capacity
-- B. DynamoDB with on-demand capacity
-- C. RDS MySQL Multi-AZ
+- A. DynamoDB with on-demand capacity
+- B. RDS MySQL Multi-AZ
+- C. DynamoDB with provisioned capacity
 - D. Amazon Redshift
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Serverless NoSQL, spiky traffic, no planning = DynamoDB on-demand.
 
@@ -80,6 +83,7 @@ A serverless application needs a NoSQL database with single-digit millisecond la
 
 ## Q 03-v1-04
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Aurora
 - tags: dr-multi-site, multi-region, rto-rpo, aurora-global-database
@@ -90,11 +94,11 @@ A serverless application needs a NoSQL database with single-digit millisecond la
 A globally distributed application needs an active-active relational database with cross-Region reads and disaster recovery, RPO near zero. Which is BEST?
 
 - A. RDS Multi-AZ
-- B. Aurora Global Database
-- C. DynamoDB Global Tables
-- D. Read Replica in another Region
+- B. DynamoDB Global Tables
+- C. Read Replica in another Region
+- D. Aurora Global Database
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Active-active relational, global, near-zero RPO = Aurora Global Database.
 
@@ -102,6 +106,7 @@ A globally distributed application needs an active-active relational database wi
 
 ## Q 03-v1-05
 - domain: performance
+- task: 3.3
 - topic: database
 - services: DAX, DynamoDB
 - difficulty: easy
@@ -110,12 +115,12 @@ A globally distributed application needs an active-active relational database wi
 
 A read-heavy DynamoDB workload needs microsecond response times for repeated reads without changing application logic significantly. Which service?
 
-- A. Amazon ElastiCache for Memcached
-- B. DynamoDB Accelerator (DAX)
-- C. DynamoDB Streams
+- A. DynamoDB Streams
+- B. Amazon ElastiCache for Memcached
+- C. DynamoDB Accelerator (DAX)
 - D. Global Secondary Index
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Microsecond DynamoDB reads, minimal code change = DAX.
 
@@ -123,6 +128,7 @@ A read-heavy DynamoDB workload needs microsecond response times for repeated rea
 
 ## Q 03-v1-06
 - domain: performance
+- task: 3.3
 - topic: database
 - services: ElastiCache
 - tags: streaming-ingestion, redis-vs-memcached
@@ -132,12 +138,12 @@ A read-heavy DynamoDB workload needs microsecond response times for repeated rea
 
 A gaming app needs an in-memory data store for a real-time leaderboard with sorted sets and persistence. Which engine?
 
-- A. ElastiCache for Memcached
-- B. ElastiCache for Redis
-- C. DynamoDB
-- D. Neptune
+- A. DynamoDB
+- B. Neptune
+- C. ElastiCache for Memcached
+- D. ElastiCache for Redis
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Leaderboard sorted sets + persistence = ElastiCache for Redis.
 
@@ -145,6 +151,7 @@ A gaming app needs an in-memory data store for a real-time leaderboard with sort
 
 ## Q 03-v1-07
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Redshift
 - tags: offline-transfer
@@ -154,12 +161,12 @@ A gaming app needs an in-memory data store for a real-time leaderboard with sort
 
 A company needs a petabyte-scale data warehouse for complex analytical (OLAP) queries over structured data. Which service?
 
-- A. Amazon RDS
-- B. Amazon Aurora
-- C. Amazon Redshift
-- D. Amazon DynamoDB
+- A. Amazon Aurora
+- B. Amazon Redshift
+- C. Amazon DynamoDB
+- D. Amazon RDS
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** Petabyte OLAP data warehouse = Amazon Redshift.
 
@@ -167,6 +174,7 @@ A company needs a petabyte-scale data warehouse for complex analytical (OLAP) qu
 
 ## Q 03-v1-08
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: SCT, DMS, Aurora
 - difficulty: easy
@@ -175,12 +183,12 @@ A company needs a petabyte-scale data warehouse for complex analytical (OLAP) qu
 
 An Oracle database must be migrated to Aurora PostgreSQL with minimal downtime. Which combination is correct?
 
-- A. AWS DataSync only
+- A. AWS Schema Conversion Tool (SCT) + AWS DMS
 - B. AWS DMS only
-- C. AWS Schema Conversion Tool (SCT) + AWS DMS
-- D. Native Oracle Data Pump only
+- C. Native Oracle Data Pump only
+- D. AWS DataSync only
 
-**Answer:** C
+**Answer:** A
 
 **Explanation:** Heterogeneous migration (Oracle->Aurora PG) = SCT + DMS.
 
@@ -188,6 +196,7 @@ An Oracle database must be migrated to Aurora PostgreSQL with minimal downtime. 
 
 ## Q 03-v1-09
 - domain: performance
+- task: 3.3
 - topic: database
 - services: RDS Proxy, Lambda, RDS
 - tags: connection-pooling
@@ -210,6 +219,7 @@ Hundreds of concurrent Lambda functions are exhausting RDS database connections.
 
 ## Q 03-v1-10
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Neptune
 - difficulty: easy
@@ -218,12 +228,12 @@ Hundreds of concurrent Lambda functions are exhausting RDS database connections.
 
 A workload needs a fully managed database storing highly connected data to power a recommendation/fraud-detection engine using graph queries. Which service?
 
-- A. Amazon Neptune
-- B. Amazon DocumentDB
-- C. Amazon Keyspaces
-- D. Amazon Timestream
+- A. Amazon Timestream
+- B. Amazon Keyspaces
+- C. Amazon Neptune
+- D. Amazon DocumentDB
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Highly connected/graph data = Amazon Neptune.
 
@@ -231,6 +241,7 @@ A workload needs a fully managed database storing highly connected data to power
 
 ## Q 03-v1-11
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: DynamoDB
 - tags: sharding, dynamodb-indexes
@@ -241,11 +252,11 @@ A workload needs a fully managed database storing highly connected data to power
 Which DynamoDB index allows querying on a completely different partition key and sort key, and can be added after table creation?
 
 - A. Local Secondary Index (LSI)
-- B. Global Secondary Index (GSI)
-- C. DynamoDB Streams
-- D. Composite primary key
+- B. Composite primary key
+- C. Global Secondary Index (GSI)
+- D. DynamoDB Streams
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Different PK/SK, add later = Global Secondary Index (GSI).
 
@@ -253,6 +264,7 @@ Which DynamoDB index allows querying on a completely different partition key and
 
 ## Q 03-v1-12
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: QLDB
 - difficulty: easy
@@ -261,12 +273,12 @@ Which DynamoDB index allows querying on a completely different partition key and
 
 A company wants an immutable, cryptographically verifiable ledger of financial transactions. Which service?
 
-- A. Amazon QLDB
-- B. Amazon Aurora
+- A. Amazon Redshift
+- B. Amazon QLDB
 - C. Amazon DynamoDB
-- D. Amazon Redshift
+- D. Amazon Aurora
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Immutable, cryptographically verifiable ledger = QLDB.
 
@@ -274,6 +286,7 @@ A company wants an immutable, cryptographically verifiable ledger of financial t
 
 ## Q 03-v1-13
 - domain: performance
+- task: 3.2
 - topic: database
 - services: EC2 Auto Scaling, DynamoDB
 - tags: dynamodb-capacity
@@ -283,12 +296,12 @@ A company wants an immutable, cryptographically verifiable ledger of financial t
 
 An application has predictable, steady database read/write throughput and wants the lowest DynamoDB cost. Which capacity mode?
 
-- A. On-demand capacity
-- B. Provisioned capacity with auto scaling
-- C. DAX only
-- D. Reserved instances for DynamoDB tables are not possible
+- A. DAX only
+- B. Reserved instances for DynamoDB tables are not possible
+- C. On-demand capacity
+- D. Provisioned capacity with auto scaling
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Predictable steady throughput, lowest cost = Provisioned + auto scaling.
 
@@ -296,6 +309,7 @@ An application has predictable, steady database read/write throughput and wants 
 
 ## Q 03-v1-14
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: DocumentDB
 - difficulty: easy
@@ -304,12 +318,12 @@ An application has predictable, steady database read/write throughput and wants 
 
 Which managed database is MongoDB-compatible and lets teams reuse existing MongoDB drivers and tools?
 
-- A. Amazon Keyspaces
-- B. Amazon DocumentDB
-- C. Amazon Neptune
-- D. Amazon RDS for PostgreSQL
+- A. Amazon DocumentDB
+- B. Amazon RDS for PostgreSQL
+- C. Amazon Keyspaces
+- D. Amazon Neptune
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** MongoDB-compatible managed DB = DocumentDB.
 
@@ -317,6 +331,7 @@ Which managed database is MongoDB-compatible and lets teams reuse existing Mongo
 
 ## Q 03-v1-15
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS
 - tags: encryption-at-rest, db-encryption
@@ -326,12 +341,12 @@ Which managed database is MongoDB-compatible and lets teams reuse existing Mongo
 
 An RDS database must encrypt data at rest, but it was created unencrypted. What is the correct approach?
 
-- A. Toggle encryption on the running instance
-- B. Create an encrypted snapshot copy and restore a new encrypted instance
+- A. Enable Multi-AZ to encrypt
+- B. Toggle encryption on the running instance
 - C. Use SSL/TLS, which encrypts at rest
-- D. Enable Multi-AZ to encrypt
+- D. Create an encrypted snapshot copy and restore a new encrypted instance
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Encrypt existing RDS = encrypted snapshot copy -> restore new instance.
 
@@ -339,6 +354,7 @@ An RDS database must encrypt data at rest, but it was created unencrypted. What 
 
 ## Q 03-v1-16
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: Timestream
 - difficulty: easy
@@ -347,12 +363,12 @@ An RDS database must encrypt data at rest, but it was created unencrypted. What 
 
 A workload ingests IoT sensor metrics and needs efficient storage and time-based analytics at scale. Which purpose-built database?
 
-- A. Amazon Timestream
-- B. Amazon RDS
-- C. Amazon Neptune
+- A. Amazon RDS
+- B. Amazon Neptune
+- C. Amazon Timestream
 - D. Amazon QLDB
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Time-series IoT metrics = Amazon Timestream.
 
@@ -360,6 +376,7 @@ A workload ingests IoT sensor metrics and needs efficient storage and time-based
 
 ## Q 03-v1-17
 - domain: performance
+- task: 3.3
 - topic: database
 - tags: caching-strategies
 - difficulty: easy
@@ -370,8 +387,8 @@ Which caching strategy loads data into the cache only when there is a cache miss
 
 - A. Write-through
 - B. Lazy loading (cache-aside)
-- C. Write-behind
-- D. TTL-only
+- C. TTL-only
+- D. Write-behind
 
 **Answer:** B
 
@@ -381,6 +398,7 @@ Which caching strategy loads data into the cache only when there is a cache miss
 
 ## Q 03-v1-18
 - domain: cost
+- task: 4.3
 - topic: database
 - services: Aurora
 - tags: aurora-serverless
@@ -391,11 +409,11 @@ Which caching strategy loads data into the cache only when there is a cache miss
 A company wants to reduce the cost of an Aurora cluster used by an internal app that is idle most nights and weekends, with bursts during business hours. Which is BEST?
 
 - A. Aurora provisioned with largest instance
-- B. Aurora Serverless v2
-- C. RDS Single-AZ
+- B. RDS Single-AZ
+- C. Aurora Serverless v2
 - D. DynamoDB on-demand
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Idle-then-bursty Aurora cost optimization = Aurora Serverless v2.
 
@@ -403,6 +421,7 @@ A company wants to reduce the cost of an Aurora cluster used by an internal app 
 
 ## Q 03-v1-19
 - domain: resilient
+- task: 2.2
 - topic: database
 - services: RDS
 - tags: multi-az, read-replicas, high-availability
@@ -412,13 +431,13 @@ A company wants to reduce the cost of an Aurora cluster used by an internal app 
 
 Which two are TRUE about RDS Multi-AZ vs Read Replicas? (Choose TWO)
 
-- A. Multi-AZ standby is readable to offload queries
-- B. Multi-AZ uses synchronous replication for high availability
-- C. Read Replicas use asynchronous replication and can be promoted
-- D. Read Replicas provide automatic failover
-- E. Multi-AZ is primarily a read-scaling feature
+- A. Multi-AZ uses synchronous replication for high availability
+- B. Multi-AZ is primarily a read-scaling feature
+- C. Read Replicas provide automatic failover
+- D. Multi-AZ standby is readable to offload queries
+- E. Read Replicas use asynchronous replication and can be promoted
 
-**Answer:** B, C
+**Answer:** A, E
 
 **Explanation:** Multi-AZ = synchronous HA; Read Replicas = async, promotable.
 
@@ -426,6 +445,7 @@ Which two are TRUE about RDS Multi-AZ vs Read Replicas? (Choose TWO)
 
 ## Q 03-v1-20
 - domain: resilient
+- task: 2.1
 - topic: database
 - services: Keyspaces
 - difficulty: easy
@@ -435,8 +455,8 @@ Which two are TRUE about RDS Multi-AZ vs Read Replicas? (Choose TWO)
 A Cassandra workload must be migrated to a fully managed, serverless, Cassandra-compatible database (CQL). Which service?
 
 - A. Amazon Keyspaces
-- B. Amazon DynamoDB
-- C. Amazon DocumentDB
+- B. Amazon DocumentDB
+- C. Amazon DynamoDB
 - D. Amazon Redshift
 
 **Answer:** A

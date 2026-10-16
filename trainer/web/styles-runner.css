@@ -1,0 +1,549 @@
+/* Styles for the test-taking experience (Runner, QuestionView, NewTest). Owner: UI-runner agent. */
+
+/* ── keyword tints (soft background + marker line; text colour unchanged) ─ */
+:root {
+  --kw-qualifier-bg: rgba(250, 178, 25, 0.3);
+  --kw-qualifier-line: rgba(196, 128, 0, 0.75);
+  --kw-cost-bg: rgba(12, 163, 12, 0.13);
+  --kw-cost-line: rgba(12, 140, 12, 0.55);
+  --kw-ops-bg: rgba(124, 92, 230, 0.13);
+  --kw-ops-line: rgba(110, 80, 220, 0.5);
+  --kw-resilient-bg: rgba(0, 150, 170, 0.13);
+  --kw-resilient-line: rgba(0, 128, 148, 0.55);
+  --kw-performance-bg: rgba(235, 104, 52, 0.14);
+  --kw-performance-line: rgba(214, 88, 36, 0.55);
+  --kw-secure-bg: rgba(208, 59, 120, 0.11);
+  --kw-secure-line: rgba(190, 50, 110, 0.5);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    --kw-qualifier-bg: rgba(250, 178, 25, 0.24);
+    --kw-qualifier-line: rgba(250, 178, 25, 0.75);
+    --kw-cost-bg: rgba(63, 194, 63, 0.17);
+    --kw-cost-line: rgba(63, 194, 63, 0.6);
+    --kw-ops-bg: rgba(160, 135, 255, 0.2);
+    --kw-ops-line: rgba(160, 135, 255, 0.65);
+    --kw-resilient-bg: rgba(40, 190, 210, 0.17);
+    --kw-resilient-line: rgba(40, 190, 210, 0.6);
+    --kw-performance-bg: rgba(240, 130, 80, 0.2);
+    --kw-performance-line: rgba(240, 130, 80, 0.65);
+    --kw-secure-bg: rgba(240, 100, 160, 0.17);
+    --kw-secure-line: rgba(240, 100, 160, 0.6);
+  }
+}
+:root[data-theme='dark'] {
+  --kw-qualifier-bg: rgba(250, 178, 25, 0.24);
+  --kw-qualifier-line: rgba(250, 178, 25, 0.75);
+  --kw-cost-bg: rgba(63, 194, 63, 0.17);
+  --kw-cost-line: rgba(63, 194, 63, 0.6);
+  --kw-ops-bg: rgba(160, 135, 255, 0.2);
+  --kw-ops-line: rgba(160, 135, 255, 0.65);
+  --kw-resilient-bg: rgba(40, 190, 210, 0.17);
+  --kw-resilient-line: rgba(40, 190, 210, 0.6);
+  --kw-performance-bg: rgba(240, 130, 80, 0.2);
+  --kw-performance-line: rgba(240, 130, 80, 0.65);
+  --kw-secure-bg: rgba(240, 100, 160, 0.17);
+  --kw-secure-line: rgba(240, 100, 160, 0.6);
+}
+
+mark.kw {
+  color: inherit;
+  background: var(--kw-bg, var(--accent-soft));
+  box-shadow: inset 0 -2px 0 var(--kw-line, var(--accent));
+  border-radius: 3px;
+  padding: 0 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+mark.kw-qualifier {
+  --kw-bg: var(--kw-qualifier-bg);
+  --kw-line: var(--kw-qualifier-line);
+  font-weight: 650;
+}
+mark.kw-cost {
+  --kw-bg: var(--kw-cost-bg);
+  --kw-line: var(--kw-cost-line);
+}
+mark.kw-ops {
+  --kw-bg: var(--kw-ops-bg);
+  --kw-line: var(--kw-ops-line);
+}
+mark.kw-resilient {
+  --kw-bg: var(--kw-resilient-bg);
+  --kw-line: var(--kw-resilient-line);
+}
+mark.kw-performance {
+  --kw-bg: var(--kw-performance-bg);
+  --kw-line: var(--kw-performance-line);
+}
+mark.kw-secure {
+  --kw-bg: var(--kw-secure-bg);
+  --kw-line: var(--kw-secure-line);
+}
+.kw-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 8px 0 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.kw-legend mark.kw {
+  padding: 0 6px;
+  font-weight: 500;
+}
+
+/* ── options: strike-out ─────────────────────────────────────────────── */
+.opt-row {
+  position: relative;
+}
+.opts.can-strike .opt {
+  padding-right: 52px;
+}
+.opt-strike {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s, border-color 0.1s;
+}
+.opt-strike:hover {
+  color: var(--bad-ink);
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.opt-strike.on {
+  color: var(--text-1);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+.opt.struck:not(.correct):not(.wrong) {
+  background: var(--surface-2);
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+.opt.struck .text {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  opacity: 0.5;
+}
+.opt.struck:not(.correct) .key {
+  opacity: 0.55;
+}
+.opt.struck.correct .text {
+  opacity: 0.85;
+  text-decoration-color: var(--critical);
+}
+.opt .marks {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-top: 4px;
+}
+.opt .marks .mark {
+  padding-top: 0;
+}
+/* the verdict colour stays on the heading; long (ENRICH) explanations read in normal text colour */
+.explain.good,
+.explain.bad {
+  color: var(--text-1);
+}
+.explain.good h4 {
+  color: var(--good-ink);
+}
+.explain.bad h4 {
+  color: var(--bad-ink);
+}
+.explain h4 .muted {
+  font-weight: 500;
+}
+
+/* ── hint / recall-first / why-note ──────────────────────────────────── */
+.hint-box {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.hint-box .hint-ico {
+  flex: none;
+}
+.chip.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.chip.is-disabled:hover {
+  background: var(--surface);
+}
+.recall-box {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 11px;
+  border: 1.5px dashed var(--accent);
+  background: var(--accent-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.recall-box .recall-q {
+  font-weight: 650;
+  font-size: 15px;
+}
+.recall-box textarea {
+  min-height: 64px;
+  background: var(--surface);
+}
+.recall-actions {
+  gap: 8px;
+}
+.recall-note {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.recall-note .recall-label {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.recall-note .recall-text {
+  font-style: italic;
+}
+.why-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.why-box label {
+  font-weight: 600;
+  font-size: 14px;
+}
+.why-box label .muted {
+  font-weight: 400;
+  font-size: 13px;
+}
+
+/* ── runner bar & layout ─────────────────────────────────────────────── */
+.runner-head {
+  min-width: 0;
+  flex: 1;
+}
+.btn.hl-toggle.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.time-warn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 9px;
+  background: var(--warn-soft);
+  font-size: 14px;
+}
+.time-warn.urgent {
+  background: var(--bad-soft);
+}
+.runner-grid.solo {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.runner-side {
+  position: sticky;
+  top: 92px;
+}
+@media (max-width: 960px) {
+  .runner-side {
+    position: static;
+  }
+}
+.runner-keys {
+  line-height: 1.9;
+}
+.bank-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 8px 6px 8px 14px;
+}
+.review-nav-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -6px 0 14px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── pearson review screen ───────────────────────────────────────────── */
+.review-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.review-head h2 {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+.review-head p {
+  margin: 10px 0 0;
+}
+.review-filter {
+  align-self: flex-start;
+  max-width: 100%;
+}
+.review-filter button {
+  white-space: nowrap;
+}
+.review-filter .n {
+  color: var(--text-3);
+  font-size: 12px;
+  margin-left: 3px;
+}
+.review-filter button.on .n {
+  color: inherit;
+}
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 8px;
+}
+.review-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 4px 6px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  cursor: pointer;
+  line-height: 1.2;
+  transition: border-color 0.1s;
+}
+.review-tile:hover {
+  border-color: var(--accent);
+}
+.review-tile .n {
+  font-weight: 700;
+  font-size: 16px;
+}
+.review-tile .st {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.review-tile.answered {
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+.review-tile.answered .st {
+  color: var(--accent-text);
+}
+.review-tile.open {
+  border-style: dashed;
+}
+.review-tile.open .st {
+  color: var(--bad-ink);
+  font-weight: 600;
+}
+.review-tile.flagged {
+  box-shadow: inset 0 0 0 1.5px var(--warn);
+}
+.review-tile .fl {
+  position: absolute;
+  top: -7px;
+  right: -4px;
+  font-size: 12px;
+}
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── new test page ───────────────────────────────────────────────────── */
+.toggle-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  cursor: pointer;
+}
+.toggle-card.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.toggle-card input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+.check-line {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.check-line input {
+  flex: none;
+  margin: 3px 0 0;
+  accent-color: var(--accent);
+}
+.field-static {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nt-accent {
+  color: var(--accent-text);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.task-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.task-group {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.task-dom {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  padding-top: 6px;
+}
+.task-chip {
+  text-align: left;
+}
+.svc-search {
+  width: 200px;
+  max-width: 100%;
+}
+.shortcut-help {
+  line-height: 1.9;
+}
+
+/* ── phones ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .runner .kbd,
+  .kbd-hint,
+  .runner-keys,
+  .hl-label,
+  .hide-sm {
+    display: none;
+  }
+  /* bar: "← Thoát + title" on the first line, tools · timer · submit on the second */
+  .runner-bar .runner-head {
+    flex: 1 1 calc(100% - 110px);
+  }
+  .runner-bar .timer {
+    margin-left: auto;
+  }
+  .recall-actions {
+    justify-content: flex-end;
+  }
+  .review-tile .st {
+    white-space: nowrap;
+    font-size: 10.5px;
+  }
+  .runner-actions {
+    gap: 10px;
+  }
+  .runner-nav {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .opts.can-strike .opt {
+    padding-right: 48px;
+  }
+  .opt-strike {
+    right: 8px;
+  }
+  .opt {
+    flex-wrap: wrap;
+  }
+  .opt .text {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .opt .marks {
+    flex-basis: 100%;
+    align-items: flex-start;
+    padding: 0 0 0 40px;
+  }
+  .review-filter {
+    display: flex;
+    width: 100%;
+  }
+  .review-filter button {
+    flex: 1;
+    padding: 6px 4px;
+  }
+  .review-grid {
+    grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  }
+  .review-actions .spacer {
+    display: none;
+  }
+  .review-actions .btn {
+    flex: 1;
+  }
+  .task-group {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .task-dom {
+    padding-top: 0;
+  }
+}

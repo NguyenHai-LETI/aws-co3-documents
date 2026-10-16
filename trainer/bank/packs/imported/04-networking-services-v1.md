@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 04-v1-01
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: NAT Gateway, EC2
 - tags: subnets
@@ -24,12 +25,12 @@ created: 2026-10-16
 
 EC2 instances in a private subnet must download OS patches from the internet but must NOT be reachable from the internet. What should be configured?
 
-- A. Internet Gateway attached to the private subnet
-- B. NAT Gateway in a public subnet with a route from the private subnet
-- C. Egress-only Internet Gateway
-- D. VPC Peering
+- A. Egress-only Internet Gateway
+- B. VPC Peering
+- C. NAT Gateway in a public subnet with a route from the private subnet
+- D. Internet Gateway attached to the private subnet
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Outbound-only internet for private subnet = NAT Gateway in public subnet + route.
 
@@ -37,6 +38,7 @@ EC2 instances in a private subnet must download OS patches from the internet but
 
 ## Q 04-v1-02
 - domain: secure
+- task: 1.2
 - topic: networking
 - tags: threat-detection, subnets, nacl
 - difficulty: easy
@@ -45,12 +47,12 @@ EC2 instances in a private subnet must download OS patches from the internet but
 
 A security team must BLOCK a specific malicious IP range from reaching all instances in a subnet. Which control is appropriate?
 
-- A. Security Group inbound allow rule
-- B. Network ACL with a deny rule
-- C. IAM policy
-- D. Route table blackhole
+- A. Route table blackhole
+- B. IAM policy
+- C. Security Group inbound allow rule
+- D. Network ACL with a deny rule
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Block a specific IP range at subnet level = NACL deny rule (SG has no deny).
 
@@ -58,6 +60,7 @@ A security team must BLOCK a specific malicious IP range from reaching all insta
 
 ## Q 04-v1-03
 - domain: secure
+- task: 1.2
 - topic: networking
 - tags: security-groups, nacl
 - difficulty: easy
@@ -67,11 +70,11 @@ A security team must BLOCK a specific malicious IP range from reaching all insta
 Which statement about Security Groups vs Network ACLs is correct?
 
 - A. Security Groups are stateless; NACLs are stateful
-- B. Security Groups are stateful; NACLs are stateless
-- C. Both support explicit deny rules
-- D. NACLs operate at the instance/ENI level
+- B. NACLs operate at the instance/ENI level
+- C. Security Groups are stateful; NACLs are stateless
+- D. Both support explicit deny rules
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Security Groups stateful; NACLs stateless.
 
@@ -79,6 +82,7 @@ Which statement about Security Groups vs Network ACLs is correct?
 
 ## Q 04-v1-04
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: ALB, ELB
 - tags: elb-features, tls-termination
@@ -89,11 +93,11 @@ Which statement about Security Groups vs Network ACLs is correct?
 An application needs path-based routing (`/api` and `/web` to different target groups) over HTTPS. Which load balancer?
 
 - A. Network Load Balancer
-- B. Application Load Balancer
-- C. Gateway Load Balancer
-- D. Classic Load Balancer
+- B. Classic Load Balancer
+- C. Application Load Balancer
+- D. Gateway Load Balancer
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** HTTP(S) path-based routing = Application Load Balancer.
 
@@ -101,6 +105,7 @@ An application needs path-based routing (`/api` and `/web` to different target g
 
 ## Q 04-v1-05
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: NLB, ELB
 - difficulty: easy
@@ -109,12 +114,12 @@ An application needs path-based routing (`/api` and `/web` to different target g
 
 A workload needs ultra-low latency, millions of requests per second, and a static IP per AZ for TCP traffic. Which load balancer?
 
-- A. Application Load Balancer
-- B. Network Load Balancer
-- C. Gateway Load Balancer
-- D. Classic Load Balancer
+- A. Network Load Balancer
+- B. Application Load Balancer
+- C. Classic Load Balancer
+- D. Gateway Load Balancer
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Ultra-low latency, millions rps, static IP, TCP = Network Load Balancer.
 
@@ -122,6 +127,7 @@ A workload needs ultra-low latency, millions of requests per second, and a stati
 
 ## Q 04-v1-06
 - domain: cost
+- task: 4.4
 - topic: networking
 - services: VPC Endpoint, VPC, S3, DynamoDB
 - difficulty: easy
@@ -130,12 +136,12 @@ A workload needs ultra-low latency, millions of requests per second, and a stati
 
 A company wants private connectivity from a VPC to Amazon S3 and DynamoDB without using the internet, at no additional cost. Which is BEST?
 
-- A. Interface Endpoint (PrivateLink)
-- B. Gateway VPC Endpoint
-- C. NAT Gateway
-- D. Internet Gateway
+- A. Internet Gateway
+- B. NAT Gateway
+- C. Interface Endpoint (PrivateLink)
+- D. Gateway VPC Endpoint
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Free private access to S3/DynamoDB = Gateway VPC Endpoint.
 
@@ -143,6 +149,7 @@ A company wants private connectivity from a VPC to Amazon S3 and DynamoDB withou
 
 ## Q 04-v1-07
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: Transit Gateway
 - difficulty: easy
@@ -151,9 +158,9 @@ A company wants private connectivity from a VPC to Amazon S3 and DynamoDB withou
 
 A company needs to connect 60 VPCs and its on-premises network with transitive routing and centralized management. Which service?
 
-- A. VPC Peering mesh
+- A. Direct Connect only
 - B. AWS Transit Gateway
-- C. Direct Connect only
+- C. VPC Peering mesh
 - D. PrivateLink
 
 **Answer:** B
@@ -164,6 +171,7 @@ A company needs to connect 60 VPCs and its on-premises network with transitive r
 
 ## Q 04-v1-08
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: CloudFront, S3
 - difficulty: easy
@@ -172,12 +180,12 @@ A company needs to connect 60 VPCs and its on-premises network with transitive r
 
 Static content stored in S3 must be delivered to global users with the lowest latency and cached at the edge. Which solution?
 
-- A. S3 Cross-Region Replication
-- B. Amazon CloudFront with the S3 bucket as origin
-- C. AWS Global Accelerator
-- D. Multi-Region Access Points only
+- A. Amazon CloudFront with the S3 bucket as origin
+- B. S3 Cross-Region Replication
+- C. Multi-Region Access Points only
+- D. AWS Global Accelerator
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Global cached static delivery = CloudFront with S3 origin.
 
@@ -185,6 +193,7 @@ Static content stored in S3 must be delivered to global users with the lowest la
 
 ## Q 04-v1-09
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: Global Accelerator
 - difficulty: easy
@@ -193,10 +202,10 @@ Static content stored in S3 must be delivered to global users with the lowest la
 
 A multiplayer game uses TCP/UDP and needs two static anycast IPs plus fast failover over the AWS backbone. Which service?
 
-- A. Amazon CloudFront
+- A. Route 53 latency routing
 - B. AWS Global Accelerator
-- C. Route 53 latency routing
-- D. Network Load Balancer only
+- C. Network Load Balancer only
+- D. Amazon CloudFront
 
 **Answer:** B
 
@@ -206,6 +215,7 @@ A multiplayer game uses TCP/UDP and needs two static anycast IPs plus fast failo
 
 ## Q 04-v1-10
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: Route 53, ALB
 - difficulty: easy
@@ -214,12 +224,12 @@ A multiplayer game uses TCP/UDP and needs two static anycast IPs plus fast failo
 
 Which Route 53 record type can be used at the zone apex (e.g., `example.com`) to point to an ALB, with no query charges and health-check support?
 
-- A. CNAME
-- B. Alias (A/AAAA)
-- C. TXT
+- A. Alias (A/AAAA)
+- B. TXT
+- C. CNAME
 - D. NS
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Zone apex to ALB, free, health checks = Alias record.
 
@@ -227,6 +237,7 @@ Which Route 53 record type can be used at the zone apex (e.g., `example.com`) to
 
 ## Q 04-v1-11
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: Route 53
 - difficulty: easy
@@ -235,12 +246,12 @@ Which Route 53 record type can be used at the zone apex (e.g., `example.com`) to
 
 A company is gradually shifting traffic from an old environment to a new one (e.g., 90/10 split) for testing. Which Route 53 routing policy?
 
-- A. Failover
-- B. Weighted
-- C. Geolocation
-- D. Latency-based
+- A. Weighted
+- B. Geolocation
+- C. Latency-based
+- D. Failover
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Percentage traffic split / A-B test = Weighted routing.
 
@@ -248,6 +259,7 @@ A company is gradually shifting traffic from an old environment to a new one (e.
 
 ## Q 04-v1-12
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: Route 53
 - difficulty: easy
@@ -256,12 +268,12 @@ A company is gradually shifting traffic from an old environment to a new one (e.
 
 Users must be served from the AWS Region that gives them the lowest network latency. Which Route 53 routing policy?
 
-- A. Simple
-- B. Latency-based
-- C. Geolocation
-- D. Multivalue answer
+- A. Multivalue answer
+- B. Geolocation
+- C. Latency-based
+- D. Simple
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Lowest network latency Region = Latency-based routing.
 
@@ -269,6 +281,7 @@ Users must be served from the AWS Region that gives them the lowest network late
 
 ## Q 04-v1-13
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: S3, CloudFront
 - tags: cloudfront-origin-security
@@ -278,12 +291,12 @@ Users must be served from the AWS Region that gives them the lowest network late
 
 Restricting access so that an S3 origin can ONLY be reached through CloudFront uses which feature?
 
-- A. Bucket ACL public-read
-- B. Origin Access Control (OAC) / Origin Access Identity (OAI)
+- A. VPC endpoint policy
+- B. Bucket ACL public-read
 - C. Signed URLs only
-- D. VPC endpoint policy
+- D. Origin Access Control (OAC) / Origin Access Identity (OAI)
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Lock S3 origin to CloudFront only = OAC/OAI.
 
@@ -291,6 +304,7 @@ Restricting access so that an S3 origin can ONLY be reached through CloudFront u
 
 ## Q 04-v1-14
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: CloudFront
 - tags: signed-urls-cookies
@@ -300,12 +314,12 @@ Restricting access so that an S3 origin can ONLY be reached through CloudFront u
 
 A premium video service must restrict content so only authenticated, paying users can access multiple files for a session. Which CloudFront feature?
 
-- A. Signed URLs
-- B. Signed Cookies
-- C. Field-level encryption
-- D. Geo restriction
+- A. Signed Cookies
+- B. Geo restriction
+- C. Signed URLs
+- D. Field-level encryption
 
-**Answer:** B
+**Answer:** A
 
 **Explanation:** Restrict multiple files per session = Signed Cookies (single file = Signed URL).
 
@@ -313,6 +327,7 @@ A premium video service must restrict content so only authenticated, paying user
 
 ## Q 04-v1-15
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: Direct Connect
 - difficulty: easy
@@ -321,12 +336,12 @@ A premium video service must restrict content so only authenticated, paying user
 
 An on-premises data center needs a dedicated, consistent, high-bandwidth private connection to AWS (not over the public internet). Which service?
 
-- A. Site-to-Site VPN
-- B. AWS Direct Connect
-- C. AWS Client VPN
-- D. Transit Gateway
+- A. Transit Gateway
+- B. AWS Client VPN
+- C. AWS Direct Connect
+- D. Site-to-Site VPN
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Dedicated private high-bandwidth link = Direct Connect.
 
@@ -334,6 +349,7 @@ An on-premises data center needs a dedicated, consistent, high-bandwidth private
 
 ## Q 04-v1-16
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: Site-to-Site VPN
 - difficulty: easy
@@ -342,12 +358,12 @@ An on-premises data center needs a dedicated, consistent, high-bandwidth private
 
 A company needs to connect on-premises to AWS quickly with an encrypted IPsec tunnel as a temporary or backup link. Which service?
 
-- A. Direct Connect
-- B. Site-to-Site VPN
+- A. CloudFront
+- B. Direct Connect
 - C. PrivateLink
-- D. CloudFront
+- D. Site-to-Site VPN
 
-**Answer:** B
+**Answer:** D
 
 **Explanation:** Quick encrypted IPsec tunnel/backup = Site-to-Site VPN.
 
@@ -355,6 +371,7 @@ A company needs to connect on-premises to AWS quickly with an encrypted IPsec tu
 
 ## Q 04-v1-17
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: PrivateLink, NLB, VPC Peering
 - difficulty: easy
@@ -363,9 +380,9 @@ A company needs to connect on-premises to AWS quickly with an encrypted IPsec tu
 
 A SaaS provider wants to expose its application privately to many customer VPCs without VPC peering or exposing it to the internet. Which service?
 
-- A. Transit Gateway
+- A. VPC Peering
 - B. AWS PrivateLink with an endpoint service (NLB)
-- C. VPC Peering
+- C. Transit Gateway
 - D. NAT Gateway
 
 **Answer:** B
@@ -376,6 +393,7 @@ A SaaS provider wants to expose its application privately to many customer VPCs 
 
 ## Q 04-v1-18
 - domain: performance
+- task: 3.4
 - topic: networking
 - tags: subnets
 - difficulty: easy
@@ -384,12 +402,12 @@ A SaaS provider wants to expose its application privately to many customer VPCs 
 
 A subnet `10.0.1.0/24` is created. How many usable host IP addresses are available?
 
-- A. 256
-- B. 254
-- C. 251
-- D. 250
+- A. 250
+- B. 251
+- C. 256
+- D. 254
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** /24 = 256 - 5 reserved = 251 usable.
 
@@ -397,6 +415,7 @@ A subnet `10.0.1.0/24` is created. How many usable host IP addresses are availab
 
 ## Q 04-v1-19
 - domain: performance
+- task: 3.4
 - topic: networking
 - services: NAT Gateway
 - tags: subnets, elastic-ip
@@ -407,12 +426,12 @@ A subnet `10.0.1.0/24` is created. How many usable host IP addresses are availab
 Which two statements about NAT Gateway are TRUE? (Choose TWO)
 
 - A. It must be placed in a private subnet
-- B. It is deployed in a public subnet and needs an Elastic IP
+- B. It allows inbound connections initiated from the internet
 - C. It is a managed, horizontally scaled service within an AZ
-- D. It allows inbound connections initiated from the internet
+- D. It is deployed in a public subnet and needs an Elastic IP
 - E. It requires you to patch the underlying instance
 
-**Answer:** B, C
+**Answer:** C, D
 
 **Explanation:** NAT GW lives in public subnet w/ EIP and is managed/HA within an AZ.
 
@@ -420,6 +439,7 @@ Which two statements about NAT Gateway are TRUE? (Choose TWO)
 
 ## Q 04-v1-20
 - domain: secure
+- task: 1.2
 - topic: networking
 - services: WAF, ALB
 - tags: web-attacks
@@ -429,10 +449,10 @@ Which two statements about NAT Gateway are TRUE? (Choose TWO)
 
 A web application behind an ALB must protect against SQL injection and apply rate-based rules. Which service integrates with the ALB for this?
 
-- A. AWS Shield Standard
+- A. Network ACLs
 - B. AWS WAF
-- C. Security Groups
-- D. Network ACLs
+- C. AWS Shield Standard
+- D. Security Groups
 
 **Answer:** B
 

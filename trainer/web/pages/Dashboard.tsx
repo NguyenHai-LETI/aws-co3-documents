@@ -3,7 +3,7 @@ import { href, navigate } from '../lib/router.ts';
 import { startTest } from '../lib/start.ts';
 import { loadActive } from '../lib/session.ts';
 import { fmtDateTime, fmtDuration, fmtRelative } from '../lib/format.ts';
-import { Meter } from '../components/charts.tsx';
+import { AttemptBadges, ReadinessCard } from '../components/insights.tsx';
 import { MODE_INFO } from '../../shared/labels.ts';
 import type { AttemptSummary, Plan, StatsResponse } from '../../shared/types.ts';
 
@@ -33,7 +33,9 @@ export function Dashboard() {
   const plan = plans?.plans[0];
   const nextSession = plan?.sessions.find((s) => !s.done?.length);
   const weakest = (stats?.byTopic ?? []).filter((b) => b.attempts >= 5).sort((a, b) => a.accuracy - b.accuracy).slice(0, 3);
-  const firstTime = !results?.length;
+  const firstTime = !!results && !results.length; // no flash of the onboarding box while loading
+  const dueToday = c.srs ?? 0;
+  const backlog = c.backlog ?? T?.backlog ?? 0;
 
   return (
     <div>
@@ -67,7 +69,7 @@ export function Dashboard() {
             <button className="btn primary" onClick={() => startTest({ mode: 'quick', feedback: 'practice' })}>
               ⚡ Luyện nhanh 10 câu
             </button>
-            <button className="btn" onClick={() => startTest({ mode: 'exam' })}>
+            <button className="btn" onClick={() => startTest({ mode: 'exam', pearson: true })}>
               🎯 Thi thử 65 câu
             </button>
           </div>
@@ -75,26 +77,35 @@ export function Dashboard() {
       )}
 
       <section className="split-l">
-        <div className="card stack">
-          <div className="small muted">Mức sẵn sàng thi</div>
-          {T && T.answers ? (
-            <>
-              <div className="row" style={{ alignItems: 'baseline', gap: 10 }}>
-                <span className="hero-figure">{T.readinessScaled}</span>
-                <span className="muted">/ 1000</span>
-              </div>
-              <Meter value={T.readiness} target={meta.exam.pass_pct} />
+        {T && T.answers ? (
+          <ReadinessCard totals={T} compact>
+            <div className="small dim">
+              Đúng {T.accuracy}% · {T.answers} câu · độ phủ {Math.round((T.distinctSeen / Math.max(1, T.bankActive)) * 100)}% · 🔥 {T.streakDays} ngày
+            </div>
+            {(dueToday > 0 || backlog > 0) && (
               <div className="small dim">
-                Đúng {T.accuracy}% · {T.answers} câu · độ phủ {Math.round((T.distinctSeen / Math.max(1, T.bankActive)) * 100)}% · 🔥 {T.streakDays} ngày
+                🧠 Ôn hôm nay <b className="num">{dueToday}</b>
+                {backlog > 0 && (
+                  <>
+                    {' '}
+                    · tồn đọng <b className="num">{backlog}</b> <span className="muted">(tối đa {meta.srs.daily_limit} câu/ngày)</span>
+                  </>
+                )}
               </div>
-              <a className="small" href={href('/stats')}>
-                Xem thống kê chi tiết →
-              </a>
-            </>
-          ) : (
-            <div className="small muted">Chưa có dữ liệu — làm bài đầu tiên để ước tính.</div>
-          )}
-        </div>
+            )}
+            <a className="small" href={href('/stats')}>
+              Xem thống kê chi tiết →
+            </a>
+          </ReadinessCard>
+        ) : (
+          <div className="card stack">
+            <div className="small muted">Mức sẵn sàng thi</div>
+            <div className="small muted">
+              Chưa có dữ liệu — làm bài đầu tiên để ước tính.
+              {T?.rushedAttempts ? ` (${T.rushedAttempts} bài làm vội không được tính.)` : ''}
+            </div>
+          </div>
+        )}
 
         <div className="stack">
           <b>Hôm nay nên làm gì?</b>
@@ -112,8 +123,14 @@ export function Dashboard() {
                 onClick={() => startTest({ mode: 'coach', plan: `${plan.id}#${nextSession.id}` })}
               />
             )}
-            {(c.srs ?? 0) > 0 && (
-              <ActionCard icon="🧠" title={`Ôn ${c.srs} câu đến hạn`} desc="Ôn đúng lúc sắp quên — hiệu quả nhất để nhớ lâu." cta="Ôn ngay" onClick={() => startTest({ mode: 'srs', count: Math.min(30, c.srs) })} />
+            {dueToday > 0 && (
+              <ActionCard
+                icon="🧠"
+                title={`Ôn ${dueToday} câu đến hạn hôm nay`}
+                desc={backlog > 0 ? `Câu dễ quên nhất trước · còn ${backlog} câu tồn đọng sang các ngày sau (giới hạn ${meta.srs.daily_limit}/ngày).` : 'Ôn đúng lúc sắp quên — hiệu quả nhất để nhớ lâu.'}
+                cta="Ôn ngay"
+                onClick={() => startTest({ mode: 'srs', count: Math.min(meta.srs.daily_limit || 30, dueToday) })}
+              />
             )}
             {(c['retry-wrong'] ?? 0) > 0 && (
               <ActionCard icon="🔁" title={`Làm lại ${c['retry-wrong']} câu sai`} desc="Các câu lần gần nhất bạn trả lời sai." cta="Làm lại" onClick={() => startTest({ mode: 'retry-wrong', count: Math.min(25, c['retry-wrong']), feedback: 'practice' })} />
@@ -178,7 +195,10 @@ export function Dashboard() {
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {MODE_INFO[a.mode]?.icon} {a.title} <span className="muted">· {fmtDateTime(a.finished)} · {fmtDuration(a.timeUsed)}</span>
                   </span>
-                  <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.score}%</span>
+                  <span className="row nowrap" style={{ gap: 4 }}>
+                    <AttemptBadges a={a} />
+                    <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.score}%</span>
+                  </span>
                 </a>
               ))}
             </div>

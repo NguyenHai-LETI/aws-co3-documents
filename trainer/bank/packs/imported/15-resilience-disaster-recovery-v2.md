@@ -15,6 +15,7 @@ created: 2026-10-16
 
 ## Q 15-v2-01
 - domain: resilient
+- task: 2.1
 - topic: resilience
 - services: EC2 Auto Scaling, ELB
 - difficulty: medium
@@ -23,10 +24,10 @@ created: 2026-10-16
 
 A stateless web app must stay available if one AZ fails. Which design is BEST?
 
-- A. Single EC2 in one AZ
+- A. Larger instance in one AZ
 - B. Auto Scaling group across multiple AZs behind an ELB
-- C. Larger instance in one AZ
-- D. EC2 with Elastic IP only
+- C. EC2 with Elastic IP only
+- D. Single EC2 in one AZ
 
 **Answer:** B
 
@@ -36,6 +37,7 @@ A stateless web app must stay available if one AZ fails. Which design is BEST?
 
 ## Q 15-v2-02
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo, dr-backup-restore
 - difficulty: medium
@@ -44,12 +46,12 @@ A stateless web app must stay available if one AZ fails. Which design is BEST?
 
 A DR strategy with the LOWEST cost that accepts hours of RTO/RPO by restoring from backups. Which strategy?
 
-- A. Backup & Restore
-- B. Pilot Light
-- C. Warm Standby
-- D. Multi-Site Active-Active
+- A. Warm Standby
+- B. Multi-Site Active-Active
+- C. Backup & Restore
+- D. Pilot Light
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Lowest cost, hours RTO/RPO, restore from backup = Backup & Restore.
 
@@ -57,6 +59,7 @@ A DR strategy with the LOWEST cost that accepts hours of RTO/RPO by restoring fr
 
 ## Q 15-v2-03
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: multi-region, dr-pilot-light
 - difficulty: medium
@@ -66,11 +69,11 @@ A DR strategy with the LOWEST cost that accepts hours of RTO/RPO by restoring fr
 A DR strategy keeps a minimal core (e.g., database replica) running in another Region, scaling up on disaster. Which strategy?
 
 - A. Backup & Restore
-- B. Pilot Light
-- C. Multi-Site Active-Active
-- D. Cold standby only
+- B. Cold standby only
+- C. Pilot Light
+- D. Multi-Site Active-Active
 
-**Answer:** B
+**Answer:** C
 
 **Explanation:** Minimal core running, scale on disaster = Pilot Light.
 
@@ -78,6 +81,7 @@ A DR strategy keeps a minimal core (e.g., database replica) running in another R
 
 ## Q 15-v2-04
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: multi-region, dr-warm-standby
 - difficulty: medium
@@ -86,12 +90,12 @@ A DR strategy keeps a minimal core (e.g., database replica) running in another R
 
 A DR strategy runs a scaled-down but fully functional copy in another Region, ready to scale up quickly. Which strategy?
 
-- A. Warm Standby
-- B. Backup & Restore
-- C. Pilot Light
-- D. Single AZ
+- A. Single AZ
+- B. Warm Standby
+- C. Backup & Restore
+- D. Pilot Light
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Scaled-down fully functional, quick scale up = Warm Standby.
 
@@ -99,6 +103,7 @@ A DR strategy runs a scaled-down but fully functional copy in another Region, re
 
 ## Q 15-v2-05
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo, dr-multi-site
 - difficulty: medium
@@ -107,12 +112,12 @@ A DR strategy runs a scaled-down but fully functional copy in another Region, re
 
 A DR strategy with near-zero RTO/RPO serving traffic from multiple Regions simultaneously. Which strategy?
 
-- A. Multi-Site Active-Active
-- B. Pilot Light
+- A. Pilot Light
+- B. Warm Standby
 - C. Backup & Restore
-- D. Warm Standby
+- D. Multi-Site Active-Active
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Near-zero RTO/RPO, multi-Region serving = Multi-Site Active-Active.
 
@@ -120,6 +125,7 @@ A DR strategy with near-zero RTO/RPO serving traffic from multiple Regions simul
 
 ## Q 15-v2-06
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo
 - difficulty: medium
@@ -128,12 +134,12 @@ A DR strategy with near-zero RTO/RPO serving traffic from multiple Regions simul
 
 RTO and RPO — which definition is CORRECT?
 
-- A. RTO = max acceptable downtime; RPO = max acceptable data loss (time)
-- B. RTO = data loss; RPO = downtime
-- C. Both mean the same
-- D. RPO = recovery cost
+- A. RPO = recovery cost
+- B. Both mean the same
+- C. RTO = max acceptable downtime; RPO = max acceptable data loss (time)
+- D. RTO = data loss; RPO = downtime
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** RTO = max downtime; RPO = max data loss.
 
@@ -141,6 +147,7 @@ RTO and RPO — which definition is CORRECT?
 
 ## Q 15-v2-07
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: RDS
 - tags: multi-az
@@ -151,9 +158,9 @@ RTO and RPO — which definition is CORRECT?
 A relational database must fail over automatically to another AZ with synchronous replication. Which feature?
 
 - A. RDS Multi-AZ
-- B. Read Replica
-- C. Cross-Region snapshot
-- D. DynamoDB
+- B. Cross-Region snapshot
+- C. DynamoDB
+- D. Read Replica
 
 **Answer:** A
 
@@ -163,6 +170,7 @@ A relational database must fail over automatically to another AZ with synchronou
 
 ## Q 15-v2-08
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: S3
 - tags: multi-region, compliance, s3-replication
@@ -172,12 +180,12 @@ A relational database must fail over automatically to another AZ with synchronou
 
 S3 data must be copied to another Region for DR and compliance. Which feature?
 
-- A. Cross-Region Replication (CRR)
-- B. Same-Region Replication
+- A. Same-Region Replication
+- B. Cross-Region Replication (CRR)
 - C. Lifecycle to Glacier
 - D. Transfer Acceleration
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** S3 copy to another Region for DR = Cross-Region Replication.
 
@@ -185,6 +193,7 @@ S3 data must be copied to another Region for DR and compliance. Which feature?
 
 ## Q 15-v2-09
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Route 53
 - tags: route53-health-checks, route53-routing
@@ -194,12 +203,12 @@ S3 data must be copied to another Region for DR and compliance. Which feature?
 
 Route 53 must stop sending traffic to an unhealthy Regional endpoint and send it to a standby. Which combination?
 
-- A. Health checks + failover routing
-- B. Weighted routing only
-- C. Simple routing
-- D. Geolocation only
+- A. Geolocation only
+- B. Simple routing
+- C. Weighted routing only
+- D. Health checks + failover routing
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Route around unhealthy Region = health checks + failover routing.
 
@@ -207,6 +216,7 @@ Route 53 must stop sending traffic to an unhealthy Regional endpoint and send it
 
 ## Q 15-v2-10
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: DynamoDB
 - tags: multi-region, dr-multi-site, dynamodb-global-tables
@@ -229,6 +239,7 @@ A DynamoDB table needs multi-Region resilience with active-active writes. Which 
 
 ## Q 15-v2-11
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Aurora
 - tags: multi-region, aurora-global-database
@@ -238,12 +249,12 @@ A DynamoDB table needs multi-Region resilience with active-active writes. Which 
 
 An Aurora database needs cross-Region DR with fast failover and low replication lag. Which feature?
 
-- A. Aurora Global Database
-- B. RDS Multi-AZ
-- C. Read Replica in same Region
-- D. Manual snapshot copy
+- A. Read Replica in same Region
+- B. Manual snapshot copy
+- C. Aurora Global Database
+- D. RDS Multi-AZ
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Aurora cross-Region DR, fast failover, low lag = Aurora Global Database.
 
@@ -251,6 +262,7 @@ An Aurora database needs cross-Region DR with fast failover and low replication 
 
 ## Q 15-v2-12
 - domain: resilient
+- task: 2.1
 - topic: resilience
 - services: EC2 Auto Scaling
 - tags: route53-health-checks
@@ -260,12 +272,12 @@ An Aurora database needs cross-Region DR with fast failover and low replication 
 
 A fleet must automatically replace unhealthy instances to maintain capacity. Which service?
 
-- A. Auto Scaling group with health checks
-- B. Single instance with CloudWatch
-- C. Elastic IP
-- D. Placement group
+- A. Elastic IP
+- B. Placement group
+- C. Auto Scaling group with health checks
+- D. Single instance with CloudWatch
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Auto-replace unhealthy instances = Auto Scaling group with health checks.
 
@@ -273,6 +285,7 @@ A fleet must automatically replace unhealthy instances to maintain capacity. Whi
 
 ## Q 15-v2-13
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: multi-region
 - difficulty: medium
@@ -282,9 +295,9 @@ A fleet must automatically replace unhealthy instances to maintain capacity. Whi
 A workload must survive the loss of an entire Region. Which approach is required?
 
 - A. Multi-Region architecture
-- B. Multi-AZ in one Region only
+- B. More EBS volumes
 - C. Larger instances
-- D. More EBS volumes
+- D. Multi-AZ in one Region only
 
 **Answer:** A
 
@@ -294,6 +307,7 @@ A workload must survive the loss of an entire Region. Which approach is required
 
 ## Q 15-v2-14
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: AWS Backup, EBS, RDS, DynamoDB, EFS
 - difficulty: medium
@@ -302,12 +316,12 @@ A workload must survive the loss of an entire Region. Which approach is required
 
 Backups of EBS, RDS, DynamoDB, and EFS must be centrally scheduled and retained by policy. Which service?
 
-- A. AWS Backup
-- B. Manual snapshots
-- C. S3 CRR
-- D. Storage Gateway
+- A. Storage Gateway
+- B. S3 CRR
+- C. Manual snapshots
+- D. AWS Backup
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Central scheduled policy backups = AWS Backup.
 
@@ -315,6 +329,7 @@ Backups of EBS, RDS, DynamoDB, and EFS must be centrally scheduled and retained 
 
 ## Q 15-v2-15
 - domain: resilient
+- task: 2.1
 - topic: resilience
 - services: SQS
 - tags: decoupling
@@ -324,12 +339,12 @@ Backups of EBS, RDS, DynamoDB, and EFS must be centrally scheduled and retained 
 
 An SQS-decoupled worker tier ensures messages are not lost if workers fail. Which property provides this resilience?
 
-- A. Messages persist in the queue until successfully processed/deleted
+- A. SNS retains messages
 - B. Messages are lost immediately
-- C. Only FIFO retains messages
-- D. SNS retains messages
+- C. Messages persist in the queue until successfully processed/deleted
+- D. Only FIFO retains messages
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** SQS resilience = messages persist until processed/deleted.
 
@@ -337,6 +352,7 @@ An SQS-decoupled worker tier ensures messages are not lost if workers fail. Whic
 
 ## Q 15-v2-16
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: NAT Gateway
 - difficulty: medium
@@ -345,12 +361,12 @@ An SQS-decoupled worker tier ensures messages are not lost if workers fail. Whic
 
 A single point of failure exists because the app uses one NAT Instance. What improves resilience?
 
-- A. NAT Gateway per AZ (redundant) or multiple NAT Gateways
-- B. One larger NAT Instance
+- A. One larger NAT Instance
+- B. Elastic IP on the instance
 - C. Remove NAT entirely
-- D. Elastic IP on the instance
+- D. NAT Gateway per AZ (redundant) or multiple NAT Gateways
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** NAT resilience = redundant NAT Gateways per AZ.
 
@@ -358,6 +374,7 @@ A single point of failure exists because the app uses one NAT Instance. What imp
 
 ## Q 15-v2-17
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: read-replicas
 - difficulty: medium
@@ -366,12 +383,12 @@ A single point of failure exists because the app uses one NAT Instance. What imp
 
 A database read replica must be promotable to primary during a DR event. Which is TRUE?
 
-- A. Read Replicas can be manually promoted to standalone primaries
+- A. Read Replicas are synchronous
 - B. Read Replicas fail over automatically like Multi-AZ
-- C. Read Replicas are synchronous
-- D. Read Replicas cannot be promoted
+- C. Read Replicas cannot be promoted
+- D. Read Replicas can be manually promoted to standalone primaries
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Read Replicas can be manually promoted to primary.
 
@@ -379,6 +396,7 @@ A database read replica must be promotable to primary during a DR event. Which i
 
 ## Q 15-v2-18
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo
 - difficulty: medium
@@ -387,12 +405,12 @@ A database read replica must be promotable to primary during a DR event. Which i
 
 To reduce RPO for a database DR, which approach helps MOST?
 
-- A. Continuous/asynchronous replication to the DR Region
+- A. No replication
 - B. Weekly backups only
 - C. Monthly snapshots
-- D. No replication
+- D. Continuous/asynchronous replication to the DR Region
 
-**Answer:** A
+**Answer:** D
 
 **Explanation:** Lower RPO = continuous/async replication to DR Region.
 
@@ -400,6 +418,7 @@ To reduce RPO for a database DR, which approach helps MOST?
 
 ## Q 15-v2-19
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: ElastiCache, DynamoDB
 - difficulty: medium
@@ -421,6 +440,7 @@ An application must maintain sessions across instance failures. Which approach a
 
 ## Q 15-v2-20
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: ELB
 - tags: elb-features
@@ -430,12 +450,12 @@ An application must maintain sessions across instance failures. Which approach a
 
 Cross-zone load balancing on an ELB provides what resilience benefit?
 
-- A. Even distribution of traffic across targets in all enabled AZs
+- A. Data replication
 - B. Cross-Region failover
-- C. Data replication
+- C. Even distribution of traffic across targets in all enabled AZs
 - D. DDoS protection
 
-**Answer:** A
+**Answer:** C
 
 **Explanation:** Cross-zone LB = even distribution across targets in all AZs.
 
@@ -443,6 +463,7 @@ Cross-zone load balancing on an ELB provides what resilience benefit?
 
 ## Q 15-v2-21
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - tags: rto-rpo, dr-warm-standby
 - difficulty: hard
@@ -451,12 +472,12 @@ Cross-zone load balancing on an ELB provides what resilience benefit?
 
 A company needs RTO of minutes and RPO of seconds across Regions, at moderate cost, without running full production capacity idle. Which strategy is BEST?
 
-- A. Backup & Restore
-- B. Pilot Light
-- C. Warm Standby
-- D. Cold backups only
+- A. Pilot Light
+- B. Warm Standby
+- C. Cold backups only
+- D. Backup & Restore
 
-**Answer:** C
+**Answer:** B
 
 **Explanation:** Minutes RTO, seconds RPO, moderate cost, no full idle = Warm Standby.
 
@@ -464,6 +485,7 @@ A company needs RTO of minutes and RPO of seconds across Regions, at moderate co
 
 ## Q 15-v2-22
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Route 53, Global Accelerator
 - tags: dr-multi-site, multi-region, route53-routing, route53-health-checks
@@ -473,13 +495,13 @@ A company needs RTO of minutes and RPO of seconds across Regions, at moderate co
 
 An active-active multi-Region app must route users to the closest Region and fail over instantly. Which two support this? (Choose TWO)
 
-- A. Route 53 latency-based routing with health checks
-- B. AWS Global Accelerator with endpoint health checks
-- C. Single-Region ALB
-- D. EBS Multi-Attach
-- E. NAT Gateway
+- A. Single-Region ALB
+- B. NAT Gateway
+- C. Route 53 latency-based routing with health checks
+- D. AWS Global Accelerator with endpoint health checks
+- E. EBS Multi-Attach
 
-**Answer:** A, B
+**Answer:** C, D
 
 **Explanation:** Active-active closest + instant failover = Route 53 latency + health checks / Global Accelerator.
 
@@ -487,6 +509,7 @@ An active-active multi-Region app must route users to the closest Region and fai
 
 ## Q 15-v2-23
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Elastic Disaster Recovery, EC2
 - difficulty: hard
@@ -497,8 +520,8 @@ A DR plan must be validated regularly without impacting production. Which servic
 
 - A. AWS Elastic Disaster Recovery (DRS) drill launches
 - B. Manual failover to prod
-- C. S3 CRR only
-- D. Snapshot copy only
+- C. Snapshot copy only
+- D. S3 CRR only
 
 **Answer:** A
 
@@ -508,6 +531,7 @@ A DR plan must be validated regularly without impacting production. Which servic
 
 ## Q 15-v2-24
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Aurora
 - tags: aurora-global-database, multi-region, s3-replication
@@ -517,13 +541,13 @@ A DR plan must be validated regularly without impacting production. Which servic
 
 An Aurora Global Database must be promoted in the secondary Region during a Regional outage. Which two are TRUE? (Choose TWO)
 
-- A. Managed unplanned failover promotes the secondary Region
-- B. Typical cross-Region replication lag is under a second
-- C. Promotion loses all data always
-- D. Aurora Global requires DynamoDB
-- E. Only Multi-AZ is involved
+- A. Promotion loses all data always
+- B. Only Multi-AZ is involved
+- C. Managed unplanned failover promotes the secondary Region
+- D. Typical cross-Region replication lag is under a second
+- E. Aurora Global requires DynamoDB
 
-**Answer:** A, B
+**Answer:** C, D
 
 **Explanation:** Aurora Global = managed unplanned failover + sub-second replication lag.
 
@@ -531,6 +555,7 @@ An Aurora Global Database must be promoted in the secondary Region during a Regi
 
 ## Q 15-v2-25
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: EFS, EC2, EBS
 - tags: multi-az, snapshots
@@ -540,12 +565,12 @@ An Aurora Global Database must be promoted in the secondary Region during a Regi
 
 A stateful application on EC2 needs data durability across AZ failure without cross-AZ EBS. Which approach?
 
-- A. Use EFS (multi-AZ) for shared data or replicate/snapshot across AZs
-- B. Single EBS volume in one AZ
+- A. Single EBS volume in one AZ
+- B. Use EFS (multi-AZ) for shared data or replicate/snapshot across AZs
 - C. Instance Store
 - D. Local disk only
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Durable cross-AZ data = EFS multi-AZ or replicate/snapshot across AZs.
 
@@ -553,6 +578,7 @@ A stateful application on EC2 needs data durability across AZ failure without cr
 
 ## Q 15-v2-26
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: AWS Backup
 - tags: automated-backups, s3-object-lock
@@ -575,6 +601,7 @@ A company must guarantee automated backups are immutable and cannot be deleted d
 
 ## Q 15-v2-27
 - domain: resilient
+- task: 2.1
 - topic: resilience
 - services: SQS
 - difficulty: hard
@@ -583,13 +610,13 @@ A company must guarantee automated backups are immutable and cannot be deleted d
 
 A multi-tier app must avoid cascading failure when a downstream dependency is slow. Which two resilience patterns apply? (Choose TWO)
 
-- A. Queue-based load leveling (SQS) to absorb bursts
-- B. Circuit breaker / timeouts and retries with backoff
-- C. Removing all retries
-- D. Synchronous tight coupling
-- E. Single-threaded processing
+- A. Circuit breaker / timeouts and retries with backoff
+- B. Single-threaded processing
+- C. Queue-based load leveling (SQS) to absorb bursts
+- D. Removing all retries
+- E. Synchronous tight coupling
 
-**Answer:** A, B
+**Answer:** A, C
 
 **Explanation:** Prevent cascading failure = queue-based load leveling + circuit breaker/timeouts+backoff.
 
@@ -597,6 +624,7 @@ A multi-tier app must avoid cascading failure when a downstream dependency is sl
 
 ## Q 15-v2-28
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: S3
 - tags: rto-rpo, s3-replication
@@ -606,12 +634,12 @@ A multi-tier app must avoid cascading failure when a downstream dependency is sl
 
 A DR requirement is RPO near zero for S3 objects across Regions with a 15-minute replication SLA. Which feature?
 
-- A. S3 Replication Time Control (RTC)
-- B. Standard CRR only
+- A. Versioning alone
+- B. S3 Replication Time Control (RTC)
 - C. Lifecycle transition
-- D. Versioning alone
+- D. Standard CRR only
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Near-zero RPO S3 with 15-min SLA = S3 Replication Time Control (RTC).
 
@@ -619,6 +647,7 @@ A DR requirement is RPO near zero for S3 objects across Regions with a 15-minute
 
 ## Q 15-v2-29
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: Global Accelerator
 - tags: ttl
@@ -628,12 +657,12 @@ A DR requirement is RPO near zero for S3 objects across Regions with a 15-minute
 
 During failover, DNS changes are slow due to caching. Which service provides near-instant traffic shifting independent of DNS TTL?
 
-- A. AWS Global Accelerator
-- B. Route 53 with high TTL
+- A. Longer TTL values
+- B. AWS Global Accelerator
 - C. CloudFront only
-- D. Longer TTL values
+- D. Route 53 with high TTL
 
-**Answer:** A
+**Answer:** B
 
 **Explanation:** Instant failover independent of DNS TTL = Global Accelerator.
 
@@ -641,6 +670,7 @@ During failover, DNS changes are slow due to caching. Which service provides nea
 
 ## Q 15-v2-30
 - domain: resilient
+- task: 2.2
 - topic: resilience
 - services: EC2 Auto Scaling, RDS
 - tags: multi-az
@@ -651,11 +681,11 @@ During failover, DNS changes are slow due to caching. Which service provides nea
 A workload must tolerate an AZ failure for both compute and a self-managed database. Which two are appropriate? (Choose TWO)
 
 - A. Multi-AZ Auto Scaling for compute
-- B. Database replication/standby in a second AZ (e.g., RDS Multi-AZ)
+- B. One instance with Elastic IP
 - C. Single-AZ database with hourly backups only
-- D. One instance with Elastic IP
+- D. Database replication/standby in a second AZ (e.g., RDS Multi-AZ)
 - E. Instance Store for the database
 
-**Answer:** A, B
+**Answer:** A, D
 
 **Explanation:** AZ tolerance = Multi-AZ ASG compute + RDS Multi-AZ standby.
