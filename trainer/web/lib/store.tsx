@@ -34,6 +34,7 @@ export interface Meta {
   paths: { trainer: string; repo: string; data: string };
   host: string;
   coachHosts: string[];
+  syncAi?: { before: boolean; after: boolean }; // config sync.before_ai / after_ai (older servers: undefined)
 }
 
 export interface BankData {

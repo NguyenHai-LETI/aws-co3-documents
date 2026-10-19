@@ -131,7 +131,12 @@ claude.ai (bỏ `ANTHROPIC_API_KEY` trừ khi `coach.use_api_key: true`). Nút b
 ## 🔄 Dùng trên 2 máy
 
 - Nút **⇅ Đồng bộ** (góc dưới thanh bên) hoặc `npm run sync`: commit `trainer/results`, `trainer/coach`, `trainer/bank` → `pull --rebase` → `push`
-  (cần quyền push vào repo; lỗi xác thực có hướng dẫn).
+  (cần quyền push vào repo; lỗi xác thực có hướng dẫn). Chỉ commit 3 thư mục dữ liệu; không bao giờ hỏi mật khẩu (thiếu đăng nhập → báo lỗi ngay);
+  conflict → huỷ rebase, dữ liệu máy này vẫn nằm trong commit cục bộ. Nút pill: ↑ commit chưa đẩy · ↓ commit mới trên remote · ● file dữ liệu chưa commit.
+- **AI Coach tự đồng bộ** (`config.yaml → sync.before_ai`, `sync.after_ai`, mặc định bật): mỗi lượt phân tích / sinh câu / ENRICH / câu dài
+  đồng bộ **trước** khi gọi Claude (AI thấy cả bài làm của máy kia; ENRICH / câu dài chọn lại lô câu nếu vừa nhận dữ liệu từ máy kia) và **sau** lượt chạy thành công
+  (kế hoạch, câu mới, patch lên GitHub ngay). Lịch tự động đồng bộ trước khi xét "có bài mới không". Đồng bộ lỗi chỉ ghi cảnh báo vào log —
+  AI vẫn chạy với dữ liệu trên máy. "Hỏi AI" không đồng bộ (chỉ đọc câu hỏi).
 - `config.yaml → coach.hosts: ["<tên-máy>"]` để **chỉ một máy** chạy coach theo lịch (tránh conflict). `issues.md`, `ratings.md`, `coach/qa/*`
   dùng `merge=union` (`.gitattributes`) nên ghi song song không conflict.
 

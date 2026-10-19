@@ -55,7 +55,7 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, statsCfg: Partial<AppConfi
     srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, ...srs },
     practice: { default_count: 20, quick_count: 10, shuffle_options: true },
     stats: { rushed_median_seconds: 5, recency_half_life_days: 14, ...statsCfg },
-    sync: { data_paths: [] },
+    sync: { data_paths: [], before_ai: false, after_ai: false },
   };
 }
 const cfg = makeCfg();

@@ -35,6 +35,7 @@ route('GET', '/api/coach', (_req, url) => {
     host: os.hostname(),
     hostAllowed: hostAllowed(cfg),
     blocked: coachGuard() ?? null, // why coach runs are refused (TRAINER_HOME test mode), null = allowed
+    sync: { beforeAi: cfg.sync.before_ai, afterAi: cfg.sync.after_ai }, // auto-sync around runs
   };
 });
 
@@ -44,7 +45,7 @@ route('POST', '/api/coach/run', async (req) => {
   if (!COACH_TASKS.includes(task)) throw new HttpError(400, `Tác vụ không hợp lệ: ${String(body.task)} (analyze | generate | enrich | longform)`);
   const params = body.params && typeof body.params === 'object' && !Array.isArray(body.params) ? body.params : {};
   try {
-    if (task === 'analyze') writeSnapshot(loadBank(), loadConfig());
+    // returns at once; the runner syncs first (sync.before_ai) and writes the snapshot after that sync
     return { run: coachRunner.start(task, 'manual', params) };
   } catch (e) {
     // busy / CLI missing / TRAINER_HOME guard / NothingToDoError (empty ENRICH batch) — the message is shown as is

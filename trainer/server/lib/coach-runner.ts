@@ -14,6 +14,8 @@ import { DAY_MS, localDateKey, localIso, stampParts } from './time.ts';
 import { applyPatch } from './patch.ts';
 import { MAX_BATCH, MAX_LONGFORM, learnerNotes, longformTargets, parseTasks, patchPath, readRunInfos, repoRel, selectBatch, writeBatchFile, writeLongformFile } from './enrich.ts';
 import { askCostsSince } from './ask.ts';
+import { writeSnapshot } from './snapshot.ts';
+import { aiSyncLine, syncForAi, type AiSyncNote } from './sync.ts';
 import type { ClaudeStatus, CoachEvent, CoachRunInfo, CoachTask, CostSummary } from '../../shared/types.ts';
 
 const LOCK_FILE = path.join(COACH_DIR, '.lock');
@@ -25,7 +27,13 @@ export const COACH_TASKS: readonly CoachTask[] = ['analyze', 'generate', 'enrich
 export type RunInfo = CoachRunInfo & {
   model?: string; // model reported by the CLI (system/init)
   outcome?: RunOutcome; // verified result of enrich/longform runs
+  sync?: { before?: AiSyncNote; after?: AiSyncNote }; // auto-sync around the run (config sync.before_ai / after_ai)
 };
+
+export interface StartOptions {
+  syncBefore?: boolean; // default config sync.before_ai (coach-run.ts passes false: it synced before choosing the task)
+  syncAfter?: boolean; // default config sync.after_ai
+}
 
 export interface RunOutcome {
   // enrich: final apply-patch pass over coach/patches/<runId>.yaml
@@ -459,7 +467,7 @@ function prepare(task: CoachTask, runId: string, params: Record<string, unknown>
 }
 
 export class CoachRunner extends EventEmitter {
-  current?: { info: RunInfo; child: ChildProcess; events: CoachEvent[] };
+  current?: { info: RunInfo; child?: ChildProcess; events: CoachEvent[] }; // no child yet while the pre-run sync runs
 
   status() {
     return { running: this.current?.info, lockedBy: this.current ? undefined : readLock() };
@@ -480,7 +488,12 @@ export class CoachRunner extends EventEmitter {
       .map((l) => JSON.parse(l) as CoachEvent);
   }
 
-  start(task: CoachTask, trigger: CoachRunInfo['trigger'], params: Record<string, unknown> = {}): RunInfo {
+  /**
+   * Checks and records the run synchronously (refusals and NothingToDoError are thrown to the caller), then goes on in
+   * the background: sync (sync.before_ai) → snapshot (analyze) → Claude Code CLI → checks → sync (sync.after_ai, only
+   * after a success) → 'done'. The coach lock is held from start to end, so both syncs pass `force`.
+   */
+  start(task: CoachTask, trigger: CoachRunInfo['trigger'], params: Record<string, unknown> = {}, opts: StartOptions = {}): RunInfo {
     const blocked = coachGuard();
     if (blocked) throw new Error(blocked);
     if (!COACH_TASKS.includes(task)) throw new Error(`Tác vụ không hợp lệ: ${String(task)}`);
@@ -490,21 +503,19 @@ export class CoachRunner extends EventEmitter {
     const cfg = loadConfig();
     const claude = findClaude(cfg, true);
     if (!claude.available || !claude.path) throw new Error(claude.hint ?? 'Claude Code CLI not found');
+    const claudePath = claude.path;
 
     fs.mkdirSync(RUNS_DIR, { recursive: true });
     const s = stampParts();
     const id = `${s.date}_${s.time}_${task}`;
-    const runParams = { ...params, ...prepare(task, id, params, cfg, s) };
+    let runParams = { ...params, ...prepare(task, id, params, cfg, s) };
     const info: RunInfo = { id, task, trigger, status: 'running', startedAt: localIso(), params: runParams };
-    const prompt = buildPrompt(task, id, trigger, runParams);
-    const args = cliArgs(prompt, cfg, claude.version, task);
-    const { cmd, pre } = claudeCommand(claude.path);
-    const child = spawn(cmd, [...pre, ...args], { cwd: REPO_DIR, env: cliEnv(cfg), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     fs.writeFileSync(LOCK_FILE, JSON.stringify({ pid: process.pid, runId: id }));
     const raw = fs.createWriteStream(path.join(RUNS_DIR, `${id}.raw.jsonl`));
     const evOut = fs.createWriteStream(path.join(RUNS_DIR, `${id}.events.jsonl`));
     const events: CoachEvent[] = [];
-    this.current = { info, child, events };
+    const run: NonNullable<CoachRunner['current']> = { info, events };
+    this.current = run;
     const saveInfo = () => fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), JSON.stringify(info, null, 2));
     saveInfo();
 
@@ -514,57 +525,42 @@ export class CoachRunner extends EventEmitter {
       evOut.write(JSON.stringify(ev) + '\n');
       this.emit('event', ev);
     };
-    const size = task === 'enrich' ? ` · ${String(runParams.size)} câu` : task === 'longform' ? ` · ${String(runParams.count)} câu` : '';
+    const size = () => (task === 'enrich' ? ` · ${String(runParams.size)} câu` : task === 'longform' ? ` · ${String(runParams.count)} câu` : '');
     const model = modelFor(task, cfg);
-    const shownPath = claude.path.startsWith(os.homedir() + path.sep) ? `~/${rel(claude.path, os.homedir())}` : claude.path;
-    emit('start', `${TASK_LABEL[task]}${size} · Claude Code ${claude.version?.split(' ')[0] ?? ''}${model ? ` · model ${model}` : ''} · ${shownPath}`);
+    const shownPath = claudePath.startsWith(os.homedir() + path.sep) ? `~/${rel(claudePath, os.homedir())}` : claudePath;
+    emit('start', `${TASK_LABEL[task]}${size()} · Claude Code ${claude.version?.split(' ')[0] ?? ''}${model ? ` · model ${model}` : ''} · ${shownPath}`);
     if (runParams.batch) emit('start', `Lô câu hỏi: ${String(runParams.batch)}`);
 
-    let buf = '';
     let resultSeen = false;
-    child.stdout!.on('data', (chunk: Buffer) => {
-      raw.write(chunk);
-      buf += chunk.toString('utf8');
-      let nl: number;
-      while ((nl = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
-        if (!line) continue;
-        let msg: Record<string, unknown>;
-        try {
-          msg = JSON.parse(line);
-        } catch {
-          emit('text', line.slice(0, 500));
-          continue;
-        }
-        this.handleMessage(msg, info, emit, () => (resultSeen = true));
-      }
-    });
-    child.stderr!.on('data', (chunk: Buffer) => {
-      const t = chunk.toString('utf8').trim();
-      if (t) emit('stderr', t.slice(0, 1000));
-    });
-
-    const timer = setTimeout(() => {
-      emit('error', `⏱ Quá ${RUN_TIMEOUT_MS / 60000} phút — dừng lượt chạy.`);
+    let timer: NodeJS.Timeout | undefined;
+    const fail = (message: string) => {
       info.status = 'error';
-      info.error = 'timeout';
-      child.kill('SIGTERM');
-    }, RUN_TIMEOUT_MS);
+      info.error = message;
+      emit('error', message);
+    };
 
-    const finish = (code: number | null, signal: NodeJS.Signals | null) => {
-      clearTimeout(timer);
+    let finished = false;
+    const finish = async (code: number | null, signal: NodeJS.Signals | null) => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearTimeout(timer);
       if (info.status === 'running') {
         if (signal) info.status = 'cancelled';
         else info.status = code === 0 && resultSeen ? 'success' : 'error';
         if (info.status === 'error' && !info.error) info.error = `CLI exited with code ${code}`;
       }
-      if (info.status !== 'cancelled') {
+      if (run.child && info.status !== 'cancelled') {
         try {
           this.postProcess(info, emit);
         } catch (e) {
           emit('error', `Kiểm tra sau lượt chạy thất bại: ${(e as Error).message}`);
         }
+      }
+      if (info.status === 'success' && (opts.syncAfter ?? cfg.sync.after_ai)) {
+        emit('tool', '⇅ Đang đẩy kết quả AI lên GitHub…');
+        const note = await syncForAi('after', { force: true });
+        info.sync = { ...info.sync, after: note };
+        emit(note.ok ? 'result' : 'stderr', aiSyncLine(note));
       }
       info.finishedAt = localIso();
       saveInfo();
@@ -579,12 +575,91 @@ export class CoachRunner extends EventEmitter {
       this.current = undefined;
       this.emit('done', info);
     };
-    child.on('error', (e) => {
-      info.status = 'error';
-      info.error = e.message;
-      emit('error', e.message);
+
+    const launch = () => {
+      if (task === 'analyze') {
+        // written here, after the sync, so it includes the results that just arrived from the other machine
+        try {
+          const snap = writeSnapshot(loadBank(), cfg);
+          emit('tool', `Snapshot: ${String(snap.attempts)} bài / ${String(snap.answers)} câu trả lời`);
+        } catch (e) {
+          emit('stderr', `Không cập nhật được snapshot: ${(e as Error).message}`);
+        }
+      }
+      const prompt = buildPrompt(task, id, trigger, runParams);
+      const { cmd, pre } = claudeCommand(claudePath);
+      const child = spawn(cmd, [...pre, ...cliArgs(prompt, cfg, claude.version, task)], { cwd: REPO_DIR, env: cliEnv(cfg), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      run.child = child;
+
+      let buf = '';
+      child.stdout!.on('data', (chunk: Buffer) => {
+        raw.write(chunk);
+        buf += chunk.toString('utf8');
+        let nl: number;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let msg: Record<string, unknown>;
+          try {
+            msg = JSON.parse(line);
+          } catch {
+            emit('text', line.slice(0, 500));
+            continue;
+          }
+          this.handleMessage(msg, info, emit, () => (resultSeen = true));
+        }
+      });
+      child.stderr!.on('data', (chunk: Buffer) => {
+        const t = chunk.toString('utf8').trim();
+        if (t) emit('stderr', t.slice(0, 1000));
+      });
+
+      timer = setTimeout(() => {
+        emit('error', `⏱ Quá ${RUN_TIMEOUT_MS / 60000} phút — dừng lượt chạy.`);
+        info.status = 'error';
+        info.error = 'timeout';
+        child.kill('SIGTERM');
+      }, RUN_TIMEOUT_MS);
+      child.on('error', (e) => fail(e.message));
+      child.on('close', (code, signal) => void finish(code, signal));
+    };
+    const launchOrFail = () => {
+      try {
+        launch();
+      } catch (e) {
+        fail((e as Error).message);
+        void finish(null, null);
+      }
+    };
+
+    if (!(opts.syncBefore ?? cfg.sync.before_ai)) {
+      launchOrFail();
+      return info;
+    }
+    emit('tool', '⇅ Đang đồng bộ với GitHub trước khi chạy AI…');
+    void syncForAi('before', { force: true }).then((note) => {
+      info.sync = { before: note };
+      emit(note.ok ? 'result' : 'stderr', aiSyncLine(note));
+      if (info.status !== 'running') return void finish(null, null); // cancelled while syncing
+      if ((note.received || note.migrated) && (task === 'enrich' || task === 'longform')) {
+        // the other machine may already have worked on some of these questions → choose the batch again
+        try {
+          runParams = { ...params, ...prepare(task, id, params, cfg, s) };
+          info.params = runParams;
+          saveInfo();
+          if (runParams.batch) emit('tool', `Chọn lại lô sau khi đồng bộ${size()}: ${String(runParams.batch)}`);
+        } catch (e) {
+          if (e instanceof NothingToDoError) {
+            info.status = 'skipped';
+            info.summary = e.message;
+            emit('result', e.message);
+          } else fail((e as Error).message);
+          return void finish(null, null);
+        }
+      }
+      launchOrFail();
     });
-    child.on('close', finish);
     return info;
   }
 
@@ -672,10 +747,12 @@ export class CoachRunner extends EventEmitter {
     }
   }
 
+  /** Stops a run that is syncing or running the CLI; a run already in its final sync is left to finish. */
   cancel(): boolean {
-    if (!this.current) return false;
-    this.current.info.status = 'cancelled';
-    this.current.child.kill('SIGTERM');
+    const cur = this.current;
+    if (!cur || cur.info.status !== 'running') return false;
+    cur.info.status = 'cancelled';
+    cur.child?.kill('SIGTERM');
     return true;
   }
 }

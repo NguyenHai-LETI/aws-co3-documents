@@ -536,3 +536,46 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
   const message = (parts.length ? `Đã đồng bộ: ${parts.join(', ')}.` : 'Đã đồng bộ — không có gì mới.') + autostashNote;
   return result(true, message, { branch, committed, received, pushed, migrated });
 }
+
+// ── auto-sync around AI coach runs (config sync.before_ai / sync.after_ai) ──
+
+export interface AiSyncNote {
+  phase: 'before' | 'after';
+  ok: boolean;
+  message: string;
+  hint?: string;
+  skipped?: boolean; // sync impossible here by design (TRAINER_HOME sandbox) — not a failure
+  committed?: number;
+  received?: number;
+  pushed?: number;
+  migrated?: number;
+  conflicts?: string[];
+}
+
+/**
+ * Sync right before an AI coach run (the AI then sees the other machine's results and bank changes) or right after a
+ * successful one (its plans / packs / patches reach the other machine before that one runs AI). Never throws: a failed
+ * sync comes back as ok:false with the hint, the caller logs it and carries on with this machine's data.
+ * `force` = the caller holds the coach lock itself (the runner), so "AI Coach đang chạy" must not refuse the sync.
+ */
+export async function syncForAi(phase: 'before' | 'after', opts: { force?: boolean } = {}): Promise<AiSyncNote> {
+  const disabled = syncDisabledReason();
+  if (disabled) return { phase, ok: true, skipped: true, message: disabled };
+  try {
+    // a sync started from the UI may be in flight (possibly a dry run) — wait for it, then run a real one
+    while (running) await running.catch(() => undefined);
+    const r = await runSync({ force: opts.force });
+    return { phase, ok: r.ok, message: r.message, hint: r.hint, committed: r.committed, received: r.received, pushed: r.pushed, migrated: r.migrated, conflicts: r.conflicts };
+  } catch (e) {
+    return { phase, ok: false, message: (e as Error).message };
+  }
+}
+
+/** One line for the coach console / CLI log. */
+export function aiSyncLine(n: AiSyncNote): string {
+  const when = n.phase === 'before' ? 'trước khi chạy AI' : 'sau khi chạy AI';
+  if (n.skipped) return `⇅ Bỏ qua đồng bộ ${when}: ${n.message}`;
+  if (n.ok) return `⇅ Đồng bộ ${when}: ${n.message}`;
+  const after = n.phase === 'before' ? 'AI vẫn chạy với dữ liệu trên máy này.' : 'Kết quả AI vẫn nằm trên máy này — bấm ⇅ Đồng bộ sau.';
+  return `⚠️ Không đồng bộ được ${when}: ${n.message}${n.hint ? ` ${n.hint}` : ''} ${after}`;
+}

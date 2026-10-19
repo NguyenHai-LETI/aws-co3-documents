@@ -122,6 +122,9 @@ export function SyncButton() {
         <div className="small dim">
           Lưu dữ liệu học (kết quả, coach, ngân hàng câu hỏi) lên git: <b>commit → pull --rebase → push</b>. Dùng khi học trên 2 máy với cùng một repo — các file nhật ký
           (báo lỗi, đánh giá, hỏi AI) được gộp tự động.
+          {meta?.syncAi && (meta.syncAi.before || meta.syncAi.after) && (
+            <> AI Coach cũng tự đồng bộ {meta.syncAi.before && meta.syncAi.after ? 'trước và sau' : meta.syncAi.before ? 'trước' : 'sau'} mỗi lượt chạy.</>
+          )}
         </div>
         {unsupported ? (
           <div className="ins-wrap alert small">Server này chưa hỗ trợ đồng bộ (cần bản server mới).</div>

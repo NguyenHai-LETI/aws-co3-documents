@@ -140,7 +140,7 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 |---|-----------|----------|
 | 13 | Chi phí & model theo tác vụ | `coach.models.{analyze,generate,enrich,ask}`; tổng lượt & chi phí quy đổi 30 ngày ở trang AI Coach |
 | 14 | Vòng chất lượng câu AI | 👍/👎 (`bank/ratings.md`), danh sách đánh giá thấp, phát hiện câu gần trùng, đo hiệu quả biến thể → snapshot → coach sửa/retire |
-| 15 | Đồng bộ 2 máy | nút ⇅ / `npm run sync` (commit dữ liệu → pull --rebase → push, không treo khi thiếu credential); `coach.hosts`; `merge=union` |
+| 15 | Đồng bộ 2 máy | nút ⇅ / `npm run sync` (commit dữ liệu → pull --rebase → push, không treo khi thiếu credential); `coach.hosts`; `merge=union`; AI Coach tự đồng bộ trước & sau mỗi lượt (`sync.before_ai` / `sync.after_ai`) |
 | 16 | CI + test | GitHub Actions (`trainer/ci/trainer-ci.yml` — chuyển vào `.github/workflows/` khi token có quyền `workflow`): validate, typecheck, unit, e2e API (TRAINER_HOME tạm), UI smoke Playwright |
 | 17 | Launcher + Windows | `start.command` / `start.sh` / `start.bat`, `OPEN=1`; dò CLI trên Windows; lịch đa nền tảng (launchd / crontab / schtasks) |
 
@@ -176,7 +176,7 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 |----------|---------|
 | Typecheck · build | `tsc --noEmit` sạch · `vite build` OK |
 | Unit (`npm test`) | 48/48 — core, learning (FSRS, readiness, Pearson, recallHit, rewriteAttempt), quality (rebalance, migration, task heuristic, duplicates, ratings), ai (patch, enrich, schedule) |
-| E2E API (`npm run test:e2e`) | 32/32 — mọi chế độ, Pearson, elim/recall/why, rushed, stats, quality/ratings, issues, coach/qa chỉ đọc, đồng bộ thật với bare remote (union merge, conflict, 401/403/timeout không treo) |
+| E2E API (`npm run test:e2e`) | 36/36 — mọi chế độ, Pearson, elim/recall/why, rushed, stats, quality/ratings, issues, coach/qa chỉ đọc, đồng bộ thật với bare remote (union merge, conflict, 401/403/timeout không treo); AI Coach tự đồng bộ trước/sau lượt chạy với 2 máy + Claude CLI giả (cả `coach-run.ts`, remote lỗi, tắt bằng config) |
 | UI smoke (`npm run test:ui`) | 19/19 — desktop, 390 px (không tràn ngang), dark; luồng tạo bài → làm → nộp → kết quả |
 | Migration trên dữ liệu thật | đáp án đúng **A 55,2 / B 38,9 / C 5,3 / D 0,6 % → A 24,2 / B 25,0 / C 25,8 / D 25,0 %**; 716 câu đổi thứ tự; **745/745 câu giữ nguyên nội dung đáp án đúng, đề và bộ lựa chọn**; 745 câu gắn task 1.1–4.4; validate 0 lỗi / 0 cảnh báo |
 | AI thật trên repo (sonnet) | ENRICH 10 câu: 10/10 áp dụng, 0 lỗi, $0.237 (tự sửa 2 câu MSK sai domain, cân độ dài 4 câu) · câu dài: 3 câu 70–85 từ, $0.215 |

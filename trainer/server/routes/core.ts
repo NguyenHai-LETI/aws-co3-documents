@@ -34,6 +34,7 @@ route('GET', '/api/meta', () => {
     paths: { trainer: TRAINER_DIR, repo: REPO_DIR, data: DATA_DIR },
     host: os.hostname(),
     coachHosts: cfg.coach.hosts,
+    syncAi: { before: cfg.sync.before_ai, after: cfg.sync.after_ai }, // AI Coach runs sync before / after themselves
   };
 });
 

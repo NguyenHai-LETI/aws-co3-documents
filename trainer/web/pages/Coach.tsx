@@ -26,6 +26,7 @@ interface CoachInfo {
   host?: string;
   hostAllowed?: boolean; // this machine may run SCHEDULED coach runs (coach.hosts)
   blocked?: string | null; // why coach runs are refused here (TRAINER_HOME test mode)
+  sync?: { beforeAi: boolean; afterAi: boolean }; // config sync.before_ai / after_ai
 }
 
 const MODEL_ROWS: { id: keyof ModelMap; label: string }[] = [
@@ -287,7 +288,13 @@ export function Coach() {
     reload();
     void refresh();
     const what = r.task === 'enrich' ? 'ENRICH' : r.task === 'longform' ? 'Sinh câu dài' : r.task === 'generate' ? 'Sinh câu hỏi' : 'AI Coach';
-    toast(r.status === 'success' ? `✅ ${what} đã xong — ${r.task === 'analyze' ? 'kế hoạch & ' : ''}ngân hàng đã cập nhật.` : `${what} kết thúc: ${r.status}`);
+    toast(
+      r.status === 'success'
+        ? `✅ ${what} đã xong — ${r.task === 'analyze' ? 'kế hoạch & ' : ''}ngân hàng đã cập nhật.`
+        : r.status === 'skipped'
+          ? `⏭ ${what}: ${r.summary ?? 'không còn việc để làm'}`
+          : `${what} kết thúc: ${r.status}`,
+    );
   });
 
   const analyze = async () => {
@@ -368,6 +375,12 @@ export function Coach() {
             <div className="ins-wrap alert warn small">
               ⚠️ Máy này (<code>{host}</code>) không nằm trong <code>coach.hosts</code> ({coachHosts.join(', ')}) — lịch tự động sẽ bỏ qua AI Coach ở đây. Bấm tay vẫn chạy
               được; đổi trong <code>trainer/config.yaml</code>.
+            </div>
+          )}
+          {info?.sync && (info.sync.beforeAi || info.sync.afterAi) && (
+            <div className="tiny muted ins-wrap" title="Đổi trong trainer/config.yaml → sync.before_ai / sync.after_ai">
+              ⇅ Tự đồng bộ {info.sync.beforeAi && info.sync.afterAi ? 'trước và sau' : info.sync.beforeAi ? 'trước' : 'sau'} mỗi lượt AI (phân tích, sinh câu, ENRICH) —{' '}
+              {info.sync.beforeAi ? 'AI thấy cả bài làm của máy kia' : 'kết quả AI được đẩy lên ngay'}.
             </div>
           )}
           <div className="row">

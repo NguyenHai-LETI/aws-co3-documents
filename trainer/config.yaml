@@ -37,3 +37,5 @@ stats:
 
 sync:
   data_paths: [trainer/results, trainer/coach, trainer/bank]   # thư mục được "⇅ Đồng bộ" commit + push
+  before_ai: true           # AI Coach (phân tích, sinh câu, ENRICH, câu dài) tự đồng bộ TRƯỚC khi chạy → thấy cả bài làm của máy kia
+  after_ai: true            # ...và tự đẩy kết quả AI (kế hoạch, câu mới, patch, hồ sơ) lên ngay SAU lượt chạy thành công

@@ -8,11 +8,11 @@
 //   node trainer/scripts/coach-run.ts --longform [--count 5]
 import os from 'node:os';
 import { loadConfig } from '../server/config.ts';
-import { loadBank } from '../server/lib/bank.ts';
 import { loadAttempts } from '../server/lib/results.ts';
 import { loadPlans } from '../server/lib/plans.ts';
 import { loadIssues } from '../server/lib/issues.ts';
-import { newDataSince, writeSnapshot } from '../server/lib/snapshot.ts';
+import { newDataSince } from '../server/lib/snapshot.ts';
+import { aiSyncLine, syncForAi } from '../server/lib/sync.ts';
 import { NothingToDoError, coachGuard, coachRunner, findClaude, hostAllowed, scheduledRunsToday } from '../server/lib/coach-runner.ts';
 import type { CoachRunInfo, CoachTask } from '../shared/types.ts';
 
@@ -58,6 +58,9 @@ if (!claude.available) {
   process.exit(2);
 }
 
+// Sync first (sync.before_ai): results that arrived from the other machine count as new data below.
+if (cfg.sync.before_ai) log(aiSyncLine(await syncForAi('before')));
+
 if (task === 'analyze' && !flag('force') && cfg.coach.skip_if_no_new_results) {
   const attempts = loadAttempts();
   const fresh = newDataSince(loadPlans(attempts)[0], attempts);
@@ -73,10 +76,7 @@ if (task === 'analyze' && !flag('force') && cfg.coach.skip_if_no_new_results) {
   }
 }
 
-if (task === 'analyze') {
-  const snap = writeSnapshot(loadBank(), cfg);
-  log(`snapshot: ${String(snap.attempts)} bài / ${String(snap.answers)} câu · Claude Code ${claude.version}`);
-} else log(`Claude Code ${claude.version} · ${claude.source}`);
+log(`Claude Code ${claude.version} · ${claude.source}`); // analyze: the runner writes the snapshot right before the CLI starts
 
 const params: Record<string, unknown> =
   task === 'generate'
@@ -105,7 +105,7 @@ const runOnce = () => {
     process.exit(0);
   }
   try {
-    const info = coachRunner.start(task, trigger, params);
+    const info = coachRunner.start(task, trigger, params, { syncBefore: false }); // synced above
     if (batches > 1) log(`▶ Lượt ${finished + 1}/${batches}: ${info.id}`);
   } catch (e) {
     if (e instanceof NothingToDoError) {
@@ -125,7 +125,7 @@ coachRunner.on('done', (info: CoachRunInfo) => {
   log(`${info.status}${info.costUsd ? ` · $${info.costUsd.toFixed(3)}` : ''}`);
   finished++;
   if (info.status === 'success' && finished < batches) return void setTimeout(runOnce, 1500);
-  process.exit(info.status === 'success' ? 0 : 1);
+  process.exit(info.status === 'success' || info.status === 'skipped' ? 0 : 1); // skipped = nothing left after the sync
 });
 process.on('SIGINT', () => coachRunner.cancel() || process.exit(130));
 process.on('SIGTERM', () => coachRunner.cancel() || process.exit(143));

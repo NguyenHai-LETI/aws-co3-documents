@@ -61,7 +61,11 @@ export interface AppConfig {
   };
   practice: { default_count: number; quick_count: number; shuffle_options: boolean };
   stats: { rushed_median_seconds: number; recency_half_life_days: number };
-  sync: { data_paths: string[] };
+  sync: {
+    data_paths: string[];
+    before_ai: boolean; // AI coach runs sync first, so the AI sees results / bank changes from the other machine
+    after_ai: boolean; // ...and push what a successful run wrote (plans, packs, patches, profile) right away
+  };
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -82,7 +86,7 @@ const DEFAULT_CONFIG: AppConfig = {
   srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4 },
   practice: { default_count: 20, quick_count: 10, shuffle_options: true },
   stats: { rushed_median_seconds: 5, recency_half_life_days: 14 },
-  sync: { data_paths: ['trainer/results', 'trainer/coach', 'trainer/bank'] },
+  sync: { data_paths: ['trainer/results', 'trainer/coach', 'trainer/bank'], before_ai: true, after_ai: true },
 };
 
 export function loadConfig(): AppConfig {

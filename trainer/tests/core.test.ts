@@ -32,7 +32,7 @@ const cfg: AppConfig = {
   srs: { algorithm: 'leitner', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4 },
   practice: { default_count: 20, quick_count: 10, shuffle_options: true },
   stats: { rushed_median_seconds: 5, recency_half_life_days: 14 },
-  sync: { data_paths: [] },
+  sync: { data_paths: [], before_ai: false, after_ai: false },
 };
 
 const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');
