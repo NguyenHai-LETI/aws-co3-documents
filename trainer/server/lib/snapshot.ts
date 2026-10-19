@@ -1,12 +1,18 @@
 // coach/snapshot.md — a compact, pre-computed digest of the learner's history for the AI coach.
 // The coach reads this first instead of parsing every result file (cheaper and less error-prone).
+// Written off the request path: routes call scheduleSnapshot() (debounced), GET /api/snapshot and the coach runner
+// build it right away when it is stale. Every number goes through regradeAttempts() (answer-key fixes, [L]).
 import fs from 'node:fs';
-import { SNAPSHOT_FILE, type AppConfig } from '../config.ts';
-import type { BankState } from './bank.ts';
+import path from 'node:path';
+import { BANK_DIR, CONFIG_FILE, ISSUES_FILE, QA_DIR, RATINGS_FILE, SNAPSHOT_FILE, loadConfig, type AppConfig } from '../config.ts';
+import { FSRS_PARAMS_FILE, context, contextStats } from '../context.ts';
+import { loadBank, type BankState } from './bank.ts';
 import { detectFeatures, detectServices } from './classify.ts';
 import { loadIssues } from './issues.ts';
-import { loadPlans } from './plans.ts';
-import { loadAttempts } from './results.ts';
+import { loadPlans, plansVersion } from './plans.ts';
+import { attemptsVersion, loadAttempts } from './results.ts';
+import { fileSig } from './index-db.ts';
+import { regradeAttempts } from './regrade.ts';
 import { computeStates, computeStats, struckCorrect } from './stats.ts';
 import { qualitySnapshotLines } from './quality.ts';
 import { qaSnapshotLines } from './ask.ts';
@@ -15,7 +21,7 @@ import { stringifyFrontMatter } from './frontmatter.ts';
 import { fmtDuration } from '../../shared/timing.ts';
 import { pct } from '../../shared/scoring.ts';
 import { MODE_INFO } from '../../shared/labels.ts';
-import type { AnswerRecord, Attempt, Bucket, Plan, Question } from '../../shared/types.ts';
+import type { AnswerRecord, Attempt, Bucket, Plan, Question, QuestionState, StatsResponse, Taxonomy } from '../../shared/types.ts';
 
 function oneLine(s: string, max = 200): string {
   const t = s.replace(/\s+/g, ' ').trim();
@@ -40,13 +46,42 @@ function safeLines(fn: () => string[], label: string): string[] {
   }
 }
 
+// Services + features named by the option text(s) of `keys`, detected once per question version (Question objects are
+// re-created when their pack file changes) and taxonomy — the history repeats the same few option sets thousands of times.
+const termCache = new WeakMap<Taxonomy, WeakMap<Question, Map<string, string[]>>>();
+function optionTerms(q: Question, keys: string, tax: Taxonomy): string[] {
+  let byQ = termCache.get(tax);
+  if (!byQ) termCache.set(tax, (byQ = new WeakMap()));
+  let m = byQ.get(q);
+  if (!m) byQ.set(q, (m = new Map()));
+  let terms = m.get(keys);
+  if (!terms) {
+    const text = q.options.filter((x) => keys.includes(x.key)).map((x) => x.text).join(' ');
+    terms = [...detectServices(text, tax), ...detectFeatures(text, tax)];
+    m.set(keys, terms);
+  }
+  return terms;
+}
+
+/**
+ * Re-graded attempts, states and stats for this bank + config: the request-path context when they match (no second
+ * FSRS replay / stats pass), computed here otherwise (scripts with another config).
+ */
+function derived(bank: BankState, cfg: AppConfig): { all: Attempt[]; states: Map<string, QuestionState>; stats: StatsResponse } {
+  const ctx = context();
+  if (ctx.bank === bank && (ctx.cfg === cfg || JSON.stringify(ctx.cfg) === JSON.stringify(cfg))) {
+    return { all: ctx.attempts, states: ctx.states, stats: contextStats(ctx) };
+  }
+  const all = regradeAttempts(loadAttempts(cfg), bank);
+  const states = computeStates(all, cfg);
+  return { all, states, stats: computeStats(all, bank, states, cfg) };
+}
+
 export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; meta: Record<string, unknown> } {
   const tax = bank.taxonomy;
-  const all = loadAttempts(cfg);
+  const { all, states, stats } = derived(bank, cfg);
   const attempts = all.filter((a) => !a.rushed);
   const rushed = all.filter((a) => a.rushed);
-  const states = computeStates(all, cfg);
-  const stats = computeStats(all, bank, states, cfg);
   const plans = loadPlans(attempts); // a rushed click-through does not complete a plan session for the coach
   const latest = plans[0];
   const fresh = newDataSince(latest, all);
@@ -58,7 +93,13 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
 
   // answer history per question (chronological, non-rushed)
   const history = new Map<string, { r: AnswerRecord; a: Attempt }[]>();
-  for (const a of attempts) for (const r of a.answers) history.set(r.q, [...(history.get(r.q) ?? []), { r, a }]);
+  for (const a of attempts) {
+    for (const r of a.answers) {
+      const h = history.get(r.q);
+      if (h) h.push({ r, a });
+      else history.set(r.q, [{ r, a }]);
+    }
+  }
 
   const meta = {
     kind: 'snapshot',
@@ -152,7 +193,13 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
 
   // ── wrong answers (latest first), with option texts so the coach can spot misconceptions
   const variantsOf = new Map<string, string[]>();
-  for (const q of bank.questions) for (const v of q.variantOf) variantsOf.set(v, [...(variantsOf.get(v) ?? []), q.id]);
+  for (const q of bank.questions) {
+    for (const v of q.variantOf) {
+      const l = variantsOf.get(v);
+      if (l) l.push(q.id);
+      else variantsOf.set(v, [q.id]);
+    }
+  }
   const wrongQs = [...states.values()]
     .filter((s) => s.lastOk === false && bank.byId.has(s.id))
     .sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''))
@@ -229,8 +276,8 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
       if (!q) continue;
       const text = (keys: string) => q.options.filter((x) => keys.includes(x.key)).map((x) => x.text).join(' ');
       const wrongKeys = [...r.pick].filter((k) => !q.answer.includes(k)).join('');
-      const pickedAll = [...detectServices(text(wrongKeys), tax), ...detectFeatures(text(wrongKeys), tax)];
-      const rightAll = [...detectServices(text(q.answer.join('')), tax), ...detectFeatures(text(q.answer.join('')), tax)];
+      const pickedAll = optionTerms(q, wrongKeys, tax);
+      const rightAll = optionTerms(q, q.answer.join(''), tax);
       // keep only what differs between the chosen and the correct option(s)
       const picked = pickedAll.filter((x) => !rightAll.includes(x));
       const right = rightAll.filter((x) => !pickedAll.includes(x));
@@ -298,10 +345,68 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   return { text: stringifyFrontMatter(meta) + '\n' + o.join('\n'), meta };
 }
 
+// ── writing: debounced, off the request path ─────────────────────────────────
+
+const SNAPSHOT_DEBOUNCE_MS = 3000;
+let timer: NodeJS.Timeout | undefined;
+let writtenFor = ''; // inputs key of the last snapshot this process wrote
+
+const sig = (file: string) => fileSig(file) || '-';
+
+/** Everything the snapshot is computed from (data versions, FSRS parameters, issue / rating / Q&A / verify files, config, date). */
+function inputsKey(): string {
+  let qa = '';
+  try {
+    qa = fs.readdirSync(QA_DIR).sort().map((f) => `${f}:${sig(path.join(QA_DIR, f))}`).join(',');
+  } catch {
+    // no Q&A yet
+  }
+  return [loadBank().version, attemptsVersion(), plansVersion(), sig(FSRS_PARAMS_FILE), sig(ISSUES_FILE), sig(RATINGS_FILE), sig(path.join(BANK_DIR, 'verify.md')), sig(CONFIG_FILE), qa, localDateKey(new Date())].join('|');
+}
+
 export function writeSnapshot(bank: BankState, cfg: AppConfig): Record<string, unknown> {
+  const key = inputsKey();
   const { text, meta } = buildSnapshot(bank, cfg);
-  fs.writeFileSync(SNAPSHOT_FILE, text);
+  const tmp = `${SNAPSHOT_FILE}.tmp-${process.pid}`; // the coach never reads a half-written file
+  fs.mkdirSync(path.dirname(SNAPSHOT_FILE), { recursive: true });
+  fs.writeFileSync(tmp, text);
+  fs.renameSync(tmp, SNAPSHOT_FILE);
+  writtenFor = key;
   return meta;
+}
+
+function writeNow(): void {
+  if (timer) clearTimeout(timer);
+  timer = undefined;
+  try {
+    writeSnapshot(loadBank(), loadConfig());
+  } catch (e) {
+    console.error('snapshot failed', e);
+  }
+}
+
+/** Rewrites the snapshot ~3 s after the last call (submit, why-note, issue…) — never inside the request. */
+export function scheduleSnapshot(delayMs = SNAPSHOT_DEBOUNCE_MS): void {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(writeNow, delayMs);
+  timer.unref(); // never keeps a script / test process alive
+}
+
+/** A scheduled write is pending, or the data changed since this process last wrote the file. */
+export function snapshotStale(): boolean {
+  return !!timer || !fs.existsSync(SNAPSHOT_FILE) || writtenFor !== inputsKey();
+}
+
+/** Builds the snapshot now when it is stale (GET /api/snapshot); returns whether it was rewritten. */
+export function ensureSnapshot(): boolean {
+  if (!snapshotStale()) return false;
+  writeNow();
+  return true;
+}
+
+/** Writes a pending scheduled snapshot immediately (server shutdown). */
+export function flushSnapshot(): void {
+  if (timer) writeNow();
 }
 
 export function questionsFor(bank: BankState, ids: string[]): Question[] {

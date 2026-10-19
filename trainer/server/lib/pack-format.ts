@@ -22,7 +22,8 @@ const Q_HEADING = /^##\s+Q:?\s+(\S+)(.*)$/;
 const OTHER_HEADING = /^#{1,2}\s/;
 const META_LINE = /^\s*[-*]\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/;
 const OPTION_LINE = /^\s*[-*]\s+(?:\[([ xX])\]\s+)?([A-H])[.)]\s+(.*)$/;
-const CHOOSE_RE = /\((?:Choose|Select)\s+(TWO|THREE|FOUR|2|3|4)\)/i;
+/** "(Choose TWO)", "(Select THREE.)" — the exam's multiple-response marker, with or without the period. */
+export const CHOOSE_RE = /\((?:Choose|Select)\s+(TWO|THREE|FOUR|2|3|4)\.?\)/i;
 
 export const META_KEYS = [
   'domain',
@@ -48,8 +49,14 @@ export function questionHash(stem: string, options: Option[], answer: string[]):
   return crypto.createHash('sha1').update(src).digest('hex').slice(0, 10);
 }
 
-/** Option-letter references in an explanation break when options are shuffled for display. */
-export const LETTER_REF_RE = /(^|\n)\s*[-*]?\s*\(?[A-H]\)?\s*[:.)–—-]\s|\b(?:[Oo]ption|[Aa]nswer|[Cc]hoice|[Đđ]áp án)\s+[A-H]\b|=\s*[A-H]\b(?![’'])|\([A-H]\)/; // uppercase letters only — "answer a few" is prose
+/**
+ * Option-letter references in an explanation break when options are shuffled for display: a line starting "A:" / "- B." ,
+ * "option B", "answer C", "choice D", "đáp án A", "phương án B", "lựa chọn C" (also "đáp án đúng là B"), "= A", "(B)".
+ * Unicode-aware (`u` + explicit letter boundaries: `\b` never matches next to đ / Đ). Uppercase letters only — "answer a
+ * few" and "RPO = a few minutes" are prose.
+ */
+export const LETTER_REF_RE =
+  /(^|\n)\s*[-*]?\s*\(?[A-H]\)?\s*[:.)–—-]\s|(?<![\p{L}\p{N}])(?:[Oo]ption|[Aa]nswer|[Cc]hoice|(?:[Đđ]áp án|[Pp]hương án|[Ll]ựa chọn)(?:\s+(?:đúng|sai))?(?:\s+là)?)\s+[A-H](?![\p{L}\p{N}])|=\s*[A-H](?![\p{L}\p{N}’'])|\([A-H]\)/u;
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const STATUSES: QuestionStatus[] = ['active', 'draft', 'retired'];

@@ -40,7 +40,7 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, statsCfg: Partial<AppConfi
   return {
     coach: {
       model: '',
-      models: { analyze: '', generate: '', enrich: '', ask: '' },
+      models: { analyze: '', generate: '', enrich: '', ask: '', verify: '' },
       effort: '',
       max_budget_usd: 0,
       skip_if_no_new_results: true,
@@ -51,10 +51,16 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, statsCfg: Partial<AppConfi
       enrich_on_idle: false,
       enrich_batch_size: 20,
       max_runs_per_day: 6,
+      structured_output: true,
+      verify: { auto: false, auto_draft: false, batch_size: 10 },
     },
-    srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, ...srs },
+    srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'off', optimize_min_reviews: 400, ...srs },
     practice: { default_count: 20, quick_count: 10, shuffle_options: true },
     stats: { rushed_median_seconds: 5, recency_half_life_days: 14, ...statsCfg },
+    quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88 },
+    server: { lan: false },
+    export: { anki_deck: 'test', ankiconnect_url: '' },
+    cache: { sqlite: false },
     sync: { data_paths: [], before_ai: false, after_ai: false },
   };
 }
@@ -101,35 +107,91 @@ it('bank fixture parses cleanly', () => {
 
 it('FSRS forgetting curve and interval', () => {
   assert.equal(fsrs.retrievability(0, 5), 1);
-  assert.ok(Math.abs(fsrs.retrievability(5, 5) - 0.9) < 1e-12, 'R(S, S) = 90 %');
+  assert.ok(Math.abs(fsrs.retrievability(5, 5) - 0.9) < 1e-7, 'R(S, S) = 90 %');
   assert.ok(fsrs.retrievability(10, 5) < fsrs.retrievability(5, 5));
-  assert.ok(Math.abs(fsrs.intervalDays(7.3, 0.9) - 7.3) < 1e-9, 'I(S, 0.9) = S');
+  assert.ok(Math.abs(fsrs.intervalDays(7.3, 0.9) - 7.3) < 1e-6, 'I(S, 0.9) = S');
   assert.ok(fsrs.intervalDays(10, 0.95) < fsrs.intervalDays(10, 0.9), 'higher retention → shorter interval');
-  assert.ok(Math.abs(fsrs.retrievability(fsrs.intervalDays(4, 0.85), 4) - 0.85) < 1e-9);
+  assert.ok(Math.abs(fsrs.retrievability(fsrs.intervalDays(4, 0.85), 4) - 0.85) < 1e-6);
+  // scheduled intervals are whole days ≥ 1, rounded like ts-fsrs (no fuzz)
+  assert.equal(fsrs.nextIntervalDays(7.3, 0.9), 7);
+  assert.equal(fsrs.nextIntervalDays(0.2, 0.9), 1);
+  assert.equal(fsrs.nextIntervalDays(10, 0.85), Math.round(fsrs.intervalDays(10, 0.85)));
+  // FSRS-6 forgetting curve: R = (1 + F·t/S)^(−w20) with F chosen so that R(S, S) = 0.9
+  const w20 = fsrs.FSRS_WEIGHTS[20];
+  const F = Math.pow(0.9, -1 / w20) - 1;
+  assert.ok(Math.abs(fsrs.retrievability(30, 4) - Math.pow(1 + (F * 30) / 4, -w20)) < 1e-7);
 });
 
-it('FSRS-4.5 update rules with the default weights', () => {
-  assert.deepEqual([1, 2, 3, 4].map((g) => fsrs.initStability(g as 1 | 2 | 3 | 4)), [0.4872, 1.4003, 3.7145, 13.8206]);
-  assert.ok(Math.abs(fsrs.initDifficulty(1) - 7.6214) < 1e-9);
-  assert.ok(Math.abs(fsrs.initDifficulty(4) - 3.932) < 1e-9);
-  assert.ok(Math.abs(fsrs.nextDifficulty(5.1618, 3) - 5.1236762) < 1e-6, 'mean reversion towards D0(4)');
+it('FSRS-6 update rules: default weights, ordering, spacing, short-term, bounds', () => {
+  assert.equal(fsrs.FSRS_WEIGHTS.length, 21, 'FSRS-6 has 21 parameters');
+  assert.deepEqual([1, 2, 3, 4].map((g) => fsrs.review(undefined, g as 1 | 2 | 3 | 4, 0).stability), [0.212, 1.2931, 2.3065, 8.2956]);
   const first = fsrs.review(undefined, 3, 0);
-  // reviewed exactly when R = 90 %
-  const good = fsrs.review(first, 3, first.stability);
-  assert.ok(Math.abs(good.stability - 14.095) < 0.05, `good → ${good.stability}`);
-  const again = fsrs.review(first, 1, first.stability);
-  assert.ok(Math.abs(again.stability - 1.418) < 0.01, `again → ${again.stability}`);
-  const hard = fsrs.review(first, 2, first.stability);
-  const easy = fsrs.review(first, 4, first.stability);
+  const t = Math.round(first.stability); // reviewed when R ≈ 90 %
+  const [again, hard, good, easy] = ([1, 2, 3, 4] as const).map((g) => fsrs.review(first, g, t));
   assert.ok(again.stability < first.stability && first.stability < hard.stability && hard.stability < good.stability && good.stability < easy.stability);
   assert.ok(again.difficulty > first.difficulty && easy.difficulty < first.difficulty);
-  // spacing effect: a later successful recall strengthens memory more; an immediate re-answer adds nothing
+  // spacing effect: a later successful recall strengthens memory more
   assert.ok(fsrs.review(first, 3, 10).stability > fsrs.review(first, 3, 2).stability);
-  assert.ok(Math.abs(fsrs.review(first, 3, 0).stability - first.stability) < 1e-9);
+  // same day (0 days): FSRS-6 short-term rule — "good" never lowers stability, "again" does
+  assert.ok(fsrs.review(first, 3, 0).stability >= first.stability);
+  assert.ok(fsrs.review(first, 1, 0).stability < first.stability);
   // difficulty stays within 1..10
   let m = fsrs.review(undefined, 1, 0);
   for (let i = 0; i < 30; i++) m = fsrs.review(m, 1, 1);
   assert.ok(m.difficulty <= 10 && m.difficulty >= 1 && m.stability > 0);
+});
+
+it('FSRS-6 replay equals ts-fsrs FSRSAlgorithm (and fsrs-rs nextStates when the optimizer package is installed)', async () => {
+  const { FSRSAlgorithm, generatorParameters } = await import('ts-fsrs');
+  const custom = [0.5, 1.5, 3, 9, 6.2, 0.7, 2.6, 0.01, 1.7, 0.15, 0.8, 1.5, 0.07, 0.3, 1.6, 0.55, 1.9, 0.5, 0.1, 0.07, 0.2];
+  // (grade, whole days since the previous answer) — includes same-day re-answers and lapses
+  const seq: [1 | 2 | 3 | 4, number][] = [[3, 0], [1, 2], [3, 0], [2, 1], [3, 4], [4, 11], [1, 40], [3, 1], [3, 0], [4, 9]];
+  for (const w of [fsrs.FSRS_WEIGHTS, custom]) {
+    const ref = new FSRSAlgorithm(generatorParameters({ w: [...w], enable_short_term: true, enable_fuzz: false }));
+    let mine: { stability: number; difficulty: number } | undefined;
+    let theirs: { stability: number; difficulty: number } | null = null;
+    for (const [g, d] of seq) {
+      mine = fsrs.review(mine, g, d, w);
+      theirs = ref.next_state(theirs, theirs ? d : 0, g);
+      assert.ok(Math.abs(mine.stability - theirs.stability) < 1e-9 && Math.abs(mine.difficulty - theirs.difficulty) < 1e-9, `step ${g}/${d}`);
+    }
+  }
+  // the same history through computeStates (day-scale: whole local days between attempts)
+  const cfg6 = makeCfg();
+  const days = [40, 38, 38, 37, 33, 22];
+  const grades: AnswerRecord[] = [ans('r', true), ans('r', false), ans('r', true), ans('r', true, { unsure: true }), ans('r', true, { t: 20 }), ans('r', true)];
+  const atts = days.map((d, i) => attempt(d, [grades[i]]));
+  const s = stats.computeStates(atts, cfg6, NOW).get('r')!;
+  let m: { stability: number; difficulty: number } | undefined;
+  let prevDay: number | undefined;
+  for (const a of atts) {
+    const day = fsrs.localDay(Date.parse(a.finished));
+    m = fsrs.review(m, fsrs.gradeAnswer(a.answers[0]), prevDay === undefined ? 0 : day - prevDay);
+    prevDay = day;
+  }
+  assert.equal(s.stability, Math.round(m!.stability * 100) / 100);
+  assert.equal(s.fsrsDifficulty, Math.round(m!.difficulty * 100) / 100);
+  assert.equal(s.dueAt, new Date(fsrs.dayStartMs(prevDay! + fsrs.nextIntervalDays(m!.stability))).toISOString(), 'due at the start of the due day');
+  // independent implementation (Rust fsrs-rs via the optional binding): same memory states
+  let binding: typeof import('@open-spaced-repetition/binding') | undefined;
+  try {
+    binding = await import('@open-spaced-repetition/binding');
+  } catch {
+    binding = undefined; // optional package not installed on this platform
+  }
+  if (binding) {
+    const rs = new binding.FSRSBinding([...fsrs.FSRS_WEIGHTS]);
+    let mem: InstanceType<typeof binding.BindingMemoryState> | undefined;
+    let mine: { stability: number; difficulty: number } | undefined;
+    const pick = (n: InstanceType<typeof binding.BindingNextStates>, g: number) => [n.again, n.hard, n.good, n.easy][g - 1].memory;
+    for (const [g, d] of seq) {
+      const next = pick(rs.nextStates(mem ?? null, 0.9, mem ? d : 0), g);
+      mine = fsrs.review(mine, g, d);
+      assert.ok(Math.abs(next.stability - mine.stability) / mine.stability < 1e-3, `fsrs-rs S ${next.stability} vs ${mine.stability}`);
+      assert.ok(Math.abs(next.difficulty - mine.difficulty) < 1e-3, `fsrs-rs D ${next.difficulty} vs ${mine.difficulty}`);
+      mem = new binding.BindingMemoryState(next.stability, next.difficulty);
+    }
+  }
 });
 
 it('answer grades: wrong 1 · unsure/hinted/struck-correct/slow 2 · fast 4 · else 3', () => {
@@ -164,14 +226,17 @@ it('FSRS states: memory levels, due dates, mastery, lapses; rushed attempts igno
   assert.ok(stats.isMastered(x, cfg));
   assert.equal(x.box, fsrs.memoryLevel(x.stability));
   assert.ok(x.box >= 4);
-  // due = last answer + max(1, S) days at 90 % retention
-  const expectedDue = NOW - 30 * DAY + Math.max(1, x.stability!) * DAY;
-  assert.ok(Math.abs(new Date(x.dueAt!).getTime() - expectedDue) < DAY * 0.01 * x.stability!);
+  // due = start of the local day (last answer day + round(S) days) at 90 % retention
+  const lastDay = fsrs.localDay(NOW - 30 * DAY);
+  const due = new Date(x.dueAt!);
+  assert.equal(due.getHours() + due.getMinutes(), 0, 'due at local midnight');
+  assert.ok(Math.abs(fsrs.localDay(due.getTime()) - lastDay - x.stability!) <= 0.51, `due ${x.dueAt} vs S ${x.stability}`);
   assert.ok(x.retrievability! > 0.5 && x.retrievability! < 1);
+  assert.ok(Math.abs(x.retrievability! - fsrs.retrievability(fsrs.localDay(NOW) - lastDay, x.stability!)) < 0.002, 'R at today, whole days');
   const y = states.get('y')!;
   assert.equal(y.lapses, 1);
   assert.equal(y.lastGrade, 1);
-  assert.ok(y.stability! < 3.7145);
+  assert.ok(y.stability! < 2.3065, `a lapse drops S below the first "good" (${y.stability})`);
   assert.ok(!stats.isMastered(y, cfg));
   assert.ok(stats.isDue(y, NOW));
   assert.equal(states.get('z')!.lapses ?? 0, 0, 'wrong before the first correct answer is not a lapse');
@@ -352,6 +417,24 @@ it('Pearson exam: 65 questions, 15 pilots keeping the scored domain mix, officia
   assert.ok(plain.questions.every((r) => !r.order));
 });
 
+it('explicit ids and AI-plan sessions never serve draft (awaiting review) or retired questions — with a note', () => {
+  const [d, r, ok, ok2] = bank.questions.slice(20, 24);
+  const byId = new Map(bank.byId);
+  byId.set(d.id, { ...d, status: 'draft' });
+  byId.set(r.id, { ...r, status: 'retired' });
+  const b2 = { ...bank, byId, questions: bank.questions.map((q) => byId.get(q.id)!) };
+  const s = select.buildTest({ mode: 'ids', ids: [d.id, r.id, ok.id, ok.id, ok2.id] }, { bank: b2, states: new Map(), cfg, plans: [] });
+  assert.deepEqual(s.questions.map((x) => x.id), [ok.id, ok2.id]);
+  assert.ok(s.notes.includes('1 câu đang chờ duyệt (draft) đã được bỏ qua.'), s.notes.join(' | '));
+  assert.ok(s.notes.includes('Bỏ qua 1 câu đã retired.'));
+  const plan = { id: 'p1', file: '', created: '', newPacks: [], body: '', sessions: [{ id: 's1', title: 'Vá lỗi', questions: [d.id, ok.id] }] };
+  const c = select.buildTest({ mode: 'coach', plan: 'p1#s1' }, { bank: b2, states: new Map(), cfg, plans: [plan] });
+  assert.deepEqual(c.questions.map((x) => x.id), [ok.id]);
+  assert.match(c.notes.join(' '), /chờ duyệt \(draft\)/);
+  // filter-based modes never had drafts in their pool
+  assert.ok(!select.buildTest({ mode: 'custom', count: 200 }, { bank: b2, states: new Map(), cfg, plans: [] }).questions.some((x) => x.id === d.id));
+});
+
 it('exam picks prefer never seen, then least recently seen', () => {
   const secure = bank.questions.filter((q) => q.domain === 'secure');
   const states = new Map<string, QuestionState>(
@@ -416,7 +499,8 @@ it('answer extras are normalized: elim, recall (300), why (500), hinted', () => 
   assert.equal(r.hinted, true);
   assert.equal(r.recallHit, false);
   const empty = results.gradeSubmission(submit(session([q.id]), () => ({ recall: '   ', why: '', elim: [] })), bank).records[0];
-  assert.deepEqual(Object.keys(empty).sort(), ['est', 'key', 'ok', 'pick', 'q', 't']);
+  assert.deepEqual(Object.keys(empty).sort(), ['est', 'h', 'key', 'ok', 'pick', 'q', 't']);
+  assert.equal(empty.h, q.hash, 'the answered version of the question is recorded');
 });
 
 it('recallHit: services/features (any case) or ≥ 2 content words; ties with a wrong option still count; stem words ignored', () => {

@@ -8,10 +8,11 @@ import { loadBank } from '../lib/bank.ts';
 import { addIssue, loadIssues } from '../lib/issues.ts';
 import { findClaude } from '../lib/coach-runner.ts';
 import { listNotes, readNote } from '../lib/notes.ts';
+import { ensureSnapshot, scheduleSnapshot } from '../lib/snapshot.ts';
 import os from 'node:os';
 
 route('GET', '/api/meta', () => {
-  const { cfg, bank, attempts, plans } = context();
+  const { cfg, bank, attempts, plans, versions } = context();
   const issues = loadIssues();
   return {
     exam: bank.taxonomy.exam,
@@ -24,6 +25,7 @@ route('GET', '/api/meta', () => {
     services: Object.entries(bank.taxonomy.services).map(([name, d]) => ({ name, topic: d.topic })),
     packs: bank.packs,
     bankVersion: bank.version,
+    versions, // {bank, results, plans} — same values as the SSE `data` event
     problems: { errors: bank.problems.filter((p) => p.level === 'error').length, warnings: bank.problems.filter((p) => p.level === 'warning').length },
     openIssues: issues.filter((i) => i.open).length,
     practice: cfg.practice,
@@ -48,7 +50,9 @@ route('GET', '/api/issues', () => loadIssues().reverse());
 route('POST', '/api/issues', async (req) => {
   const body = await readBody<{ qid?: string; type?: string; note?: string }>(req);
   if (!body.qid || !loadBank().byId.has(body.qid)) throw new HttpError(400, 'Unknown question id');
-  return addIssue(body.qid, body.type ?? 'other', (body.note ?? '').slice(0, 1000));
+  const item = addIssue(body.qid, body.type ?? 'other', (body.note ?? '').slice(0, 1000));
+  scheduleSnapshot(); // open issues are a snapshot section
+  return item;
 });
 
 route('GET', '/api/notes', () => listNotes());
@@ -70,4 +74,8 @@ route('GET', '/api/file', (_req, url) => {
   return { path: rel(abs), content: fs.readFileSync(abs, 'utf8') };
 });
 
-route('GET', '/api/snapshot', () => ({ content: fs.existsSync(SNAPSHOT_FILE) ? fs.readFileSync(SNAPSHOT_FILE, 'utf8') : '' }));
+/** coach/snapshot.md — rebuilt first when stale (a scheduled write is pending or the data changed since it was written). */
+route('GET', '/api/snapshot', () => {
+  ensureSnapshot();
+  return { content: fs.existsSync(SNAPSHOT_FILE) ? fs.readFileSync(SNAPSHOT_FILE, 'utf8') : '' };
+});

@@ -105,7 +105,9 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | **4. Chất lượng dữ liệu (v2)** | #1–#5 §7 | ✅ v2 |
 | **5. Học hiệu quả hơn (v2)** | #6–#12 §7 | ✅ v2 |
 | **6. AI & vận hành (v2)** | #13–#17 §7 | ✅ v2 |
-| **7. Tiếp theo** | §7.4 | 💡 đề xuất |
+| **7. Hiệu năng & chất lượng câu hỏi (v3, đợt 2)** | #18–#23 §7.4 | ✅ v3 |
+| **8. Nâng cao (v3, đợt 3)** | #24–#29 §7.5 | ✅ v3 |
+| **9. Tiếp theo** | §7.6 | 💡 đề xuất |
 
 ## 7. Tính năng
 
@@ -130,7 +132,7 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | 7 | Gạch đáp án + tô từ khoá | ✕ / chuột phải / Shift+số; `elim` lưu vào kết quả; thống kê “gạch nhầm đáp án đúng”; tô qualifier theo `taxonomy.keywords` |
 | 8 | Thi thử 2.0 (Pearson VUE) | 15 câu thử nghiệm không tính điểm, màn hình Review cuối bài, không tạm dừng, cảnh báo 15′/5′, sức bền theo phần tư |
 | 9 | Nhớ trước khi xem đáp án | ẩn lựa chọn đến khi người học viết đáp án mình nghĩ; `recallHit` chấm tự động theo service/khái niệm |
-| 10 | FSRS + giới hạn ôn/ngày | FSRS-4.5 (grade theo đúng/sai, chưa chắc, gợi ý, tốc độ); ôn câu sắp quên nhất trước; `daily_limit` + tồn đọng |
+| 10 | FSRS + giới hạn ôn/ngày | FSRS-4.5 ở v2 → **FSRS-6** ở v3 (#24) (grade theo đúng/sai, chưa chắc, gợi ý, tốc độ); ôn câu sắp quên nhất trước; `daily_limit` + tồn đọng |
 | 11 | Mức sẵn sàng v2 + lọc nhiễu | trọng số thời gian/độ khó/câu dài, prior Laplace, khoảng tin cậy 90 %, xác suất đỗ; loại bài làm vội |
 | 12 | Hỏi AI + gợi ý | `claude -p` chỉ đọc, trả lời tiếng Việt, lưu `coach/qa/<id>.md`; gợi ý (`hint`) do ENRICH soạn sẵn |
 
@@ -144,15 +146,44 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | 16 | CI + test | GitHub Actions (`trainer/ci/trainer-ci.yml` — chuyển vào `.github/workflows/` khi token có quyền `workflow`): validate, typecheck, unit, e2e API (TRAINER_HOME tạm), UI smoke Playwright |
 | 17 | Launcher + Windows | `start.command` / `start.sh` / `start.bat`, `OPEN=1`; dò CLI trên Windows; lịch đa nền tảng (launchd / crontab / schtasks) |
 
-### 7.4 Lộ trình tiếp theo (đề xuất)
+### 7.4 Hiệu năng & chất lượng câu hỏi (v3 — đợt 2 của bản rà soát)
 
-1. **Bản đồ phủ notes** — mục `##/###` nào trong notes chưa có câu hỏi → sinh câu cho đúng mục đó.
-2. **Ngày thi & dự báo** — đặt ngày thi, dự báo ngày đạt mức sẵn sàng ≥ 75 %, coach ưu tiên theo thời gian còn lại; mục tiêu ngày + nhắc bằng thông báo hệ thống.
-3. **Flashcard từ khoá → service** (từ `M-keywords-mapping.md`, `L-quyet-dinh-nhanh.md`) và xuất/nhập Anki.
-4. **Báo cáo tuần do AI viết** (`coach/reports/`).
-5. **Nhiều kỳ thi** (DVA-C02, SOA-C02, SAP-C02) — taxonomy theo `exam`.
-6. **Truy cập từ điện thoại trong LAN** (opt-in, token) / PWA.
-7. **“Giải thích lại” (explain-back)** — người học tự giải thích, AI chấm mức hiểu.
+Rà soát v2 (đo trên bộ dữ liệu giả lập 2 năm: 1.500 bài, 47 nghìn câu trả lời, 700 kế hoạch): nộp bài chặn server ~3,5 s (snapshot tính lại
+toàn lịch sử), khởi động đọc mọi file kết quả 2 lần (~4,3 s), mỗi request 130–170 ms, `/api/plans` 3,2 MB. Nghiên cứu sinh câu trắc nghiệm
+bằng LLM (2025–2026): AI tự sửa câu thì 56–68 % bản sửa phát sinh lỗi mới; model thứ hai giải mù bắt được nhiều câu lỗi hơn tự kiểm (63,6 % vs 27 %).
+
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 18 | Hiệu năng | snapshot ra khỏi request (debounce 3 s, cache theo phiên bản câu); parse cache SQLite (`node:sqlite`, `.cache/trainer.db`, mỗi file đọc 1 lần); `context()` memo theo phiên bản dữ liệu; chỉ mục kế hoạch; phân trang `/api/results?limit&offset`, `/api/plans` (+ `/api/plans/:id`); gzip JSON; web chỉ tải lại phần đã đổi. Kết quả: nộp bài 3.301 → 7 ms; meta/state/stats ~12 ms; khởi động 5,7 → 0,6–1 s; mỗi trang < 200 KB |
+| 19 | Giải mù bằng model thứ hai | task `verify`: model khác (`coach.models.verify`, mặc định opus) giải câu chỉ với đề + phương án (`--tools ""`, `--json-schema`); sổ `bank/verify.md` (merge=union); tự chạy sau lượt AI có câu mới/câu bị đổi; câu AI lệch/mơ hồ → `draft` chờ duyệt (Duyệt/Loại/Sửa bằng ENRICH); câu draft không bao giờ vào bài |
+| 20 | Lint lỗi viết câu | `server/lib/lint.ts`: 11 luật (nặng: trùng phương án, All/None of the above, Choose N, nhắc chữ cái; vừa: đáp án đúng dài nhất, lặp từ đề, từ tuyệt đối, phủ định, a/an, chồng lấn; nhẹ: giải thích ngắn); `validate --lint`; patch AI làm phát sinh lỗi nặng mới bị từ chối |
+| 21 | Phân tích phương án nhiễu | từ bài làm (chỉ phiên bản hiện tại của câu): phương án không ai chọn mà hay bị gạch → ENRICH `distractors`; cùng phương án sai được chọn chắc chắn nhiều lần → nghi sai đáp án → giải mù / báo lỗi; vào snapshot cho coach |
+| 22 | Phiên bản câu & chấm lại | mỗi câu trả lời lưu `h` = hash câu hỏi lúc làm; đáp án đổi → `regradeAttempts` chấm lại trong thống kê/FSRS/snapshot (file kết quả giữ nguyên); trang kết quả ghi ↻ / ✎ |
+| 23 | AI trả JSON | Sinh câu / ENRICH / Câu dài: `--json-schema` + công cụ chỉ đọc; app tự ghi patch/pack sau khi kiểm tra (định dạng, task–domain, chữ cái, gợi ý lộ đáp án, Choose N, lint nặng); 1 vòng sửa qua `--resume`; chế độ ghi file giữ cho `/trainer-*` & Cowork |
+
+### 7.5 Nâng cao (v3 — đợt 3)
+
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 24 | FSRS-6 + tham số cá nhân | ts-fsrs 5.4 (theo ngày, short-term); tối ưu bằng `@open-spaced-repetition/binding` trong **tiến trình con** (lỗi native không làm sập server); chỉ dùng khi log-loss tốt hơn mặc định; `results/fsrs-params.json` (merge=union); `srs.optimize auto/manual/off` |
+| 25 | Ngày thi & dự báo | `results/goal.md`; dự báo theo domain đúng ngày thi (nếu dừng học / nếu ôn đúng lịch), độ phủ, lịch ôn sắp tới; thẻ đếm ngược ở Tổng quan |
+| 26 | Đối chiếu điểm thi chính thức | `results/external/*.md`; mức sẵn sàng tại ngày thi thử → độ lệch → mức sẵn sàng hiệu chỉnh |
+| 27 | Tìm kiếm toàn văn | SQLite FTS5 (`unicode61 remove_diacritics 2`, gập “đ”), câu hỏi + tài liệu theo heading, ô tìm kiếm toàn cục (`/`), fallback quét bộ nhớ |
+| 28 | Câu trùng theo nghĩa | embedding chạy trên máy qua Ollama (`embeddinggemma`), cache theo nội dung, chạy nền, cosine ≥ 0,88, gộp với trùng từ khoá |
+| 29 | Điện thoại (LAN) + Anki | LAN opt-in: listener 0.0.0.0, mã truy cập + cookie HMAC, Host allow-list, giao diện đóng gói cho điện thoại, QR; Anki: TSV có GUID cố định + AnkiConnect (cập nhật thẻ cũ) |
+
+### 7.6 Lộ trình tiếp theo (đề xuất)
+
+1. **Đợt 1 của bản rà soát (chưa làm theo yêu cầu)**: câu bỏ trống chưa xem vẫn bị FSRS tính là quên; mức sẵn sàng dựa cả câu ôn lặp lại /
+   gợi ý (σ chỉ có sai số mẫu → xác suất đỗ quá tự tin); `taxonomy.yaml` lỗi làm sập app; kế hoạch AI có `feedback` sai làm nộp bài lỗi 500;
+   tự đặt `coach.hosts` khi cài lịch; kiểm tra đăng nhập sau khi CLI cập nhật (`--bare` có thể thành mặc định cho `-p`); thu hẹp quyền ghi
+   của phân tích (không ghi `bank/migrations/`); bỏ `ANTHROPIC_AUTH_TOKEN` khỏi môi trường coach; kiểm tra `session.mode` phía server.
+2. **Hạn mức & token (bỏ qua theo yêu cầu)**: nhận biết hết hạn mức 5 giờ/tuần, hẹn chạy lại, bớt token mỗi lượt.
+3. **Bản đồ phủ notes** — mục `##/###` nào trong notes chưa có câu hỏi → sinh câu cho đúng mục đó (có thể dùng FTS5/embedding).
+4. **Flashcard từ khoá → service** (từ `M-keywords-mapping.md`, `L-quyet-dinh-nhanh.md`).
+5. **Báo cáo tuần do AI viết** (`coach/reports/`); đưa dự báo ngày thi vào snapshot để coach ưu tiên theo thời gian còn lại.
+6. **Nhiều kỳ thi** (DVA-C02, SOA-C02, SAP-C02) — taxonomy theo `exam`.
+7. **“Giải thích lại” (explain-back)** — người học tự giải thích, AI chấm mức hiểu; PWA cho điện thoại.
 
 ## 8. Rủi ro & giảm thiểu
 
@@ -182,3 +213,16 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | AI thật trên repo (sonnet) | ENRICH 10 câu: 10/10 áp dụng, 0 lỗi, $0.237 (tự sửa 2 câu MSK sai domain, cân độ dài 4 câu) · câu dài: 3 câu 70–85 từ, $0.215 |
 | QA giao diện | các agent UI chụp & soát > 120 ảnh (light/dark, 1440/390 px); orchestrator soát lại các trang chính với dữ liệu thật đã migration |
 | Lỗi tìm thấy & sửa trong lúc làm | thời gian từng câu luôn = 0 dưới React StrictMode (lỗi từ v1); regex nhận diện chữ cái đáp án bắt nhầm chữ thường; modal đồng bộ bị đè; tràn ngang trang Coach ở 390 px |
+
+**v3** (đợt 2 + 3 của bản rà soát; 5 sub-agent làm song song theo vùng file riêng → tích hợp → 3 agent rà soát độc lập → sửa → kiểm lại):
+
+| Hạng mục | Kết quả |
+|----------|---------|
+| Typecheck · build | `tsc --noEmit` sạch · `vite build` OK |
+| Unit (`npm test`) | 146/146 — thêm lint (17), embeddings + Ollama giả (7), Anki (15), progress/FSRS-6/optimizer/forecast (12+), perf/parse cache/snapshot (12+), search FTS5 (9), AI pipeline (structured output, repair, verify, lock) |
+| E2E API (`npm run test:e2e`) | 97/97 (2 lần liên tiếp) — thêm search, progress, quality (lint/distractor/semantic/verify), ai-pipeline (sinh câu + sửa + giải mù + auto-draft, ENRICH ids/distractors, huỷ, 2 tiến trình song song, deadline), LAN (Host/token/cookie, rebinding, file ẩn, upgrade DoS, redirect, mở lại khi đổi mạng), lan-anki, lifecycle (SIGHUP/SIGTERM ghi snapshot, sự kiện SSE) |
+| UI smoke (`npm run test:ui`) | 21/21 — thêm trang 🧰 Công cụ; các agent tự soát thêm bằng Playwright (1440/390 px, sáng/tối) mọi màn hình mới |
+| Hiệu năng (1.500 bài / 47 nghìn câu / 700 kế hoạch) | nộp bài 3.301 → 7 ms · meta/state/stats 140–186 → 11–14 ms · khởi động 5,7 → 0,6–1 s · mỗi trang 2,3–5,6 MB → 163–187 KB · tìm kiếm 2–10 ms · giao diện điện thoại tải 2,7 → 0,6 s |
+| Ngân hàng thật (chỉ đọc) | validate 0 lỗi / 0 cảnh báo · lint: 0 câu lỗi nặng, 480 câu lỗi vừa (đáp án đúng dài nhất 348, lặp từ đề 273, từ tuyệt đối 168) |
+| Claude CLI thật (sandbox, 6 lượt) | giải mù 3/3 · ENRICH 2/2 + giải mù · sinh 2 câu từ tài liệu + giải mù · câu dài 1 · `--resume` + `--json-schema` OK — ≈ $0,62 quy đổi API |
+| Rà soát độc lập | 26 lỗi được tái hiện (AI 11, học/hiệu năng 10, bảo mật LAN 5) → 25 đã sửa kèm test hồi quy (+1 lỗi sập server do EPIPE khi upgrade bị reset); 1 để lại vì thuộc đợt 1 (FSRS vẫn tính câu bỏ trống chưa xem là quên) |

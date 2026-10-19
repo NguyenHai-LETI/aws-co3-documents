@@ -223,11 +223,16 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
           }
         }
       }
-      const missing = ids.filter((id) => !bank.byId.has(id));
+      const unique = [...new Set(ids)];
+      const missing = unique.filter((id) => !bank.byId.has(id));
       if (missing.length) notes.push(`${missing.length} câu không còn trong ngân hàng: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '…' : ''}`);
-      const retired = ids.filter((id) => bank.byId.get(id)?.status === 'retired');
+      const retired = unique.filter((id) => bank.byId.get(id)?.status === 'retired');
       if (retired.length) notes.push(`Bỏ qua ${retired.length} câu đã retired.`);
-      picked = [...new Set(ids)].map((id) => bank.byId.get(id)).filter((q): q is Question => !!q && q.status !== 'retired');
+      // drafts wait for review (e.g. drafted by the blind-solve check right after the plan was written) — never served,
+      // whether the ids come from an AI plan or a list (nothing in the request tells an explicit Bank pick apart)
+      const drafts = unique.filter((id) => bank.byId.get(id)?.status === 'draft');
+      if (drafts.length) notes.push(`${drafts.length} câu đang chờ duyệt (draft) đã được bỏ qua.`);
+      picked = unique.map((id) => bank.byId.get(id)).filter((q): q is Question => !!q && q.status === 'active');
       keepOrder = !req.shuffleQuestions;
       count = picked.length;
       break;

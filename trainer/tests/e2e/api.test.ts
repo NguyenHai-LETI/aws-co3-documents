@@ -331,6 +331,11 @@ test('results list and detail', T, async () => {
   const list = (await api.get<any[]>('/api/results')).body;
   assert.ok(list.length >= history.length + 1);
   assert.ok(new Date(list[0].finished) >= new Date(list[list.length - 1].finished), 'newest first');
+  // paginated form (History, Dashboard): same order, one slice + the total
+  const page = (await api.get(`/api/results?limit=3&offset=1`)).body;
+  assert.deepEqual(page.items.map((a: any) => a.id), list.slice(1, 4).map((a) => a.id));
+  assert.equal(page.total, list.length);
+  assert.ok(page.items.every((a: any) => !('answers' in a)), 'summaries only');
   const p = history.find((a) => a.pearson)!;
   const d = (await api.get(`/api/results/${encodeURIComponent(p.id)}`)).body;
   assert.equal(d.attempt.answers.length, 65);

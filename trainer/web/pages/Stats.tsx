@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useData, useFetch } from '../lib/store.tsx';
-import { href, navigate } from '../lib/router.ts';
+import { href, navigate, useRoute } from '../lib/router.ts';
 import { startTest } from '../lib/start.ts';
 import { compact, fmtDateTime, fmtDuration } from '../lib/format.ts';
 import { BarList, ChartCard, Heatmap, Kpi, LineChart, Meter, StackBar } from '../components/charts.tsx';
 import { ReadinessCard, pctOf } from '../components/insights.tsx';
 import { Empty, ErrorBox, Loading, Seg } from '../components/ui.tsx';
+import { ExamSection } from '../components/progress/ExamSection.tsx';
+import { FsrsCard } from '../components/progress/FsrsCard.tsx';
+import { useProgress } from '../components/progress/useProgress.ts';
 import type { Bucket, StatsResponse } from '../../shared/types.ts';
 
 const FSRS_LABELS = ['Chưa học', 'Mức 1 · < 1 ngày', 'Mức 2 · 1–7 ngày', 'Mức 3 · 7–21 ngày', 'Mức 4 · 21–60 ngày', 'Mức 5 · ≥ 60 ngày'];
@@ -201,14 +204,27 @@ function LengthSplit({ l, share, minWords, passPct }: { l: StatsResponse['length
 }
 
 export function Stats() {
-  const { meta } = useData();
-  const { data: s, error, loading } = useFetch<StatsResponse>('/api/stats');
+  const { meta, refresh } = useData();
+  const route = useRoute();
+  const { data: s, error, loading, reload } = useFetch<StatsResponse>('/api/stats');
+  const { data: progress } = useProgress();
   const [topicSort, setTopicSort] = useState<'weak' | 'bank'>('weak');
+  const focus = route.query.get('focus');
+  // Dashboard "Đặt ngày thi →" opens #/stats?focus=exam
+  useEffect(() => {
+    if (focus === 'exam' && progress) document.getElementById('exam-goal')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focus, !!progress, !!s]); // eslint-disable-line react-hooks/exhaustive-deps
   if (loading && !s) return <Loading />;
   if (error && !s) return <ErrorBox error={error} />;
   if (!s || !meta) return null;
   const T = s.totals;
   const rushed = s.rushed ?? [];
+  // new personal FSRS parameters → memory levels, due dates and review counts change
+  const paramsChanged = () => {
+    reload();
+    void refresh();
+  };
+  const regraded = s.regraded ?? progress?.regraded ?? 0;
   const rushedNote = rushed.length > 0 && (
     <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
       ⚡ <b>{rushed.length} bài làm vội</b> không được tính vào thống kê, mức sẵn sàng và lịch ôn (thời gian trung vị mỗi câu quá ngắn):{' '}
@@ -234,6 +250,7 @@ export function Stats() {
         <Empty icon="📈" title="Chưa có dữ liệu">
           Làm vài bài test để thấy thống kê theo domain, task, chủ đề, service, tốc độ và lịch ôn tập.
         </Empty>
+        {progress && <ExamSection progress={progress} />}
       </div>
     );
   }
@@ -263,6 +280,12 @@ export function Stats() {
         </div>
       </div>
       {rushedNote}
+      {regraded > 0 && (
+        <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
+          ↻ <b>{regraded} câu trả lời được chấm lại</b> theo đáp án đã sửa trong ngân hàng (file kết quả giữ nguyên) — thống kê, mức sẵn sàng và lịch ôn tính theo đáp án hiện
+          tại.
+        </div>
+      )}
 
       <section className="split-l">
         <ReadinessCard totals={T} />
@@ -288,6 +311,8 @@ export function Stats() {
           <Kpi label="Thời gian học" value={fmtDuration(T.studySeconds, { long: true })} sub="tổng thời gian làm bài" />
         </div>
       </section>
+
+      {progress && <ExamSection progress={progress} readiness={T.readiness} />}
 
       <section className="grid c2">
         <ChartCard
@@ -380,43 +405,55 @@ export function Stats() {
         </ChartCard>
       </section>
 
-      <section className="grid c2">
-        <div className="card stack">
-          <div className="card-head" style={{ marginBottom: 0 }}>
-            <h2>🧠 Mức ghi nhớ {fsrs ? '(FSRS)' : '(Leitner)'}</h2>
-            {dueToday > 0 && (
-              <button className="btn primary sm" onClick={() => startTest({ mode: 'srs', count: Math.min(dueToday, meta.srs.daily_limit || dueToday) })}>
-                Ôn {dueToday} câu
-              </button>
-            )}
-          </div>
-          <StackBar segments={s.boxes.map((v, i) => ({ label: boxLabels[i] ?? `Mức ${i}`, value: v, color: BOX_COLORS[i] ?? 'var(--seq-5)' }))} />
-          <div className="row ins-stat-row">
-            <div>
-              <div className="ins-stat">{dueToday}</div>
-              <div className="tiny muted">ôn hôm nay</div>
+      <section className="grid c2 lrn-align-start">
+        <div className="stack">
+          <div className="card stack">
+            <div className="card-head" style={{ marginBottom: 0 }}>
+              <h2>🧠 Mức ghi nhớ {fsrs ? '(FSRS)' : '(Leitner)'}</h2>
+              {dueToday > 0 && (
+                <button className="btn primary sm" onClick={() => startTest({ mode: 'srs', count: Math.min(dueToday, meta.srs.daily_limit || dueToday) })}>
+                  Ôn {dueToday} câu
+                </button>
+              )}
             </div>
-            {v2 && (
+            <StackBar segments={s.boxes.map((v, i) => ({ label: boxLabels[i] ?? `Mức ${i}`, value: v, color: BOX_COLORS[i] ?? 'var(--seq-5)' }))} />
+            <div className="row ins-stat-row">
               <div>
-                <div className="ins-stat">{T.backlog}</div>
-                <div className="tiny muted">tồn đọng</div>
+                <div className="ins-stat">{dueToday}</div>
+                <div className="tiny muted">ôn hôm nay</div>
               </div>
-            )}
-            <div>
-              <div className="ins-stat">{T.mastered}</div>
-              <div className="tiny muted">đã thuộc</div>
+              {v2 && (
+                <div>
+                  <div className="ins-stat">{T.backlog}</div>
+                  <div className="tiny muted">tồn đọng</div>
+                </div>
+              )}
+              <div>
+                <div className="ins-stat">{T.mastered}</div>
+                <div className="tiny muted">đã thuộc</div>
+              </div>
+            </div>
+            <div className="small muted">
+              {fsrs
+                ? `FSRS-6 ước lượng độ bền trí nhớ của từng câu và hẹn ôn khi xác suất còn nhớ xuống ~${Math.round((meta.srs.desired_retention || 0.9) * 100)}% (tính theo ngày: câu đến hạn từ đầu ngày). Sai → độ bền giảm mạnh; đúng nhanh & chắc → tăng nhiều; chưa chắc, dùng gợi ý hay gạch nhầm → tăng ít; làm lại trong cùng ngày → thay đổi ít. Mỗi ngày tối đa ${meta.srs.daily_limit} câu (câu dễ quên nhất trước), phần dư thành tồn đọng.`
+                : `Sai → về box 1 (ôn ngày mai). Đúng chắc chắn → lên 1 box (khoảng cách ${meta.srs.intervals_days.join(' → ')} ngày). “Chưa chắc” không được lên box.`}
             </div>
           </div>
-          <div className="small muted">
-            {fsrs
-              ? `FSRS ước lượng độ bền trí nhớ của từng câu và hẹn ôn khi xác suất còn nhớ xuống ~${Math.round((meta.srs.desired_retention || 0.9) * 100)}%. Sai → độ bền giảm mạnh; đúng nhanh & chắc → tăng nhiều; chưa chắc, dùng gợi ý hay gạch nhầm → tăng ít. Mỗi ngày tối đa ${meta.srs.daily_limit} câu (câu dễ quên nhất trước), phần dư thành tồn đọng.`
-              : `Sai → về box 1 (ôn ngày mai). Đúng chắc chắn → lên 1 box (khoảng cách ${meta.srs.intervals_days.join(' → ')} ngày). “Chưa chắc” không được lên box.`}
+          {progress?.fsrs && (
+            <div className="card">
+              <h2>📅 Hoạt động 18 tuần</h2>
+              <Heatmap days={s.daily} />
+            </div>
+          )}
+        </div>
+        {progress?.fsrs ? (
+          <FsrsCard info={progress.fsrs} onParamsChanged={paramsChanged} />
+        ) : (
+          <div className="card">
+            <h2>📅 Hoạt động 18 tuần</h2>
+            <Heatmap days={s.daily} />
           </div>
-        </div>
-        <div className="card">
-          <h2>📅 Hoạt động 18 tuần</h2>
-          <Heatmap days={s.daily} />
-        </div>
+        )}
       </section>
 
       {(s.calibration || s.elimination || s.recall || s.lengthSplit) && (

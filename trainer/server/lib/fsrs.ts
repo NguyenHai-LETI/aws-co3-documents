@@ -1,15 +1,16 @@
-// FSRS-4.5 spaced-repetition model (open-spaced-repetition, default weights), recomputed from the
-// answer history on every request — no scheduler state is stored anywhere.
-//   R(t,S) = (1 + FACTOR·t/S)^DECAY            recall probability t days after the last review
-//   I(S,r) = S/FACTOR · (r^(1/DECAY) − 1)      interval that brings R down to the desired retention r
-// With r = 0.9 the interval equals the stability (that is how FACTOR = 19/81 is chosen).
+// FSRS-6 spaced-repetition model (open-spaced-repetition, ts-fsrs 5.x), recomputed from the answer history on every
+// request — no scheduler state is stored anywhere (personal parameters aside, see fsrs-optimize.ts).
+// Day-scale reviews: the elapsed time is counted in whole local calendar days; a second answer on the same day uses the
+// FSRS-6 short-term stability rule (w17–w19). No fuzz.
+//   R(t,S) = (1 + F·t/S)^(−w20), F = 0.9^(−1/w20) − 1      recall probability t days after the last review
+//   I(S,r) = S/F · (r^(−1/w20) − 1)                          interval that brings R down to the desired retention r
+// With r = 0.9 the interval equals the stability (that is how F is chosen).
+import { FSRSAlgorithm, computeDecayFactor, default_w, forgetting_curve, generatorParameters } from 'ts-fsrs';
 import type { AnswerRecord } from '../../shared/types.ts';
 
-export const FSRS_WEIGHTS: readonly number[] = [
-  0.4872, 1.4003, 3.7145, 13.8206, 5.1618, 1.2298, 0.8975, 0.031, 1.6474, 0.1367, 1.0461, 2.1072, 0.0793, 0.3246, 1.587, 0.2272, 2.8755,
-];
-export const DECAY = -0.5;
-export const FACTOR = 19 / 81;
+export const FSRS_VERSION = 'fsrs-6';
+/** FSRS-6 default parameters w0…w20 (ts-fsrs, trained on the open-spaced-repetition dataset). */
+export const FSRS_WEIGHTS: readonly number[] = default_w;
 /** Longest interval the scheduler will ever produce (days). */
 export const MAX_INTERVAL_DAYS = 36500;
 
@@ -21,51 +22,84 @@ export interface MemoryState {
   difficulty: number; // 1..10
 }
 
+const DAY_MS = 86_400_000;
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+export const clampRetention = (r: number) => clamp(Number.isFinite(r) ? r : 0.9, 0.5, 0.99);
 
-export function retrievability(elapsedDays: number, stability: number): number {
+/**
+ * A usable FSRS-6 parameter vector: 21 finite numbers, or a 17/19-number FSRS-4.5/5 vector migrated by ts-fsrs.
+ * Anything else → undefined (caller falls back to the next parameter source).
+ */
+export function normalizeWeights(w: unknown): number[] | undefined {
+  if (!Array.isArray(w) || ![17, 19, 21].includes(w.length)) return undefined;
+  const nums = w.map(Number);
+  if (!nums.every(Number.isFinite)) return undefined;
+  return generatorParameters({ w: nums }).w as number[];
+}
+
+// One ts-fsrs core per (parameters, retention) — the parameter sets in use change rarely.
+const algorithms = new Map<string, FSRSAlgorithm>();
+function algorithm(w: readonly number[], desiredRetention: number): FSRSAlgorithm {
+  const key = `${clampRetention(desiredRetention)}|${w.join(',')}`;
+  let a = algorithms.get(key);
+  if (!a) {
+    if (algorithms.size > 16) algorithms.clear();
+    a = new FSRSAlgorithm({
+      w: [...w],
+      request_retention: clampRetention(desiredRetention),
+      maximum_interval: MAX_INTERVAL_DAYS,
+      enable_fuzz: false,
+      enable_short_term: true,
+    });
+    algorithms.set(key, a);
+  }
+  return a;
+}
+
+/** FSRS-6 operations for one parameter set + desired retention (get it once per computation, not per answer). */
+export interface Scheduler {
+  /** One review: `prev` undefined = first answer; `days` = whole days since the previous answer (0 = same day). */
+  review(prev: MemoryState | undefined, g: Grade, days: number): MemoryState;
+  /** Recall probability `days` after the last review. */
+  recall(days: number, stability: number): number;
+  /** Scheduled interval in whole days (≥ 1), rounded like the ts-fsrs scheduler (no fuzz). */
+  interval(stability: number): number;
+}
+
+export function scheduler(w: readonly number[] = FSRS_WEIGHTS, desiredRetention = 0.9): Scheduler {
+  const a = algorithm(w, desiredRetention);
+  return {
+    review(prev, g, days) {
+      const next = a.next_state(prev ?? null, Math.max(0, Math.round(days)), g);
+      return { stability: next.stability, difficulty: next.difficulty };
+    },
+    recall: (days, stability) => (stability > 0 ? a.forgetting_curve(Math.max(0, days), stability) : 0),
+    interval: (stability) => a.next_interval(stability, 0),
+  };
+}
+
+export function retrievability(elapsedDays: number, stability: number, w: readonly number[] = FSRS_WEIGHTS): number {
   if (!(stability > 0)) return 0;
-  return Math.pow(1 + (FACTOR * Math.max(0, elapsedDays)) / stability, DECAY);
+  return forgetting_curve(w, Math.max(0, elapsedDays), stability);
 }
 
 /** Days until R(t, S) falls to `desiredRetention` (not rounded, not clamped to ≥ 1). */
-export function intervalDays(stability: number, desiredRetention = 0.9): number {
-  const r = clamp(desiredRetention, 0.5, 0.99);
-  return Math.min(MAX_INTERVAL_DAYS, (stability / FACTOR) * (Math.pow(r, 1 / DECAY) - 1));
+export function intervalDays(stability: number, desiredRetention = 0.9, w: readonly number[] = FSRS_WEIGHTS): number {
+  const { decay, factor } = computeDecayFactor(w);
+  return Math.min(MAX_INTERVAL_DAYS, (stability / factor) * (Math.pow(clampRetention(desiredRetention), 1 / decay) - 1));
 }
 
-export function initStability(g: Grade, w: readonly number[] = FSRS_WEIGHTS): number {
-  return Math.max(0.1, w[g - 1]);
-}
-
-export function initDifficulty(g: Grade, w: readonly number[] = FSRS_WEIGHTS): number {
-  return clamp(w[4] - (g - 3) * w[5], 1, 10);
-}
-
-/** D' with mean reversion towards D0(easy). */
-export function nextDifficulty(d: number, g: Grade, w: readonly number[] = FSRS_WEIGHTS): number {
-  return clamp(w[7] * initDifficulty(4, w) + (1 - w[7]) * (d - w[6] * (g - 3)), 1, 10);
-}
-
-export function recallStability(d: number, s: number, r: number, g: Grade, w: readonly number[] = FSRS_WEIGHTS): number {
-  const hardPenalty = g === 2 ? w[15] : 1;
-  const easyBonus = g === 4 ? w[16] : 1;
-  return s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * hardPenalty * easyBonus);
-}
-
-export function forgetStability(d: number, s: number, r: number, w: readonly number[] = FSRS_WEIGHTS): number {
-  return Math.min(s, w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r)));
+/** Scheduled interval in whole days (≥ 1), exactly as the ts-fsrs scheduler rounds it (no fuzz). */
+export function nextIntervalDays(stability: number, desiredRetention = 0.9, w: readonly number[] = FSRS_WEIGHTS): number {
+  return algorithm(w, desiredRetention).next_interval(stability, 0);
 }
 
 /**
- * Applies one review. `prev` undefined = first time the question is answered.
- * Stability is updated with the difficulty *before* the review (as in the reference implementation).
+ * Applies one review. `prev` undefined = first time the question is answered; `elapsedDays` = whole days since the
+ * previous answer (0 = same day → short-term stability). Delegates to ts-fsrs `FSRSAlgorithm.next_state`.
  */
 export function review(prev: MemoryState | undefined, g: Grade, elapsedDays: number, w: readonly number[] = FSRS_WEIGHTS): MemoryState {
-  if (!prev) return { stability: initStability(g, w), difficulty: initDifficulty(g, w) };
-  const r = retrievability(elapsedDays, prev.stability);
-  const stability = g === 1 ? forgetStability(prev.difficulty, prev.stability, r, w) : recallStability(prev.difficulty, prev.stability, r, g, w);
-  return { stability: clamp(stability, 0.01, MAX_INTERVAL_DAYS), difficulty: nextDifficulty(prev.difficulty, g, w) };
+  return scheduler(w).review(prev, g, elapsedDays);
 }
 
 /**
@@ -79,6 +113,33 @@ export function gradeAnswer(r: Pick<AnswerRecord, 'ok' | 'pick' | 'key' | 't' | 
   if (r.unsure || r.hinted || struckCorrect || (r.est > 0 && r.t > 1.5 * r.est)) return 2;
   if (r.est > 0 && r.t > 0 && r.t < 0.5 * r.est) return 4;
   return 3;
+}
+
+// ── day scale (local calendar days, like the app's daily stats and review cap) ──
+
+/** Local calendar day of a timestamp as a day number (days since 1970-01-01 of that local date). */
+export function localDay(ms: number): number {
+  const d = new Date(ms);
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
+}
+
+/** Local midnight (ms) at the start of a day number from `localDay`. */
+export function dayStartMs(day: number): number {
+  const u = new Date(day * DAY_MS);
+  return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate()).getTime();
+}
+
+/** YYYY-MM-DD of a day number from `localDay`. */
+export function dayKey(day: number): string {
+  return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Day number of a YYYY-MM-DD string (undefined when malformed). */
+export function dayOfKey(key: string): number | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return undefined;
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return dayKey(Math.round(ms / DAY_MS)) === key ? Math.round(ms / DAY_MS) : undefined;
 }
 
 /** Memory level shown in the UI: 0 unseen, 1 S < 1 d, 2 1–7 d, 3 7–21 d, 4 21–60 d, 5 ≥ 60 d. */

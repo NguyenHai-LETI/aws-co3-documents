@@ -20,7 +20,10 @@ export interface Sandbox {
 function copyData(dest: string, opts: { results?: boolean }) {
   fs.mkdirSync(dest, { recursive: true });
   fs.cpSync(path.join(TRAINER_ROOT, 'bank'), path.join(dest, 'bank'), { recursive: true });
-  fs.copyFileSync(path.join(TRAINER_ROOT, 'config.yaml'), path.join(dest, 'config.yaml'));
+  // sandboxes never start the semantic-duplicate job (on a machine running Ollama it would embed the whole bank);
+  // tests that need it set quality.embeddings themselves
+  const cfgText = fs.readFileSync(path.join(TRAINER_ROOT, 'config.yaml'), 'utf8');
+  fs.writeFileSync(path.join(dest, 'config.yaml'), cfgText.replace(/^(\s+embeddings:\s*)\w+/m, '$1off'));
   const coach = path.join(TRAINER_ROOT, 'coach');
   fs.mkdirSync(path.join(dest, 'coach'), { recursive: true });
   for (const f of fs.existsSync(coach) ? fs.readdirSync(coach) : []) {

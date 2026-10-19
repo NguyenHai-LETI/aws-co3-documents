@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Start the SAA-C03 Trainer and open the browser (macOS / Linux). Usage: ./start.sh   (PORT=4000 ./start.sh)
-# Installs npm packages when needed; if the app is already running, just opens it.
+# Start the SAA-C03 Trainer and open the browser (macOS / Linux). Usage: ./start.sh [--lan]   (PORT=4000 ./start.sh)
+# --lan (or LAN=1): also open it to phones on the same Wi-Fi (access code / QR on the 🧰 Công cụ page).
+# Installs npm packages when needed; if the app is already running, just opens it (and turns LAN access on if asked).
 cd "$(dirname "$0")" || exit 1
 PORT="${PORT:-3003}"
 URL="http://localhost:$PORT"
+WANT_LAN=0
+for a in "$@"; do [ "$a" = "--lan" ] && WANT_LAN=1; done
+case "${LAN:-}" in 1|true|yes|on) WANT_LAN=1 ;; esac
 
 pause_on_error() {
   # start.command (double-click) sets TRAINER_PAUSE=1 so the Terminal window stays readable
@@ -35,10 +39,17 @@ if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.e
   pause_on_error
 fi
 
-# Already running on this port? Then only open the browser.
+# Already running on this port? Then only open the browser (LAN requested → switch it on through the API).
 if command -v curl >/dev/null 2>&1 && curl -fsS -m 2 "http://127.0.0.1:$PORT/api/meta" >/dev/null 2>&1; then
   echo "✓ Trainer đã chạy sẵn → $URL"
-  open_url "$URL"
+  if [ "$WANT_LAN" = "1" ]; then
+    if curl -fsS -m 10 -X POST -H 'X-Trainer: 1' -H 'Content-Type: application/json' -d '{"enabled":true}' "http://127.0.0.1:$PORT/api/lan" >/dev/null 2>&1; then
+      echo "📱 Đã mở truy cập LAN — quét mã QR ở trang 🧰 Công cụ"
+    fi
+    open_url "$URL/#/tools"
+  else
+    open_url "$URL"
+  fi
   exit 0
 fi
 
@@ -54,4 +65,4 @@ if [ ! -d node_modules ] || ! cmp -s package-lock.json "$STAMP"; then
 fi
 
 echo "→ Đang khởi động… (Ctrl+C hoặc đóng cửa sổ này để dừng)"
-OPEN=1 PORT="$PORT" node server/index.ts || pause_on_error
+OPEN=1 PORT="$PORT" node server/index.ts "$@" || pause_on_error

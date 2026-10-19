@@ -1,0 +1,258 @@
+/* [X] 🧰 Công cụ — phone (LAN) access and Anki export. Tokens and base classes come from styles.css. */
+
+.tl-stack {
+  gap: 18px;
+}
+.tl-lead {
+  margin: 0;
+  max-width: 78ch;
+}
+.tl-chips {
+  gap: 6px;
+}
+.tl-break {
+  overflow-wrap: anywhere;
+}
+.tl-card .card-head {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+/* ── LAN card ─────────────────────────────────────────────────────────── */
+.tl-lan {
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.tl-qr {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.tl-qr-img {
+  width: 100%;
+  max-width: 228px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: #ffffff; /* scanners need dark-on-light, also in dark mode */
+  border: 1px solid var(--border);
+}
+.tl-qr-img svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tl-urls {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tl-urls li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.tl-urls li > span {
+  overflow-wrap: anywhere;
+}
+.tl-token-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.tl-token {
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.tl-devices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tl-badge-lan {
+  color: var(--good-ink);
+  font-weight: 600;
+}
+
+/* ── collapsible help ─────────────────────────────────────────────────── */
+.tl-tips,
+.tl-more {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.tl-tips summary,
+.tl-more summary {
+  cursor: pointer;
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 2px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.tl-tips summary::before,
+.tl-more summary::before {
+  content: '▸';
+  font-size: 12px;
+  transition: transform 0.12s;
+}
+.tl-tips[open] summary::before,
+.tl-more[open] summary::before {
+  transform: rotate(90deg);
+}
+.tl-tips summary::-webkit-details-marker,
+.tl-more summary::-webkit-details-marker {
+  display: none;
+}
+.tl-tips summary,
+.tl-more summary {
+  list-style: none;
+}
+.tl-tips ul,
+.tl-tips ol {
+  margin: 8px 0 2px;
+  padding-left: 20px;
+  font-size: 14px;
+  color: var(--text-2);
+  max-width: 90ch;
+}
+.tl-tips li + li {
+  margin-top: 5px;
+}
+.tl-more > .tl-filters,
+.tl-more > .tl-cards {
+  margin-top: 10px;
+}
+
+/* ── Anki card ────────────────────────────────────────────────────────── */
+.tl-anki {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
+}
+.tl-anki-side {
+  position: sticky;
+  top: 16px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  gap: 10px;
+}
+.tl-anki-side .btn {
+  width: 100%;
+}
+.tl-count {
+  line-height: 1.25;
+}
+.tl-count-n {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.tl-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.tl-status .btn {
+  width: auto;
+}
+.tl-errors {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+.tl-hint {
+  margin-top: 6px;
+}
+.tl-opts {
+  gap: 12px;
+}
+.tl-opts input,
+.tl-opts select {
+  width: 100%;
+  min-width: 0;
+}
+.tl-filters {
+  gap: 12px;
+}
+
+/* card preview: rendered like a plain Anki card */
+.tl-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.tl-anki-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 12px 14px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.tl-anki-card p {
+  margin: 0.4em 0;
+}
+.tl-anki-card ul,
+.tl-anki-card ol {
+  margin: 0.4em 0;
+  padding-left: 20px;
+}
+.tl-anki-card blockquote {
+  margin: 0.4em 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-2);
+}
+.tl-anki-card hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.7em 0;
+}
+
+@media (max-width: 960px) {
+  .tl-anki {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tl-anki-side {
+    position: static;
+  }
+}
+@media (max-width: 640px) {
+  .tl-lan {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tl-qr-img {
+    max-width: 240px;
+  }
+  .tl-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tl-opts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -241,17 +241,44 @@ export function loadQa(qid: string): QaEntry[] {
   return parseQa(fs.readFileSync(file, 'utf8'));
 }
 
+// Parsed Q&A files, re-read only when a file's mtime / size changes (appends do not touch the directory mtime).
+const qaFiles = new Map<string, { sig: string; entries: QaEntry[] }>();
+let qaList: { dir: string; dirSig: string; names: string[] } | undefined;
+
 function allQa(): { qid: string; e: QaEntry }[] {
-  if (!fs.existsSync(QA_DIR)) return [];
+  let dirSig: string;
+  try {
+    dirSig = String(fs.statSync(QA_DIR).mtimeMs);
+  } catch {
+    return [];
+  }
+  if (qaList?.dir !== QA_DIR || qaList.dirSig !== dirSig) {
+    const names = fs.readdirSync(QA_DIR).filter((f) => f.endsWith('.md') && !f.startsWith('.') && !f.startsWith('_'));
+    const keep = new Set(names.map((f) => path.join(QA_DIR, f)));
+    for (const k of qaFiles.keys()) if (!keep.has(k)) qaFiles.delete(k);
+    qaList = { dir: QA_DIR, dirSig, names };
+  }
   const out: { qid: string; e: QaEntry }[] = [];
-  for (const f of fs.readdirSync(QA_DIR)) {
-    if (!f.endsWith('.md') || f.startsWith('.') || f.startsWith('_')) continue;
-    const qid = f.slice(0, -3);
+  for (const f of qaList.names) {
+    const file = path.join(QA_DIR, f);
+    let sig: string;
     try {
-      for (const e of parseQa(fs.readFileSync(path.join(QA_DIR, f), 'utf8'))) out.push({ qid, e });
+      const st = fs.statSync(file);
+      sig = `${st.mtimeMs}:${st.size}`;
     } catch {
-      // unreadable file — skip
+      continue;
     }
+    let cached = qaFiles.get(file);
+    if (cached?.sig !== sig) {
+      try {
+        cached = { sig, entries: parseQa(fs.readFileSync(file, 'utf8')) };
+      } catch {
+        continue; // unreadable file — skip
+      }
+      qaFiles.set(file, cached);
+    }
+    const qid = f.slice(0, -3);
+    for (const e of cached.entries) out.push({ qid, e });
   }
   return out;
 }

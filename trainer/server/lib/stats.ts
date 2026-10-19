@@ -1,7 +1,9 @@
 import type { AppConfig } from '../config.ts';
 import type { BankState } from './bank.ts';
 import { DAY_MS, localDateKey } from './time.ts';
-import { FSRS_LEVEL_LABELS, gradeAnswer, intervalDays, memoryLevel, retrievability, review, type MemoryState } from './fsrs.ts';
+import { FSRS_LEVEL_LABELS, dayStartMs, gradeAnswer, localDay, memoryLevel, scheduler, type MemoryState } from './fsrs.ts';
+import { resolveFsrsParams } from './fsrs-optimize.ts';
+import { countRegraded } from './regrade.ts';
 import { compareDue, isMasteredState } from '../../shared/filters.ts';
 import { pct, scaledScore } from '../../shared/scoring.ts';
 import type { Attempt, Bucket, Difficulty, DomainDef, Question, QuestionState, StatsResponse } from '../../shared/types.ts';
@@ -23,22 +25,26 @@ export function struckCorrect(r: { elim?: string; key: string }): boolean {
  * Learning state per question, recomputed from the full answer history (no database).
  * Rushed attempts (median answer time below stats.rushed_median_seconds) are ignored.
  *
- * srs.algorithm = fsrs (default): FSRS-4.5 memory model (see fsrs.ts) — `box` = memory level by stability,
- *   due = last answer + max(1, interval(S, desired_retention)) days.
+ * srs.algorithm = fsrs (default): FSRS-6 memory model (see fsrs.ts), day-scale: elapsed time between answers in whole
+ *   local days (same day = short-term rule). `box` = memory level by stability; due = start of the local day
+ *   `last answer day + interval(S, desired_retention)` (whole days ≥ 1); retrievability at today's date.
+ *   Parameters: `weights` argument, else config srs.weights > personal (results/fsrs-params.json) > defaults.
  * srs.algorithm = leitner:
  *   wrong → box 1 · correct + unsure/hinted → stays (min box 1) · correct → first time box 2, else box + 1 (max 5)
  *   due = last answer + intervals[box − 1] days
  */
-export function computeStates(attempts: Attempt[], cfg: AppConfig, now = Date.now()): Map<string, QuestionState> {
+export function computeStates(attempts: Attempt[], cfg: AppConfig, now = Date.now(), weights?: readonly number[]): Map<string, QuestionState> {
   const fsrs = cfg.srs.algorithm !== 'leitner';
+  const sched = fsrs ? scheduler(weights ?? resolveFsrsParams(cfg).weights, cfg.srs.desired_retention) : undefined;
   const states = new Map<string, QuestionState>();
   const timeSum = new Map<string, number>();
-  const memory = new Map<string, MemoryState & { at: number }>();
+  const memory = new Map<string, MemoryState & { day: number }>();
   const ordered = attempts
     .filter((a) => !a.rushed)
     .map((a, i) => ({ a, i, at: timeOf(a.finished) }))
     .sort((x, y) => x.at - y.at || x.i - y.i);
   for (const { a, at } of ordered) {
+    const day = localDay(at);
     for (const r of a.answers) {
       let s = states.get(r.q);
       if (!s) {
@@ -46,9 +52,9 @@ export function computeStates(attempts: Attempt[], cfg: AppConfig, now = Date.no
         states.set(r.q, s);
       }
       const grade = gradeAnswer(r);
-      if (fsrs) {
+      if (sched) {
         const m = memory.get(r.q);
-        memory.set(r.q, { ...review(m, grade, m ? (at - m.at) / DAY_MS : 0), at });
+        memory.set(r.q, { ...sched.review(m, grade, m ? Math.max(0, day - m.day) : 0), day });
       }
       if (!r.ok && s.correct > 0) s.lapses = (s.lapses ?? 0) + 1;
       if (struckCorrect(r)) s.elimCorrect = (s.elimCorrect ?? 0) + 1;
@@ -79,16 +85,16 @@ export function computeStates(attempts: Attempt[], cfg: AppConfig, now = Date.no
     }
   }
   const intervals = cfg.srs.intervals_days;
+  const today = localDay(now);
   for (const s of states.values()) {
     s.avgTime = Math.round((timeSum.get(s.id) ?? 0) / Math.max(1, s.attempts));
     const m = memory.get(s.id);
-    if (fsrs && m) {
+    if (sched && m) {
       s.stability = round(m.stability, 2);
       s.fsrsDifficulty = round(m.difficulty, 2);
-      s.retrievability = round(retrievability((now - m.at) / DAY_MS, m.stability), 3);
+      s.retrievability = round(sched.recall(today - m.day, m.stability), 3);
       s.box = memoryLevel(m.stability);
-      const days = Math.max(1, intervalDays(m.stability, cfg.srs.desired_retention));
-      s.dueAt = new Date(m.at + days * DAY_MS).toISOString();
+      s.dueAt = new Date(dayStartMs(m.day + sched.interval(m.stability))).toISOString();
     } else if (!fsrs && s.lastAt && s.box > 0) {
       const days = intervals[Math.min(s.box, intervals.length) - 1] ?? 1;
       s.dueAt = new Date(new Date(s.lastAt).getTime() + days * DAY_MS).toISOString();
@@ -217,6 +223,26 @@ export function computeReadiness(items: ReadinessItem[], domains: DomainDef[], p
     passProbability: round(passProbability, 3),
     confidence: width < 8 ? 'high' : width < 15 ? 'medium' : 'low',
   };
+}
+
+/**
+ * The readiness the stats page would have shown at time `at`: same items and weights as computeStats (non-rushed
+ * attempts, retired questions left out), restricted to attempts finished by `at`, ages measured from `at`.
+ * `answers` = evidence behind it (0 → no readiness yet).
+ */
+export function readinessAt(attempts: Attempt[], bank: BankState, cfg: AppConfig, at: number): Readiness & { answers: number } {
+  const items: ReadinessItem[] = [];
+  for (const a of attempts) {
+    const t = timeOf(a.finished);
+    if (a.rushed || t > at) continue;
+    const ageDays = Math.max(0, (at - t) / DAY_MS);
+    for (const r of a.answers) {
+      const q = bank.byId.get(r.q);
+      if (q && q.status !== 'retired') items.push({ domain: q.domain, ok: r.ok, ageDays, longForm: q.longForm, difficulty: q.difficulty });
+    }
+  }
+  const tax = bank.taxonomy;
+  return { ...computeReadiness(items, tax.domains, tax.exam.pass_pct, cfg.stats.recency_half_life_days), answers: items.length };
 }
 
 // ── aggregate statistics ────────────────────────────────────────────────────
@@ -433,5 +459,6 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     trend: used.slice(-40).map((a) => ({ id: a.id, finished: a.finished, score: a.score, total: a.total, mode: a.mode, title: a.title })),
     daily: [...daily].map(([date, v]) => ({ date, ...v })).sort((a, b) => a.date.localeCompare(b.date)),
     mostMissed,
+    regraded: countRegraded(used),
   };
 }

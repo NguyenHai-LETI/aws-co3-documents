@@ -7,12 +7,13 @@ import crypto from 'node:crypto';
 import { DATA_DIR, RESULTS_DIR, loadConfig, rel, type AppConfig } from '../config.ts';
 import { asString, splitFrontMatter, stringifyFrontMatter } from './frontmatter.ts';
 import { listMarkdownFiles, loadBank, type BankState } from './bank.ts';
+import { ParseCache, statSig, type FileParse } from './index-db.ts';
 import { detectFeatures, detectServices } from './classify.ts';
 import { fmtLocal, localIso, stampParts } from './time.ts';
 import { isCorrect, normalizeKeys, pct, scaledScore } from '../../shared/scoring.ts';
 import { fmtDuration } from '../../shared/timing.ts';
 import { FEEDBACK_INFO, MODE_INFO } from '../../shared/labels.ts';
-import type { AnswerInput, AnswerRecord, Attempt, AttemptSummary, Question, SubmitRequest, Taxonomy, TestMode } from '../../shared/types.ts';
+import type { AnswerInput, AnswerRecord, Attempt, AttemptPoint, AttemptSummary, Question, ResultsPage, SubmitRequest, Taxonomy, TestMode } from '../../shared/types.ts';
 
 /** Result files written from v2 on: option letters match the bank after the answer-position rebalance. */
 export const RESULT_LAYOUT = 2;
@@ -21,6 +22,39 @@ export const WHY_MAX_CHARS = 500;
 
 const fileCache = new Map<string, { sig: string; attempt?: Attempt }>();
 let listCache: { version: string; threshold: number; attempts: Attempt[] } | undefined;
+
+/** Bump when parseResultFile changes what it extracts (stored parse-cache rows are then ignored). */
+const RESULT_PARSE_VERSION = 1;
+
+/**
+ * Front matter of a results/ file. Files whose front matter cannot be an attempt (goal.md, external/*.md, notes…) are
+ * recognized without a YAML parse: the word "attempt" does not occur in their front matter.
+ */
+export function parseResultFile(text: string): FileParse {
+  const src = text.replace(/^﻿/, '');
+  if (!/^---\r?\n/.test(src)) return { data: null };
+  const end = src.indexOf('\n---', 4);
+  if (end < 0 || !/\battempt\b/.test(src.slice(0, end))) return { data: null };
+  const fm = splitFrontMatter(src);
+  return { data: fm.error ? null : fm.data };
+}
+
+/** Parsed front matter of result files: memory → SQLite (.cache/trainer.db) → YAML. Shared with migrateResults(). */
+export const resultParses = new ParseCache('result', RESULT_PARSE_VERSION, parseResultFile);
+
+/** One stat pass over results/: files, their signatures (statSig) and a version hash of both. */
+function scanResults(): { files: string[]; sigs: string[]; version: string } {
+  const files = listMarkdownFiles(RESULTS_DIR);
+  const sigs = files.map((f) => {
+    try {
+      return statSig(fs.statSync(f));
+    } catch {
+      return ''; // deleted while listing
+    }
+  });
+  const version = crypto.createHash('sha1').update(files.map((f, i) => f + sigs[i]).join('|')).digest('hex');
+  return { files, sigs, version };
+}
 
 function num(v: unknown, d = 0): number {
   const n = Number(v);
@@ -59,6 +93,7 @@ function toAnswer(a: Record<string, unknown>): AnswerRecord {
   const why = cleanNote(a.why, WHY_MAX_CHARS);
   if (why) r.why = why;
   if (a.scored === false) r.scored = false;
+  if (typeof a.h === 'string' && a.h) r.h = a.h;
   return r;
 }
 
@@ -110,36 +145,64 @@ function toAttempt(data: Record<string, unknown>, file: string): Attempt | undef
   return attempt;
 }
 
+/**
+ * Every attempt (oldest first). The same array is returned while no result file changed (callers memoize on its
+ * identity); changed files are re-read only — from the SQLite parse cache when another process already parsed them.
+ */
 export function loadAttempts(cfg: AppConfig = loadConfig()): Attempt[] {
   const threshold = cfg.stats.rushed_median_seconds;
-  const files = listMarkdownFiles(RESULTS_DIR);
-  const sigs = files.map((f) => {
-    const st = fs.statSync(f);
-    return `${st.mtimeMs}:${st.size}`;
-  });
-  const version = crypto.createHash('sha1').update(files.map((f, i) => f + sigs[i]).join('|')).digest('hex');
+  const useSqlite = cfg.cache?.sqlite !== false;
+  const { files, sigs, version } = scanResults();
   if (listCache?.version === version && listCache.threshold === threshold) return listCache.attempts;
+  const misses = files.map((abs, i) => ({ abs, sig: sigs[i] })).filter((e) => e.sig && fileCache.get(e.abs)?.sig !== e.sig);
+  resultParses.prefetch(misses, useSqlite);
   const attempts: Attempt[] = [];
   files.forEach((abs, i) => {
+    if (!sigs[i]) return;
     let e = fileCache.get(abs);
     if (!e || e.sig !== sigs[i]) {
-      const fm = splitFrontMatter(fs.readFileSync(abs, 'utf8'));
-      e = { sig: sigs[i], attempt: fm.error ? undefined : toAttempt(fm.data, rel(abs)) };
+      const p = resultParses.get(abs, sigs[i], useSqlite);
+      e = { sig: sigs[i], attempt: p.data ? toAttempt(p.data, rel(abs)) : undefined };
       fileCache.set(abs, e);
+      resultParses.forget(abs); // the Attempt is kept instead of the raw front matter
     }
     // shallow copy: `rushed` depends on the current threshold, cached parses stay untouched
     if (e.attempt) attempts.push({ ...e.attempt, rushed: isRushed(e.attempt.medianTime ?? 0, threshold) });
   });
   const present = new Set(files);
-  for (const abs of fileCache.keys()) if (!present.has(abs)) fileCache.delete(abs);
+  let removed = false;
+  for (const abs of fileCache.keys()) {
+    if (!present.has(abs)) {
+      fileCache.delete(abs);
+      removed = true;
+    }
+  }
+  resultParses.flush(removed ? present : undefined, useSqlite);
   attempts.sort((a, b) => a.finished.localeCompare(b.finished));
   listCache = { version, threshold, attempts };
   return attempts;
 }
 
+/** Short version of the results directory (changes whenever a result file is added, edited or removed). */
 export function attemptsVersion(): string {
-  loadAttempts();
-  return listCache?.version.slice(0, 12) ?? '';
+  return scanResults().version.slice(0, 12);
+}
+
+/** attemptsVersion() as of the last loadAttempts() call (no second scan right after loading). */
+export function loadedAttemptsVersion(): string {
+  return listCache ? listCache.version.slice(0, 12) : attemptsVersion();
+}
+
+/** Same as `attempts.find((a) => a.id === id)` (first match wins), indexed once per loadAttempts() array. */
+const byIdMemo = new WeakMap<Attempt[], Map<string, Attempt>>();
+export function attemptById(attempts: Attempt[], id: string): Attempt | undefined {
+  let m = byIdMemo.get(attempts);
+  if (!m) {
+    m = new Map();
+    for (const a of attempts) if (!m.has(a.id)) m.set(a.id, a);
+    byIdMemo.set(attempts, m);
+  }
+  return m.get(id);
 }
 
 /** Per-domain/topic tallies cover scored answers only (pilot items of a Pearson exam are left out, like the score). */
@@ -159,6 +222,42 @@ export function summarize(a: Attempt, bank: BankState): AttemptSummary {
   }
   const { answers: _a, selection: _s, ...rest } = a;
   return { ...rest, domains, topics };
+}
+
+// ── history pages (GET /api/results?limit=&offset=…) ─────────────────────────
+
+const TREND_POINTS = 40;
+const round1 = (x: number) => Math.round(x * 10) / 10;
+
+/** One page of the history (newest first) + the numbers the History page shows about the whole filtered set. */
+export function resultsPage(attempts: Attempt[], bank: BankState, opts: { limit: number; offset: number; mode?: string; q?: string; hideRushed?: boolean }): ResultsPage {
+  const newest = [...attempts].reverse();
+  const words = (opts.q ?? '').toLowerCase().trim();
+  const matching = newest.filter((a) => {
+    if (opts.mode === 'pearson') {
+      if (!a.pearson) return false;
+    } else if (opts.mode && a.mode !== opts.mode) return false;
+    return !words || a.title.toLowerCase().includes(words);
+  });
+  const filtered = opts.hideRushed ? matching.filter((a) => !a.rushed) : matching;
+  const counted = filtered.filter((a) => !a.rushed);
+  const trend: AttemptPoint[] = counted
+    .slice(0, TREND_POINTS)
+    .reverse()
+    .map((a) => ({ id: a.id, finished: a.finished, title: a.title, score: a.score, correct: a.correct, total: a.total }));
+  return {
+    items: filtered.slice(opts.offset, opts.offset + opts.limit).map((a) => summarize(a, bank)),
+    total: filtered.length,
+    offset: opts.offset,
+    limit: opts.limit,
+    modes: [...new Set(newest.map((a) => a.mode))] as TestMode[],
+    pearson: newest.filter((a) => a.pearson).length,
+    rushed: matching.filter((a) => a.rushed).length,
+    counted: counted.length,
+    avgScore: counted.length ? round1(counted.reduce((s, a) => s + a.score, 0) / counted.length) : 0,
+    timeUsed: filtered.reduce((s, a) => s + a.timeUsed, 0),
+    trend,
+  };
 }
 
 // ── recall-first matching ───────────────────────────────────────────────────
@@ -266,6 +365,7 @@ function toRecord(q: Question, a: AnswerInput | undefined, pilot: boolean, tax: 
   const why = cleanNote(a?.why, WHY_MAX_CHARS);
   if (why) r.why = why;
   if (pilot) r.scored = false;
+  r.h = q.hash; // which version of the question was answered (item versioning)
   return r;
 }
 
@@ -301,7 +401,7 @@ export function gradeSubmission(req: SubmitRequest, bank: BankState): GradedSubm
   };
 }
 
-const ANSWER_KEYS = ['q', 'pick', 'key', 'ok', 't', 'est', 'flag', 'unsure', 'elim', 'recall', 'recallHit', 'hinted', 'why', 'scored'];
+const ANSWER_KEYS = ['q', 'pick', 'key', 'ok', 't', 'est', 'flag', 'unsure', 'elim', 'recall', 'recallHit', 'hinted', 'why', 'scored', 'h', 'regraded'];
 
 /** Compact front-matter form of an answer (+ unknown keys of the previous version of the record). */
 function answerData(r: AnswerRecord, prev?: Record<string, unknown>): Record<string, unknown> {
@@ -316,6 +416,7 @@ function answerData(r: AnswerRecord, prev?: Record<string, unknown>): Record<str
   if (r.hinted) o.hinted = true;
   if (r.why) o.why = r.why;
   if (r.scored === false) o.scored = false;
+  if (r.h) o.h = r.h;
   for (const [k, v] of Object.entries(prev ?? {})) if (!ANSWER_KEYS.includes(k) && v !== undefined) o[k] = v;
   return o;
 }
@@ -407,6 +508,7 @@ export function gradeAndSave(req: SubmitRequest, bank: BankState): Attempt {
   };
   const data = frontMatterData(attempt, {}, { estimate_total: session.estimateTotal, timing: session.timingPreset });
   writeAtomic(file, stringifyFrontMatter(data, ['answers']) + '\n' + renderBody(attempt, g.questions, bank, session.estimateTotal, cfg));
+  resultParses.drop(file, cfg.cache?.sqlite !== false); // a stored row of a deleted file with the same name must not come back
   return attempt;
 }
 
@@ -433,6 +535,7 @@ export function rewriteAttempt(fileRel: string, mutate: (a: Attempt) => void): b
   if (infoNotes.length) body = body.replace(/\n*$/, '\n\n') + infoNotes.join('\n\n') + '\n';
   writeAtomic(abs, stringifyFrontMatter(data, ['answers']) + '\n' + body);
   fileCache.delete(abs);
+  resultParses.drop(abs, cfg.cache?.sqlite !== false); // never serve the previous parse to another process
   listCache = undefined;
   return true;
 }

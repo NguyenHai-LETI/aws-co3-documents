@@ -4,8 +4,11 @@ import { startTest } from '../lib/start.ts';
 import { loadActive } from '../lib/session.ts';
 import { fmtDateTime, fmtDuration, fmtRelative } from '../lib/format.ts';
 import { AttemptBadges, ReadinessCard } from '../components/insights.tsx';
+import { ExamCountdown } from '../components/progress/ExamCountdown.tsx';
 import { MODE_INFO } from '../../shared/labels.ts';
-import type { AttemptSummary, Plan, StatsResponse } from '../../shared/types.ts';
+import type { AttemptSummary, PlansResponse, ResultsPage, StatsResponse } from '../../shared/types.ts';
+
+const RECENT = 6;
 
 function ActionCard({ icon, title, desc, cta, onClick, tone }: { icon: string; title: string; desc: string; cta: string; onClick: () => void; tone?: 'accent' }) {
   return (
@@ -24,16 +27,20 @@ function ActionCard({ icon, title, desc, cta, onClick, tone }: { icon: string; t
 export function Dashboard() {
   const { meta, state } = useData();
   const { data: stats } = useFetch<StatsResponse>('/api/stats');
-  const { data: results } = useFetch<AttemptSummary[]>('/api/results');
-  const { data: plans } = useFetch<{ plans: Plan[]; newSince: { attempts: number } }>('/api/plans');
+  // paginated APIs: only the newest attempts and the latest plan summary (no Markdown bodies) — older servers answer
+  // `?limit=` with the full legacy array, which is handled too
+  const { data: page } = useFetch<ResultsPage | AttemptSummary[]>(`/api/results?limit=${RECENT}`);
+  const { data: plans } = useFetch<PlansResponse>('/api/plans?limit=1');
   const active = loadActive();
   if (!meta) return null;
+  const results = Array.isArray(page) ? page.slice(0, RECENT) : page?.items;
+  const totalResults = Array.isArray(page) ? page.length : page?.total;
   const c = state?.counts ?? {};
   const T = stats?.totals;
   const plan = plans?.plans[0];
   const nextSession = plan?.sessions.find((s) => !s.done?.length);
   const weakest = (stats?.byTopic ?? []).filter((b) => b.attempts >= 5).sort((a, b) => a.accuracy - b.accuracy).slice(0, 3);
-  const firstTime = !!results && !results.length; // no flash of the onboarding box while loading
+  const firstTime = totalResults === 0; // no flash of the onboarding box while loading
   const dueToday = c.srs ?? 0;
   const backlog = c.backlog ?? T?.backlog ?? 0;
 
@@ -77,35 +84,38 @@ export function Dashboard() {
       )}
 
       <section className="split-l">
-        {T && T.answers ? (
-          <ReadinessCard totals={T} compact>
-            <div className="small dim">
-              Đúng {T.accuracy}% · {T.answers} câu · độ phủ {Math.round((T.distinctSeen / Math.max(1, T.bankActive)) * 100)}% · 🔥 {T.streakDays} ngày
-            </div>
-            {(dueToday > 0 || backlog > 0) && (
+        <div className="stack">
+          {T && T.answers ? (
+            <ReadinessCard totals={T} compact>
               <div className="small dim">
-                🧠 Ôn hôm nay <b className="num">{dueToday}</b>
-                {backlog > 0 && (
-                  <>
-                    {' '}
-                    · tồn đọng <b className="num">{backlog}</b> <span className="muted">(tối đa {meta.srs.daily_limit} câu/ngày)</span>
-                  </>
-                )}
+                Đúng {T.accuracy}% · {T.answers} câu · độ phủ {Math.round((T.distinctSeen / Math.max(1, T.bankActive)) * 100)}% · 🔥 {T.streakDays} ngày
               </div>
-            )}
-            <a className="small" href={href('/stats')}>
-              Xem thống kê chi tiết →
-            </a>
-          </ReadinessCard>
-        ) : (
-          <div className="card stack">
-            <div className="small muted">Mức sẵn sàng thi</div>
-            <div className="small muted">
-              Chưa có dữ liệu — làm bài đầu tiên để ước tính.
-              {T?.rushedAttempts ? ` (${T.rushedAttempts} bài làm vội không được tính.)` : ''}
+              {(dueToday > 0 || backlog > 0) && (
+                <div className="small dim">
+                  🧠 Ôn hôm nay <b className="num">{dueToday}</b>
+                  {backlog > 0 && (
+                    <>
+                      {' '}
+                      · tồn đọng <b className="num">{backlog}</b> <span className="muted">(tối đa {meta.srs.daily_limit} câu/ngày)</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <a className="small" href={href('/stats')}>
+                Xem thống kê chi tiết →
+              </a>
+            </ReadinessCard>
+          ) : (
+            <div className="card stack">
+              <div className="small muted">Mức sẵn sàng thi</div>
+              <div className="small muted">
+                Chưa có dữ liệu — làm bài đầu tiên để ước tính.
+                {T?.rushedAttempts ? ` (${T.rushedAttempts} bài làm vội không được tính.)` : ''}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+          <ExamCountdown />
+        </div>
 
         <div className="stack">
           <b>Hôm nay nên làm gì?</b>
@@ -190,7 +200,7 @@ export function Dashboard() {
             <div className="small muted">Chưa có bài nào.</div>
           ) : (
             <div className="stack sm">
-              {results.slice(0, 6).map((a) => (
+              {results.map((a) => (
                 <a key={a.id} href={href(`/result/${encodeURIComponent(a.id)}`)} className="row between nowrap small" style={{ color: 'inherit' }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {MODE_INFO[a.mode]?.icon} {a.title} <span className="muted">· {fmtDateTime(a.finished)} · {fmtDuration(a.timeUsed)}</span>

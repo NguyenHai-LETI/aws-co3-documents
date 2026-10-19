@@ -1,0 +1,341 @@
+/* [L] styles for this workstream (imported by web/main.tsx): exam goal & forecast, review workload, external scores,
+   FSRS parameters. Tokens from styles.css; class names are prefixed `lrn-`. Forecast marks use one hue in two
+   validated shades: --seq-2 (if study stops now, hollow) and --seq-4 (on schedule, filled). */
+
+.lrn-section .split-l {
+  align-items: stretch;
+}
+.lrn-gap {
+  margin-top: 16px;
+}
+.lrn-method {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.lrn-align-start {
+  align-items: start;
+}
+
+/* ── forecast track: band between the two forecasts, target hairline, two dots ── */
+.lrn-track {
+  position: relative;
+  height: 10px;
+  margin: 6px 7px 2px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+}
+.lrn-track-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--seq-3) 35%, transparent);
+}
+.lrn-track-target {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text-2);
+}
+.lrn-dot {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.lrn-dot.stop {
+  background: var(--surface);
+  border: 3px solid var(--seq-2);
+}
+.lrn-dot.sched {
+  background: var(--seq-4);
+  z-index: 1;
+}
+.lrn-legend {
+  margin-top: 8px;
+}
+.lrn-key-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+.lrn-key-dot.stop {
+  border: 2px solid var(--seq-2);
+}
+.lrn-key-dot.sched {
+  background: var(--seq-4);
+}
+
+/* ── per-domain rows ── */
+.lrn-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lrn-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) minmax(0, 1fr) 86px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px;
+  border-radius: 8px;
+  outline: none;
+}
+.lrn-row:hover,
+.lrn-row.on {
+  background: var(--surface-2);
+}
+.lrn-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.lrn-row-label {
+  font-size: 13px;
+  line-height: 1.3;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lrn-row .lrn-track {
+  margin: 0 7px;
+}
+.lrn-row-value {
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.lrn-row-tip {
+  left: 50%;
+  top: 0;
+}
+
+/* ── review workload columns ── */
+.lrn-wl {
+  position: relative;
+}
+.lrn-wl-plot {
+  position: relative;
+  height: 130px;
+  margin-top: 20px;
+  border-bottom: 1px solid var(--axis);
+}
+.lrn-wl-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--text-2);
+  z-index: 1;
+  pointer-events: none;
+}
+.lrn-wl-cap span {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface);
+  padding: 0 3px;
+  border-radius: 4px;
+}
+.lrn-wl-cols {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+.lrn-wl-band {
+  position: relative;
+  height: 100%;
+  border-radius: 4px 4px 0 0;
+  outline: none;
+}
+.lrn-wl-band:hover,
+.lrn-wl-band.on {
+  background: var(--surface-2);
+}
+.lrn-wl-band:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.lrn-wl-bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 70%;
+  max-width: min(24px, calc(100% - 2px));
+  transform: translateX(-50%);
+  border-radius: 4px 4px 0 0;
+  background: var(--series-1);
+}
+.lrn-wl-val {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-1);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--surface);
+  line-height: 1.35;
+  pointer-events: none;
+}
+.lrn-wl-band .tooltip {
+  z-index: 6;
+}
+.lrn-wl-x {
+  display: grid;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+/* labels wider than their column stay centred on it (flex overflows both ways); the ends hug the plot edges */
+.lrn-wl-x > span {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.lrn-wl-x > span:first-child {
+  justify-content: flex-start;
+}
+.lrn-wl-x > span:last-child {
+  justify-content: flex-end;
+}
+
+/* ── forms (goal, external score) ── */
+.lrn-goal-form,
+.lrn-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+}
+.lrn-goal-form label,
+.lrn-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.lrn-goal-form input,
+.lrn-form input {
+  min-width: 0;
+  max-width: 100%;
+}
+.lrn-goal-form input[type='number'],
+.lrn-form input[type='number'] {
+  width: 110px;
+}
+.lrn-form {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.lrn-form-wide {
+  flex: 1 1 220px;
+}
+.lrn-form-wide input {
+  width: 100%;
+}
+.lrn-form-actions,
+.lrn-goal-actions {
+  gap: 6px;
+}
+
+/* ── external scores, calibration, FSRS card ── */
+.lrn-ext-list {
+  display: flex;
+  flex-direction: column;
+}
+.lrn-ext-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.lrn-ext-item:first-child {
+  border-top: 0;
+}
+.lrn-ext-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lrn-ext-nums {
+  text-align: right;
+}
+.lrn-calib {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+.lrn-metrics td,
+.lrn-metrics th {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.lrn-weights summary {
+  cursor: pointer;
+}
+.lrn-weights code {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .lrn-ext-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .lrn-ext-nums {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: left;
+  }
+  .lrn-ext-item > .btn {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .lrn-row {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    gap: 4px 10px;
+  }
+  .lrn-row-label {
+    grid-column: 1 / -1;
+  }
+  .lrn-row .lrn-track {
+    grid-column: 1;
+  }
+  .lrn-wl-plot {
+    height: 110px;
+  }
+  .lrn-goal-form input[type='date'],
+  .lrn-form input[type='date'] {
+    width: 150px;
+  }
+}

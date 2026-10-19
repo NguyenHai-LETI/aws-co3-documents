@@ -5,6 +5,10 @@ import { DataProvider } from './lib/store.tsx';
 import './styles.css';
 import './styles-runner.css';
 import './styles-insights.css';
+import './styles-search.css';
+import './styles-learning.css';
+import './styles-quality.css';
+import './styles-tools.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

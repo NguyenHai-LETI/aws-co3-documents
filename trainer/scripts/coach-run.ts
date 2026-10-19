@@ -4,12 +4,15 @@
 //   node trainer/scripts/coach-run.ts --force               # analyze even without new results
 //   node trainer/scripts/coach-run.ts --trigger schedule    # scheduled run: coach.hosts, max_runs_per_day, enrich_on_idle
 //   node trainer/scripts/coach-run.ts --generate --sources 03-database-services.md --count 15 --focus "RDS Proxy"
-//   node trainer/scripts/coach-run.ts --enrich [--size 20] [--tasks explain,hint,classify,balance] [--batches 3]
+//   node trainer/scripts/coach-run.ts --enrich [--size 20] [--tasks explain,hint,classify,balance,distractors] [--batches 3]
+//   node trainer/scripts/coach-run.ts --enrich --ids 03-v2-01,05-v1-12 [--tasks distractors] [--note "…"]
 //   node trainer/scripts/coach-run.ts --longform [--count 5]
+//   node trainer/scripts/coach-run.ts --verify [--ids a,b | --pack <pack-id> | --scope unverified-ai|new|changed]
 import os from 'node:os';
 import { loadConfig } from '../server/config.ts';
-import { loadAttempts } from '../server/lib/results.ts';
-import { loadPlans } from '../server/lib/plans.ts';
+import { context } from '../server/context.ts';
+import { loadBank } from '../server/lib/bank.ts';
+import { VERIFY_SCOPES } from '../server/lib/verify.ts';
 import { loadIssues } from '../server/lib/issues.ts';
 import { newDataSince } from '../server/lib/snapshot.ts';
 import { aiSyncLine, syncForAi } from '../server/lib/sync.ts';
@@ -30,7 +33,7 @@ const int = (v: string | undefined, dflt: number, max: number) => {
 };
 
 const cfg = loadConfig();
-let task: CoachTask = flag('generate') ? 'generate' : flag('enrich') ? 'enrich' : flag('longform') ? 'longform' : 'analyze';
+let task: CoachTask = flag('generate') ? 'generate' : flag('enrich') ? 'enrich' : flag('longform') ? 'longform' : flag('verify') ? 'verify' : 'analyze';
 const trigger = (opt('trigger') ?? 'cli') as CoachRunInfo['trigger'];
 const maxPerDay = cfg.coach.max_runs_per_day;
 
@@ -62,8 +65,8 @@ if (!claude.available) {
 if (cfg.sync.before_ai) log(aiSyncLine(await syncForAi('before')));
 
 if (task === 'analyze' && !flag('force') && cfg.coach.skip_if_no_new_results) {
-  const attempts = loadAttempts();
-  const fresh = newDataSince(loadPlans(attempts)[0], attempts);
+  const { attempts, plans } = context(); // re-graded attempts (answer-key fixes count against the new key)
+  const fresh = newDataSince(plans[0], attempts);
   const openIssues = loadIssues().filter((i) => i.open).length;
   if (!fresh.attempts && !openIssues) {
     if (trigger === 'schedule' && cfg.coach.enrich_on_idle) {
@@ -78,6 +81,11 @@ if (task === 'analyze' && !flag('force') && cfg.coach.skip_if_no_new_results) {
 
 log(`Claude Code ${claude.version} · ${claude.source}`); // analyze: the runner writes the snapshot right before the CLI starts
 
+const list = (v: string | undefined) =>
+  (v ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 const params: Record<string, unknown> =
   task === 'generate'
     ? {
@@ -92,11 +100,35 @@ const params: Record<string, unknown> =
         slug: opt('slug'),
       }
     : task === 'enrich'
-      ? { size: int(opt('size'), cfg.coach.enrich_batch_size, 60), ...(opt('tasks') ? { tasks: opt('tasks') } : {}) }
+      ? {
+          size: int(opt('size'), cfg.coach.enrich_batch_size, 60),
+          ...(opt('tasks') ? { tasks: opt('tasks') } : {}),
+          ...(opt('ids') ? { ids: list(opt('ids')) } : {}),
+          ...(opt('note') ? { note: opt('note') } : {}),
+        }
       : task === 'longform'
         ? { count: int(opt('count'), 5, 20) }
-        : { note: opt('note') };
-const batches = task === 'enrich' && flag('enrich') ? int(opt('batches'), 1, 20) : 1;
+        : task === 'verify'
+          ? { ...(opt('ids') ? { ids: list(opt('ids')) } : {}), ...(opt('pack') ? { pack: opt('pack') } : {}), ...(opt('scope') ? { scope: opt('scope') } : {}) }
+          : { note: opt('note') };
+const batches = task === 'enrich' && flag('enrich') && !opt('ids') ? int(opt('batches'), 1, 20) : 1;
+
+if (task === 'verify') {
+  // a typo must not look like "nothing to verify" (exit 0) or silently become another scope
+  if (opt('scope') && !(VERIFY_SCOPES as readonly string[]).includes(opt('scope')!)) {
+    console.error(`[${stamp()}] ✗ --scope không hợp lệ: ${opt('scope')} (${VERIFY_SCOPES.join(' | ')})`);
+    process.exit(2);
+  }
+  const pack = opt('pack');
+  if (pack && !loadBank().packs.some((p) => p.id === pack || p.file === pack)) {
+    console.error(`[${stamp()}] ✗ Không có pack "${pack}" (dùng pack id, vd ai-2026-10-16-1757-longform, hoặc đường dẫn bank/packs/…)`);
+    process.exit(2);
+  }
+  if (flag('ids') && !opt('ids')) {
+    console.error(`[${stamp()}] ✗ --ids cần danh sách id, vd --ids 03-v2-01,05-v1-12`);
+    process.exit(2);
+  }
+}
 
 let finished = 0;
 const runOnce = () => {

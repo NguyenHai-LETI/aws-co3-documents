@@ -13,6 +13,9 @@ import { Stats } from './pages/Stats.tsx';
 import { BankPage } from './pages/Bank.tsx';
 import { Coach } from './pages/Coach.tsx';
 import { Notes } from './pages/Notes.tsx';
+import { Tools } from './pages/Tools.tsx';
+import { LanBadge } from './components/tools/LanBadge.tsx';
+import { SearchBox } from './components/SearchBox.tsx';
 
 type Theme = 'system' | 'light' | 'dark';
 
@@ -45,6 +48,7 @@ const NAV = [
   { path: '/coach', icon: '🤖', label: 'AI Coach' },
   { path: '/bank', icon: '🗂️', label: 'Ngân hàng câu hỏi' },
   { path: '/notes', icon: '📖', label: 'Tài liệu' },
+  { path: '/tools', icon: '🧰', label: 'Công cụ' },
 ];
 
 export function App() {
@@ -65,6 +69,7 @@ export function App() {
   else if (top === '/bank') page = <BankPage query={route.query} />;
   else if (top === '/coach') page = <Coach />;
   else if (top === '/notes') page = <Notes query={route.query} />;
+  else if (top === '/tools') page = <Tools />;
   else page = <Dashboard />;
 
   const counts: Record<string, number | undefined> = {
@@ -108,7 +113,7 @@ export function App() {
               <option value="dark">🌙 Tối</option>
             </select>
             <span className="spacer" />
-            <span title={`Chỉ chạy ở máy bạn (127.0.0.1)${meta?.host ? ` · máy: ${meta.host}` : ''}`}>🔒 local</span>
+            <LanBadge host={meta?.host} />
           </div>
         </div>
       </nav>
@@ -117,6 +122,7 @@ export function App() {
       ) : (
         <main className="main">
           <ErrorBox error={error && `Không kết nối được server: ${error}`} />
+          <SearchBox />
           {page}
         </main>
       )}

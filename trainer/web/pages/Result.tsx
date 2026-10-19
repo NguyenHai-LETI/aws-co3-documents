@@ -12,6 +12,7 @@ import { AttemptBadges, ColumnChart, KvRow, TaskBadge, pctOf } from '../componen
 import { BarList, ChartCard, Meter } from '../components/charts.tsx';
 import { Empty, ErrorBox, Loading, Tabs, toast } from '../components/ui.tsx';
 import { MODE_INFO, FEEDBACK_INFO } from '../../shared/labels.ts';
+import { isCorrect, normalizeKeys } from '../../shared/scoring.ts';
 import type { AnswerRecord, Attempt, AttemptSummary, BuildTestRequest, Question } from '../../shared/types.ts';
 
 type Filter = 'all' | 'wrong' | 'right' | 'flag' | 'slow' | 'pilot' | 'elim';
@@ -19,6 +20,17 @@ type Filter = 'all' | 'wrong' | 'right' | 'flag' | 'slow' | 'pilot' | 'elim';
 /** The learner struck out (one of) the correct option(s). */
 const struckCorrect = (r: AnswerRecord) => !!r.elim && [...r.elim].some((k) => r.key.includes(k));
 const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
+
+/**
+ * Item versioning: the result keeps the key the answer was graded with (`key`) and the question version (`h`).
+ * keyChanged → statistics, readiness and the review schedule count this answer against the current key (`nowOk`);
+ * edited → the question text/options changed since, the key did not.
+ */
+function versionOf(r: AnswerRecord, q: Question): { keyChanged: boolean; nowOk: boolean; edited: boolean } {
+  const now = normalizeKeys(q.answer);
+  const keyChanged = !!r.regraded || (!!r.key && normalizeKeys([...r.key].filter((c) => /[a-z]/i.test(c))) !== now);
+  return { keyChanged, nowOk: isCorrect([...r.pick], q.answer), edited: !keyChanged && !!r.h && !!q.hash && r.h !== q.hash };
+}
 
 // ── stamina: accuracy + pace per quarter of an exam ─────────────────────────
 
@@ -101,6 +113,35 @@ function Stamina({ answers }: { answers: AnswerRecord[] }) {
       </div>
     </ChartCard>
   );
+}
+
+/** Per-answer item-versioning note: re-graded against a fixed key, or only a light "edited since" hint. */
+function VersionNote({ r, q, v }: { r: AnswerRecord; q: Question; v?: ReturnType<typeof versionOf> }) {
+  if (v?.keyChanged) {
+    const knownOldKey = !!r.key && normalizeKeys([...r.key]) !== normalizeKeys(q.answer);
+    return (
+      <div className="ins-wrap alert warn small" style={{ marginTop: 10 }}>
+        ↻{' '}
+        {knownOldKey ? (
+          <>
+            Đáp án lúc chấm là <b>{r.key}</b>, ngân hàng hiện tại là <b>{q.answer.join(', ')}</b> (câu đã được sửa sau bài này)
+          </>
+        ) : (
+          'Đáp án của câu này đã được sửa sau bài làm'
+        )}{' '}
+        — thống kê, mức sẵn sàng và lịch ôn chấm lại câu này là <b>{v.nowOk ? 'đúng' : 'sai'}</b>
+        {v.nowOk !== r.ok ? ` (lúc chấm: ${r.ok ? 'đúng' : 'sai'})` : ''}. File kết quả giữ nguyên.
+      </div>
+    );
+  }
+  if (v?.edited) {
+    return (
+      <div className="tiny muted" style={{ marginTop: 8 }} title={`Phiên bản lúc làm: ${r.h} · hiện tại: ${q.hash}`}>
+        ✎ Câu đã được chỉnh sửa sau bài này (đề / phương án) — đáp án đúng không đổi.
+      </div>
+    );
+  }
+  return null;
 }
 
 // ── "why did you pick this?" note on wrong answers ────────────────────────
@@ -228,9 +269,15 @@ export function ResultPage({ id }: { id: string }) {
   const hinted = ans.filter((r) => r.hinted);
   const recall = ans.filter((r) => r.recall);
   const unsure = ans.filter((r) => r.unsure);
-  const whyCount = ans.filter((r) => !r.ok && (why[r.q] ?? r.why)).length;
-  const wrongPicked = ans.filter((r) => !r.ok && r.pick).length;
+  // answers graded against a key that has been fixed since: how the statistics count them now
+  const versions = rows.map(({ r, q }) => (q ? versionOf(r, q) : undefined));
+  const okNow = (i: number) => (versions[i]?.keyChanged ? versions[i]!.nowOk : rows[i].r.ok);
+  const whyCount = ans.filter((r, i) => !okNow(i) && (why[r.q] ?? r.why)).length;
+  const wrongPicked = ans.filter((r, i) => !okNow(i) && r.pick).length;
   const showStamina = (a.mode === 'exam' || a.pearson) && ans.length >= 20;
+  const regraded = rows.filter((_, i) => versions[i]?.keyChanged).length;
+  const flipped = rows.filter(({ r }, i) => versions[i]?.keyChanged && okNow(i) !== r.ok).length;
+  const scoredNowCorrect = rows.filter(({ r }, i) => r.scored !== false && okNow(i)).length;
 
   const retry = (ids: string[], title: string) => startTest({ mode: 'ids', ids, title, feedback: 'practice', timing: { preset: 'standard' }, shuffleOptions: true });
   const again = () => {
@@ -339,6 +386,11 @@ export function ResultPage({ id }: { id: string }) {
                 {whyCount}/{wrongPicked}
               </KvRow>
             )}
+            {regraded > 0 && (
+              <KvRow k="↻ Đáp án đã sửa" title="Đáp án của các câu này đã được sửa sau bài làm — thống kê, mức sẵn sàng và lịch ôn chấm lại theo đáp án hiện tại; file kết quả giữ nguyên">
+                {regraded} câu{flipped ? ` · nay ${scoredNowCorrect}/${a.total} đúng` : ''}
+              </KvRow>
+            )}
             {a.plan && (
               <KvRow k="Kế hoạch AI">
                 <a href={href('/coach')} className="mono tiny">
@@ -409,6 +461,11 @@ export function ResultPage({ id }: { id: string }) {
                         🧪 thử nghiệm
                       </span>
                     )}
+                    {versions[n - 1]?.keyChanged && (
+                      <span className="badge warn" title="Đáp án đã được sửa sau bài này — thống kê tính theo đáp án hiện tại">
+                        ↻ chấm lại: {versions[n - 1]!.nowOk ? 'đúng' : 'sai'}
+                      </span>
+                    )}
                     {r.flag && <span className="badge warn">🚩 cờ</span>}
                     {r.unsure && <span className="badge warn">🤔 chưa chắc</span>}
                     {r.hinted && (
@@ -445,12 +502,10 @@ export function ResultPage({ id }: { id: string }) {
                   </div>
                 </div>
                 <QuestionView q={q} picked={[...r.pick]} reveal showMeta compact elim={r.elim ? [...r.elim] : []} recall={r.recall || undefined} />
-                {!r.ok && !!r.pick && <WhyNote attemptId={a.id} r={r} value={why[r.q] ?? r.why} onSaved={(w) => setWhy((x) => ({ ...x, [r.q]: w }))} />}
-                {r.key !== q.answer.join('') && (
-                  <div className="ins-wrap alert warn small" style={{ marginTop: 10 }}>
-                    ℹ️ Đáp án lúc chấm là <b>{r.key}</b>, ngân hàng hiện tại là <b>{q.answer.join(', ')}</b> (câu đã được sửa sau bài này).
-                  </div>
+                {((!okNow(n - 1) && !!r.pick) || !!(why[r.q] ?? r.why)) && (
+                  <WhyNote attemptId={a.id} r={r} value={why[r.q] ?? r.why} onSaved={(w) => setWhy((x) => ({ ...x, [r.q]: w }))} />
                 )}
+                <VersionNote r={r} q={q} v={versions[n - 1]} />
               </div>
             ) : (
               <div key={`${r.q}-${n}`} className="card small muted">

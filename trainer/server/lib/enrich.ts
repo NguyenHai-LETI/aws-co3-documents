@@ -1,5 +1,5 @@
 // ENRICH routine helpers: which questions still need maintenance (explanation, hint, classification,
-// option-length balance), the batch file handed to the AI (coach/enrich/<runId>-batch.md), long-form
+// option-length balance, weak distractors), the batch file handed to the AI (coach/enrich/<runId>-batch.md), long-form
 // targets (short questions the learner meets/misses often) and the progress counters for the UI.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,10 +8,13 @@ import type { BankState } from './bank.ts';
 import { correctIsLongest } from './patch.ts';
 import { localIso } from './time.ts';
 import { countWords } from '../../shared/timing.ts';
-import type { Attempt, CoachRunInfo, EnrichStatus, Question, QuestionState } from '../../shared/types.ts';
+import type { OptionStats } from './quality.ts';
+import type { Attempt, CoachRunInfo, DistractorReport, EnrichStatus, Question, QuestionState, VerifyVerdict } from '../../shared/types.ts';
 
-export type EnrichTodo = 'explain' | 'hint' | 'classify' | 'balance';
+export type EnrichTodo = 'explain' | 'hint' | 'classify' | 'balance' | 'distractors';
+/** Default work of a batch (pending per question). `distractors` runs only when asked for (data-driven, see distractorReport). */
 export const ENRICH_TODOS: readonly EnrichTodo[] = ['explain', 'hint', 'classify', 'balance'];
+export const ALL_TODOS: readonly EnrichTodo[] = [...ENRICH_TODOS, 'distractors'];
 export const MIN_EXPLANATION_WORDS = 25;
 export const MAX_BATCH = 60;
 export const MAX_LONGFORM = 20;
@@ -21,11 +24,12 @@ const TODO_LABEL: Record<EnrichTodo, string> = {
   hint: 'hint — 1 dòng gợi ý tiếng Việt, không lộ đáp án',
   classify: 'classify — domain + task + services/tags + concept',
   balance: 'balance — đáp án đúng dài hơn mọi distractor ≥ 15 %: viết lại distractor cho cân',
+  distractors: 'distractors — phương án nhiễu quá dễ loại (số liệu 📊 ở từng câu): viết lại cho hợp lý, giữ đáp án và ý của câu',
 };
 
 /** Work still pending for one question (ENRICH.md). */
-export function pendingTodos(q: Question): EnrichTodo[] {
-  const out: EnrichTodo[] = [];
+export function pendingTodos(q: Question): Exclude<EnrichTodo, 'distractors'>[] {
+  const out: Exclude<EnrichTodo, 'distractors'>[] = [];
   if (!q.enriched || countWords(q.explanation) < MIN_EXPLANATION_WORDS) out.push('explain');
   if (!q.hint) out.push('hint');
   if (!q.enriched) out.push('classify');
@@ -33,12 +37,21 @@ export function pendingTodos(q: Question): EnrichTodo[] {
   return out;
 }
 
-/** `tasks` may mix todo kinds ("explain,hint") and exam-guide task ids ("2.2") to narrow the batch. */
-export function parseTasks(tasks: unknown): { todos: EnrichTodo[]; examTasks: string[] } {
+/**
+ * `tasks` may mix todo kinds ("explain,hint", "distractors") and exam-guide task ids ("2.2") to narrow the batch.
+ * `explicit` = todo kinds were named (otherwise the four default kinds).
+ */
+export function parseTasks(tasks: unknown): { todos: EnrichTodo[]; examTasks: string[]; explicit: boolean } {
   const list = (Array.isArray(tasks) ? tasks.map(String) : typeof tasks === 'string' ? tasks.split(',') : []).map((t) => t.trim().toLowerCase()).filter(Boolean);
-  const todos = list.filter((t): t is EnrichTodo => (ENRICH_TODOS as readonly string[]).includes(t));
+  const todos = [...new Set(list.filter((t): t is EnrichTodo => (ALL_TODOS as readonly string[]).includes(t)))];
   const examTasks = list.filter((t) => /^[1-4]\.[1-9]$/.test(t));
-  return { todos: todos.length ? todos : [...ENRICH_TODOS], examTasks };
+  return { todos: todos.length ? todos : [...ENRICH_TODOS], examTasks, explicit: todos.length > 0 };
+}
+
+/** Explicit question ids from params (array or comma list), trimmed, unique, at most MAX_BATCH. */
+export function idList(v: unknown): string[] {
+  const list = Array.isArray(v) ? v.map(String) : typeof v === 'string' ? v.split(',') : [];
+  return [...new Set(list.map((x) => x.trim()).filter(Boolean))].slice(0, MAX_BATCH);
 }
 
 const clampInt = (v: unknown, min: number, max: number, dflt: number) => {
@@ -59,23 +72,45 @@ function domainWeight(bank: BankState, q: Question): number {
   return bank.taxonomy.domains.find((d) => d.id === q.domain)?.weight ?? 0;
 }
 
+const tierOf = (s: QuestionState | undefined): BatchItem['tier'] => (s?.everWrong ? 'wrong' : s && s.attempts > 0 ? 'seen' : 'unseen');
+
 /**
  * Picks the next ENRICH batch: non-retired questions with pending work, ordered by
  * learner relevance (answered wrong before > seen > unseen), then exam weight of the domain,
  * then how often they were missed; ties stay grouped by topic so one batch shares notes.
+ * - `ids`: explicit questions, in that order, bypassing the scoring — todo = the requested kinds (all of them),
+ *   or each question's pending work (`explain` when nothing is pending: a re-check was asked for).
+ * - `distractors` without ids: questions whose weak distractors `report` (distractorReport) lists, most struck first.
  */
-export function selectBatch(bank: BankState, states: Map<string, QuestionState>, opts: { size?: number; tasks?: unknown } = {}): BatchItem[] {
-  const { todos, examTasks } = parseTasks(opts.tasks);
+export function selectBatch(bank: BankState, states: Map<string, QuestionState>, opts: { size?: number; tasks?: unknown; ids?: string[]; report?: DistractorReport } = {}): BatchItem[] {
+  const { todos, examTasks, explicit } = parseTasks(opts.tasks);
   const size = clampInt(opts.size, 1, MAX_BATCH, 20);
+  if (opts.ids?.length) {
+    return opts.ids
+      .map((id) => bank.byId.get(id))
+      .filter((q): q is Question => !!q && q.status !== 'retired')
+      .slice(0, MAX_BATCH)
+      .map((q) => {
+        const pending = pendingTodos(q);
+        const todo = explicit ? todos : pending.length ? pending : (['explain'] as EnrichTodo[]);
+        return { q, todo, tier: tierOf(states.get(q.id)), state: states.get(q.id) };
+      });
+  }
+  const weak = new Map<string, number>(); // qid → strike-outs of its weak distractors
+  if (todos.includes('distractors')) for (const w of opts.report?.weakDistractors ?? []) weak.set(w.id, (weak.get(w.id) ?? 0) + w.elims);
   const items: BatchItem[] = [];
   for (const q of bank.questions) {
     if (q.status === 'retired') continue;
     if (examTasks.length && !examTasks.includes(q.task ?? '')) continue;
-    const todo = pendingTodos(q).filter((t) => todos.includes(t));
+    const todo = [...pendingTodos(q), ...(weak.has(q.id) ? (['distractors'] as EnrichTodo[]) : [])].filter((t) => todos.includes(t));
     if (!todo.length) continue;
     const s = states.get(q.id);
-    const tier = s?.everWrong ? 'wrong' : s && s.attempts > 0 ? 'seen' : 'unseen';
-    items.push({ q, todo, tier, state: s });
+    items.push({ q, todo, tier: tierOf(s), state: s });
+  }
+  if (weak.size) {
+    // a distractor batch: the questions the learner rules out most easily first
+    items.sort((a, b) => (weak.get(b.q.id) ?? -1) - (weak.get(a.q.id) ?? -1) || a.q.id.localeCompare(b.q.id, 'en', { numeric: true }));
+    return items.filter((i) => i.todo.includes('distractors')).slice(0, size);
   }
   const wrong = (s?: QuestionState) => (s ? s.attempts - s.correct : 0);
   items.sort(
@@ -136,20 +171,55 @@ export function longformTargets(bank: BankState, states: Map<string, QuestionSta
 
 // ── status ──────────────────────────────────────────────────────────────────
 
-/** Run records in coach/runs/*.json, newest first. */
-export function readRunInfos(limit = Infinity): CoachRunInfo[] {
-  if (!fs.existsSync(RUNS_DIR)) return [];
-  const out: CoachRunInfo[] = [];
-  for (const f of fs.readdirSync(RUNS_DIR).filter((x) => x.endsWith('.json')).sort().reverse()) {
-    if (out.length >= limit) break;
-    try {
-      const j = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, f), 'utf8')) as CoachRunInfo;
-      if (j && typeof j.id === 'string' && typeof j.startedAt === 'string') out.push(j);
-    } catch {
-      // partial write or foreign file
-    }
+// Run records are read on every AI Coach request: keep them parsed, keyed by the directory mtime (the runner saves a
+// record with a rename, so every write bumps it) — records of runs still marked running are re-checked by file mtime.
+const runFiles = new Map<string, { mtimeMs: number; info?: CoachRunInfo }>();
+let runList: { dir: string; mtimeMs: number; list: CoachRunInfo[] } | undefined;
+
+function readRunFile(file: string): CoachRunInfo | undefined {
+  try {
+    const j = JSON.parse(fs.readFileSync(file, 'utf8')) as CoachRunInfo;
+    return j && typeof j.id === 'string' && typeof j.startedAt === 'string' ? j : undefined;
+  } catch {
+    return undefined; // partial write or foreign file
   }
-  return out;
+}
+
+/** Run records in coach/runs/*.json, newest first (cached; do not mutate). */
+export function readRunInfos(limit = Infinity): CoachRunInfo[] {
+  let mtimeMs: number;
+  try {
+    mtimeMs = fs.statSync(RUNS_DIR).mtimeMs;
+  } catch {
+    return [];
+  }
+  const live = runList?.list.some((r) => r.status === 'running');
+  if (!runList || runList.dir !== RUNS_DIR || runList.mtimeMs !== mtimeMs || live) {
+    const names = fs
+      .readdirSync(RUNS_DIR)
+      .filter((x) => x.endsWith('.json'))
+      .sort()
+      .reverse();
+    const list: CoachRunInfo[] = [];
+    for (const name of names) {
+      const file = path.join(RUNS_DIR, name);
+      let entry = runFiles.get(file);
+      if (!entry || !entry.info || entry.info.status === 'running') {
+        let m = 0;
+        try {
+          m = fs.statSync(file).mtimeMs;
+        } catch {
+          continue;
+        }
+        if (!entry || entry.mtimeMs !== m) runFiles.set(file, (entry = { mtimeMs: m, info: readRunFile(file) }));
+      }
+      if (entry.info) list.push(entry.info);
+    }
+    const keep = new Set(names.map((n) => path.join(RUNS_DIR, n)));
+    for (const f of runFiles.keys()) if (!keep.has(f)) runFiles.delete(f);
+    runList = { dir: RUNS_DIR, mtimeMs, list };
+  }
+  return Number.isFinite(limit) ? runList.list.slice(0, limit) : runList.list;
 }
 
 export function enrichStatus(bank: BankState, runs: CoachRunInfo[] = readRunInfos(200)): EnrichStatus & { longFormCandidates: number } {
@@ -243,9 +313,61 @@ function taskTable(bank: BankState): string[] {
   return bank.taxonomy.tasks.map((t) => `- \`${t.id}\` (${t.domain}) ${t.label} — ${t.label_vi}`);
 }
 
-/** Writes coach/enrich/<runId>-batch.md for an ENRICH batch; returns the absolute path. */
-export function writeBatchFile(runId: string, items: BatchItem[], bank: BankState, opts: { todos?: EnrichTodo[]; notes?: Map<string, string[]> } = {}): string {
+/**
+ * 📊 lines for the `distractors` todo: per-option picks / strike-outs on the current version of the question
+ * (quality.ts optionStats), the weak distractors and confidently repeated wrong picks (distractorReport).
+ */
+export function distractorLines(q: Question, report: DistractorReport | undefined, stats?: OptionStats): string[] {
+  const out: string[] = [];
+  if (stats?.exposures) {
+    const per = q.options
+      .filter((o) => !q.answer.includes(o.key))
+      .map((o) => `${o.key} chọn ${stats.options[o.key]?.picks ?? 0} · gạch ${stats.options[o.key]?.elims ?? 0}`)
+      .join('; ');
+    out.push(`📊 ${stats.exposures} lượt trả lời phiên bản hiện tại (đúng ${stats.correct}) — phương án nhiễu: ${per}`);
+  }
+  const weak = report?.weakDistractors.filter((w) => w.id === q.id) ?? [];
+  if (weak.length) {
+    const opt = (k: string) => q.options.find((o) => o.key === k)?.text ?? '?';
+    out.push(
+      `📊 phương án nhiễu yếu (chưa ai chọn, hay bị gạch): ${weak.map((w) => `${w.key} “${opt(w.key).slice(0, 60)}” — gặp ${w.exposures} lần, bị gạch ${w.elims} lần`).join('; ')} → viết lại cho hợp lý (service/tính năng thật, cùng “dáng” và độ dài với đáp án đúng)`,
+    );
+  }
+  for (const s of report?.suspectedKeys.filter((x) => x.id === q.id) ?? []) {
+    out.push(`⚠️ người học chọn ${s.pick} ${s.times} lần (${s.confident} lần chắc chắn) dù đáp án là ${s.key}${s.note ? ` — ${s.note}` : ''} → kiểm tra lại đáp án (đổi chỉ khi chắc chắn, kèm reason)`);
+  }
+  if (!out.length) out.push('📊 chưa đủ dữ liệu làm bài — viết lại các phương án nhiễu dễ loại nhất (service/tính năng có thật, cùng “dáng” và độ dài với đáp án đúng)');
+  return out;
+}
+
+/** 🧪 line when the blind-solve model disagreed with the key (latestVerdicts of verify.ts). */
+export function verdictLines(q: Question, verdicts: Record<string, VerifyVerdict> | undefined): string[] {
+  const v = verdicts?.[q.id];
+  if (!v || v.hash !== q.hash || v.decision === 'approved' || (v.outcome !== 'mismatch' && v.outcome !== 'ambiguous')) return [];
+  const what = v.outcome === 'ambiguous' ? `cho là câu MƠ HỒ (chọn ${v.picked ?? '—'})` : `chọn ${v.picked ?? '—'} thay vì ${v.key ?? q.answer.join('')}`;
+  return [`🧪 model giải mù (${v.model ?? '?'}, tin cậy ${v.confidence ?? '?'}) ${what}: “${v.reason ?? ''}” → kiểm tra đề/đáp án; sửa đề cho rõ, đổi đáp án (kèm reason) hoặc giữ nguyên nếu model sai`];
+}
+
+/**
+ * Writes coach/enrich/<runId>-batch.md for an ENRICH batch; returns the absolute path. `mode: 'json'` = the app runs the
+ * batch with structured output (the AI answers in JSON, the app writes the patch); 'files' = the AI writes the patch.
+ */
+export function writeBatchFile(
+  runId: string,
+  items: BatchItem[],
+  bank: BankState,
+  opts: {
+    todos?: EnrichTodo[];
+    notes?: Map<string, string[]>;
+    report?: DistractorReport;
+    stats?: Map<string, OptionStats>;
+    verdicts?: Record<string, VerifyVerdict>;
+    mode?: 'json' | 'files';
+    note?: string; // the learner's instruction for this batch
+  } = {},
+): string {
   const todos = opts.todos ?? [...ENRICH_TODOS];
+  const json = opts.mode === 'json';
   const file = batchPath(runId);
   const patch = repoRel(patchPath(runId));
   const o: string[] = [
@@ -256,30 +378,45 @@ export function writeBatchFile(runId: string, items: BatchItem[], bank: BankStat
     `size: ${items.length}`,
     `todo: [${todos.join(', ')}]`,
     `patch: ${patch}`,
+    `mode: ${json ? 'json' : 'files'}`,
     '---',
     '',
     `# 🧰 Lô ENRICH \`${runId}\` — ${items.length} câu`,
     '',
     '> File tự sinh bởi trainer app — đầu vào cho phần **A** của `trainer/coach/ENRICH.md` (đọc file đó trước).',
-    `> Viết patch vào \`${patch}\` (khung ở cuối file này), rồi chạy \`node trainer/scripts/apply-patch.ts ${patch}\``,
-    '> và sửa/chạy lại đến khi không còn ❌. Mỗi câu bên dưới phải có đúng **một** item trong patch.',
+    ...(json
+      ? [
+          '> **Chế độ app (JSON):** trả kết quả bằng JSON (`items`: mỗi câu bên dưới đúng **một** item, khoá như patch SCHEMA §8;',
+          `> \`base\` do app tự điền). Không ghi file, không chạy lệnh — app ghi \`${patch}\`, kiểm tra từng item và báo lỗi để bạn sửa một lần.`,
+        ]
+      : [
+          `> Viết patch vào \`${patch}\` (khung ở cuối file này), rồi chạy \`node trainer/scripts/apply-patch.ts ${patch}\``,
+          '> và sửa/chạy lại đến khi không còn ❌. Mỗi câu bên dưới phải có đúng **một** item trong patch.',
+        ]),
     '',
     '**Todo:**',
     ...todos.map((t) => `- ${TODO_LABEL[t]}`),
     '',
+    ...(opts.note ? [`**Ghi chú của người học cho lô này:** ${opts.note}`, ''] : []),
     '**Task statements (exam guide) — `task` phải cùng domain:**',
     ...taskTable(bank),
     '',
   ];
   items.forEach((it, i) => {
     const why = (opts.notes?.get(it.q.id) ?? []).map((w) => `🗣️ người học ${w} → giải thích phải gỡ đúng hiểu lầm này`);
-    o.push(...questionSection(bank, it.q, { n: i + 1, title: `todo: ${it.todo.join(' · ')}`, lengths: it.todo.includes('balance'), state: it.state, extra: why }));
+    const extra = [...why, ...(it.todo.includes('distractors') ? distractorLines(it.q, opts.report, opts.stats?.get(it.q.id)) : []), ...verdictLines(it.q, opts.verdicts)];
+    o.push(...questionSection(bank, it.q, { n: i + 1, title: `todo: ${it.todo.join(' · ')}`, lengths: it.todo.includes('balance') || it.todo.includes('distractors'), state: it.state, extra }));
   });
-  o.push('---', '', '## Khung patch', '', '```yaml', `run_id: ${runId}`, 'items:');
-  for (const it of items) {
-    o.push(`  - id: ${it.q.id}        # ${it.todo.join(', ')}`, `    base: ${it.q.hash}`);
+  if (!json) {
+    o.push('---', '', '## Khung patch', '', '```yaml', `run_id: ${runId}`, 'items:');
+    for (const it of items) {
+      // quoted: YAML reads an unquoted hash such as 46794516e3 or 9e114 as a number
+      o.push(`  - id: "${it.q.id}"        # ${it.todo.join(', ')}`, `    base: "${it.q.hash}"`);
+    }
+    o.push('```', '');
+  } else {
+    o.push('---', '', `**Id cần trả về (${items.length}):** ${items.map((it) => `\`${it.q.id}\``).join(', ')}`, '');
   }
-  o.push('```', '');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, o.join('\n'));
   return file;

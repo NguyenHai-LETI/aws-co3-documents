@@ -8,9 +8,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { MIGRATIONS_DIR, RESULTS_DIR } from '../config.ts';
+import { DATA_DIR, MIGRATIONS_DIR, RESULTS_DIR } from '../config.ts';
 import { listMarkdownFiles } from './bank.ts';
 import { asStringList, splitFrontMatter, stringifyFrontMatter } from './frontmatter.ts';
+import { fileSig } from './index-db.ts';
+import { resultParses } from './results.ts';
 import { LETTER_REF_RE, parsePack, serializeQuestion, toDraft } from './pack-format.ts';
 import { localIso, stampParts } from './time.ts';
 import type { Option, Question, Taxonomy } from '../../shared/types.ts';
@@ -412,15 +414,64 @@ function gradedBefore(answers: Record<string, unknown>[], m: MigrationRecord, fi
   return layout < 2 && !(finished >= Date.parse(m.applied));
 }
 
+const attemptAnswers = (data: Record<string, unknown>) => (data.answers as unknown[]).filter((a): a is Record<string, unknown> => !!a && typeof a === 'object');
+
+/**
+ * Applies every pending migration to the front matter of one attempt (mutates `data`); returns the applied ids.
+ * A migration changes the letters, so later migrations are decided on the already remapped answers.
+ */
+function applyMigrations(data: Record<string, unknown>, migrations: MigrationRecord[]): string[] {
+  const answers = attemptAnswers(data);
+  const done = asStringList(data.migrations);
+  const layout = Number(data.layout) || 0;
+  const finished = Date.parse(String(data.finished ?? ''));
+  const applied: string[] = [];
+  for (const m of migrations) {
+    if (done.includes(m.id) || !answers.some((a) => m.questions[String(a.q)])) continue;
+    if (!gradedBefore(answers, m, finished, layout)) continue;
+    for (const a of answers) {
+      const map = m.questions[String(a.q)];
+      if (!map) continue;
+      a.pick = remapKeys(String(a.pick ?? ''), map);
+      a.key = remapKeys(String(a.key ?? ''), map);
+      if (typeof a.elim === 'string') a.elim = remapKeys(a.elim, map);
+      else if (Array.isArray(a.elim)) a.elim = a.elim.map((k) => map[String(k)] ?? String(k));
+    }
+    applied.push(m.id);
+  }
+  return applied;
+}
+
+/**
+ * Would applyMigrations() change this file? Read-only, so it can run on the shared parse cache: nothing is remapped
+ * before the first migration that applies, hence the first `gradedBefore` hit decides exactly.
+ */
+function needsMigration(data: Record<string, unknown>, migrations: MigrationRecord[]): boolean {
+  if (data.kind !== 'attempt' || !Array.isArray(data.answers)) return false;
+  const answers = attemptAnswers(data);
+  const done = asStringList(data.migrations);
+  const layout = Number(data.layout) || 0;
+  const finished = Date.parse(String(data.finished ?? ''));
+  return migrations.some((m) => !done.includes(m.id) && answers.some((a) => m.questions[String(a.q)]) && gradedBefore(answers, m, finished, layout));
+}
+
 /**
  * Rewrites `pick`, `key`, `elim` letters of result files graded before a layout migration, sets
  * `layout: 2`, records the migration id in `migrations:` (idempotence) and appends a note to the body.
+ * The check runs on the shared parse cache (no YAML parse when the SQLite cache knows the file, and the parse done
+ * here is reused by loadAttempts() at startup); only files that change are read and parsed again.
  */
 export function migrateResults(opts: { resultsDir?: string; migrationsDir?: string } = {}): { migrated: number; files: string[] } {
   const migrations = loadMigrations(opts.migrationsDir ?? MIGRATIONS_DIR);
   if (!migrations.length) return { migrated: 0, files: [] };
   const files: string[] = [];
-  for (const abs of listMarkdownFiles(opts.resultsDir ?? RESULTS_DIR)) {
+  const entries = listMarkdownFiles(opts.resultsDir ?? RESULTS_DIR).map((abs) => ({ abs, sig: fileSig(abs) }));
+  resultParses.prefetch(entries);
+  for (const { abs, sig } of entries) {
+    if (!sig) continue;
+    const cached = resultParses.get(abs, sig).data;
+    if (!abs.startsWith(DATA_DIR + path.sep)) resultParses.forget(abs); // temp dirs (tests): nothing will reuse it
+    if (!cached || !needsMigration(cached, migrations)) continue;
     let text: string;
     try {
       text = fs.readFileSync(abs, 'utf8');
@@ -430,24 +481,9 @@ export function migrateResults(opts: { resultsDir?: string; migrationsDir?: stri
     const fm = splitFrontMatter(text);
     if (fm.error || !fm.hasFrontMatter || fm.data.kind !== 'attempt' || !Array.isArray(fm.data.answers)) continue;
     const data = fm.data;
-    const answers = (data.answers as unknown[]).filter((a): a is Record<string, unknown> => !!a && typeof a === 'object');
     const done = asStringList(data.migrations);
     const layout = Number(data.layout) || 0;
-    const finished = Date.parse(String(data.finished ?? ''));
-    const applied: string[] = [];
-    for (const m of migrations) {
-      if (done.includes(m.id) || !answers.some((a) => m.questions[String(a.q)])) continue;
-      if (!gradedBefore(answers, m, finished, layout)) continue;
-      for (const a of answers) {
-        const map = m.questions[String(a.q)];
-        if (!map) continue;
-        a.pick = remapKeys(String(a.pick ?? ''), map);
-        a.key = remapKeys(String(a.key ?? ''), map);
-        if (typeof a.elim === 'string') a.elim = remapKeys(a.elim, map);
-        else if (Array.isArray(a.elim)) a.elim = a.elim.map((k) => map[String(k)] ?? String(k));
-      }
-      applied.push(m.id);
-    }
+    const applied = applyMigrations(data, migrations);
     if (!applied.length) continue;
 
     // keep key order; new keys go right before the (long) answers list
@@ -464,7 +500,9 @@ export function migrateResults(opts: { resultsDir?: string; migrationsDir?: stri
     const tmp = `${abs}.tmp-${process.pid}`;
     fs.writeFileSync(tmp, stringifyFrontMatter(out, ['answers']) + body);
     fs.renameSync(tmp, abs);
+    resultParses.drop(abs); // rewritten: the stored parse is outdated
     files.push(abs);
   }
+  resultParses.flush(); // parses done here are stored for the next start
   return { migrated: files.length, files };
 }

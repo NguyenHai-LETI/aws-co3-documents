@@ -1,6 +1,8 @@
 // Applies an AI patch (coach/patches/<runId>.yaml) to the question bank — format in bank/SCHEMA.md §8.
 // Usage: node trainer/scripts/apply-patch.ts <patch.yaml> [--dry-run] [--json]
-//   - each item is checked (base hash, field rules, re-parse); failing items are reverted and reported
+//   - each item is checked (base hash, field rules, re-parse, lint: a new high-severity item-writing flaw — duplicate
+//     options, "all/none of the above", Choose-N mismatch, option letters — rejects it; other new flaws are ⚠️ warnings);
+//     failing items are reverted and reported
 //   - exit code 1 when an item failed or the patch could not be read (fix the items and run again)
 import fs from 'node:fs';
 import path from 'node:path';

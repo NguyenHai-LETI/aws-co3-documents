@@ -9,7 +9,13 @@ import { AskDialog, QaHistory } from '../components/AskDialog.tsx';
 import { RatingButtons, useRatings } from '../components/RatingButtons.tsx';
 import { ChartCard } from '../components/charts.tsx';
 import { ColumnChart, EnrichPanel, TaskBadge, pctOf } from '../components/insights.tsx';
-import { Drawer, Empty, Modal, Tabs } from '../components/ui.tsx';
+import { Chip, Drawer, Empty, Modal, Tabs } from '../components/ui.tsx';
+import { LintSection } from '../components/quality/LintSection.tsx';
+import { DistractorSection } from '../components/quality/DistractorSection.tsx';
+import { DuplicateSection } from '../components/quality/DuplicateSection.tsx';
+import { VerifySection } from '../components/quality/VerifySection.tsx';
+import { QuestionQuality } from '../components/quality/QuestionQuality.tsx';
+import { startVerify, useAiReady } from '../components/quality/common.tsx';
 import { applyFilters, isDueState, isMasteredState } from '../../shared/filters.ts';
 import { countWords } from '../../shared/timing.ts';
 import type { BankQuality, DuplicatePair, IssueItem, PackOrigin, Question, QuestionState, SelectionFilters } from '../../shared/types.ts';
@@ -17,6 +23,8 @@ import type { Meta } from '../lib/store.tsx';
 
 type Tab = 'questions' | 'packs' | 'quality' | 'health' | 'issues';
 const TABS: Tab[] = ['questions', 'packs', 'quality', 'health', 'issues'];
+type QSec = 'overview' | 'lint' | 'distractors' | 'dups' | 'verify'; // sections of the 📐 Chất lượng tab (?sec=)
+const QSECS: QSec[] = ['overview', 'lint', 'distractors', 'dups', 'verify'];
 type Progress = '' | 'unseen' | 'wrong' | 'due' | 'mastered' | 'flagged';
 type Feature = '' | 'long' | 'short' | 'hint' | 'nohint' | 'enriched' | 'notenriched' | 'notask' | 'shortexpl' | 'longest';
 const FEATURES: { id: Feature; label: string }[] = [
@@ -35,7 +43,7 @@ const PAGE = 40;
 const ORIGIN_LABEL: Record<PackOrigin, string> = { imported: '📚 Đề gốc', ai: '🤖 AI', doc: '📄 Tài liệu', manual: '✍️ Thủ công' };
 const LEVEL_LABEL = ['mới', '< 1 ngày', '1–7 ngày', '7–21 ngày', '21–60 ngày', '≥ 60 ngày'];
 
-/** A correct option is longer than every distractor by ≥ 15 % — a guessable tell (same rule as server/lib/quality.ts). */
+/** A correct option is longer than every distractor by ≥ 15 % — a guessable tell (same rule as server/lib/lint.ts correctIsLongest). */
 function correctLongest(q: Question): boolean {
   if (q.options.length < 3 || !q.answer.length) return false;
   const longest = (pick: (k: string) => boolean) => Math.max(0, ...q.options.filter((o) => pick(o.key)).map((o) => o.text.trim().length));
@@ -148,6 +156,7 @@ function QuestionDrawer({ q, onClose, onIssue, onAsk }: { q: Question | undefine
             <div className="muted">Chưa làm câu này.</div>
           )}
         </div>
+        <QuestionQuality q={q} />
         <div className="card flat stack sm small">
           <b>🤖 Hỏi đáp với AI</b>
           <QaHistory qid={q.id} empty="Chưa hỏi AI về câu này — bấm “🤖 Hỏi AI” ở trên." />
@@ -250,11 +259,29 @@ function shareRows(letters: Record<string, number>) {
   return { keys, total, share: (k: string) => pctOf(letters[k] ?? 0, total) };
 }
 
-function QualityTab({ onFeature, onOpenPair }: { onFeature: (f: Feature) => void; onOpenPair: (p: DuplicatePair) => void }) {
-  const { meta, byId } = useData();
-  const { data: qd, error, status, loading } = useFetch<BankQuality>('/api/quality');
-  const { byQid } = useRatings();
-  const [dupAll, setDupAll] = useState(false);
+function QualityTab({
+  sec,
+  onSec,
+  rule,
+  onRule,
+  selected,
+  onFeature,
+  onOpenPair,
+  onOpen,
+  onIssue,
+}: {
+  sec: QSec;
+  onSec: (s: QSec) => void;
+  rule?: string;
+  onRule: (code?: string) => void;
+  selected: string[];
+  onFeature: (f: Feature) => void;
+  onOpenPair: (p: DuplicatePair) => void;
+  onOpen: (id: string) => void;
+  onIssue: (id: string) => void;
+}) {
+  const { meta } = useData();
+  const { data: qd, error, status, loading, reload } = useFetch<BankQuality>('/api/quality');
   if (!meta) return null;
   if (loading && !qd) return <div className="empty">Đang tính chất lượng ngân hàng…</div>;
   if (!qd) {
@@ -267,6 +294,36 @@ function QualityTab({ onFeature, onOpenPair }: { onFeature: (f: Feature) => void
       </div>
     );
   }
+  const lintIssues = (qd.lint?.bySeverity?.high ?? 0) + (qd.lint?.bySeverity?.medium ?? 0);
+  const nav: { id: QSec; label: string; count?: number }[] = [
+    { id: 'overview', label: '📐 Tổng quan' },
+    { id: 'lint', label: '🩺 Lỗi viết câu', count: qd.lint ? lintIssues : undefined },
+    { id: 'distractors', label: '🎯 Phương án nhiễu', count: qd.distractors ? qd.distractors.weakDistractors.length + qd.distractors.suspectedKeys.length : undefined },
+    { id: 'dups', label: '👯 Câu trùng', count: qd.duplicates.length },
+    { id: 'verify', label: '🧪 Giải mù', count: qd.verification?.review },
+  ];
+  return (
+    <div className="stack">
+      <div className="row qq-nav" role="group" aria-label="Mục chất lượng">
+        {nav.map((n) => (
+          <Chip key={n.id} on={sec === n.id} onClick={() => onSec(n.id)} count={n.count}>
+            {n.label}
+          </Chip>
+        ))}
+      </div>
+      {sec === 'overview' && <QualityOverview qd={qd} onFeature={onFeature} onSec={onSec} />}
+      {sec === 'lint' && <LintSection lint={qd.lint} rule={rule} onRule={onRule} onOpen={onOpen} />}
+      {sec === 'distractors' && <DistractorSection report={qd.distractors} onOpen={onOpen} onIssue={onIssue} />}
+      {sec === 'dups' && <DuplicateSection pairs={qd.duplicates} semantic={qd.semantic} onOpenPair={onOpenPair} onChanged={reload} />}
+      {sec === 'verify' && <VerifySection summary={qd.verification} selected={selected} onOpen={onOpen} onIssue={onIssue} onChanged={reload} />}
+    </div>
+  );
+}
+
+function QualityOverview({ qd, onFeature, onSec }: { qd: BankQuality; onFeature: (f: Feature) => void; onSec: (s: QSec) => void }) {
+  const { meta, byId } = useData();
+  const { byQid } = useRatings();
+  if (!meta) return null;
   const total = Math.max(1, qd.total);
   const { keys, total: singleTotal, share } = shareRows(qd.letters ?? {});
   const coreKeys = keys.filter((k) => 'ABCD'.includes(k));
@@ -275,10 +332,14 @@ function QualityTab({ onFeature, onOpenPair }: { onFeature: (f: Feature) => void
   const skewed = !!worst && singleTotal >= 20 && worst.v > target + 10;
   const longestPct = pctOf(qd.correctLongest, total);
   const origins = Object.entries(qd.lettersByOrigin ?? {}).filter(([, l]) => Object.values(l).some((n) => n > 0));
-  const dups = qd.duplicates ?? [];
   const ratingTotals = Object.values(qd.ratings ?? {}).reduce((acc, r) => ({ up: acc.up + r.up, down: acc.down + r.down }), { up: 0, down: 0 });
   const ve = qd.variantEffect ?? { originals: 0, fixedAfterVariant: 0, examples: [] };
   const minWords = meta.timing.long_form_min_words ?? 55;
+  const sev = qd.lint?.bySeverity;
+  const dr = qd.distractors;
+  const vs = qd.verification;
+  const sem = qd.semantic;
+  const semantic = qd.duplicates.filter((d) => d.kind === 'semantic').length;
 
   return (
     <div className="stack">
@@ -301,6 +362,39 @@ function QualityTab({ onFeature, onOpenPair }: { onFeature: (f: Feature) => void
         <QTile label="💡 Có gợi ý" value={`${pctOf(qd.withHint, total)}%`} sub={`${qd.withHint}/${qd.total} câu`} onClick={() => onFeature('nohint')} />
         <QTile label="📋 Gắn task 1.1–4.4" value={`${pctOf(qd.withTask, total)}%`} sub={`${qd.withTask}/${qd.total} câu`} onClick={() => onFeature('notask')} />
         <QTile label="✨ Đã ENRICH" value={`${pctOf(qd.enriched, total)}%`} sub={`${qd.enriched}/${qd.total} câu`} onClick={() => onFeature('notenriched')} />
+      </div>
+
+      <div className="stack sm">
+        <b className="small">Việc cần làm (bấm để xem chi tiết)</b>
+        <div className="qq-todo">
+          <QTile
+            label="🩺 Lỗi viết câu"
+            value={sev ? sev.high + sev.medium : '—'}
+            sub={sev ? `câu có lỗi nặng/vừa · ${sev.high ? `❗ ${sev.high} câu lỗi nặng` : '✓ không có lỗi nặng'} · ${sev.low} câu chỉ lỗi nhẹ` : 'server chưa hỗ trợ'}
+            status={sev ? (sev.high ? 'warn' : undefined) : undefined}
+            onClick={() => onSec('lint')}
+          />
+          <QTile
+            label="🎯 Phương án nhiễu"
+            value={dr ? dr.weakDistractors.length : '—'}
+            sub={dr ? `phương án quá dễ · ${dr.suspectedKeys.length} câu nghi sai đáp án` : 'server chưa hỗ trợ'}
+            status={dr?.suspectedKeys.length ? 'warn' : undefined}
+            onClick={() => onSec('distractors')}
+          />
+          <QTile
+            label="👯 Câu gần trùng"
+            value={qd.duplicates.length}
+            sub={`${semantic} theo nghĩa · ${sem?.available ? `🧠 ${sem.model ?? 'Ollama'}` : sem?.provider === 'off' ? 'tìm theo nghĩa đang tắt' : 'chưa có Ollama — chỉ từ khoá'}`}
+            onClick={() => onSec('dups')}
+          />
+          <QTile
+            label="🧪 Giải mù"
+            value={vs ? vs.review : '—'}
+            sub={vs ? `chờ duyệt · ${vs.verified} câu đã kiểm · ${vs.ok} khớp` : 'server chưa hỗ trợ'}
+            status={vs?.review ? 'warn' : undefined}
+            onClick={() => onSec('verify')}
+          />
+        </div>
       </div>
 
       <div className="grid c2">
@@ -443,62 +537,6 @@ function QualityTab({ onFeature, onOpenPair }: { onFeature: (f: Feature) => void
       </div>
 
       <div className="card">
-        <div className="card-head">
-          <h2>👯 Câu gần trùng ({dups.length})</h2>
-          <span className="small muted">so khớp từ khoá của đề + đáp án đúng</span>
-        </div>
-        {!dups.length ? (
-          <div className="small muted">✓ Không thấy cặp câu nào gần trùng.</div>
-        ) : (
-          <>
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th className="num">Giống</th>
-                    <th>Câu A</th>
-                    <th>Câu B</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {(dupAll ? dups : dups.slice(0, 12)).map((d) => (
-                    <tr key={`${d.a}-${d.b}`} className="click" onClick={() => onOpenPair(d)} title="Bấm để so sánh hai câu">
-                      <td className="num small">{Math.round(d.score * 100)}%</td>
-                      {[d.a, d.b].map((id) => (
-                        <td key={id} className="small">
-                          <a href={href(`/bank?q=${encodeURIComponent(id)}`)} className="mono tiny" onClick={(e) => e.stopPropagation()}>
-                            {id}
-                          </a>
-                          <div className="ins-clamp muted">{byId.get(id)?.stem ?? '(không còn trong ngân hàng)'}</div>
-                        </td>
-                      ))}
-                      <td>
-                        <button
-                          className="btn ghost sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenPair(d);
-                          }}
-                        >
-                          So sánh
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {dups.length > 12 && (
-              <button className="btn ghost sm" onClick={() => setDupAll((v) => !v)}>
-                {dupAll ? 'Thu gọn' : `Xem tất cả ${dups.length} cặp`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="card">
         <h2>🧹 ENRICH — bảo trì ngân hàng bằng AI</h2>
         <EnrichPanel />
       </div>
@@ -539,6 +577,27 @@ function PairModal({ pair, onClose }: { pair?: DuplicatePair; onClose: () => voi
   );
 }
 
+/** Selection bar: blind-solve the selected questions with the second model (max 60 per run). */
+function VerifySelectedButton({ ids }: { ids: string[] }) {
+  const ai = useAiReady();
+  const [busy, setBusy] = useState(false);
+  const n = Math.min(60, ids.length);
+  return (
+    <button
+      className="btn sm"
+      disabled={busy || !ai.ready}
+      title={ai.why ?? 'Model thứ hai giải các câu này mà không xem đáp án (kết quả ở Chất lượng → 🧪 Giải mù)'}
+      onClick={async () => {
+        setBusy(true);
+        if (await startVerify({ ids: ids.slice(0, 60) }, `${n} câu đang chọn`)) ai.reload();
+        setBusy(false);
+      }}
+    >
+      🔎 Giải mù {n} câu
+    </button>
+  );
+}
+
 // ── page ──────────────────────────────────────────────────────────────────
 
 export function BankPage({ query }: { query: URLSearchParams }) {
@@ -546,7 +605,13 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   const qTab = query.get('tab');
   const qFeature = query.get('feature');
   const qTask = query.get('task');
-  const [tab, setTab] = useState<Tab>(() => (TABS.includes(qTab as Tab) ? (qTab as Tab) : 'questions'));
+  const qSec = query.get('sec');
+  const qRule = query.get('rule');
+  const qLint = query.get('lint');
+  const [tab, setTab] = useState<Tab>(() => (TABS.includes(qTab as Tab) ? (qTab as Tab) : qLint ? 'questions' : qSec || qRule ? 'quality' : 'questions'));
+  const [qsec, setQsec] = useState<QSec>(() => (QSECS.includes(qSec as QSec) ? (qSec as QSec) : qRule ? 'lint' : 'overview'));
+  const [rule, setRule] = useState<string | undefined>(qRule ?? undefined); // lint rule open in 🩺 Lỗi viết câu
+  const [lintCode, setLintCode] = useState<string | undefined>(qLint ?? undefined); // question list filtered by a lint rule
   const [filters, setFilters] = useState<SelectionFilters>(() => (qTask ? { tasks: [qTask] } : {}));
   const [status, setStatus] = useState<'active' | 'draft' | 'retired' | 'all'>('active');
   const [progress, setProgress] = useState<Progress>('');
@@ -559,10 +624,32 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   const openId = query.get('q') ?? undefined;
   const { data: issues } = useFetch<IssueItem[]>(tab === 'issues' ? '/api/issues' : null, [tab]);
 
-  // deep links: #/bank?tab=quality · ?feature=nohint · ?task=2.2
+  // deep links: #/bank?tab=quality · ?feature=nohint · ?task=2.2 · ?sec=verify · ?rule=stem-echo · ?lint=stem-echo
   useEffect(() => {
     if (qTab && TABS.includes(qTab as Tab)) setTab(qTab as Tab);
   }, [qTab]);
+  useEffect(() => {
+    if (qSec && QSECS.includes(qSec as QSec)) {
+      setQsec(qSec as QSec);
+      setTab('quality');
+    }
+  }, [qSec]);
+  useEffect(() => {
+    if (qRule) {
+      setRule(qRule);
+      setQsec('lint');
+      setTab('quality');
+    }
+  }, [qRule]);
+  useEffect(() => {
+    if (qLint) {
+      setLintCode(qLint);
+      setTab('questions');
+    }
+  }, [qLint]);
+  const lintList = useFetch<{ rules: { code: string; label: string }[]; questions: { id: string }[] }>(lintCode ? `/api/quality/lint?code=${encodeURIComponent(lintCode)}&limit=2000` : null, [lintCode]);
+  const lintIds = useMemo(() => (lintList.data ? new Set(lintList.data.questions.map((x) => x.id)) : undefined), [lintList.data]);
+  const lintLabel = lintList.data?.rules.find((r) => r.code === lintCode)?.label ?? lintCode;
   useEffect(() => {
     if (qFeature && FEATURES.some((f) => f.id === qFeature)) {
       setFeature(qFeature as Feature);
@@ -584,14 +671,15 @@ export function BankPage({ query }: { query: URLSearchParams }) {
     const taskSel = filters.tasks ?? [];
     if (taskSel.length) qs = qs.filter((q) => (taskSel.includes('none') ? !q.task : !!q.task && taskSel.includes(q.task)));
     if (feature) qs = qs.filter(FEATURE_TEST[feature]);
+    if (lintCode && lintIds) qs = qs.filter((q) => lintIds.has(q.id));
     if (progress === 'unseen') qs = qs.filter((q) => !states[q.id]);
     if (progress === 'wrong') qs = qs.filter((q) => states[q.id]?.lastOk === false);
     if (progress === 'due') qs = qs.filter((q) => isDueState(states[q.id]));
     if (progress === 'mastered') qs = qs.filter((q) => mastered(states[q.id], meta));
     if (progress === 'flagged') qs = qs.filter((q) => states[q.id]?.lastFlag || states[q.id]?.lastUnsure);
     return qs;
-  }, [bank, filters, status, progress, feature, states, meta]);
-  useEffect(() => setPage(0), [filters, status, progress, feature]);
+  }, [bank, filters, status, progress, feature, states, meta, lintCode, lintIds]);
+  useEffect(() => setPage(0), [filters, status, progress, feature, lintCode]);
 
   if (!meta || !bank) return null;
   const set = (patch: Partial<SelectionFilters>) => setFilters((f) => ({ ...f, ...patch }));
@@ -601,7 +689,21 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   const warnings = bank.problems.filter((p) => p.level === 'warning');
   const openIssues = (issues ?? []).filter((i) => i.open).length;
   const tasks = meta.tasks ?? [];
-  const filtered = !!(filters.search || filters.topics?.length || filters.domains?.length || filters.packs?.length || filters.origins?.length || filters.tasks?.length || feature || progress || status !== 'active');
+  const filtered = !!(
+    filters.search ||
+    filters.topics?.length ||
+    filters.domains?.length ||
+    filters.packs?.length ||
+    filters.origins?.length ||
+    filters.tasks?.length ||
+    feature ||
+    progress ||
+    lintCode ||
+    status !== 'active'
+  );
+  // a question opened from the quality tab comes back to the same section when the drawer closes
+  const qualityPath = () => `/bank?tab=quality&sec=${qsec}${qsec === 'lint' && rule ? `&rule=${encodeURIComponent(rule)}` : ''}`;
+  const openFromQuality = (id: string) => navigate(`${qualityPath()}&q=${encodeURIComponent(id)}`);
   const goFeature = (f: Feature) => {
     setFeature(f);
     setTab('questions');
@@ -698,6 +800,12 @@ export function BankPage({ query }: { query: URLSearchParams }) {
               <option value="retired">Retired</option>
               <option value="all">Tất cả trạng thái</option>
             </select>
+            {lintCode && (
+              <button type="button" className="chip on" onClick={() => setLintCode(undefined)} title="Bỏ lọc theo lỗi viết câu">
+                🩺 {lintLabel}
+                {lintList.loading && !lintIds ? ' …' : ''} ✕
+              </button>
+            )}
             {filtered && (
               <button
                 className="btn ghost sm"
@@ -706,6 +814,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
                   setFeature('');
                   setProgress('');
                   setStatus('active');
+                  setLintCode(undefined);
                 }}
               >
                 ✕ Bỏ lọc
@@ -721,6 +830,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
                 <button className="btn sm" onClick={() => setSelected([])}>
                   Bỏ chọn
                 </button>
+                <VerifySelectedButton ids={selected} />
                 <button className="btn primary sm" onClick={() => startTest({ mode: 'ids', ids: selected, title: `Bộ chọn tay (${selected.length} câu)` })}>
                   ▶ Tạo test từ {selected.length} câu
                 </button>
@@ -865,7 +975,19 @@ export function BankPage({ query }: { query: URLSearchParams }) {
         </div>
       )}
 
-      {tab === 'quality' && <QualityTab onFeature={goFeature} onOpenPair={setPair} />}
+      {tab === 'quality' && (
+        <QualityTab
+          sec={qsec}
+          onSec={setQsec}
+          rule={rule}
+          onRule={setRule}
+          selected={selected}
+          onFeature={goFeature}
+          onOpenPair={setPair}
+          onOpen={openFromQuality}
+          onIssue={setIssueFor}
+        />
+      )}
 
       {tab === 'health' && (
         <div className="stack">
@@ -958,7 +1080,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
 
       <QuestionDrawer
         q={openId ? byId.get(openId) : undefined}
-        onClose={() => navigate(tab === 'questions' ? '/bank' : `/bank?tab=${tab}`, { replace: true })}
+        onClose={() => navigate(tab === 'questions' ? '/bank' : tab === 'quality' ? qualityPath() : `/bank?tab=${tab}`, { replace: true })}
         onIssue={setIssueFor}
         onAsk={setAskFor}
       />

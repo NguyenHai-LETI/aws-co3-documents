@@ -8,7 +8,8 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import type { IncomingMessage } from 'node:http';
-import type { CoachRunInfo, QuestionState } from '../shared/types.ts';
+import YAML from 'yaml';
+import type { CoachRunInfo, LintFlaw, Question, QuestionState, VerifyVerdict } from '../shared/types.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-ai-'));
@@ -22,11 +23,13 @@ after(() => fs.rmSync(home, { recursive: true, force: true }));
 
 const { loadConfig } = await import('../server/config.ts');
 const { loadBank } = await import('../server/lib/bank.ts');
-const { applyPatch, findBlock } = await import('../server/lib/patch.ts');
+const { applyPatch, applyPatchItems, findBlock } = await import('../server/lib/patch.ts');
 const enrich = await import('../server/lib/enrich.ts');
 const runner = await import('../server/lib/coach-runner.ts');
 const ask = await import('../server/lib/ask.ts');
 const sched = await import('../scripts/schedule.ts');
+const aiOut = await import('../server/lib/ai-output.ts');
+const verify = await import('../server/lib/verify.ts');
 
 const PACK = path.join(home, 'bank', 'packs', 'manual', 't.md');
 const PACK_TEXT = `---
@@ -233,7 +236,7 @@ items:
     base: ${hashOf('t-04')}
     answer: [B]
   - id: t-05
-    base: 0000000000
+    base: "0000000000"
     set: { hint: "x" }
   - id: missing-01
     base: abc
@@ -261,6 +264,13 @@ items:
 
   const bad = writePatch('p3', 'items: [ { id: t-01, base: x\n');
   assert.match(applyPatch(bad).error ?? '', /YAML/);
+
+  // unquoted hashes such as 46794516e3 / 0123456789 are numbers for YAML: rejected with the fix, never silently mismatched
+  const numeric = writePatch('p3b', `items:\n  - id: t-01\n    base: 46794516e3\n  - id: 1234\n    base: "x"\n`);
+  const rn = applyPatch(numeric);
+  assert.equal(rn.items[0].status, 'failed');
+  assert.match(rn.items[0].errors.join(' '), /base phải là chuỗi trong ngoặc kép[^\n]*base: "<hash>"/);
+  assert.match(rn.items[1].errors.join(' '), /id phải là chuỗi trong ngoặc kép/);
 });
 
 test('patch: answer fix with reason, status-only retire, dry run', () => {
@@ -311,7 +321,7 @@ test('patch: an item prepared before an answer-position migration is re-keyed (o
       - Amazon S3 buckets: object storage, not a POSIX file system.
       > 🇻🇳 File system dùng chung nhiều AZ → EFS.
   - id: t-01
-    base: 0123456789
+    base: "0123456789"
 `,
   );
   // simulate the rebalance: options re-lettered (old → new: A→C, B→D, C→A, D→B) + migration record
@@ -339,6 +349,16 @@ test('patch: an item prepared before an answer-position migration is re-keyed (o
     assert.deepEqual(q.answer, ['D']);
     assert.equal(r.items[1].status, 'skipped', 'a hash that no migration explains is still skipped');
     assert.match(r.items[1].errors.join(' '), /đổi vị trí đáp án/);
+    // re-running the same patch (file-mode post-check, repair round, the AI running apply-patch twice) must not apply the
+    // old letters again on the new layout — that would swap option texts
+    const again = applyPatch(file, { today: TODAY });
+    assert.equal(again.items[0].status, 'unchanged');
+    const q2 = loadBank().byId.get('t-02')!;
+    assert.deepEqual(
+      q2.options.map((o) => o.text),
+      ['S3', 'Instance store', 'Amazon EBS Multi-Attach volumes attached in one Availability Zone', 'Amazon EFS with mount targets in each Availability Zone'],
+    );
+    assert.deepEqual(q2.answer, ['D']);
   } finally {
     fs.rmSync(migDir, { recursive: true, force: true });
   }
@@ -389,7 +409,9 @@ test('enrich: pending todos and batch priority (wrong > seen > unseen, then exam
   assert.deepEqual(enrich.selectBatch(bank, states, { size: 2 }).map((i) => i.q.id), ['t-02', 't-01']);
   assert.deepEqual(enrich.selectBatch(bank, states, { tasks: ['balance'] }).map((i) => [i.q.id, i.todo]), [['t-02', ['balance']]]);
   assert.deepEqual(enrich.selectBatch(bank, states, { tasks: 'hint,2.2' }), [], 'exam-task filter: nobody has task 2.2 yet');
-  assert.deepEqual(enrich.parseTasks('explain, 3.1, bogus'), { todos: ['explain'], examTasks: ['3.1'] });
+  assert.deepEqual(enrich.parseTasks('explain, 3.1, bogus'), { todos: ['explain'], examTasks: ['3.1'], explicit: true });
+  assert.deepEqual(enrich.parseTasks(undefined), { todos: ['explain', 'hint', 'classify', 'balance'], examTasks: [], explicit: false });
+  assert.deepEqual(enrich.parseTasks(['distractors', 'Explain']).todos, ['distractors', 'explain']);
 
   const st = enrich.enrichStatus(bank, []);
   assert.equal(st.total, 4);
@@ -416,7 +438,9 @@ test('enrich: batch file lists base hashes, todo and a patch skeleton; long-form
   const text = fs.readFileSync(file, 'utf8');
   assert.match(text, /^---\nkind: enrich-batch\nrun_id: 2026-10-16_120000_enrich\n/);
   assert.ok(text.includes(`- base: \`${bank.byId.get('t-02')!.hash}\``));
-  assert.ok(text.includes(`  - id: t-02        # explain, hint, classify, balance\n    base: ${bank.byId.get('t-02')!.hash}`));
+  assert.ok(text.includes(`  - id: "t-02"        # explain, hint, classify, balance\n    base: "${bank.byId.get('t-02')!.hash}"`), 'quoted: YAML reads hashes like 46794516e3 as numbers');
+  const skeleton = YAML.parse(text.slice(text.indexOf('```yaml') + 8, text.lastIndexOf('```'))) as { items: { id: unknown; base: unknown }[] };
+  assert.ok(skeleton.items.every((i) => typeof i.id === 'string' && typeof i.base === 'string'));
   assert.match(text, /người học: sai 3\/3 lượt · đã chọn sai: A×3/);
   assert.match(text, /- B\. Amazon EFS with mount targets in each Availability Zone {2}⟨\d+⟩ {2}✅/);
   assert.match(text, /`2\.2` \(resilient\)/);
@@ -440,7 +464,7 @@ test('coach runner: refused on a TRAINER_HOME copy, per-task models and least-pr
   assert.match(runner.coachGuard() ?? '', /TRAINER_HOME/);
   assert.throws(() => runner.coachRunner.start('enrich', 'cli', {}), /TRAINER_HOME/);
   const cfg = loadConfig();
-  assert.deepEqual(runner.resolvedModels(cfg), { analyze: 'opus', generate: 'opus', enrich: 'sonnet', ask: 'haiku' });
+  assert.deepEqual(runner.resolvedModels(cfg), { analyze: 'opus', generate: 'opus', enrich: 'sonnet', ask: 'haiku', verify: 'opus' });
   assert.equal(runner.modelFor('longform', cfg), 'sonnet');
 
   const args = runner.cliArgs('PROMPT', cfg, '2.1.301 (Claude Code)', 'enrich');
@@ -603,4 +627,620 @@ test('schedule: times, launchd plist, crontab block merge, Windows tasks', () =>
     sched.parseSchtasksCsv('"\\Microsoft\\Other","N/A","Ready"\r\n"\\SAA-Trainer-Coach-0830","10/17/2026 8:30:00 AM","Ready"\r\n'),
     [{ name: 'SAA-Trainer-Coach-0830', next: '10/17/2026 8:30:00 AM', status: 'Ready' }],
   );
+});
+
+// ── lint after every patch item ─────────────────────────────────────────────
+
+test('patch: lint re-runs after every item — a new high-severity flaw rejects (reverts) it, other new flaws warn', () => {
+  resetPack();
+  // stand-in rules (injected) so the test does not depend on lint.ts's rule set
+  const lint = (q: Question): LintFlaw[] => [
+    ...q.options.filter((o) => /\bguaranteed\b/i.test(o.text)).map((o) => ({ code: 'test-high', severity: 'high' as const, message: 'phương án tuyệt đối', option: o.key })),
+    ...q.options.filter((o) => /\bnormally\b/i.test(o.text)).map((o) => ({ code: 'test-medium', severity: 'medium' as const, message: 'từ mơ hồ', option: o.key })),
+  ];
+  const file = writePatch(
+    'lint1',
+    `items:
+  - id: t-01
+    base: ${hashOf('t-01')}
+    options: { A: "Read Replicas in another AZ with guaranteed failover" }
+  - id: t-02
+    base: ${hashOf('t-02')}
+    options: { A: "Amazon EBS volumes that are normally attached in one AZ" }
+`,
+  );
+  const r = applyPatch(file, { today: TODAY, lint });
+  assert.equal(r.items[0].status, 'failed');
+  assert.match(r.items[0].errors.join(' '), /lint \(mức cao\): phương án tuyệt đối \[test-high · A\]/);
+  assert.equal(r.items[1].status, 'applied');
+  assert.match(r.items[1].warnings.join(' '), /lint: từ mơ hồ \[test-medium · A\]/);
+  assert.equal(loadBank().byId.get('t-01')!.options[0].text, 'Read Replicas in another AZ', 'rejected item reverted');
+
+  // a flaw the question already had is not new: editing another field passes
+  const again = writePatch('lint2', `items:\n  - id: t-02\n    base: ${hashOf('t-02')}\n    set: { concept: "EFS vs EBS" }\n`);
+  assert.deepEqual(applyPatch(again, { today: TODAY, lint }).items[0].warnings, []);
+
+  // a crashing linter never blocks an edit
+  const boom = writePatch('lint3', `items:\n  - id: t-03\n    base: ${hashOf('t-03')}\n`);
+  const r3 = applyPatch(boom, {
+    today: TODAY,
+    lint: () => {
+      throw new Error('bug');
+    },
+  });
+  assert.equal(r3.items[0].status, 'applied');
+  assert.match(r3.items[0].warnings.join(' '), /lint không chạy được: bug/);
+
+  // default = lint.ts: duplicate options are high severity; option letters are reported once, not twice
+  const real = writePatch(
+    'lint4',
+    `items:
+  - id: t-04
+    base: ${hashOf('t-04')}
+    options: { B: "Use Spot Instances with a diversified allocation strategy" }
+  - id: t-03
+    base: ${hashOf('t-03')}
+    explanation: |
+      Option A and answer B together keep keys in KMS and log every use in CloudTrail for the auditors to review later on.
+`,
+  );
+  const r4 = applyPatch(real, { today: TODAY });
+  assert.equal(r4.items[0].status, 'failed');
+  assert.match(r4.items[0].errors.join(' '), /\[duplicate-options/);
+  assert.equal(r4.items[1].status, 'failed');
+  assert.equal(r4.items[1].errors.filter((e) => /chữ cái|letter-ref/.test(e)).length, 1, r4.items[1].errors.join(' | '));
+});
+
+test('applyPatchItems: in-memory items (status change) without a patch file or ledger', () => {
+  resetPack();
+  const r = applyPatchItems([{ id: 't-04', base: hashOf('t-04'), status: 'draft' }], { label: '(test)' });
+  assert.equal(r.patch, '(test)');
+  assert.equal(r.items[0].status, 'applied');
+  const q = loadBank().byId.get('t-04')!;
+  assert.equal(q.status, 'draft');
+  assert.equal(q.enriched, undefined, 'a status-only item is not enrichment');
+  assert.deepEqual(fs.readdirSync(path.join(home, 'coach', 'patches')), [], 'no patch file, no ledger');
+});
+
+// ── structured output (coach.structured_output) ────────────────────────────
+
+test('structured output: extraction, ENRICH items (base from the batch, empty values dropped), repair merge, audit patch round-trip', () => {
+  resetPack();
+  assert.deepEqual(aiOut.structuredOutput({ structured_output: { items: [] } }), { items: [] });
+  assert.deepEqual(aiOut.structuredOutput({ result: '```json\n{"a":1}\n```' }), { a: 1 });
+  assert.equal(aiOut.structuredOutput({ result: 'not json' }), undefined);
+  assert.equal(aiOut.structuredOutput(undefined), undefined);
+
+  const bases = { 't-01': hashOf('t-01'), 't-02': hashOf('t-02'), 't-03': hashOf('t-03') };
+  const out = {
+    items: [
+      { id: 't-01', base: 'model-typo', set: { task: '2.2', hint: '', tags: [] }, explanation: GOOD_EXPLANATION, stem: ' ', answer: [], options: {} },
+      { id: 't-01', explanation: 'duplicate → ignored' },
+      { id: 'nope', explanation: 'not in the batch → ignored' },
+      { id: 't-02', options: { A: 'Amazon EBS Multi-Attach volumes in one AZ', C: '' } },
+    ],
+    summary: 's',
+  };
+  const r = aiOut.enrichItems(out, bases);
+  assert.deepEqual(r.items[0], { id: 't-01', base: bases['t-01'], set: { task: '2.2' }, explanation: GOOD_EXPLANATION });
+  assert.deepEqual(r.items[1], { id: 't-02', base: bases['t-02'], options: { A: 'Amazon EBS Multi-Attach volumes in one AZ' } });
+  assert.deepEqual(r.ignored, ['t-01', 'nope']);
+  assert.deepEqual(r.failures.map((f) => f.id), ['t-03'], 'a batch question without an item must be repaired');
+
+  const merged = aiOut.mergeRepaired(r.items, { items: [{ id: 't-03' }, { id: 't-02', explanation: 'not a failed id → ignored' }] }, ['t-03'], bases);
+  assert.deepEqual(merged.fixed, ['t-03']);
+  assert.deepEqual(merged.items[2], { id: 't-03', base: bases['t-03'] });
+  assert.equal(merged.items[1].explanation, undefined);
+
+  const items = [{ ...merged.items[0], set: { task: '2.2', hint: 'Đề cần: failover # tự động — cơ chế "đồng bộ" nào?' } }, merged.items[1], merged.items[2]];
+  const file = path.join(home, 'coach', 'patches', 'json-1.yaml');
+  aiOut.writePatchFile(file, 'json-1', items);
+  assert.match(fs.readFileSync(file, 'utf8'), /^# Patch do app ghi[^\n]*\nrun_id: json-1\nitems:\n/);
+  const applied = applyPatch(file, { today: TODAY });
+  assert.deepEqual(applied.items.map((i) => i.status), ['applied', 'applied', 'applied']);
+  const q1 = loadBank().byId.get('t-01')!;
+  assert.equal(q1.hint, 'Đề cần: failover # tự động — cơ chế "đồng bộ" nào?');
+  assert.equal(q1.explanation, GOOD_EXPLANATION);
+  assert.match(aiOut.repairPrompt('enrich', 'r1', [{ id: 't-01', errors: ['a', 'b'] }]), /- `t-01`: a \| b[\s\S]*- run_id: r1$/);
+  assert.match(aiOut.repairPrompt('generate', 'r2', [{ id: 'doc-x-02', errors: ['e'], label: '“A company…”' }]), /- `doc-x-02` \(“A company…”\): e/);
+});
+
+const NEW_Q = (over: Record<string, unknown> = {}) => ({
+  domain: 'resilient',
+  task: '2.2',
+  topic: 'database',
+  services: ['RDS'],
+  tags: ['multi-az'],
+  difficulty: 'medium',
+  concept: 'RDS Multi-AZ vs read replicas',
+  refs: ['03-database-services.md'],
+  hint: 'Cần failover tự động khi mất một AZ — cơ chế nào giữ bản sao đồng bộ?',
+  stem: 'A company runs PostgreSQL on Amazon RDS. The database must fail over automatically when an Availability Zone fails, without application changes. Which solution meets these requirements?',
+  options: ['Convert the database to a Multi-AZ deployment', 'Add a read replica in another Availability Zone', 'Restore hourly snapshots in another zone', 'Copy nightly exports to Amazon S3 buckets'],
+  answer: ['A'],
+  explanation: GOOD_EXPLANATION,
+  ...over,
+});
+
+test('structured output: new questions — schema checks, ids, rubric time, letters / hints / lint, pack written and parsed', () => {
+  resetPack();
+  const bank = loadBank();
+  const target = { kind: 'generate' as const, runId: 'r-gen', today: TODAY, sources: ['03-database-services.md'] };
+  const plan = aiOut.planPack(target, { pack: { slug: 'RDS Đa vùng!', title: 'RDS HA' } }, bank);
+  assert.equal(plan.packId, 'doc-rds-da-vung');
+  assert.equal(plan.file, path.join(home, 'bank', 'packs', 'docs', `${TODAY}-rds-da-vung.md`));
+  assert.equal(plan.idOf(0), 'doc-rds-da-vung-01');
+  assert.deepEqual(plan.meta, { pack: 'doc-rds-da-vung', title: 'RDS HA', origin: 'doc', created: TODAY, generated_by: 'r-gen', source: '03-database-services.md' });
+
+  const ctx = { tax: bank.taxonomy, today: TODAY, kind: 'generate' as const, bank };
+  const ok = aiOut.draftOf(NEW_Q(), 'doc-rds-da-vung-01', ctx);
+  assert.deepEqual(ok.errors, []);
+  assert.ok(ok.draft!.time >= 45 && ok.draft!.time <= 180, 'time from the rubric');
+  assert.equal(ok.draft!.created, TODAY);
+  assert.equal(ok.draft!.enriched, TODAY, 'complete question (explanation + hint + task) is marked enriched');
+  assert.deepEqual(ok.draft!.options.map((o) => o.key), ['A', 'B', 'C', 'D']);
+
+  const errs = (over: Record<string, unknown>, kind: 'generate' | 'longform' = 'generate', originals?: string[]) => aiOut.draftOf(NEW_Q(over), 'doc-x-01', { ...ctx, kind, originals }).errors.join(' | ');
+  assert.match(errs({ domain: 'bogus' }), /domain "bogus"/);
+  assert.match(errs({ task: '4.1' }), /task 4\.1 thuộc domain cost/);
+  assert.match(errs({ topic: 'nope' }), /topic "nope"/);
+  assert.match(errs({ explanation: 'Option A wins because (B) is slow and the rest are worse for this scenario overall.' }), /chữ cái đáp án/);
+  assert.match(errs({ answer: ['A', 'B'] }), /Choose TWO/);
+  assert.match(errs({ stem: `${NEW_Q().stem} (Choose TWO)` }), /chỉ có 1 đáp án/);
+  assert.match(errs({ hint: 'Chọn Convert the database to a Multi-AZ deployment' }), /lộ đáp án/);
+  assert.match(errs({ options: ['x', 'y', 'z'] }), /4–6 lựa chọn/);
+  assert.match(errs({ answer: ['E'] }), /answer E/);
+  assert.match(errs({}, 'longform', ['t-01']), /câu dài phải có variant_of[\s\S]*câu dài cần ≥ 55 từ/);
+  assert.match(errs({ variant_of: ['t-02'] }, 'longform', ['t-01']), /không phải câu gốc của lô/);
+  const prefixed = aiOut.draftOf(NEW_Q({ options: ['A. One option text', 'B) Two option text', 'C. Three option', 'D. Four option'] }), 'doc-x-01', ctx);
+  assert.deepEqual(prefixed.draft!.options.map((o) => o.text), ['One option text', 'Two option text', 'Three option', 'Four option']);
+
+  assert.match(aiOut.checkDraft({ ...ok.draft!, id: 't-01' }, plan, bank).errors.join(' '), /đã có trong ngân hàng/);
+  assert.match(aiOut.checkDraft(ok.draft!, plan, bank, () => [{ code: 'x', severity: 'high', message: 'lỗi nặng' }]).errors.join(' '), /lint \(mức cao\): lỗi nặng \[x\]/);
+  const medium = aiOut.checkDraft(ok.draft!, plan, bank, () => [{ code: 'y', severity: 'medium', message: 'nhắc nhẹ' }]);
+  assert.deepEqual(medium.errors, []);
+  assert.deepEqual(medium.warnings, ['lint: nhắc nhẹ [y]']);
+
+  const rel = aiOut.writePack(plan, [ok.draft!]);
+  try {
+    assert.equal(rel, `bank/packs/docs/${TODAY}-rds-da-vung.md`);
+    const b2 = loadBank();
+    const q = b2.byId.get('doc-rds-da-vung-01')!;
+    assert.equal(q.origin, 'doc');
+    assert.equal(q.pack, 'doc-rds-da-vung');
+    assert.equal(q.enriched, TODAY);
+    assert.deepEqual(b2.problems.filter((p) => p.file === rel && p.level === 'error'), []);
+    assert.equal(aiOut.planPack(target, { pack: { slug: 'rds-da-vung', title: 'x' } }, b2).packId, 'doc-rds-da-vung-2', 'a taken slug gets a suffix');
+    const lf = aiOut.planPack(
+      { kind: 'longform', runId: 'r-lf', today: TODAY, packFile: path.join(home, 'bank', 'packs', 'ai', '2026-10-16-1200-longform-<slug>.md'), packId: 'ai-2026-10-16-1200-longform', idPrefix: 'ai-20261016-1200-lf', batch: 'b.md' },
+      { pack: { slug: 'RDS HA', title: 'RDS HA' } },
+      b2,
+    );
+    assert.equal(lf.file, path.join(home, 'bank', 'packs', 'ai', '2026-10-16-1200-longform-rds-ha.md'));
+    assert.equal(lf.idOf(1), 'ai-20261016-1200-lf02');
+    assert.equal(lf.meta.title, 'AI · Câu dài chuẩn đề thi · RDS HA');
+    assert.equal(lf.meta.origin, 'ai');
+  } finally {
+    fs.rmSync(path.join(home, rel), { force: true });
+  }
+});
+
+// ── blind-solve verification ────────────────────────────────────────────────
+
+function vpack(pack: string, origin: string, ids: string[]): string {
+  const block = (id: string, i: number) => {
+    const multi = i % 2 === 1;
+    return [
+      `## Q ${id}`,
+      '- domain: resilient',
+      '- topic: database',
+      '- difficulty: medium',
+      '- time: 60',
+      '- concept: SECRET-CONCEPT',
+      '- hint: SECRET-HINT gợi ý',
+      '',
+      `Question ${id}: which design keeps a standby database ready for an automatic failover inside one Region${multi ? ' (Choose TWO)' : ''}?`,
+      '',
+      '- A. Multi-AZ deployment',
+      '- B. Read replica in another zone',
+      '- C. Snapshot copied hourly',
+      '- D. Global table',
+      ...(multi ? ['- E. Backup plan'] : []),
+      '',
+      `**Answer:** ${multi ? 'A, C' : 'B'}`,
+      '',
+      `**Explanation:** SECRET-EXPLANATION ${id}`,
+    ].join('\n');
+  };
+  return `---\npack: ${pack}\ntitle: ${pack}\norigin: ${origin}\n---\n\n# ${pack}\n\n${ids.map(block).join('\n\n---\n\n')}\n`;
+}
+
+test('verify: ledger round-trip, judging, a prompt without the key, batches', () => {
+  const v: VerifyVerdict = {
+    date: '2026-10-19',
+    at: '2026-10-19T10:00:00+07:00',
+    qid: 't-01',
+    hash: 'abc1234567',
+    outcome: 'mismatch',
+    picked: 'C',
+    key: 'B',
+    confidence: 'high',
+    model: 'opus',
+    runId: 'r1',
+    reason: 'Lý do có --> và <!-- và `code`\nxuống dòng',
+  };
+  const line = verify.formatVerdict(v);
+  assert.match(line, /^- 2026-10-19 · `t-01` · ❌ lệch đáp án \(model C · đáp án B\) · opus · tin cậy cao — Lý do có/);
+  assert.equal(line.split('\n').length, 1);
+  const earlier = verify.formatVerdict({ ...v, qid: 't-02', at: '2026-10-19T09:00:00+07:00', outcome: 'ok', picked: 'B', reason: undefined });
+  const parsed = verify.parseVerdicts(`# h\n\n${line}\n- 2026-10-19 · \`Bad Id\` · x <!-- verify {"hash":"x","outcome":"ok"} -->\nrandom\n${earlier}\n`);
+  assert.deepEqual(parsed.map((p) => p.qid), ['t-02', 't-01'], 'ordered by time, not by line');
+  assert.deepEqual(parsed[1], { ...v, line: 3, reason: 'Lý do có và và `code` xuống dòng' });
+
+  const q = { id: 'x', options: ['A', 'B', 'C', 'D'].map((key) => ({ key, text: key.toLowerCase() })), answer: ['B'], stem: 's', hash: 'h' } as unknown as Question;
+  assert.equal(verify.judge(q, { answer: ['b'], confidence: 'high', ambiguous: false }).outcome, 'ok');
+  assert.deepEqual(verify.judge(q, { answer: ['C'], ambiguous: false, confidence: 'low', reason: ' r ' }), { outcome: 'mismatch', picked: 'C', key: 'B', confidence: 'low', reason: 'r' });
+  assert.equal(verify.judge(q, { answer: ['B'], ambiguous: true }).outcome, 'ambiguous', 'two defensible options is a flaw even when the pick matches');
+  assert.equal(verify.judge(q, { answer: ['Z'] }).outcome, 'error');
+  assert.equal(verify.judge(q, undefined).outcome, 'error');
+  const multi = { ...q, answer: ['A', 'C'] } as Question;
+  assert.equal(verify.judge(multi, { answer: ['C', 'A'] }).outcome, 'ok');
+  assert.equal(verify.judge(multi, { answer: ['A'] }).outcome, 'mismatch');
+  const vs = verify.verdictsFor([q, { ...q, id: 'y' } as Question], { results: [{ id: 'x', answer: ['B'], confidence: 'high', ambiguous: false, reason: 'ok' }] }, { runId: 'r', model: 'm' });
+  assert.deepEqual(vs.map((x) => [x.qid, x.outcome, x.hash, x.model, x.runId]), [
+    ['x', 'ok', 'h', 'm', 'r'],
+    ['y', 'error', 'h', 'm', 'r'],
+  ]);
+
+  const many = Array.from({ length: 23 }, (_, i) => ({ ...q, id: `x-${i}` }) as Question);
+  assert.deepEqual(verify.verifyBatches(many, 10).map((b) => b.length), [10, 10, 3]);
+  const big = Array.from({ length: 5 }, (_, i) => ({ ...q, id: `y-${i}`, stem: 'w'.repeat(9000) }) as Question);
+  assert.deepEqual(verify.verifyBatches(big, 10).map((b) => b.length), [2, 2, 1], 'prompt size limit (Windows command lines)');
+
+  const aiFile = path.join(home, 'bank', 'packs', 'ai', 'v-prompt.md');
+  fs.mkdirSync(path.dirname(aiFile), { recursive: true });
+  fs.writeFileSync(aiFile, vpack('v-prompt', 'ai', ['vp-01', 'vp-02']));
+  try {
+    const b = loadBank();
+    const prompt = verify.verifyPrompt([b.byId.get('vp-01')!, b.byId.get('vp-02')!], 'r-v');
+    assert.ok(!prompt.includes('SECRET'), 'no explanation / hint / concept');
+    assert.doesNotMatch(prompt, /\*\*Answer|đáp án đúng/);
+    assert.match(prompt, /## 1\. `vp-01` — chọn 1/);
+    assert.match(prompt, /## 2\. `vp-02` — chọn 2\n\nQuestion vp-02: [^\n]*\(Choose TWO\)\?\n\n- A\. Multi-AZ deployment\n[\s\S]*- E\. Backup plan/);
+    assert.match(prompt, /- run_id: r-v/);
+  } finally {
+    fs.rmSync(aiFile);
+  }
+});
+
+test('verify: summary + review queue, targets by scope, auto-draft policy, decisions, stale verdicts', () => {
+  resetPack();
+  const files = [path.join(home, 'bank', 'packs', 'ai', 'v-ai.md'), path.join(home, 'bank', 'packs', 'imported', 'v-imp.md')];
+  fs.mkdirSync(path.dirname(files[1]), { recursive: true });
+  fs.writeFileSync(files[0], vpack('v-ai', 'ai', ['v-ai-01', 'v-ai-02']));
+  fs.writeFileSync(files[1], vpack('v-imported', 'imported', ['v-imp-01']));
+  try {
+    let bank = loadBank();
+    assert.deepEqual(verify.verifySummary(bank), { verified: 0, ok: 0, review: 0, stale: 0, pending: [] });
+    assert.deepEqual(verify.verifyTargets(bank, {}).ids, ['v-ai-01', 'v-ai-02'], 'default scope: AI-written without a verdict');
+    assert.deepEqual(verify.verifyTargets(bank, { scope: 'new' }).ids, ['v-ai-01', 'v-ai-02', 't-01', 't-02', 't-03', 't-04'], 'never verified, not imported, not retired');
+    assert.deepEqual(verify.verifyTargets(bank, { pack: 'v-imported' }).ids, ['v-imp-01']);
+    assert.deepEqual(verify.verifyTargets(bank, { ids: ['v-imp-01', 't-05', 'nope', 'v-imp-01'] }).ids, ['v-imp-01']);
+
+    const qs = (...ids: string[]) => ids.map((id) => bank.byId.get(id)!);
+    const now = new Date('2026-10-19T10:00:00+07:00');
+    const vs = [
+      ...verify.verdictsFor(qs('v-ai-01', 'v-ai-02'), { results: [{ id: 'v-ai-01', answer: ['B'] }, { id: 'v-ai-02', answer: ['A', 'B'] }] }, { runId: 'r1', model: 'opus', now }),
+      ...verify.verdictsFor(qs('v-imp-01', 't-01'), { results: [{ id: 'v-imp-01', answer: ['C'] }, { id: 't-01', answer: ['B'], ambiguous: true }] }, { runId: 'r1', now }),
+    ];
+    verify.appendVerdicts(vs);
+    assert.match(fs.readFileSync(verify.VERIFY_FILE, 'utf8'), /^# 🧪 Giải mù câu hỏi[\s\S]*<!-- verify-log -->\n- 2026-10-19 · `v-ai-01` · ✅ khớp/);
+    bank = loadBank();
+    const s = verify.verifySummary(bank);
+    assert.deepEqual([s.verified, s.ok, s.review, s.stale], [4, 1, 3, 0]);
+    assert.deepEqual(s.pending.map((p) => p.qid).sort(), ['t-01', 'v-ai-02', 'v-imp-01']);
+    assert.deepEqual(verify.verifyTargets(bank, {}).ids, [], 'every AI question has a verdict now');
+
+    // auto_draft: AI-written → yes · imported → never · other origins only when the run just changed them
+    assert.deepEqual(verify.draftCandidates(vs, bank).map((v) => v.qid), ['v-ai-02']);
+    assert.deepEqual(verify.draftCandidates(vs, bank, new Set(['t-01', 'v-imp-01'])).map((v) => v.qid), ['v-ai-02', 't-01']);
+    assert.deepEqual(verify.autoDraft(verify.draftCandidates(vs, bank), 'r1', TODAY), { drafted: ['v-ai-02'], errors: [] });
+    bank = loadBank();
+    assert.equal(bank.byId.get('v-ai-02')!.status, 'draft');
+    assert.match(fs.readFileSync(path.join(home, 'coach', 'patches', 'r1-verify.yaml'), 'utf8'), /- id: v-ai-02\n {4}base: \w+\n {4}status: draft/);
+    assert.equal(verify.verifySummary(bank).pending.find((p) => p.qid === 'v-ai-02')!.decision, 'drafted', 'drafted questions stay in the review queue');
+
+    // decisions
+    const a = verify.decide('v-ai-02', 'approve', 'đã kiểm tra với notes');
+    assert.equal(a.decision, 'approved');
+    assert.equal(a.reason, 'đã kiểm tra với notes');
+    assert.equal(loadBank().byId.get('v-ai-02')!.status, 'active', 'approve puts a drafted question back');
+    verify.decide('v-imp-01', 'retire');
+    assert.equal(loadBank().byId.get('v-imp-01')!.status, 'retired');
+    assert.deepEqual(verify.verifySummary(loadBank()).pending.map((p) => p.qid), ['t-01']);
+    assert.throws(() => verify.decide('nope', 'approve'), verify.VerifyInputError);
+    assert.throws(() => verify.decide('t-02', 'approve'), /chưa được giải mù/);
+
+    // an edit makes the verdict stale: kept for display, picked up again by scope 'changed'
+    const edit = applyPatchItems([{ id: 't-01', base: hashOf('t-01'), stem: 'A database must fail over automatically when one Availability Zone fails. Which feature should be used?' }], { today: TODAY });
+    assert.equal(edit.items[0].status, 'applied');
+    bank = loadBank();
+    const s3 = verify.verifySummary(bank);
+    assert.deepEqual([s3.verified, s3.ok, s3.review, s3.stale], [2, 1, 0, 1]);
+    assert.deepEqual(verify.verifyTargets(bank, { scope: 'changed' }).ids, ['t-01']);
+    const latest = verify.latestVerdicts(bank);
+    assert.notEqual(latest['t-01'].hash, bank.byId.get('t-01')!.hash);
+    assert.equal(latest['v-ai-02'].decision, 'approved');
+  } finally {
+    for (const f of [...files, verify.VERIFY_FILE]) fs.rmSync(f, { force: true });
+  }
+});
+
+// ── runner: structured / verify CLI arguments ───────────────────────────────
+
+test('coach runner: structured (JSON) and blind-solve CLI arguments, prompts, changed questions', () => {
+  const cfg = loadConfig();
+  const sa = runner.structuredArgs('P', cfg, 'enrich');
+  assert.ok(JSON.parse(sa[sa.indexOf('--json-schema') + 1]).properties.items);
+  assert.equal(sa[sa.indexOf('--tools') + 1], 'Read,Glob,Grep');
+  assert.ok(!sa.some((a) => /^(Edit|Write|Bash)/.test(a)), 'read-only: no write / shell rule');
+  assert.ok(!sa.includes('--resume'));
+  assert.equal(sa[sa.indexOf('--model') + 1], 'sonnet');
+  const rs = runner.structuredArgs('P', cfg, 'generate', { resume: 'sess-1' });
+  assert.equal(rs[rs.indexOf('--resume') + 1], 'sess-1');
+  assert.ok(JSON.parse(rs[rs.indexOf('--json-schema') + 1]).properties.questions);
+  const va = runner.verifyArgs('P', cfg);
+  assert.equal(va[va.indexOf('--tools') + 1], '', 'no tools at all');
+  assert.ok(va.includes('--no-session-persistence'));
+  assert.equal(va[va.indexOf('--model') + 1], 'opus');
+  assert.equal(va[va.indexOf('--fallback-model') + 1], 'sonnet');
+  assert.ok(JSON.parse(va[va.indexOf('--json-schema') + 1]).properties.results);
+  assert.ok(!runner.verifyArgs('P', { ...cfg, coach: { ...cfg.coach, models: { ...cfg.coach.models, verify: 'sonnet' } } }).includes('--fallback-model'));
+  assert.equal(runner.modelFor('verify', { ...cfg, coach: { ...cfg.coach, model: 'haiku', models: { ...cfg.coach.models, verify: '' } } }), 'opus', 'verify defaults to opus, not coach.model');
+
+  assert.equal(runner.isStructured('enrich', cfg, '2.1.301 (Claude Code)'), true);
+  assert.equal(runner.isStructured('analyze', cfg, '2.1.301'), false);
+  assert.equal(runner.isStructured('generate', cfg, '2.0.1'), false, 'an old CLI falls back to file mode');
+  assert.equal(runner.isStructured('longform', { ...cfg, coach: { ...cfg.coach, structured_output: false } }, '2.1.301'), false);
+  assert.ok(runner.COACH_TASKS.includes('verify'));
+
+  const jp = runner.buildJsonPrompt('enrich', 'r1', 'manual', { batch: 'b.md', size: 2, patch: 'p.yaml', tasks: ['distractors'], note: 'xem lại D' });
+  assert.match(jp, /CHẾ ĐỘ APP \(JSON\)[\s\S]*b\.md[\s\S]*distractors[\s\S]*ghi chú của người học: xem lại D/);
+  assert.doesNotMatch(jp, /apply-patch\.ts/);
+  assert.match(runner.buildJsonPrompt('generate', 'r2', 'manual', { count: 3, sources: ['x.md'] }), /GENERATE\.md[\s\S]*count: 3[\s\S]*doc-<slug>-01/);
+  assert.match(runner.buildJsonPrompt('longform', 'r3', 'manual', { batch: 'b.md', count: 2, idPrefix: 'ai-1-lf', packFile: 'p.md' }), /phần \*\*B\*\*[\s\S]*ai-1-lf01/);
+
+  resetPack();
+  const bank = loadBank();
+  const before = new Map(bank.questions.map((q) => [q.id, q.hash]));
+  before.set('t-02', 'old');
+  before.delete('t-03');
+  before.set('t-05', 'old');
+  assert.deepEqual(runner.changedSince(before, bank), ['t-02', 't-03'], 'new or edited, never retired');
+});
+
+// ── ENRICH: explicit ids, distractors, JSON-mode batch ──────────────────────
+
+test('enrich: explicit ids bypass scoring, distractors todo with option numbers, JSON-mode batch with verifier notes', () => {
+  resetPack();
+  const bank = loadBank();
+  const states = new Map<string, QuestionState>();
+  assert.deepEqual(
+    enrich.selectBatch(bank, states, { ids: ['t-04', 't-05', 'nope', 't-01'] }).map((i) => [i.q.id, i.todo]),
+    [
+      ['t-04', ['explain', 'hint', 'classify']],
+      ['t-01', ['explain', 'hint', 'classify']],
+    ],
+    'order kept, retired / unknown dropped, pending work as todo',
+  );
+  assert.deepEqual(enrich.selectBatch(bank, states, { ids: ['t-02'], tasks: 'distractors' }).map((i) => i.todo), [['distractors']]);
+  const report = {
+    minExposures: 3,
+    weakDistractors: [
+      { id: 't-03', key: 'E', exposures: 4, elims: 3 },
+      { id: 't-02', key: 'D', exposures: 5, elims: 4 },
+    ],
+    suspectedKeys: [{ id: 't-02', key: 'B', pick: 'A', times: 3, confident: 2, note: 'tưởng EBS dùng chung' }],
+  };
+  assert.deepEqual(enrich.selectBatch(bank, states, { tasks: 'distractors', report }).map((i) => i.q.id), ['t-02', 't-03'], 'most struck first');
+  assert.deepEqual(enrich.selectBatch(bank, states, { tasks: 'distractors' }), [], 'no report → nothing to rewrite');
+
+  const stats = new Map([['t-02', { id: 't-02', exposures: 5, correct: 1, options: { A: { picks: 3, elims: 0 }, B: { picks: 1, elims: 0 }, C: { picks: 1, elims: 2 }, D: { picks: 0, elims: 4 } }, wrong: {} }]]);
+  const verdicts: Record<string, VerifyVerdict> = {
+    't-02': { date: TODAY, qid: 't-02', hash: bank.byId.get('t-02')!.hash, outcome: 'mismatch', picked: 'A', key: 'B', confidence: 'high', model: 'opus', reason: 'EBS Multi-Attach cũng dùng chung được' },
+  };
+  const items = enrich.selectBatch(bank, states, { ids: ['t-02'], tasks: 'explain,distractors' });
+  const file = enrich.writeBatchFile('2026-10-19_120000_enrich', items, bank, { todos: ['explain', 'distractors'], report, stats, verdicts, mode: 'json', note: 'xem lại phương án D' });
+  const text = fs.readFileSync(file, 'utf8');
+  assert.match(text, /^mode: json$/m);
+  assert.match(text, /Chế độ app \(JSON\)/);
+  assert.doesNotMatch(text, /Khung patch/);
+  assert.match(text, /\*\*Id cần trả về \(1\):\*\* `t-02`/);
+  assert.match(text, /📊 5 lượt trả lời phiên bản hiện tại \(đúng 1\) — phương án nhiễu: A chọn 3 · gạch 0; C chọn 1 · gạch 2; D chọn 0 · gạch 4/);
+  assert.match(text, /📊 phương án nhiễu yếu [^\n]*D “Instance store” — gặp 5 lần, bị gạch 4 lần/);
+  assert.match(text, /⚠️ người học chọn A 3 lần \(2 lần chắc chắn\) dù đáp án là B — tưởng EBS dùng chung/);
+  assert.match(text, /🧪 model giải mù \(opus, tin cậy high\) chọn A thay vì B: “EBS Multi-Attach cũng dùng chung được”/);
+  assert.match(text, /\*\*Ghi chú của người học cho lô này:\*\* xem lại phương án D/);
+  assert.match(text, /- D\. Instance store {2}⟨14⟩/, 'option lengths shown for distractor rewrites');
+  assert.match(fs.readFileSync(enrich.writeBatchFile('2026-10-19_120001_enrich', items, bank, {}), 'utf8'), /## Khung patch/, 'file mode keeps the skeleton');
+  const approved = { ...verdicts['t-02'], decision: 'approved' as const };
+  assert.deepEqual(enrich.verdictLines(bank.byId.get('t-02')!, { 't-02': approved }), [], 'an approved verdict is not repeated');
+});
+
+// ── caches ──────────────────────────────────────────────────────────────────
+
+test('run records: cached by directory mtime, records of running runs re-read', () => {
+  const dir = path.join(home, 'coach', 'runs');
+  for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f));
+  let tick = Date.now() / 1000;
+  const bump = () => fs.utimesSync(dir, (tick += 5), tick); // coarse-mtime file systems
+  const save = (info: Record<string, unknown>) => {
+    const tmp = path.join(dir, `.${String(info.id)}.tmp`);
+    fs.writeFileSync(tmp, JSON.stringify(info));
+    fs.renameSync(tmp, path.join(dir, `${String(info.id)}.json`));
+    bump();
+  };
+  const base = { trigger: 'manual', startedAt: '2026-10-19T10:00:00+07:00' };
+  save({ ...base, id: '2026-10-19_100000_enrich', task: 'enrich', status: 'success' });
+  save({ ...base, id: '2026-10-19_110000_verify', task: 'verify', status: 'running' });
+  assert.deepEqual(enrich.readRunInfos().map((r) => [r.id, r.status]), [
+    ['2026-10-19_110000_verify', 'running'],
+    ['2026-10-19_100000_enrich', 'success'],
+  ]);
+  // rewritten in place (no rename → same directory mtime): still seen because the record was running
+  const f = path.join(dir, '2026-10-19_110000_verify.json');
+  fs.writeFileSync(f, JSON.stringify({ ...base, id: '2026-10-19_110000_verify', task: 'verify', status: 'success' }));
+  fs.utimesSync(f, (tick += 5), tick);
+  assert.equal(enrich.readRunInfos()[0].status, 'success');
+  const cached = enrich.readRunInfos();
+  assert.equal(enrich.readRunInfos(), cached, 'nothing running, directory unchanged → same parsed list');
+  assert.equal(enrich.readRunInfos(1).length, 1);
+  save({ ...base, id: '2026-10-19_120000_generate', task: 'generate', status: 'success' });
+  assert.equal(enrich.readRunInfos()[0].id, '2026-10-19_120000_generate');
+  for (const x of fs.readdirSync(dir)) fs.rmSync(path.join(dir, x));
+});
+
+test('ask: Q&A costs are cached per file and follow appends and deletions', () => {
+  const since = Date.parse('2026-10-16T00:00:00+07:00');
+  ask.appendQa('t-02', { at: '2026-10-17T10:00:00+07:00', question: 'Q1?', answer: 'A1', costUsd: 0.01 });
+  assert.deepEqual(ask.askCostsSince(since), { count: 1, costUsd: 0.01 });
+  ask.appendQa('t-02', { at: '2026-10-17T11:00:00+07:00', question: 'Q2?', answer: 'A2', costUsd: 0.02 });
+  assert.deepEqual(ask.askCostsSince(since), { count: 2, costUsd: 0.03 });
+  fs.rmSync(path.join(home, 'coach', 'qa', 't-02.md'));
+  fs.utimesSync(path.join(home, 'coach', 'qa'), Date.now() / 1000 + 30, Date.now() / 1000 + 30);
+  assert.deepEqual(ask.askCostsSince(since), { count: 0, costUsd: 0 });
+});
+
+test('CLI detection: the cached status is returned at once and refreshed in the background', async () => {
+  const fake = path.join(here, 'helpers', 'fake-claude.mjs');
+  const base = loadConfig();
+  const cfg = { ...base, coach: { ...base.coach, claude_bin: fake } };
+  const s1 = runner.findClaude(cfg, true);
+  assert.equal(s1.available, true);
+  assert.equal(s1.path, fake);
+  assert.equal(s1.version, '2.1.301 (Claude Code)');
+  assert.deepEqual(s1.auth, { loggedIn: true, method: 'claude.ai', plan: 'max' });
+  assert.equal(runner.findClaude(cfg), s1, 'cached: no process spawned on the request path');
+  const s2 = await runner.refreshClaudeStatus(cfg);
+  assert.equal(s2.version, '2.1.301 (Claude Code)');
+  assert.notEqual(s2, s1);
+  assert.equal(runner.findClaude(cfg), s2, 'the refreshed status is the cached one now');
+});
+
+// ── review fixes (regressions) ──────────────────────────────────────────────
+
+test('option letters: Vietnamese references are caught (Unicode-aware), prose is not; "(Select TWO.)" is a valid marker', async () => {
+  const { LETTER_REF_RE, CHOOSE_RE } = await import('../server/lib/pack-format.ts');
+  for (const s of ['> 🇻🇳 Chọn đáp án B vì Multi-AZ.', 'Đáp án B đúng.', '> 🇻🇳 Phương án B đúng; phương án C sai.', 'Lựa chọn C sai vì chậm.', 'Đáp án đúng là B vì…', 'phương án sai là C', 'Option B is wrong', 'answer C', '(B) is wrong', 'RPO = A', '- A: wrong']) {
+    assert.ok(LETTER_REF_RE.test(s), s);
+  }
+  for (const s of ['answer a few questions', 'RPO = a few minutes', 'lựa chọn tốt nhất', 'phương án Bảo mật', 'Lựa chọn tốt nhất là Amazon RDS', 'đáp án đúng là AWS Lambda', 'Use option groups for RDS']) {
+    assert.ok(!LETTER_REF_RE.test(s), s);
+  }
+  assert.match('Which TWO actions meet these requirements? (Select TWO.)', CHOOSE_RE);
+  const bank = loadBank();
+  const two = aiOut.draftOf(NEW_Q({ stem: `${NEW_Q().stem} (Select TWO.)`, answer: ['A', 'B'] }), 'doc-x-01', { tax: bank.taxonomy, today: TODAY, kind: 'generate', bank });
+  assert.deepEqual(two.errors, []);
+  const vn = aiOut.draftOf(NEW_Q({ explanation: `${GOOD_EXPLANATION}\n> 🇻🇳 Phương án A đúng vì failover tự động.` }), 'doc-x-01', { tax: bank.taxonomy, today: TODAY, kind: 'generate', bank });
+  assert.match(vn.errors.join(' '), /chữ cái đáp án/);
+});
+
+test('verify: empty pick + ambiguous is "ambiguous", ids are normalised, error answers never count as verified', () => {
+  resetPack();
+  const file = path.join(home, 'bank', 'packs', 'ai', 'v-err.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, vpack('v-err', 'ai', ['ve-01', 've-02', 've-03']));
+  try {
+    const bank = loadBank();
+    const [q1, q2, q3] = ['ve-01', 've-02', 've-03'].map((id) => bank.byId.get(id)!);
+    assert.equal(verify.judge(q1, { answer: [], ambiguous: true, confidence: 'high', reason: 'không lựa chọn nào đúng' }).outcome, 'ambiguous');
+    assert.equal((verify.VERIFY_SCHEMA.properties.results.items.properties.answer as { minItems?: number }).minItems, 1);
+    const vs = verify.verdictsFor([q1, q2, q3], { results: [{ id: '`ve-01`', answer: ['B'] }, { id: ' ve-02 ', answer: ['A', 'C'] }] }, { runId: 'r-err' });
+    assert.deepEqual(vs.map((v) => [v.qid, v.outcome]), [
+      ['ve-01', 'ok'],
+      ['ve-02', 'ok'],
+      ['ve-03', 'error'],
+    ], 'ids in backticks / with spaces match; the omitted one is an error');
+    verify.appendVerdicts(vs);
+    const b2 = loadBank();
+    const s = verify.verifySummary(b2);
+    assert.deepEqual([s.verified, s.ok, s.review, s.stale], [2, 2, 0, 0]);
+    assert.ok(verify.verifyTargets(b2, { scope: 'unverified-ai' }).ids.includes('ve-03'), 'an error answer is picked again');
+    assert.ok(verify.verifyTargets(b2, { scope: 'new' }).ids.includes('ve-03'));
+    assert.ok(!verify.verifyTargets(b2, { scope: 'changed' }).ids.includes('ve-03'));
+    assert.equal(verify.latestVerdicts(b2)['ve-03'], undefined);
+  } finally {
+    for (const f of [file, verify.VERIFY_FILE]) fs.rmSync(f, { force: true });
+  }
+});
+
+test('verify: a question the blind-solve drafted stays queued until decided (any version), approve / OK re-verify reactivate it, an approved version is never re-drafted, a stale decision is refused', () => {
+  resetPack();
+  const file = path.join(home, 'bank', 'packs', 'ai', 'v-dr.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, vpack('v-dr', 'ai', ['vd-01', 'vd-03', 'vd-05']));
+  const q = (id: string) => loadBank().byId.get(id)!;
+  const solve = (id: string, answer: string[], runId: string) => {
+    const vs = verify.verdictsFor([q(id)], { results: [{ id, answer, confidence: 'high', ambiguous: false, reason: 'r' }] }, { model: 'opus', runId });
+    verify.appendVerdicts(vs);
+    return vs;
+  };
+  const queued = (id: string) => verify.verifySummary(loadBank()).pending.find((p) => p.qid === id);
+  try {
+    // (a) drafted → fixed by an edit (new hash) → re-verified OK by a plain append (no runner): still queued, approve reactivates
+    verify.autoDraft(verify.draftCandidates(solve('vd-01', ['A'], 'r1'), loadBank()), 'r1', TODAY);
+    assert.equal(q('vd-01').status, 'draft');
+    const fix = applyPatchItems([{ id: 'vd-01', base: q('vd-01').hash, options: { A: 'Multi-AZ deployment in a second AWS Region' } }], { today: TODAY });
+    assert.equal(fix.items[0].status, 'applied');
+    assert.equal(queued('vd-01')?.decision, 'drafted', 'edited after drafting: stays in the queue');
+    solve('vd-01', ['A'], 'r2'); // still a mismatch on the new version
+    assert.equal(queued('vd-01')?.outcome, 'mismatch');
+    assert.throws(() => verify.decide('vd-01', 'approve', undefined, 'deadbeef00'), verify.VerifyConflictError, 'a decision on an older version is refused');
+    assert.equal(verify.decide('vd-01', 'approve', undefined, q('vd-01').hash).decision, 'approved');
+    assert.equal(q('vd-01').status, 'active', 'approve reactivates a verifier-drafted question whatever its version');
+    assert.equal(queued('vd-01'), undefined);
+
+    // (b) drafted → the same version re-verified OK through the runner path (reactivate) → active again, automatic decision
+    const v3 = solve('vd-03', ['A', 'B'], 'r3');
+    verify.autoDraft(verify.draftCandidates(v3, loadBank()), 'r3', TODAY);
+    assert.equal(q('vd-03').status, 'draft');
+    const ok = solve('vd-03', ['A', 'C'], 'r4');
+    assert.equal(queued('vd-03')?.decision, 'drafted', 'OK verdict appended alone: queued until decided');
+    assert.deepEqual(verify.reactivate(ok, 'r4'), { reactivated: ['vd-03'], errors: [] });
+    assert.equal(q('vd-03').status, 'active');
+    assert.equal(queued('vd-03'), undefined);
+    assert.match(fs.readFileSync(verify.VERIFY_FILE, 'utf8'), /`vd-03` · ✅ tự dùng lại \(giải mù khớp\)/);
+
+    // (c) approved mismatch → the same version solved wrong again is not drafted again
+    verify.autoDraft(verify.draftCandidates(solve('vd-05', ['A'], 'r5'), loadBank()), 'r5', TODAY);
+    verify.decide('vd-05', 'approve');
+    assert.equal(q('vd-05').status, 'active');
+    assert.deepEqual(verify.draftCandidates(solve('vd-05', ['A'], 'r6'), loadBank()), [], 'your approval of this version stands');
+    assert.equal(queued('vd-05'), undefined);
+  } finally {
+    for (const f of [file, verify.VERIFY_FILE]) fs.rmSync(f, { force: true });
+  }
+});
+
+test('coach lock: taken atomically; a live holder means busy, a dead one is replaced; only our own lock is released', () => {
+  const lock = path.join(home, 'coach', '.lock');
+  fs.rmSync(lock, { force: true });
+  try {
+    fs.writeFileSync(lock, JSON.stringify({ pid: process.ppid, runId: 'other-run' })); // a live process (our parent)
+    assert.throws(() => runner.acquireLock('mine'), /pid \d+\) đang chạy coach: other-run/);
+    fs.writeFileSync(lock, '');
+    assert.throws(() => runner.acquireLock('mine'), /đang bắt đầu chạy coach/, 'a lock being written right now counts as held');
+    fs.writeFileSync(lock, JSON.stringify({ pid: 2 ** 22 + 12345, runId: 'dead-run' })); // no such process
+    runner.acquireLock('mine');
+    assert.deepEqual(JSON.parse(fs.readFileSync(lock, 'utf8')), { pid: process.pid, runId: 'mine' });
+    runner.releaseLock('someone-else');
+    assert.ok(fs.existsSync(lock), 'not ours → kept');
+    runner.releaseLock('mine');
+    assert.ok(!fs.existsSync(lock));
+    fs.writeFileSync(lock, JSON.stringify({ pid: process.pid, runId: 'crashed' })); // leftover of a crashed run in this process
+    runner.acquireLock('again');
+    runner.releaseLock('again');
+  } finally {
+    fs.rmSync(lock, { force: true });
+  }
 });

@@ -29,6 +29,7 @@ export const COACH_TASK_LABEL: Record<string, string> = {
   enrich: '🧹 ENRICH',
   longform: '📏 Câu dài',
   ask: '🤖 Hỏi AI',
+  verify: '🧪 Giải mù',
 };
 
 export const ENRICH_JOBS = [

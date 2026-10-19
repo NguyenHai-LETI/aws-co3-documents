@@ -1,16 +1,17 @@
-// Prepares an ENRICH batch without running the AI (for /trainer-enrich in Claude Code, or by hand):
-// writes coach/enrich/<run_id>-batch.md and prints where the patch / new pack must go.
+// Prepares an ENRICH batch without running the AI (for /trainer-enrich in Claude Code, or by hand — interactive mode:
+// the AI writes the patch / pack file itself): writes coach/enrich/<run_id>-batch.md and prints where they must go.
 // Usage:
-//   node trainer/scripts/enrich-batch.ts [--size 20] [--tasks explain,hint,classify,balance] [--run-id <id>]
+//   node trainer/scripts/enrich-batch.ts [--size 20] [--tasks explain,hint,classify,balance,distractors] [--run-id <id>]
+//   node trainer/scripts/enrich-batch.ts --ids 03-v2-01,05-v1-12 [--tasks distractors] [--note "…"] [--run-id <id>]
 //   node trainer/scripts/enrich-batch.ts --longform [--count 5] [--run-id <id>]
 //   node trainer/scripts/enrich-batch.ts --status [--json]
 import path from 'node:path';
-import { PACKS_DIR, loadConfig } from '../server/config.ts';
-import { loadBank } from '../server/lib/bank.ts';
-import { loadAttempts } from '../server/lib/results.ts';
-import { computeStates } from '../server/lib/stats.ts';
+import { PACKS_DIR } from '../server/config.ts';
+import { context } from '../server/context.ts';
+import { distractorReport, optionStats } from '../server/lib/quality.ts';
+import { latestVerdicts } from '../server/lib/verify.ts';
 import { stampParts } from '../server/lib/time.ts';
-import { MAX_BATCH, MAX_LONGFORM, enrichStatus, learnerNotes, longformTargets, parseTasks, patchPath, repoRel, selectBatch, writeBatchFile, writeLongformFile } from '../server/lib/enrich.ts';
+import { MAX_BATCH, MAX_LONGFORM, enrichStatus, idList, learnerNotes, longformTargets, parseTasks, patchPath, repoRel, selectBatch, writeBatchFile, writeLongformFile } from '../server/lib/enrich.ts';
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(`--${name}`);
@@ -23,8 +24,7 @@ const int = (v: string | undefined, dflt: number, max: number) => {
   return Number.isFinite(n) && n > 0 ? Math.min(max, n) : dflt;
 };
 
-const cfg = loadConfig();
-const bank = loadBank();
+const { cfg, bank, attempts, states } = context(); // re-graded attempts: answer-key fixes count against the new key
 
 if (flag('status')) {
   const st = enrichStatus(bank);
@@ -37,8 +37,6 @@ if (flag('status')) {
   process.exit(0);
 }
 
-const attempts = loadAttempts();
-const states = computeStates(attempts, cfg);
 const s = stampParts();
 const longform = flag('longform');
 const runId = opt('run-id') ?? `${s.date}_${s.time}_${longform ? 'longform' : 'enrich'}`;
@@ -67,12 +65,22 @@ if (longform) {
   console.log('   Tiếp theo: làm theo trainer/coach/ENRICH.md phần B.');
 } else {
   const { todos } = parseTasks(opt('tasks'));
-  const items = selectBatch(bank, states, { size: int(opt('size'), cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks') });
+  const distractors = todos.includes('distractors');
+  const report = distractors ? distractorReport(bank, attempts) : undefined;
+  const items = selectBatch(bank, states, { size: int(opt('size'), cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks'), ids: idList(opt('ids')), report });
   if (!items.length) {
     console.log('✓ Không còn câu nào cần ENRICH cho lựa chọn này.');
     process.exit(0);
   }
-  const file = writeBatchFile(runId, items, bank, { todos, notes: learnerNotes(attempts, items.map((i) => i.q.id)) });
+  const file = writeBatchFile(runId, items, bank, {
+    todos,
+    notes: learnerNotes(attempts, items.map((i) => i.q.id)),
+    report,
+    stats: distractors ? optionStats(bank, attempts) : undefined,
+    verdicts: latestVerdicts(bank),
+    mode: 'files',
+    note: opt('note'),
+  });
   const patch = repoRel(patchPath(runId));
   console.log(`🧰 ${items.length} câu → ${repoRel(file)}`);
   console.log(`   run_id: ${runId}`);

@@ -4,6 +4,9 @@
 > (`npm run coach`), Claude Cowork, hoặc `/trainer-coach` trong Claude Code. Working directory = **gốc repo**.
 > Bảo trì hàng loạt (viết lại giải thích, gợi ý, phân loại task, cân độ dài đáp án, câu dài) là việc của
 > **ENRICH** (`trainer/coach/ENRICH.md`, chạy riêng theo lô) — lượt phân tích tập trung vào người học.
+> Lượt phân tích luôn chạy ở **chế độ file** (bạn tự ghi kế hoạch / pack / patch). Sau lượt chạy, app cho **model thứ hai giải mù**
+> câu mới và câu bạn vừa sửa đề / lựa chọn / đáp án (chỉ thấy đề + lựa chọn); câu AI viết bị lệch đáp án hoặc mơ hồ chuyển
+> `status: draft` chờ người học duyệt (`trainer/bank/verify.md`, SCHEMA §9).
 
 Bạn là huấn luyện viên luyện thi **AWS SAA-C03** cho một người học. Mục tiêu mỗi lượt chạy:
 **(1)** hiểu người học đang yếu/hiểu nhầm ở đâu, **(2)** cập nhật ngân hàng câu hỏi để vá đúng chỗ yếu,
@@ -23,6 +26,7 @@ Bạn là huấn luyện viên luyện thi **AWS SAA-C03** cho một người h�
 | `trainer/bank/packs/**/*.md` | Ngân hàng câu hỏi (snapshot ghi rõ file của từng câu) |
 | `trainer/results/**/*.md` | Kết quả từng bài (chỉ đọc khi cần chi tiết hơn snapshot) |
 | `trainer/bank/ratings.md` · `trainer/coach/qa/<id>.md` | 👍/👎 kèm ghi chú của người học · hỏi đáp “🤖 Hỏi AI” về từng câu (snapshot đã tóm tắt) |
+| `trainer/bank/verify.md` | (tuỳ chọn) kết quả giải mù của model thứ hai: ❌ lệch đáp án / ⚠️ mơ hồ chưa được duyệt = dấu hiệu câu có thể sai — xử lý như issue (3a) khi câu đó liên quan điểm yếu đang vá |
 | `*.md` ở gốc repo | Notes lý thuyết — **nguồn kiến thức để viết câu hỏi** (dùng Grep tìm đoạn liên quan, đừng đọc hết file lớn như `P-architecture-diagrams.md`) |
 
 | Được ghi | Mục đích |
@@ -118,7 +122,9 @@ Sửa câu có sẵn: sửa tại chỗ (giữ id, giữ nguyên các dòng meta
 - **Bám notes**: trước khi viết về một topic, Grep/đọc đoạn liên quan trong file notes của topic
   (`taxonomy.yaml → topics[].notes`). Không chắc một con số/giới hạn → không đưa vào câu.
 - Tuân thủ checklist chất lượng SCHEMA §6 (1 đáp án tốt nhất, distractor có thật & hợp lý, văn phong SAA-C03,
-  phân bố đáp án đúng đều A–D, đề tiếng Anh).
+  phân bố đáp án đúng đều A–D, đề tiếng Anh). Mỗi câu mới sẽ được model thứ hai **giải mù** — đề phải chứa đủ dữ kiện để chỉ
+  một lựa chọn đúng; câu lệch / mơ hồ bị chuyển `status: draft` (ra khỏi các chế độ test) cho tới khi được duyệt — đừng đưa câu
+  `draft` vào `questions` của kế hoạch.
 
 **3e. Kiểm tra định dạng:** chạy `node trainer/scripts/validate.ts packs/ai/<tên-file> --fill-time`
 (tự điền `time` theo rubric nếu thiếu) và sửa **mọi lỗi ❌** (và cảnh báo về chữ cái / độ dài đáp án) cho tới khi sạch;

@@ -28,7 +28,24 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   return data as T;
 }
 
+// Identical GETs started together (React StrictMode runs every effect twice in `npm start`'s dev build; several
+// components asking for the same URL on mount) share one request. The window is short so a GET issued after a change
+// never receives a response that was requested before it.
+const SHARE_MS = 40;
+const inflight = new Map<string, { at: number; promise: Promise<unknown> }>();
+
+function sharedGet<T>(url: string): Promise<T> {
+  const now = performance.now();
+  const hit = inflight.get(url);
+  if (hit && now - hit.at < SHARE_MS) return hit.promise as Promise<T>;
+  const promise = request<T>('GET', url).finally(() => {
+    if (inflight.get(url)?.promise === promise) inflight.delete(url);
+  });
+  inflight.set(url, { at: now, promise });
+  return promise;
+}
+
 export const api = {
-  get: <T>(url: string) => request<T>('GET', url),
+  get: <T>(url: string) => sharedGet<T>(url),
   post: <T>(url: string, body: unknown = {}) => request<T>('POST', url, body),
 };

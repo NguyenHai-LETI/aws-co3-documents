@@ -1,32 +1,62 @@
 // Runs the AI coach headlessly through the Claude Code CLI (`claude -p … --output-format stream-json`)
 // and turns its event stream into short progress lines for the UI (SSE) and log files in coach/runs/.
-// Tasks: analyze (COACH.md), generate (GENERATE.md), enrich + longform (ENRICH.md — the batch of questions
-// is prepared here before the spawn, and the patch is re-applied/verified when the run ends).
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+// Tasks: analyze (COACH.md), generate (GENERATE.md), enrich + longform (ENRICH.md — the batch of questions is prepared
+// here before the spawn) and verify (blind-solve by a second model, verify.ts).
+// A run is a sequence of CLI calls ("phases") under one lock, log and cost:
+//   main      — the task itself. With coach.structured_output, generate / enrich / longform run with read-only tools and
+//               `--json-schema`; the app writes and checks the patch / pack (ai-output.ts). Otherwise the AI writes the
+//               files and the app re-checks them afterwards (legacy file mode, also used by the interactive skills).
+//   repair    — structured runs only: the rejected items go back once through `--resume <session_id>`.
+//   verify    — coach.verify.auto: questions the run added or changed (new hash) are blind-solved; mismatches on
+//               AI-written / just-changed questions go to `status: draft` (coach.verify.auto_draft).
+import { execFile, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { COACH_DIR, DATA_DIR, PACKS_DIR, REPO_DIR, RUNS_DIR, TRAINER_DIR, loadConfig, rel, type AppConfig } from '../config.ts';
 import { context } from '../context.ts';
-import { loadBank } from './bank.ts';
+import { loadBank, type BankState } from './bank.ts';
 import { DAY_MS, localDateKey, localIso, stampParts } from './time.ts';
-import { applyPatch } from './patch.ts';
-import { MAX_BATCH, MAX_LONGFORM, learnerNotes, longformTargets, parseTasks, patchPath, readRunInfos, repoRel, selectBatch, writeBatchFile, writeLongformFile } from './enrich.ts';
+import { applyPatch, applyPatchItems, combineResults, ledgerPath, type PatchResult } from './patch.ts';
+import { MAX_BATCH, MAX_LONGFORM, idList, learnerNotes, longformTargets, parseTasks, patchPath, readRunInfos, repoRel, selectBatch, writeBatchFile, writeLongformFile } from './enrich.ts';
 import { askCostsSince } from './ask.ts';
 import { writeSnapshot } from './snapshot.ts';
 import { aiSyncLine, syncForAi, type AiSyncNote } from './sync.ts';
-import type { ClaudeStatus, CoachEvent, CoachRunInfo, CoachTask, CostSummary } from '../../shared/types.ts';
+import { distractorReport, optionStats } from './quality.ts';
+import {
+  MAX_NEW_QUESTIONS,
+  STRUCTURED_TASKS,
+  checkDraft,
+  draftOf,
+  enrichItems,
+  mergeRepaired,
+  planPack,
+  repairPrompt,
+  schemaFor,
+  structuredOutput,
+  writePack,
+  writePatchFile,
+  type ItemFailure,
+  type PackTarget,
+  type StructuredTask,
+} from './ai-output.ts';
+import { MAX_VERIFY, VERIFY_SCHEMA, appendVerdicts, autoDraft, draftCandidates, latestVerdicts, reactivate, verdictsFor, verifyBatches, verifyPrompt, verifyTargets } from './verify.ts';
+import type { QuestionDraft } from './pack-format.ts';
+import type { ClaudeStatus, CoachEvent, CoachRunInfo, CoachRunOutcome, CoachTask, CostSummary, Question, VerifyVerdict } from '../../shared/types.ts';
 
 const LOCK_FILE = path.join(COACH_DIR, '.lock');
-const RUN_TIMEOUT_MS = 40 * 60_000;
+const RUN_TIMEOUT_MS = 40 * 60_000; // main + repair phases
+const VERIFY_TIMEOUT_MS = Number(process.env.TRAINER_VERIFY_TIMEOUT_MS) || 20 * 60_000; // blind-solve phase (all its batches); env = tests
+const fmtLimit = (ms: number) => (ms >= 60_000 ? `${Math.round(ms / 60_000)} phút` : `${Math.round(ms / 1000)} giây`);
 const IS_WIN = process.platform === 'win32';
-export const COACH_TASKS: readonly CoachTask[] = ['analyze', 'generate', 'enrich', 'longform'];
+export const COACH_TASKS: readonly CoachTask[] = ['analyze', 'generate', 'enrich', 'longform', 'verify'];
+export const DEFAULT_VERIFY_MODEL = 'opus';
 
 /** Run record = shared CoachRunInfo + optional extras written by this runner (UI may show them). */
 export type RunInfo = CoachRunInfo & {
   model?: string; // model reported by the CLI (system/init)
-  outcome?: RunOutcome; // verified result of enrich/longform runs
+  outcome?: RunOutcome; // checked result: patch / new pack / blind-solve verdicts
   sync?: { before?: AiSyncNote; after?: AiSyncNote }; // auto-sync around the run (config sync.before_ai / after_ai)
 };
 
@@ -35,21 +65,9 @@ export interface StartOptions {
   syncAfter?: boolean; // default config sync.after_ai
 }
 
-export interface RunOutcome {
-  // enrich: final apply-patch pass over coach/patches/<runId>.yaml
-  patch?: string | null;
-  updated?: number; // items applied now or earlier (applied + unchanged)
-  skipped?: number;
-  failed?: number;
-  missing?: string[]; // batch questions without an item in the patch
-  // longform: the new pack
-  pack?: string | null;
-  questions?: number;
-  longForm?: number;
-  errors?: number;
-}
+export type RunOutcome = CoachRunOutcome;
 
-/** Nothing left to do for this task (empty ENRICH batch, no long-form target) — not an error. */
+/** Nothing left to do for this task (empty ENRICH batch, no long-form target, nothing to verify) — not an error. */
 export class NothingToDoError extends Error {}
 
 // ── locating the CLI ────────────────────────────────────────────────────────
@@ -143,17 +161,13 @@ function candidates(cfg: AppConfig): { p: string; source: string }[] {
   return out;
 }
 
-let statusCache: { at: number; status: ClaudeStatus } | undefined;
-
-/** `claude auth status` → whether the CLI is logged in and how (no personal details are kept). */
-function authStatus(bin: string): ClaudeStatus['auth'] {
-  const { cmd, pre } = claudeCommand(bin);
-  const r = spawnSync(cmd, [...pre, 'auth', 'status'], { encoding: 'utf8', timeout: 15_000, windowsHide: true });
+/** `claude auth status` output → whether the CLI is logged in and how (no personal details are kept). */
+function parseAuth(stdout: string, ok: boolean): ClaudeStatus['auth'] {
   try {
-    const j = JSON.parse(r.stdout) as { loggedIn?: boolean; authMethod?: string; subscriptionType?: string };
+    const j = JSON.parse(stdout) as { loggedIn?: boolean; authMethod?: string; subscriptionType?: string };
     return { loggedIn: !!j.loggedIn, method: j.authMethod, plan: j.subscriptionType };
   } catch {
-    return r.status === 0 ? { loggedIn: true } : { loggedIn: false };
+    return { loggedIn: ok };
   }
 }
 
@@ -161,9 +175,16 @@ const INSTALL_HINT = IS_WIN
   ? 'Không tìm thấy Claude Code CLI. Cài bằng PowerShell `irm https://claude.ai/install.ps1 | iex` (hoặc `npm i -g @anthropic-ai/claude-code`), chạy `claude` một lần để đăng nhập, hoặc đặt đường dẫn ở trainer/config.yaml → coach.claude_bin / biến môi trường CLAUDE_BIN (claude.exe hoặc claude.cmd). Có thể dùng Claude Cowork thay thế (nút “Copy prompt”).'
   : 'Không tìm thấy Claude Code CLI. Cài bằng `npm i -g @anthropic-ai/claude-code` (rồi `claude` để đăng nhập), hoặc đặt đường dẫn ở trainer/config.yaml → coach.claude_bin / biến môi trường CLAUDE_BIN. Có thể dùng Claude Cowork thay thế (nút “Copy prompt”).';
 
-export function findClaude(cfg: AppConfig = loadConfig(), fresh = false): ClaudeStatus {
-  if (!fresh && statusCache && Date.now() - statusCache.at < 60_000) return statusCache.status;
-  let status: ClaudeStatus = { available: false, hint: INSTALL_HINT };
+const STATUS_TTL_MS = 60_000;
+let statusCache: { at: number; status: ClaudeStatus } | undefined;
+let refreshing: Promise<ClaudeStatus> | undefined;
+
+function sourceOf(c: { p: string; source: string }, target: string): string {
+  return target === c.p ? c.source : `${c.source} (${path.basename(c.p)} → ${path.basename(target)})`;
+}
+
+/** Blocking detection (`--version`, then `auth status`) — first call / explicit fresh checks only. */
+function detectSync(cfg: AppConfig): ClaudeStatus {
   const tried = new Set<string>();
   for (const c of candidates(cfg)) {
     const target = resolveCandidate(c.p);
@@ -171,14 +192,62 @@ export function findClaude(cfg: AppConfig = loadConfig(), fresh = false): Claude
     tried.add(target);
     const { cmd, pre } = claudeCommand(target);
     const r = spawnSync(cmd, [...pre, '--version'], { encoding: 'utf8', timeout: 15_000, windowsHide: true });
-    if (r.status === 0) {
-      const source = target === c.p ? c.source : `${c.source} (${path.basename(c.p)} → ${path.basename(target)})`;
-      status = { available: true, path: target, version: r.stdout.trim().split('\n')[0], source, auth: authStatus(target) };
-      break;
-    }
+    if (r.status !== 0) continue;
+    const a = spawnSync(cmd, [...pre, 'auth', 'status'], { encoding: 'utf8', timeout: 15_000, windowsHide: true });
+    return { available: true, path: target, version: r.stdout.trim().split('\n')[0], source: sourceOf(c, target), auth: parseAuth(a.stdout ?? '', a.status === 0) };
   }
+  return { available: false, hint: INSTALL_HINT };
+}
+
+function run(cmd: string, args: string[]): Promise<{ ok: boolean; stdout: string }> {
+  return new Promise((resolve) => {
+    execFile(cmd, args, { encoding: 'utf8', timeout: 15_000, windowsHide: true }, (err, stdout) => resolve({ ok: !err, stdout: String(stdout ?? '') }));
+  });
+}
+
+/** Same detection without blocking the event loop. */
+async function detectAsync(cfg: AppConfig): Promise<ClaudeStatus> {
+  const tried = new Set<string>();
+  for (const c of candidates(cfg)) {
+    const target = resolveCandidate(c.p);
+    if (!target || tried.has(target)) continue;
+    tried.add(target);
+    const { cmd, pre } = claudeCommand(target);
+    const v = await run(cmd, [...pre, '--version']);
+    if (!v.ok) continue;
+    const a = await run(cmd, [...pre, 'auth', 'status']);
+    return { available: true, path: target, version: v.stdout.trim().split('\n')[0], source: sourceOf(c, target), auth: parseAuth(a.stdout, a.ok) };
+  }
+  return { available: false, hint: INSTALL_HINT };
+}
+
+/**
+ * Where the Claude Code CLI is and whether it is logged in. Never blocks once something is cached: a status older than
+ * a minute is returned as is and refreshed in the background. `fresh` (scripts) and the very first call detect
+ * synchronously (~0.4 s: `--version` + `auth status`).
+ */
+export function findClaude(cfg: AppConfig = loadConfig(), fresh = false): ClaudeStatus {
+  if (!fresh && statusCache) {
+    if (Date.now() - statusCache.at >= STATUS_TTL_MS) void refreshClaudeStatus(cfg);
+    return statusCache.status;
+  }
+  const status = detectSync(cfg);
   statusCache = { at: Date.now(), status };
   return status;
+}
+
+/** Re-detects the CLI off the request path (one detection at a time); resolves with the new status. */
+export function refreshClaudeStatus(cfg: AppConfig = loadConfig()): Promise<ClaudeStatus> {
+  refreshing ??= detectAsync(cfg)
+    .then((status) => {
+      statusCache = { at: Date.now(), status };
+      return status;
+    })
+    .catch(() => statusCache?.status ?? { available: false, hint: INSTALL_HINT })
+    .finally(() => {
+      refreshing = undefined;
+    });
+  return refreshing;
 }
 
 export function versionAtLeast(version: string | undefined, min: [number, number, number]): boolean {
@@ -189,7 +258,7 @@ export function versionAtLeast(version: string | undefined, min: [number, number
   return true;
 }
 
-/** CLI versions that know `--permission-prompts`, `--tools`, `--no-session-persistence`. */
+/** CLI versions that know `--permission-prompts`, `--tools`, `--no-session-persistence` (and `--json-schema`). */
 export const MODERN_CLI: [number, number, number] = [2, 1, 259];
 
 // ── policy: test mode, hosts, models ────────────────────────────────────────
@@ -212,20 +281,29 @@ export function hostAllowed(cfg: AppConfig, host: string = os.hostname()): boole
   return list.some((x) => x === h || x === short || x.split('.')[0] === short);
 }
 
-/** Model for a task: coach.models[task] || coach.model ('' = Claude Code default). Long-form uses the enrich model. */
+/**
+ * Model for a task: coach.models[task] || coach.model ('' = Claude Code default). Long-form uses the enrich model.
+ * The blind-solve verifier is meant to be a different, strong model: coach.models.verify, default opus.
+ */
 export function modelFor(task: CoachTask | 'ask', cfg: AppConfig): string {
+  if (task === 'verify') return String(cfg.coach.models?.verify || DEFAULT_VERIFY_MODEL).trim();
   const key = task === 'longform' ? 'enrich' : task;
   return String(cfg.coach.models?.[key] || cfg.coach.model || '').trim();
 }
 
-export function resolvedModels(cfg: AppConfig): { analyze: string; generate: string; enrich: string; ask: string } {
-  return { analyze: modelFor('analyze', cfg), generate: modelFor('generate', cfg), enrich: modelFor('enrich', cfg), ask: modelFor('ask', cfg) };
+export function resolvedModels(cfg: AppConfig): { analyze: string; generate: string; enrich: string; ask: string; verify: string } {
+  return { analyze: modelFor('analyze', cfg), generate: modelFor('generate', cfg), enrich: modelFor('enrich', cfg), ask: modelFor('ask', cfg), verify: modelFor('verify', cfg) };
 }
 
 /** Scheduled runs started today (local date) — compared with coach.max_runs_per_day. */
 export function scheduledRunsToday(runs: CoachRunInfo[] = readRunInfos(200), now = new Date()): number {
   const today = localDateKey(now);
   return runs.filter((r) => r.trigger === 'schedule' && r.status !== 'skipped' && localDateKey(r.startedAt) === today).length;
+}
+
+/** generate / enrich / longform answer in JSON (coach.structured_output) — needs a CLI with --json-schema / --tools. */
+export function isStructured(task: CoachTask, cfg: AppConfig, version?: string): boolean {
+  return !!cfg.coach.structured_output && STRUCTURED_TASKS.includes(task) && versionAtLeast(version, MODERN_CLI);
 }
 
 // ── prompts ─────────────────────────────────────────────────────────────────
@@ -244,15 +322,21 @@ const TASK_LABEL: Record<CoachTask, string> = {
   generate: 'Sinh câu hỏi',
   enrich: 'Bảo trì ngân hàng (ENRICH)',
   longform: 'Sinh câu dài chuẩn đề thi',
+  verify: 'Giải mù câu hỏi (model thứ hai)',
 };
 
+function runInfoLines(runId: string, trigger: string): string[] {
+  return [`- run_id: ${runId}`, `- trigger: ${trigger}`, `- now: ${localIso()}`, `- working directory = thư mục gốc repo; mọi đường dẫn bên dưới là tương đối từ đây.`];
+}
+
+const noteLine = (params: Record<string, unknown>) => {
+  const note = typeof params.note === 'string' ? params.note.trim() : '';
+  return note ? `- ghi chú của người học: ${note.replace(/\s+/g, ' ').slice(0, 300)}` : '';
+};
+
+/** File mode: the AI writes the patch / pack / plan itself (also what the interactive skills do). */
 export function buildPrompt(task: CoachTask, runId: string, trigger: string, params: Record<string, unknown> = {}): string {
-  const common = [
-    `- run_id: ${runId}`,
-    `- trigger: ${trigger}`,
-    `- now: ${localIso()}`,
-    `- working directory = thư mục gốc repo; mọi đường dẫn bên dưới là tương đối từ đây.`,
-  ];
+  const common = runInfoLines(runId, trigger);
   if (task === 'analyze') {
     return [
       'Bạn là AI Coach của hệ thống luyện thi AWS SAA-C03 trong repo này.',
@@ -261,7 +345,7 @@ export function buildPrompt(task: CoachTask, runId: string, trigger: string, par
       'Thông tin lượt chạy:',
       ...common,
       '- snapshot vừa được cập nhật: `trainer/coach/snapshot.md`',
-      params.note ? `- ghi chú của người học: ${String(params.note)}` : '',
+      noteLine(params),
       '',
       'Kết thúc bằng 3–6 dòng tóm tắt (tiếng Việt): phát hiện chính, số câu mới, file kế hoạch đã tạo.',
     ]
@@ -271,7 +355,7 @@ export function buildPrompt(task: CoachTask, runId: string, trigger: string, par
   if (task === 'enrich') {
     return [
       'Bạn là biên tập viên ngân hàng câu hỏi (ENRICH) của hệ thống luyện thi AWS SAA-C03 trong repo này.',
-      'Đọc TOÀN BỘ file `trainer/coach/ENRICH.md` rồi thực hiện ĐÚNG phần **A (lô bảo trì)** cho lô câu hỏi đã được app chuẩn bị sẵn.',
+      'Đọc TOÀN BỘ file `trainer/coach/ENRICH.md` rồi thực hiện ĐÚNG phần **A (lô bảo trì)** cho lô câu hỏi đã được app chuẩn bị sẵn (chế độ tương tác: tự ghi file patch).',
       '',
       'Thông tin lượt chạy:',
       ...common,
@@ -279,9 +363,12 @@ export function buildPrompt(task: CoachTask, runId: string, trigger: string, par
       `- todo được yêu cầu: ${(params.tasks as string[] | undefined)?.join(', ') || 'explain, hint, classify, balance'}`,
       `- patch phải ghi: \`${String(params.patch)}\``,
       `- áp dụng: \`node trainer/scripts/apply-patch.ts ${String(params.patch)}\` (sửa item lỗi rồi chạy lại đến khi sạch)`,
+      noteLine(params),
       '',
       'Kết thúc bằng 2–4 dòng tóm tắt (tiếng Việt): số câu đã cải thiện theo từng loại todo, item lỗi/bỏ qua (nếu có), kết quả apply-patch cuối cùng.',
-    ].join('\n');
+    ]
+      .filter((l) => l !== '')
+      .join('\n');
   }
   if (task === 'longform') {
     return [
@@ -304,18 +391,76 @@ export function buildPrompt(task: CoachTask, runId: string, trigger: string, par
     '',
     'Thông tin lượt chạy:',
     ...common,
+    ...generateLines(p),
+    '',
+    'Kết thúc bằng 3–5 dòng tóm tắt (tiếng Việt): file pack đã tạo, số câu, kết quả validate.',
+  ].join('\n');
+}
+
+function generateLines(p: GenerateParams): string[] {
+  return [
     `- sources: ${p.sources?.length ? p.sources.map((s) => '`' + s + '`').join(', ') : '(không chỉ định — chọn theo topic/focus)'}`,
     `- count: ${p.count ?? 15}`,
     `- topic: ${p.topic || '(tự xác định từ tài liệu)'}`,
     `- difficulty mix: ${p.difficulty || 'medium 50%, hard 35%, easy 15%'}`,
     `- focus: ${p.focus || '(không có)'}`,
     `- pack slug gợi ý: ${p.slug || '(tự đặt)'}`,
+  ];
+}
+
+const APP_MODE = '- CHẾ ĐỘ APP (JSON): chỉ đọc file (Read / Grep / Glob) — KHÔNG ghi file, KHÔNG chạy lệnh. Trả toàn bộ kết quả bằng JSON đúng schema (công cụ StructuredOutput).';
+
+/** App mode (coach.structured_output): read-only tools, the answer is JSON; the app writes, checks and repairs. */
+export function buildJsonPrompt(task: StructuredTask, runId: string, trigger: string, params: Record<string, unknown> = {}): string {
+  const common = runInfoLines(runId, trigger);
+  if (task === 'enrich') {
+    return [
+      'Bạn là biên tập viên ngân hàng câu hỏi (ENRICH) của hệ thống luyện thi AWS SAA-C03 trong repo này.',
+      'Đọc TOÀN BỘ file `trainer/coach/ENRICH.md` (mục "Chế độ app (JSON)" và phần **A**) rồi xử lý lô câu hỏi app đã chuẩn bị sẵn.',
+      '',
+      'Thông tin lượt chạy:',
+      ...common,
+      APP_MODE,
+      `- lô câu hỏi: \`${String(params.batch)}\` (${String(params.size)} câu) — đọc toàn bộ; \`items\` có đúng một item cho mỗi câu (khoá như patch YAML SCHEMA §8; \`base\` do app tự điền).`,
+      `- todo được yêu cầu: ${(params.tasks as string[] | undefined)?.join(', ') || 'explain, hint, classify, balance'}`,
+      noteLine(params),
+      `- app ghi patch \`${String(params.patch)}\`, kiểm tra từng item (base, giá trị, chữ cái đáp án, hint, lint) và gửi lại các item lỗi MỘT lần để bạn sửa.`,
+      '',
+      '`summary`: 2–4 dòng tiếng Việt — số câu đã cải thiện theo từng loại todo, câu đã đổi đáp án / retired (nếu có).',
+    ]
+      .filter((l) => l !== '')
+      .join('\n');
+  }
+  if (task === 'longform') {
+    return [
+      'Bạn là AI Question Writer của hệ thống luyện thi AWS SAA-C03 trong repo này.',
+      'Đọc TOÀN BỘ file `trainer/coach/ENRICH.md` (mục "Chế độ app (JSON)" và phần **B**) rồi viết câu dài cho các câu gốc app đã chọn sẵn.',
+      '',
+      'Thông tin lượt chạy:',
+      ...common,
+      APP_MODE,
+      `- câu gốc: \`${String(params.batch)}\` — viết đúng ${String(params.count)} câu, mỗi câu gốc một biến thể dài, \`variant_of\` = [id câu gốc].`,
+      '- `pack.slug`: 2–4 từ kebab-case mô tả chủ đề; `pack.title`: tên chủ đề (app ghép thành "AI · Câu dài chuẩn đề thi · …").',
+      `- app gán id câu (\`${String(params.idPrefix)}01\`, …), tính \`time\`, ghi \`created\`/\`enriched\` và tạo pack \`${String(params.packFile)}\`.`,
+      '',
+      '`summary`: 2–4 dòng tiếng Việt — số câu, số từ stem trung bình, câu gốc nào khó viết biến thể (nếu có).',
+    ].join('\n');
+  }
+  return [
+    'Bạn là AI Question Writer của hệ thống luyện thi AWS SAA-C03 trong repo này.',
+    'Đọc TOÀN BỘ file `trainer/coach/GENERATE.md` (mục "Chế độ app (JSON)") rồi sinh câu hỏi mới vào ngân hàng.',
     '',
-    'Kết thúc bằng 3–5 dòng tóm tắt (tiếng Việt): file pack đã tạo, số câu, kết quả validate.',
+    'Thông tin lượt chạy:',
+    ...common,
+    APP_MODE,
+    ...generateLines(params as GenerateParams),
+    '- app gán pack id `doc-<slug>` (theo `pack.slug`) và id câu `doc-<slug>-01`, …, tính `time`, ghi pack mới `trainer/bank/packs/docs/<ngày>-<slug>.md`.',
+    '',
+    '`summary`: 3–5 dòng tiếng Việt — số câu theo domain/độ khó, lưu ý nếu tài liệu có chỗ sai/lỗi thời.',
   ].join('\n');
 }
 
-/** Least-privilege tool rules per task (dontAsk mode: everything else is denied; reads inside the repo are allowed). */
+/** Least-privilege tool rules per task in file mode (dontAsk mode: everything else is denied; reads inside the repo are allowed). */
 export function allowedTools(task: CoachTask): string[] {
   const rw = (p: string) => [`Edit(${p})`, `Write(${p})`];
   const base = ['Glob', 'Grep', 'TodoWrite', 'Bash(node trainer/scripts/validate.ts:*)'];
@@ -324,6 +469,8 @@ export function allowedTools(task: CoachTask): string[] {
       return [...base, ...rw('trainer/coach/patches/**'), 'Bash(node trainer/scripts/apply-patch.ts:*)'];
     case 'longform':
       return [...base, ...rw('trainer/bank/packs/ai/**')];
+    case 'verify':
+      return [];
     default:
       return [
         ...base,
@@ -335,6 +482,14 @@ export function allowedTools(task: CoachTask): string[] {
   }
 }
 
+function tail(args: string[], cfg: AppConfig, model: string): string[] {
+  if (model) args.push('--model', model);
+  if (cfg.coach.effort) args.push('--effort', cfg.coach.effort);
+  if (cfg.coach.max_budget_usd > 0) args.push('--max-budget-usd', String(cfg.coach.max_budget_usd));
+  return args;
+}
+
+/** File mode: the AI may write where allowedTools says. */
 export function cliArgs(prompt: string, cfg: AppConfig, version?: string, task: CoachTask = 'analyze'): string[] {
   const args = [
     '-p',
@@ -350,11 +505,57 @@ export function cliArgs(prompt: string, cfg: AppConfig, version?: string, task: 
     '--allowedTools',
     ...allowedTools(task),
   ];
-  const model = modelFor(task, cfg);
-  if (model) args.push('--model', model);
-  if (cfg.coach.effort) args.push('--effort', cfg.coach.effort);
-  if (cfg.coach.max_budget_usd > 0) args.push('--max-budget-usd', String(cfg.coach.max_budget_usd));
-  return args;
+  return tail(args, cfg, modelFor(task, cfg));
+}
+
+/**
+ * App mode (structured output): read-only built-in tools, no Edit / Write / Bash rule, the answer through
+ * `--json-schema`. `resume` continues the session of the first call (repair round).
+ */
+export function structuredArgs(prompt: string, cfg: AppConfig, task: StructuredTask, opts: { resume?: string } = {}): string[] {
+  const args = [
+    '-p',
+    prompt,
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--json-schema',
+    JSON.stringify(schemaFor(task)),
+    '--tools',
+    'Read,Glob,Grep',
+    '--permission-mode',
+    'dontAsk',
+    '--permission-prompts',
+    'none',
+    ...(opts.resume ? ['--resume', opts.resume] : []),
+    '--allowedTools',
+    'Glob',
+    'Grep',
+  ];
+  return tail(args, cfg, modelFor(task, cfg));
+}
+
+/** Blind-solve call: no tools at all, no session kept, the verify model (with sonnet as fallback when it is overloaded). */
+export function verifyArgs(prompt: string, cfg: AppConfig): string[] {
+  const model = modelFor('verify', cfg);
+  const args = [
+    '-p',
+    prompt,
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--json-schema',
+    JSON.stringify(VERIFY_SCHEMA),
+    '--tools',
+    '',
+    '--permission-mode',
+    'dontAsk',
+    '--permission-prompts',
+    'none',
+    '--no-session-persistence',
+  ];
+  if (model && !/sonnet/i.test(model)) args.push('--fallback-model', 'sonnet');
+  return tail(args, cfg, model);
 }
 
 /** Environment for CLI children: the claude.ai login unless config opts into the API key. */
@@ -410,6 +611,73 @@ export function readLock(): { pid: number; runId: string } | undefined {
   return undefined;
 }
 
+/**
+ * Takes the coach lock atomically (`wx`: two processes starting together cannot both get it). A lock left by a dead
+ * process is removed and the creation retried once; one that is being written right now (unreadable, < 10 s old)
+ * counts as held. Throws the "busy" message otherwise.
+ */
+export function acquireLock(runId: string): void {
+  fs.mkdirSync(COACH_DIR, { recursive: true });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      fs.writeFileSync(LOCK_FILE, JSON.stringify({ pid: process.pid, runId }), { flag: 'wx' });
+      return;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    }
+    let held: { pid?: number; runId?: string } | undefined;
+    try {
+      held = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8')) as { pid?: number; runId?: string };
+    } catch {
+      const age = (() => {
+        try {
+          return Date.now() - fs.statSync(LOCK_FILE).mtimeMs;
+        } catch {
+          return Infinity; // gone in between → retry
+        }
+      })();
+      if (age < 10_000) throw new Error('Một tiến trình khác đang bắt đầu chạy coach — thử lại sau ít giây.');
+    }
+    // this process has no run (start() checked): a lock with our own pid is a leftover of a crashed run
+    if (held?.pid && held.pid !== process.pid && pidAlive(held.pid)) throw new Error(`Một tiến trình khác (pid ${held.pid}) đang chạy coach: ${held.runId ?? '?'}`);
+    try {
+      fs.unlinkSync(LOCK_FILE); // stale: its process is gone
+    } catch {
+      // removed by someone else meanwhile
+    }
+  }
+  throw new Error('Không tạo được khoá coach/.lock — thử lại.');
+}
+
+/** Rewrites the lock with the final run id — only while it is still ours. */
+function updateLock(runId: string): void {
+  const l = readLock();
+  if (l?.pid === process.pid) fs.writeFileSync(LOCK_FILE, JSON.stringify({ pid: process.pid, runId }));
+}
+
+/** Releases the lock only when it still holds this process and run (never someone else's lock). */
+export function releaseLock(runId: string): void {
+  try {
+    const l = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8')) as { pid?: number; runId?: string };
+    if (l.pid === process.pid && l.runId === runId) fs.unlinkSync(LOCK_FILE);
+  } catch {
+    // already gone
+  }
+}
+
+/** Reserves coach/runs/<id>.json atomically (`wx`), adding -2, -3 … when two runs start within the same second. */
+function reserveRunId(base: string): string {
+  for (let n = 1; ; n++) {
+    const id = n === 1 ? base : `${base}-${n}`;
+    try {
+      fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), '', { flag: 'wx' }); // empty = not a record yet (readRunInfos skips it)
+      return id;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST' || n > 99) throw e;
+    }
+  }
+}
+
 function summarizeInput(name: string, input: Record<string, unknown>): string {
   const p = (k: string) => (typeof input[k] === 'string' ? (input[k] as string) : '');
   const short = (s: string) => {
@@ -430,6 +698,11 @@ function summarizeInput(name: string, input: Record<string, unknown>): string {
       return short(p('command'));
     case 'TodoWrite':
       return Array.isArray(input.todos) ? `${(input.todos as unknown[]).length} việc` : '';
+    case 'StructuredOutput': {
+      const n = (k: string) => (Array.isArray(input[k]) ? (input[k] as unknown[]).length : undefined);
+      const parts = [n('items') !== undefined && `${n('items')} item`, n('questions') !== undefined && `${n('questions')} câu`, n('results') !== undefined && `${n('results')} câu đã giải`].filter(Boolean);
+      return `→ kết quả JSON${parts.length ? ` (${parts.join(', ')})` : ''}`;
+    }
     default:
       return short(JSON.stringify(input));
   }
@@ -440,17 +713,48 @@ const clampInt = (v: unknown, min: number, max: number, dflt: number) => {
   return Number.isFinite(n) && n > 0 ? Math.min(max, Math.max(min, n)) : dflt;
 };
 
-/** Selects the questions and writes coach/enrich/<runId>-batch.md; returns the params recorded with the run. */
-function prepare(task: CoachTask, runId: string, params: Record<string, unknown>, cfg: AppConfig, s: ReturnType<typeof stampParts>): Record<string, unknown> {
-  if (task !== 'enrich' && task !== 'longform') return {};
+interface Prepared {
+  params: Record<string, unknown>; // recorded with the run (UI, log)
+  bases?: Record<string, string>; // enrich: question hash per batch id when the batch was written
+}
+
+/** Selects the questions (ENRICH batch, long-form originals, blind-solve targets) and writes the batch file. */
+function prepare(task: CoachTask, runId: string, params: Record<string, unknown>, cfg: AppConfig, s: ReturnType<typeof stampParts>, structured: boolean): Prepared {
+  const mode = structured ? { structured: true } : {};
+  if (task === 'verify') {
+    const t = verifyTargets(loadBank(), params);
+    if (!t.ids.length) throw new NothingToDoError('Không có câu nào cần giải mù (mọi câu trong phạm vi này đã có kết quả cho phiên bản hiện tại) 🎉');
+    return { params: { ids: t.ids, count: t.ids.length, ...(t.total > t.ids.length ? { remaining: t.total - t.ids.length } : {}) } };
+  }
+  if (task !== 'enrich' && task !== 'longform') return { params: mode };
   const { bank, states, attempts } = context();
   if (task === 'enrich') {
     const { todos, examTasks } = parseTasks(params.tasks);
+    const ids = idList(params.ids);
+    if (params.ids !== undefined && !ids.length) throw new Error('params.ids phải là danh sách id câu hỏi');
     const size = clampInt(params.size, 1, MAX_BATCH, clampInt(cfg.coach.enrich_batch_size, 1, MAX_BATCH, 20));
-    const items = selectBatch(bank, states, { size, tasks: params.tasks });
-    if (!items.length) throw new NothingToDoError(`Không còn câu nào cần ENRICH (${[...todos, ...examTasks].join(', ')}) 🎉`);
-    const file = writeBatchFile(runId, items, bank, { todos, notes: learnerNotes(attempts, items.map((i) => i.q.id)) });
-    return { size: items.length, tasks: [...todos, ...examTasks], batch: repoRel(file), patch: repoRel(patchPath(runId)), ids: items.map((i) => i.q.id) };
+    const wantsDistractors = todos.includes('distractors');
+    const report = wantsDistractors ? distractorReport(bank, attempts) : undefined;
+    const items = selectBatch(bank, states, { size, tasks: params.tasks, ids, report });
+    if (!items.length) {
+      throw new NothingToDoError(
+        ids.length ? 'Không có câu nào để ENRICH trong danh sách (id không tồn tại hoặc câu đã retired).' : `Không còn câu nào cần ENRICH (${[...todos, ...examTasks].join(', ')}) 🎉`,
+      );
+    }
+    const note = typeof (params.note ?? params.reason) === 'string' ? String(params.note ?? params.reason).replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+    const file = writeBatchFile(runId, items, bank, {
+      todos,
+      notes: learnerNotes(attempts, items.map((i) => i.q.id)),
+      report,
+      stats: wantsDistractors ? optionStats(bank, attempts) : undefined,
+      verdicts: latestVerdicts(bank),
+      mode: structured ? 'json' : 'files',
+      note: note || undefined,
+    });
+    return {
+      params: { size: items.length, tasks: [...todos, ...examTasks], batch: repoRel(file), patch: repoRel(patchPath(runId)), ids: items.map((i) => i.q.id), ...(note ? { note } : {}), ...mode },
+      bases: Object.fromEntries(items.map((i) => [i.q.id, i.q.hash])),
+    };
   }
   const count = clampInt(params.count, 1, MAX_LONGFORM, 5);
   const targets = longformTargets(bank, states, count);
@@ -463,11 +767,68 @@ function prepare(task: CoachTask, runId: string, params: Record<string, unknown>
     idPrefix: `ai-${s.compact}-${hhmm}-lf`,
   };
   const file = writeLongformFile(runId, targets, bank, plan);
-  return { count: plan.count, batch: repoRel(file), packFile: plan.packFile, packId: plan.packId, idPrefix: plan.idPrefix, ids: targets.map((t) => t.q.id) };
+  return { params: { count: plan.count, batch: repoRel(file), packFile: plan.packFile, packId: plan.packId, idPrefix: plan.idPrefix, ids: targets.map((t) => t.q.id), ...mode } };
 }
 
+/** Question id → content hash (what a run may change: stem, options, key). */
+function hashes(bank: BankState): Map<string, string> {
+  return new Map(bank.questions.map((q) => [q.id, q.hash]));
+}
+
+/** Questions a run added or whose stem / options / key changed (retired ones excluded). */
+export function changedSince(before: Map<string, string>, bank: BankState): string[] {
+  return bank.questions.filter((q) => q.status !== 'retired' && before.get(q.id) !== q.hash).map((q) => q.id);
+}
+
+/** Atomic write: readRunInfos keys its cache on the directory mtime, which a rename always bumps. */
+function saveRunInfo(info: RunInfo): void {
+  const tmp = path.join(RUNS_DIR, `.${info.id}.${process.pid}.tmp`);
+  fs.writeFileSync(tmp, JSON.stringify(info, null, 2));
+  fs.renameSync(tmp, path.join(RUNS_DIR, `${info.id}.json`));
+}
+
+interface PhaseResult {
+  spawned: boolean;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  result?: Record<string, unknown>; // the final {"type":"result"} line
+  sessionId?: string;
+  model?: string; // system/init
+  error?: string; // spawn error / timeout
+}
+
+type PhaseKind = 'main' | 'repair' | 'verify';
+
+/** Everything one run needs while it goes through its phases. `info.status` stays 'running' until finish(). */
+interface RunState {
+  info: RunInfo;
+  cfg: AppConfig;
+  claudePath: string;
+  version?: string;
+  structured: boolean;
+  bases?: Record<string, string>;
+  emit: (kind: CoachEvent['kind'], text: string) => void;
+  raw: fs.WriteStream;
+  evOut: fs.WriteStream;
+  run: NonNullable<CoachRunner['current']>;
+  deadline: number;
+  result: 'success' | 'error'; // outcome so far
+  opts: StartOptions;
+}
+
+const sizeLabel = (info: RunInfo) => {
+  const p = info.params ?? {};
+  return info.task === 'enrich' ? ` · ${String(p.size)} câu` : info.task === 'longform' || info.task === 'verify' ? ` · ${String(p.count)} câu` : '';
+};
+
+const stemLabel = (raw: unknown) => {
+  const s = raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).stem === 'string' ? ((raw as Record<string, unknown>).stem as string) : '';
+  const t = s.replace(/\s+/g, ' ').trim();
+  return t ? `“${t.length > 70 ? t.slice(0, 69) + '…' : t}”` : undefined;
+};
+
 export class CoachRunner extends EventEmitter {
-  current?: { info: RunInfo; child?: ChildProcess; events: CoachEvent[] }; // no child yet while the pre-run sync runs
+  current?: { info: RunInfo; child?: ChildProcess; events: CoachEvent[] }; // no child while syncing / between phases
 
   status() {
     return { running: this.current?.info, lockedBy: this.current ? undefined : readLock() };
@@ -490,34 +851,51 @@ export class CoachRunner extends EventEmitter {
 
   /**
    * Checks and records the run synchronously (refusals and NothingToDoError are thrown to the caller), then goes on in
-   * the background: sync (sync.before_ai) → snapshot (analyze) → Claude Code CLI → checks → sync (sync.after_ai, only
-   * after a success) → 'done'. The coach lock is held from start to end, so both syncs pass `force`.
+   * the background: sync (sync.before_ai) → snapshot (analyze) → Claude Code CLI → checks (+ repair round) → blind-solve
+   * phase → sync (sync.after_ai, only after a success) → 'done'. The coach lock is held from start to end, so both
+   * syncs pass `force`.
    */
   start(task: CoachTask, trigger: CoachRunInfo['trigger'], params: Record<string, unknown> = {}, opts: StartOptions = {}): RunInfo {
     const blocked = coachGuard();
     if (blocked) throw new Error(blocked);
     if (!COACH_TASKS.includes(task)) throw new Error(`Tác vụ không hợp lệ: ${String(task)}`);
     if (this.current) throw new Error(`Đang có lượt chạy ${this.current.info.id}`);
-    const lock = readLock();
-    if (lock) throw new Error(`Một tiến trình khác (pid ${lock.pid}) đang chạy coach: ${lock.runId}`);
     const cfg = loadConfig();
-    const claude = findClaude(cfg, true);
+    let claude = findClaude(cfg);
+    if (!claude.available) claude = findClaude(cfg, true); // installed since the last check?
     if (!claude.available || !claude.path) throw new Error(claude.hint ?? 'Claude Code CLI not found');
-    const claudePath = claude.path;
+    if (task === 'verify' && !versionAtLeast(claude.version, MODERN_CLI)) {
+      throw new Error(`Giải mù cần Claude Code ≥ ${MODERN_CLI.join('.')} (đang có ${claude.version ?? '?'}) — cập nhật Claude Code rồi thử lại.`);
+    }
+    const structured = isStructured(task, cfg, claude.version);
 
-    fs.mkdirSync(RUNS_DIR, { recursive: true });
+    // lock first (atomic: another process starting at the same moment gets "busy"), then reserve a unique run id
     const s = stampParts();
-    const id = `${s.date}_${s.time}_${task}`;
-    let runParams = { ...params, ...prepare(task, id, params, cfg, s) };
-    const info: RunInfo = { id, task, trigger, status: 'running', startedAt: localIso(), params: runParams };
-    fs.writeFileSync(LOCK_FILE, JSON.stringify({ pid: process.pid, runId: id }));
+    const baseId = `${s.date}_${s.time}_${task}`;
+    acquireLock(baseId);
+    let id = baseId;
+    let reserved = false;
+    let prep: Prepared;
+    try {
+      fs.mkdirSync(RUNS_DIR, { recursive: true });
+      id = reserveRunId(baseId);
+      reserved = true;
+      updateLock(id);
+      prep = prepare(task, id, params, cfg, s, structured);
+    } catch (e) {
+      // refused before the run exists (nothing to do, bad params): give the run id and the lock back
+      if (reserved) fs.rmSync(path.join(RUNS_DIR, `${id}.json`), { force: true });
+      releaseLock(id);
+      releaseLock(baseId);
+      throw e;
+    }
+    const info: RunInfo = { id, task, trigger, status: 'running', startedAt: localIso(), params: { ...params, ...prep.params } };
     const raw = fs.createWriteStream(path.join(RUNS_DIR, `${id}.raw.jsonl`));
     const evOut = fs.createWriteStream(path.join(RUNS_DIR, `${id}.events.jsonl`));
     const events: CoachEvent[] = [];
     const run: NonNullable<CoachRunner['current']> = { info, events };
     this.current = run;
-    const saveInfo = () => fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), JSON.stringify(info, null, 2));
-    saveInfo();
+    saveRunInfo(info);
 
     const emit = (kind: CoachEvent['kind'], text: string) => {
       const ev: CoachEvent = { runId: id, at: new Date().toISOString(), kind, text };
@@ -525,194 +903,200 @@ export class CoachRunner extends EventEmitter {
       evOut.write(JSON.stringify(ev) + '\n');
       this.emit('event', ev);
     };
-    const size = () => (task === 'enrich' ? ` · ${String(runParams.size)} câu` : task === 'longform' ? ` · ${String(runParams.count)} câu` : '');
     const model = modelFor(task, cfg);
-    const shownPath = claudePath.startsWith(os.homedir() + path.sep) ? `~/${rel(claudePath, os.homedir())}` : claudePath;
-    emit('start', `${TASK_LABEL[task]}${size()} · Claude Code ${claude.version?.split(' ')[0] ?? ''}${model ? ` · model ${model}` : ''} · ${shownPath}`);
-    if (runParams.batch) emit('start', `Lô câu hỏi: ${String(runParams.batch)}`);
+    const shownPath = claude.path.startsWith(os.homedir() + path.sep) ? `~/${rel(claude.path, os.homedir())}` : claude.path;
+    emit('start', `${TASK_LABEL[task]}${sizeLabel(info)} · Claude Code ${claude.version?.split(' ')[0] ?? ''}${model ? ` · model ${model}` : ''}${structured ? ' · JSON' : ''} · ${shownPath}`);
+    if (info.params?.batch) emit('start', `Lô câu hỏi: ${String(info.params.batch)}`);
 
-    let resultSeen = false;
-    let timer: NodeJS.Timeout | undefined;
-    const fail = (message: string) => {
-      info.status = 'error';
-      info.error = message;
-      emit('error', message);
-    };
+    const st: RunState = { info, cfg, claudePath: claude.path, version: claude.version, structured, bases: prep.bases, emit, raw, evOut, run, deadline: Date.now() + RUN_TIMEOUT_MS, result: 'error', opts };
+    void this.execute(st, params, s);
+    return info;
+  }
 
-    let finished = false;
-    const finish = async (code: number | null, signal: NodeJS.Signals | null) => {
-      if (finished) return;
-      finished = true;
-      if (timer) clearTimeout(timer);
-      if (info.status === 'running') {
-        if (signal) info.status = 'cancelled';
-        else info.status = code === 0 && resultSeen ? 'success' : 'error';
-        if (info.status === 'error' && !info.error) info.error = `CLI exited with code ${code}`;
-      }
-      if (run.child && info.status !== 'cancelled') {
-        try {
-          this.postProcess(info, emit);
-        } catch (e) {
-          emit('error', `Kiểm tra sau lượt chạy thất bại: ${(e as Error).message}`);
-        }
-      }
-      if (info.status === 'success' && (opts.syncAfter ?? cfg.sync.after_ai)) {
-        emit('tool', '⇅ Đang đẩy kết quả AI lên GitHub…');
-        const note = await syncForAi('after', { force: true });
-        info.sync = { ...info.sync, after: note };
+  private fail(st: RunState, message: string) {
+    st.result = 'error';
+    st.info.error = message;
+    st.emit('error', message);
+  }
+
+  private async execute(st: RunState, params: Record<string, unknown>, s: ReturnType<typeof stampParts>) {
+    const { info, cfg, emit } = st;
+    const task = info.task;
+    try {
+      if (st.opts.syncBefore ?? cfg.sync.before_ai) {
+        emit('tool', '⇅ Đang đồng bộ với GitHub trước khi chạy AI…');
+        const note = await syncForAi('before', { force: true });
+        info.sync = { before: note };
         emit(note.ok ? 'result' : 'stderr', aiSyncLine(note));
-      }
-      info.finishedAt = localIso();
-      saveInfo();
-      emit('end', `Kết thúc: ${info.status}${info.costUsd ? ` · $${info.costUsd.toFixed(3)}` : ''}`);
-      raw.end();
-      evOut.end();
-      try {
-        fs.unlinkSync(LOCK_FILE);
-      } catch {
-        // already gone
-      }
-      this.current = undefined;
-      this.emit('done', info);
-    };
-
-    const launch = () => {
-      if (task === 'analyze') {
-        // written here, after the sync, so it includes the results that just arrived from the other machine
-        try {
-          const snap = writeSnapshot(loadBank(), cfg);
-          emit('tool', `Snapshot: ${String(snap.attempts)} bài / ${String(snap.answers)} câu trả lời`);
-        } catch (e) {
-          emit('stderr', `Không cập nhật được snapshot: ${(e as Error).message}`);
+        if (info.status !== 'running') return await this.finish(st); // cancelled while syncing
+        if ((note.received || note.migrated) && (task === 'enrich' || task === 'longform' || task === 'verify')) {
+          // the other machine may already have worked on some of these questions → choose them again
+          try {
+            const prep = prepare(task, info.id, params, cfg, s, st.structured);
+            info.params = { ...params, ...prep.params };
+            st.bases = prep.bases;
+            saveRunInfo(info);
+            emit('tool', `Chọn lại câu hỏi sau khi đồng bộ${sizeLabel(info)}${info.params.batch ? `: ${String(info.params.batch)}` : ''}`);
+          } catch (e) {
+            if (e instanceof NothingToDoError) {
+              info.status = 'skipped';
+              info.summary = e.message;
+              emit('result', e.message);
+            } else this.fail(st, (e as Error).message);
+            return await this.finish(st);
+          }
         }
       }
-      const prompt = buildPrompt(task, id, trigger, runParams);
-      const { cmd, pre } = claudeCommand(claudePath);
-      const child = spawn(cmd, [...pre, ...cliArgs(prompt, cfg, claude.version, task)], { cwd: REPO_DIR, env: cliEnv(cfg), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-      run.child = child;
+      if (task === 'verify') await this.verifyPhase(st, Array.isArray(info.params?.ids) ? (info.params!.ids as string[]) : [], new Set());
+      else await this.mainPhase(st);
+    } catch (e) {
+      this.fail(st, (e as Error).message);
+    }
+    await this.finish(st);
+  }
 
+  /** The task itself (+ checks, repair round) and, after a success, the blind-solve phase over what it changed. */
+  private async mainPhase(st: RunState) {
+    const { info, cfg, emit } = st;
+    const task = info.task;
+    if (task === 'analyze') {
+      // written here, after the sync, so it includes the results that just arrived from the other machine
+      try {
+        const snap = writeSnapshot(loadBank(), cfg);
+        emit('tool', `Snapshot: ${String(snap.attempts)} bài / ${String(snap.answers)} câu trả lời`);
+      } catch (e) {
+        emit('stderr', `Không cập nhật được snapshot: ${(e as Error).message}`);
+      }
+    }
+    const before = hashes(loadBank());
+    const params = info.params ?? {};
+    const args = st.structured
+      ? structuredArgs(buildJsonPrompt(task as StructuredTask, info.id, info.trigger, params), cfg, task as StructuredTask)
+      : cliArgs(buildPrompt(task, info.id, info.trigger, params), cfg, st.version, task);
+    const main = await this.runPhase(st, args, 'main');
+    if (info.status !== 'running') return; // cancelled
+    this.settle(st, main);
+    if (st.structured) {
+      if (main.result && st.result === 'success') await this.structuredPost(st, task as StructuredTask, main);
+    } else if (main.spawned) {
+      // the AI wrote the files itself: re-check them (also after a failed run — a patch may still be there)
+      try {
+        this.postProcess(st);
+      } catch (e) {
+        emit('error', `Kiểm tra sau lượt chạy thất bại: ${(e as Error).message}`);
+      }
+    }
+    if (info.status !== 'running' || st.result !== 'success' || !cfg.coach.verify.auto) return;
+    const changed = changedSince(before, loadBank());
+    if (!changed.length) return;
+    if (!versionAtLeast(st.version, MODERN_CLI)) {
+      emit('stderr', `Bỏ qua giải mù tự động: cần Claude Code ≥ ${MODERN_CLI.join('.')}.`);
+      return;
+    }
+    emit('tool', `🧪 ${changed.length} câu mới / vừa sửa đề, lựa chọn hoặc đáp án → giải mù tự động (coach.verify.auto)`);
+    await this.verifyPhase(st, changed, new Set(changed));
+  }
+
+  /** Main-phase result → run outcome so far (error / success) and summary. */
+  private settle(st: RunState, main: PhaseResult) {
+    const { info } = st;
+    const r = main.result;
+    if (typeof r?.result === 'string' && !st.structured) info.summary = r.result.slice(0, 4000);
+    if (main.error) {
+      st.result = 'error';
+      info.error = main.error;
+    } else if (r) {
+      if (r.is_error || (typeof r.subtype === 'string' && r.subtype !== 'success')) {
+        st.result = 'error';
+        info.error = String(r.subtype ?? 'error');
+      } else st.result = 'success';
+    } else {
+      st.result = 'error';
+      info.error = `CLI exited with code ${main.code}`;
+    }
+  }
+
+  /** One CLI call: streams its events into the run log; resolves when the process is gone (never rejects). */
+  private runPhase(st: RunState, args: string[], kind: PhaseKind, deadline = st.deadline): Promise<PhaseResult> {
+    return new Promise((resolve) => {
+      const out: PhaseResult = { spawned: false, code: null, signal: null };
+      let done = false;
+      let timer: NodeJS.Timeout | undefined;
+      const end = () => {
+        if (done) return;
+        done = true;
+        if (timer) clearTimeout(timer);
+        st.run.child = undefined;
+        resolve(out);
+      };
+      const { cmd, pre } = claudeCommand(st.claudePath);
+      let child: ChildProcess;
+      try {
+        child = spawn(cmd, [...pre, ...args], { cwd: REPO_DIR, env: cliEnv(st.cfg), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      } catch (e) {
+        out.error = (e as Error).message;
+        st.emit('error', out.error);
+        return end();
+      }
+      out.spawned = true;
+      st.run.child = child;
       let buf = '';
+      const onLine = (line: string) => {
+        let msg: Record<string, unknown>;
+        try {
+          msg = JSON.parse(line);
+        } catch {
+          st.emit('text', line.slice(0, 500));
+          return;
+        }
+        this.handleMessage(msg, st, out, kind);
+      };
       child.stdout!.on('data', (chunk: Buffer) => {
-        raw.write(chunk);
+        st.raw.write(chunk);
         buf += chunk.toString('utf8');
         let nl: number;
         while ((nl = buf.indexOf('\n')) >= 0) {
           const line = buf.slice(0, nl).trim();
           buf = buf.slice(nl + 1);
-          if (!line) continue;
-          let msg: Record<string, unknown>;
-          try {
-            msg = JSON.parse(line);
-          } catch {
-            emit('text', line.slice(0, 500));
-            continue;
-          }
-          this.handleMessage(msg, info, emit, () => (resultSeen = true));
+          if (line) onLine(line);
         }
       });
       child.stderr!.on('data', (chunk: Buffer) => {
         const t = chunk.toString('utf8').trim();
-        if (t) emit('stderr', t.slice(0, 1000));
+        if (t) st.emit('stderr', t.slice(0, 1000));
       });
-
-      timer = setTimeout(() => {
-        emit('error', `⏱ Quá ${RUN_TIMEOUT_MS / 60000} phút — dừng lượt chạy.`);
-        info.status = 'error';
-        info.error = 'timeout';
-        child.kill('SIGTERM');
-      }, RUN_TIMEOUT_MS);
-      child.on('error', (e) => fail(e.message));
-      child.on('close', (code, signal) => void finish(code, signal));
-    };
-    const launchOrFail = () => {
-      try {
-        launch();
-      } catch (e) {
-        fail((e as Error).message);
-        void finish(null, null);
-      }
-    };
-
-    if (!(opts.syncBefore ?? cfg.sync.before_ai)) {
-      launchOrFail();
-      return info;
-    }
-    emit('tool', '⇅ Đang đồng bộ với GitHub trước khi chạy AI…');
-    void syncForAi('before', { force: true }).then((note) => {
-      info.sync = { before: note };
-      emit(note.ok ? 'result' : 'stderr', aiSyncLine(note));
-      if (info.status !== 'running') return void finish(null, null); // cancelled while syncing
-      if ((note.received || note.migrated) && (task === 'enrich' || task === 'longform')) {
-        // the other machine may already have worked on some of these questions → choose the batch again
-        try {
-          runParams = { ...params, ...prepare(task, id, params, cfg, s) };
-          info.params = runParams;
-          saveInfo();
-          if (runParams.batch) emit('tool', `Chọn lại lô sau khi đồng bộ${size()}: ${String(runParams.batch)}`);
-        } catch (e) {
-          if (e instanceof NothingToDoError) {
-            info.status = 'skipped';
-            info.summary = e.message;
-            emit('result', e.message);
-          } else fail((e as Error).message);
-          return void finish(null, null);
-        }
-      }
-      launchOrFail();
+      timer = setTimeout(
+        () => {
+          out.error = 'timeout';
+          st.emit('error', `⏱ Quá ${fmtLimit(kind === 'verify' ? VERIFY_TIMEOUT_MS : RUN_TIMEOUT_MS)} — dừng ${kind === 'verify' ? 'lượt giải mù này' : 'lượt chạy'}.`);
+          child.kill('SIGTERM');
+        },
+        Math.max(1000, deadline - Date.now()),
+      );
+      child.on('error', (e) => {
+        out.error = e.message;
+        st.emit('error', e.message);
+        end();
+      });
+      child.on('close', (code, signal) => {
+        if (buf.trim()) onLine(buf.trim());
+        out.code = code;
+        out.signal = signal;
+        end();
+      });
     });
-    return info;
   }
 
-  /** enrich: re-apply the patch (idempotent; catches a patch the AI wrote but never applied). longform: check the new pack. */
-  private postProcess(info: RunInfo, emit: (k: CoachEvent['kind'], t: string) => void) {
-    const params = info.params ?? {};
-    if (info.task === 'enrich') {
-      const file = patchPath(info.id);
-      if (!fs.existsSync(file)) {
-        info.outcome = { patch: null, updated: 0 };
-        if (info.status === 'success') {
-          info.status = 'error';
-          info.error = 'no patch';
-        }
-        emit('error', `Không thấy patch ${repoRel(file)} — lượt này chưa cập nhật câu nào.`);
-        return;
-      }
-      const r = applyPatch(file);
-      const ids = Array.isArray(params.ids) ? (params.ids as string[]) : [];
-      const inPatch = new Set(r.items.map((i) => i.id));
-      const missing = ids.filter((x) => !inPatch.has(x));
-      info.outcome = { patch: repoRel(file), updated: r.applied + r.unchanged, skipped: r.skipped, failed: r.failed + (r.error ? 1 : 0), missing };
-      if (r.error) emit('stderr', `❌ ${r.error}`);
-      for (const it of r.items) if (it.status === 'failed' || it.status === 'skipped') emit('stderr', `${it.status === 'skipped' ? '⏭' : '❌'} ${it.id}: ${it.errors.join(' | ')}`);
-      emit(
-        'result',
-        `Patch: ${r.applied + r.unchanged}/${ids.length || r.items.length} câu đã cập nhật${r.skipped ? ` · ${r.skipped} bỏ qua` : ''}${r.failed ? ` · ${r.failed} lỗi` : ''}${missing.length ? ` · ${missing.length} câu thiếu trong patch` : ''}${r.error ? ` · ${r.error}` : ''}`,
-      );
-      return;
-    }
-    if (info.task === 'longform') {
-      const bank = loadBank();
-      const prefix = String(params.idPrefix ?? '');
-      const qs = prefix ? bank.questions.filter((q) => q.id.startsWith(prefix)) : [];
-      const pack = bank.packs.find((p) => p.id === params.packId) ?? bank.packs.find((p) => qs.some((q) => q.file === p.file));
-      const errors = pack ? bank.problems.filter((p) => p.level === 'error' && p.file === pack.file).length : 0;
-      info.outcome = { pack: pack ? pack.file : null, questions: qs.length, longForm: qs.filter((q) => q.longForm).length, errors };
-      if (!qs.length && info.status === 'success') {
-        info.status = 'error';
-        info.error = 'no new questions';
-      }
-      emit(
-        pack && !errors ? 'result' : 'stderr',
-        pack ? `Pack mới ${pack.file}: ${qs.length} câu (${qs.filter((q) => q.longForm).length} câu dài) · ${errors} lỗi định dạng` : 'Không thấy pack câu dài mới.',
-      );
-    }
-  }
-
-  private handleMessage(msg: Record<string, unknown>, info: RunInfo, emit: (k: CoachEvent['kind'], t: string) => void, markResult: () => void) {
+  private handleMessage(msg: Record<string, unknown>, st: RunState, out: PhaseResult, kind: PhaseKind) {
+    const { info, emit } = st;
     const type = msg.type;
     if (type === 'system' && msg.subtype === 'init') {
-      if (typeof msg.model === 'string') info.model = msg.model;
-      emit('start', `Model: ${String(msg.model ?? '?')} · permission: ${String(msg.permissionMode ?? '?')}`);
+      if (typeof msg.model === 'string') {
+        out.model = msg.model;
+        if (kind === 'main' || (info.task === 'verify' && !info.model)) info.model = msg.model;
+      }
+      if (typeof msg.session_id === 'string') out.sessionId = msg.session_id;
+      if (kind === 'main') emit('start', `Model: ${String(msg.model ?? '?')} · permission: ${String(msg.permissionMode ?? '?')}`);
       return;
     }
     if (type === 'assistant') {
@@ -734,20 +1118,351 @@ export class CoachRunner extends EventEmitter {
       return;
     }
     if (type === 'result') {
-      markResult();
-      info.costUsd = typeof msg.total_cost_usd === 'number' ? msg.total_cost_usd : undefined;
-      info.summary = typeof msg.result === 'string' ? msg.result.slice(0, 4000) : undefined;
-      if (msg.is_error || (typeof msg.subtype === 'string' && msg.subtype !== 'success')) {
-        info.status = 'error';
-        info.error = String(msg.subtype ?? 'error');
-      } else info.status = 'success';
+      out.result = msg;
+      if (typeof msg.session_id === 'string') out.sessionId = msg.session_id;
+      if (typeof msg.total_cost_usd === 'number') info.costUsd = round4((info.costUsd ?? 0) + msg.total_cost_usd);
+      const failed = !!msg.is_error || (typeof msg.subtype === 'string' && msg.subtype !== 'success');
       const denials = Array.isArray(msg.permission_denials) ? msg.permission_denials.length : 0;
-      if (denials) emit('stderr', `${denials} thao tác bị chặn bởi quyền hạn (${allowedTools(info.task).filter((t) => /^(Edit|Bash)/.test(t)).join(', ')}).`);
-      emit('result', info.summary ?? '(không có tóm tắt)');
+      if (denials) {
+        const rules = st.structured || kind === 'verify' ? 'chế độ chỉ đọc' : allowedTools(info.task).filter((t) => /^(Edit|Bash)/.test(t)).join(', ');
+        emit('stderr', `${denials} thao tác bị chặn bởi quyền hạn (${rules}).`);
+      }
+      if (failed) emit('error', `Claude Code báo lỗi: ${String(msg.subtype ?? 'error')}${typeof msg.result === 'string' && msg.result ? ` — ${msg.result.slice(0, 300)}` : ''}`);
+      else if (kind === 'main' && !st.structured) emit('result', typeof msg.result === 'string' && msg.result ? msg.result.slice(0, 4000) : '(không có tóm tắt)');
     }
   }
 
-  /** Stops a run that is syncing or running the CLI; a run already in its final sync is left to finish. */
+  // ── structured output: check, repair once, write ──────────────────────────
+
+  private canRepair(st: RunState, main: PhaseResult): boolean {
+    return !!main.sessionId && st.info.status === 'running' && Date.now() < st.deadline;
+  }
+
+  /** `--resume` with the failures per id; undefined when cancelled. */
+  private async repairPhase(st: RunState, task: StructuredTask, main: PhaseResult, failures: ItemFailure[]): Promise<PhaseResult | undefined> {
+    st.emit('start', `🔧 Vòng sửa lỗi: gửi lại ${failures.length} ${task === 'enrich' ? 'item' : 'câu'} bị từ chối cho Claude (--resume)…`);
+    const r = await this.runPhase(st, structuredArgs(repairPrompt(task, st.info.id, failures), st.cfg, task, { resume: main.sessionId }), 'repair');
+    if (st.info.status !== 'running') return undefined;
+    if (!structuredOutput(r.result)) st.emit('stderr', `Vòng sửa lỗi không trả JSON hợp lệ${r.error ? ` (${r.error})` : ''} — giữ kết quả lần đầu.`);
+    return r;
+  }
+
+  private async structuredPost(st: RunState, task: StructuredTask, main: PhaseResult) {
+    const out = structuredOutput(main.result);
+    if (typeof out?.summary === 'string' && out.summary.trim()) st.info.summary = out.summary.trim().slice(0, 4000);
+    if (!out) st.emit('stderr', 'Claude không trả JSON hợp lệ (structured_output) — yêu cầu trả lại.');
+    if (task === 'enrich') await this.enrichJson(st, main, out);
+    else await this.packJson(st, task, main, out);
+  }
+
+  private static patchFailures(r: PatchResult, missing: ItemFailure[]): ItemFailure[] {
+    return [...missing, ...r.items.filter((i) => i.status === 'failed').map((i) => ({ id: i.id, errors: i.errors }))];
+  }
+
+  /** ENRICH: JSON items → coach/patches/<runId>.yaml → applyPatch; failed / missing items get one repair round. */
+  private async enrichJson(st: RunState, main: PhaseResult, out: Record<string, unknown> | undefined) {
+    const { info, emit } = st;
+    const bases = st.bases ?? {};
+    const ids = Object.keys(bases);
+    const file = patchPath(info.id);
+    const first = enrichItems(out, bases);
+    let items = first.items;
+    if (first.ignored.length) emit('stderr', `Bỏ qua ${first.ignored.length} item không thuộc lô: ${first.ignored.slice(0, 5).join(', ')}`);
+    writePatchFile(file, info.id, items);
+    let r = applyPatch(file);
+    let fails = CoachRunner.patchFailures(r, first.failures);
+    emit('tool', `Kiểm tra JSON: ${r.applied + r.unchanged}/${ids.length} item hợp lệ${r.skipped ? ` · ${r.skipped} bỏ qua (base)` : ''}${fails.length ? ` · ${fails.length} bị từ chối` : ''}`);
+    let repaired = 0;
+    if (fails.length && this.canRepair(st, main)) {
+      for (const f of fails.slice(0, 10)) emit('stderr', `❌ ${f.id}: ${f.errors.join(' | ')}`);
+      const rep = await this.repairPhase(st, 'enrich', main, fails);
+      if (info.status !== 'running') return; // cancelled during the repair round: keep what round 1 applied, nothing more
+      const out2 = structuredOutput(rep?.result);
+      if (out2) {
+        const merged = mergeRepaired(items, out2, fails.map((f) => f.id), bases);
+        items = merged.items;
+        writePatchFile(file, info.id, items); // audit trail = the final items
+        // apply ONLY the repaired items: the others are already in the bank (re-applying them is never needed)
+        const fixed = new Set(merged.fixed);
+        const r2 = applyPatchItems(
+          items.filter((it) => fixed.has(String(it.id))),
+          { label: repoRel(file), runId: info.id, ledgerFile: ledgerPath(file) },
+        );
+        r = combineResults(r, r2);
+        const after = CoachRunner.patchFailures(r, enrichItems({ items }, bases).failures);
+        const still = new Set(after.map((f) => f.id));
+        repaired = fails.filter((f) => !still.has(f.id)).length;
+        fails = after;
+      }
+    }
+    const inPatch = new Set(r.items.map((i) => i.id));
+    const missing = ids.filter((x) => !inPatch.has(x));
+    const updated = r.applied + r.unchanged;
+    info.outcome = {
+      ...info.outcome,
+      structured: true,
+      patch: repoRel(file),
+      updated,
+      skipped: r.skipped,
+      failed: r.failed + (r.error ? 1 : 0),
+      missing,
+      repaired,
+      rejected: fails.map((f) => ({ id: f.id, errors: f.errors })),
+    };
+    if (r.error) emit('stderr', `❌ ${r.error}`);
+    for (const it of r.items) if (it.status === 'failed' || it.status === 'skipped') emit('stderr', `${it.status === 'skipped' ? '⏭' : '❌'} ${it.id}: ${it.errors.join(' | ')}`);
+    emit(
+      'result',
+      `Patch ${repoRel(file)}: ${updated}/${ids.length} câu đã cập nhật${repaired ? ` (${repaired} nhờ vòng sửa lỗi)` : ''}${r.skipped ? ` · ${r.skipped} bỏ qua` : ''}${r.failed ? ` · ${r.failed} lỗi` : ''}${missing.length ? ` · ${missing.length} câu thiếu` : ''}`,
+    );
+    if (!updated && ids.length) {
+      st.result = 'error';
+      info.error = 'no item applied';
+    }
+  }
+
+  /** generate / longform: JSON questions → checked drafts → one repair round → the new pack (valid questions only). */
+  private async packJson(st: RunState, task: 'generate' | 'longform', main: PhaseResult, first: Record<string, unknown> | undefined) {
+    const { info, emit } = st;
+    const p = info.params ?? {};
+    const today = localDateKey(new Date());
+    const target: PackTarget =
+      task === 'generate'
+        ? { kind: 'generate', runId: info.id, today, sources: Array.isArray(p.sources) ? p.sources.map(String) : [], slug: typeof p.slug === 'string' ? p.slug : undefined }
+        : {
+            kind: 'longform',
+            runId: info.id,
+            today,
+            packFile: String(p.packFile ?? ''),
+            packId: String(p.packId ?? ''),
+            idPrefix: String(p.idPrefix ?? ''),
+            originals: Array.isArray(p.ids) ? p.ids.map(String) : [],
+            batch: typeof p.batch === 'string' ? p.batch : undefined,
+          };
+    const bank = loadBank();
+    let plan = planPack(target, first, bank);
+    interface Entry {
+      id: string;
+      raw: unknown;
+      draft?: QuestionDraft;
+      errors: string[];
+      warnings: string[];
+    }
+    const check = (raw: unknown, id: string): Entry => {
+      const d = draftOf(raw, id, { tax: bank.taxonomy, today, kind: task, originals: target.originals, bank });
+      if (!d.draft) return { id, raw, errors: d.errors, warnings: d.warnings };
+      const c = checkDraft(d.draft, plan, bank);
+      return { id, raw, draft: d.draft, errors: c.errors, warnings: [...d.warnings, ...c.warnings] };
+    };
+    const build = (o: Record<string, unknown> | undefined) => (Array.isArray(o?.questions) ? (o!.questions as unknown[]) : []).slice(0, MAX_NEW_QUESTIONS).map((raw, i) => check(raw, plan.idOf(i)));
+    const failuresOf = (es: Entry[]): ItemFailure[] => es.filter((e) => e.errors.length).map((e) => ({ id: e.id, errors: e.errors, label: stemLabel(e.raw) }));
+    let entries = build(first);
+    let fails = entries.length ? failuresOf(entries) : [{ id: '(tất cả)', errors: ['không có câu hỏi nào trong JSON (`questions` rỗng hoặc thiếu)'] }];
+    emit('tool', `Kiểm tra JSON: ${entries.length - failuresOf(entries).length}/${entries.length} câu hợp lệ${fails.length ? ` · ${fails.length} bị từ chối` : ''}`);
+    let repaired = 0;
+    if (fails.length && this.canRepair(st, main)) {
+      for (const f of fails.slice(0, 10)) emit('stderr', `❌ ${f.id}${f.label ? ` ${f.label}` : ''}: ${f.errors.join(' | ')}`);
+      const rep = await this.repairPhase(st, task, main, fails);
+      if (info.status !== 'running') return; // cancelled during the repair round: write nothing
+      const out2 = structuredOutput(rep?.result);
+      if (out2 && !entries.length) {
+        if (typeof out2.summary === 'string' && out2.summary.trim()) info.summary = out2.summary.trim().slice(0, 4000);
+        plan = planPack(target, out2, bank);
+        entries = build(out2);
+        repaired = entries.length - failuresOf(entries).length;
+      } else if (out2) {
+        const failed = new Set(fails.map((f) => f.id));
+        const byId = new Map<string, unknown>();
+        const unnamed: unknown[] = [];
+        for (const raw of Array.isArray(out2.questions) ? (out2.questions as unknown[]) : []) {
+          const id = raw && typeof raw === 'object' ? String((raw as Record<string, unknown>).id ?? '').trim() : '';
+          if (failed.has(id) && !byId.has(id)) byId.set(id, raw);
+          else if (!id) unnamed.push(raw);
+        }
+        let k = 0;
+        entries = entries.map((e) => {
+          if (!failed.has(e.id)) return e;
+          const raw = byId.get(e.id) ?? unnamed[k++];
+          if (raw === undefined) return e;
+          const fixed = check(raw, e.id);
+          if (!fixed.errors.length) repaired++;
+          return fixed;
+        });
+      }
+      if (out2) fails = entries.length ? failuresOf(entries) : fails;
+    }
+    const good = entries.filter((e) => e.draft && !e.errors.length);
+    for (const f of fails) emit('stderr', `⏭ ${f.id}${f.label ? ` ${f.label}` : ''}: ${f.errors.join(' | ')} — không ghi câu này`);
+    const warned = good.filter((e) => e.warnings.length);
+    if (warned.length) emit('stderr', `⚠️ ${warned.length} câu có cảnh báo (vẫn ghi): ${warned.slice(0, 3).map((e) => `${e.id}: ${e.warnings[0]}`).join(' | ')}${warned.length > 3 ? ' …' : ''}`);
+    const rejected = fails.map((f) => ({ id: f.id, errors: f.errors }));
+    if (!good.length) {
+      st.result = 'error';
+      info.error = 'no valid questions';
+      info.outcome = { ...info.outcome, structured: true, pack: null, questions: 0, repaired, rejected };
+      emit('error', 'Không có câu hợp lệ nào — không ghi pack.');
+      return;
+    }
+    const relFile = writePack(plan, good.map((e) => e.draft!));
+    const after = loadBank();
+    const qs = after.questions.filter((q) => q.file === relFile);
+    const errors = after.problems.filter((x) => x.level === 'error' && x.file === relFile).length;
+    info.outcome = { ...info.outcome, structured: true, pack: relFile, questions: qs.length, longForm: qs.filter((q) => q.longForm).length, errors, repaired, rejected };
+    emit(
+      errors ? 'stderr' : 'result',
+      `Pack mới ${relFile}: ${qs.length} câu (${qs.filter((q) => q.longForm).length} câu dài) · ${errors} lỗi định dạng${repaired ? ` · ${repaired} câu sửa ở vòng 2` : ''}${rejected.length ? ` · ${rejected.length} câu bị loại` : ''}`,
+    );
+  }
+
+  // ── file mode: re-check what the AI wrote ─────────────────────────────────
+
+  /** enrich: re-apply the patch (idempotent; catches a patch the AI wrote but never applied). longform: check the new pack. */
+  private postProcess(st: RunState) {
+    const { info, emit } = st;
+    const params = info.params ?? {};
+    if (info.task === 'enrich') {
+      const file = patchPath(info.id);
+      if (!fs.existsSync(file)) {
+        info.outcome = { ...info.outcome, patch: null, updated: 0 };
+        if (st.result === 'success') {
+          st.result = 'error';
+          info.error = 'no patch';
+        }
+        emit('error', `Không thấy patch ${repoRel(file)} — lượt này chưa cập nhật câu nào.`);
+        return;
+      }
+      const r = applyPatch(file);
+      const ids = Array.isArray(params.ids) ? (params.ids as string[]) : [];
+      const inPatch = new Set(r.items.map((i) => i.id));
+      const missing = ids.filter((x) => !inPatch.has(x));
+      info.outcome = { ...info.outcome, patch: repoRel(file), updated: r.applied + r.unchanged, skipped: r.skipped, failed: r.failed + (r.error ? 1 : 0), missing };
+      if (r.error) emit('stderr', `❌ ${r.error}`);
+      for (const it of r.items) if (it.status === 'failed' || it.status === 'skipped') emit('stderr', `${it.status === 'skipped' ? '⏭' : '❌'} ${it.id}: ${it.errors.join(' | ')}`);
+      emit(
+        'result',
+        `Patch: ${r.applied + r.unchanged}/${ids.length || r.items.length} câu đã cập nhật${r.skipped ? ` · ${r.skipped} bỏ qua` : ''}${r.failed ? ` · ${r.failed} lỗi` : ''}${missing.length ? ` · ${missing.length} câu thiếu trong patch` : ''}${r.error ? ` · ${r.error}` : ''}`,
+      );
+      return;
+    }
+    if (info.task === 'longform') {
+      const bank = loadBank();
+      const prefix = String(params.idPrefix ?? '');
+      const qs = prefix ? bank.questions.filter((q) => q.id.startsWith(prefix)) : [];
+      const pack = bank.packs.find((p) => p.id === params.packId) ?? bank.packs.find((p) => qs.some((q) => q.file === p.file));
+      const errors = pack ? bank.problems.filter((p) => p.level === 'error' && p.file === pack.file).length : 0;
+      info.outcome = { ...info.outcome, pack: pack ? pack.file : null, questions: qs.length, longForm: qs.filter((q) => q.longForm).length, errors };
+      if (!qs.length && st.result === 'success') {
+        st.result = 'error';
+        info.error = 'no new questions';
+      }
+      emit(
+        pack && !errors ? 'result' : 'stderr',
+        pack ? `Pack mới ${pack.file}: ${qs.length} câu (${qs.filter((q) => q.longForm).length} câu dài) · ${errors} lỗi định dạng` : 'Không thấy pack câu dài mới.',
+      );
+    }
+  }
+
+  // ── blind-solve ───────────────────────────────────────────────────────────
+
+  /**
+   * Blind-solves `ids` in batches (verify task, or the auto phase after a run), appends the verdicts to bank/verify.md
+   * and applies auto_draft. `changed` = questions this run just added / edited (they may be drafted even when not
+   * AI-written; imported ones never are).
+   */
+  private async verifyPhase(st: RunState, ids: string[], changed: Set<string>) {
+    const { info, cfg, emit } = st;
+    const isTask = info.task === 'verify';
+    const bank = loadBank();
+    const all = ids.map((id) => bank.byId.get(id)).filter((q): q is Question => !!q && q.status !== 'retired');
+    const qs = all.slice(0, MAX_VERIFY);
+    const sum: NonNullable<RunOutcome['verify']> = { checked: 0, ok: 0, mismatch: 0, ambiguous: 0, error: 0, drafted: [] };
+    const left = all.length - qs.length + (isTask && typeof info.params?.remaining === 'number' ? info.params.remaining : 0); // capped at MAX_VERIFY
+    if (left > 0) sum.remaining = left;
+    if (!qs.length) {
+      if (isTask) this.fail(st, 'Không còn câu nào để giải mù (đã xoá hoặc retired).');
+      return;
+    }
+    const model = modelFor('verify', cfg);
+    const batches = verifyBatches(qs, cfg.coach.verify.batch_size);
+    const deadline = Date.now() + VERIFY_TIMEOUT_MS;
+    emit('start', `🧪 Giải mù ${qs.length} câu · model ${model}${/sonnet/i.test(model) ? '' : ' (dự phòng sonnet)'} · ${batches.length} lượt gọi — model chỉ thấy đề + lựa chọn`);
+    const verdicts: VerifyVerdict[] = [];
+    for (const [i, batch] of batches.entries()) {
+      if (info.status !== 'running') return; // cancelled
+      if (Date.now() >= deadline) {
+        // out of time: do not start a call that would be killed at once — the rest stays unverified for a later run
+        const rest = batches.slice(i).reduce((n, b) => n + b.length, 0);
+        sum.remaining = (sum.remaining ?? 0) + rest;
+        emit('stderr', `⏱ Hết ${fmtLimit(VERIFY_TIMEOUT_MS)} giải mù — ${rest} câu chưa giải, để lượt sau (--scope unverified-ai / changed).`);
+        break;
+      }
+      const r = await this.runPhase(st, verifyArgs(verifyPrompt(batch, info.id), cfg), 'verify', deadline);
+      if (info.status !== 'running') return;
+      const out = structuredOutput(r.result);
+      if (!out || r.error || r.result?.is_error) {
+        emit('stderr', `🧪 Lượt ${i + 1}/${batches.length}: không có kết quả JSON${r.error ? ` (${r.error})` : ''} — ${batch.length} câu chưa được giải.`);
+        continue;
+      }
+      const vs = verdictsFor(batch, out, { model: r.model ?? model, runId: info.id });
+      appendVerdicts(vs);
+      verdicts.push(...vs);
+      for (const v of vs) {
+        sum.checked++;
+        sum[v.outcome]++;
+        if (v.outcome === 'ok') continue;
+        const what = v.outcome === 'mismatch' ? `model chọn ${v.picked}, đáp án ${v.key}` : v.outcome === 'ambiguous' ? `mơ hồ (model chọn ${v.picked ?? '—'})` : 'không trả lời được';
+        emit(v.outcome === 'error' ? 'stderr' : 'result', `${v.outcome === 'mismatch' ? '❌' : v.outcome === 'ambiguous' ? '⚠️' : '💥'} ${v.qid}: ${what}${v.reason ? ` — ${v.reason.slice(0, 200)}` : ''}`);
+      }
+    }
+    // drafted by an earlier blind-solve and solved correctly now (fixed by ENRICH, or re-verified) → back to active
+    const re = reactivate(verdicts, info.id);
+    for (const e of re.errors) emit('stderr', `Không đưa câu về active được: ${e}`);
+    if (re.reactivated.length) {
+      sum.reactivated = re.reactivated;
+      emit('result', `✅ ${re.reactivated.length} câu đang draft vì giải mù nay đã khớp → dùng lại: ${re.reactivated.join(', ')}`);
+    }
+    if (cfg.coach.verify.auto_draft) {
+      const candidates = draftCandidates(verdicts, loadBank(), changed);
+      if (candidates.length) {
+        const d = autoDraft(candidates, info.id);
+        sum.drafted = d.drafted;
+        for (const e of d.errors) emit('stderr', `Không chuyển được sang draft: ${e}`);
+        if (d.drafted.length) emit('result', `📝 ${d.drafted.length} câu chuyển sang draft, chờ bạn duyệt ở Ngân hàng → Chất lượng: ${d.drafted.join(', ')}`);
+      }
+    }
+    info.outcome = { ...info.outcome, verify: sum };
+    const line = `🧪 Giải mù ${sum.checked}/${qs.length} câu: ${sum.ok} khớp · ${sum.mismatch} lệch · ${sum.ambiguous} mơ hồ${sum.error ? ` · ${sum.error} lỗi` : ''}${sum.drafted.length ? ` · ${sum.drafted.length} câu → draft` : ''}${sum.remaining ? ` · còn ${sum.remaining} câu cho lượt sau` : ''}`;
+    emit('result', line);
+    if (isTask) {
+      if (sum.checked) {
+        st.result = 'success';
+        info.summary = line;
+      } else this.fail(st, 'Không giải được câu nào (xem log).');
+    }
+  }
+
+  /** Final status, sync after a success, run record, unlock, 'done'. */
+  private async finish(st: RunState) {
+    const { info, cfg, emit } = st;
+    if (info.status === 'running') info.status = st.result; // cancelled / skipped stay as they are
+    if (info.status === 'error' && !info.error) info.error = 'error';
+    if (info.status === 'success' && (st.opts.syncAfter ?? cfg.sync.after_ai)) {
+      emit('tool', '⇅ Đang đẩy kết quả AI lên GitHub…');
+      const note = await syncForAi('after', { force: true });
+      info.sync = { ...info.sync, after: note };
+      emit(note.ok ? 'result' : 'stderr', aiSyncLine(note));
+    }
+    info.finishedAt = localIso();
+    saveRunInfo(info);
+    emit('end', `Kết thúc: ${info.status}${info.costUsd ? ` · $${info.costUsd.toFixed(3)}` : ''}`);
+    st.raw.end();
+    st.evOut.end();
+    releaseLock(info.id); // only our own lock — never one another process took meanwhile
+    this.current = undefined;
+    this.emit('done', info);
+  }
+
+  /** Stops a run that is syncing or running a CLI phase; a run already in its final sync is left to finish. */
   cancel(): boolean {
     const cur = this.current;
     if (!cur || cur.info.status !== 'running') return false;

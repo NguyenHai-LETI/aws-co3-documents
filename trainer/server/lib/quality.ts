@@ -1,26 +1,30 @@
-// Bank quality metrics (#2, #14): correct-letter distribution, "correct option is the longest",
-// stem/explanation length, hints/tasks/enrichment coverage, near-duplicates, 👍/👎 ratings and
-// whether practicing a variant fixed the original question. Numbers cover active questions.
+// Bank quality metrics (#2, #14): correct-letter distribution, "correct option is the longest", stem/explanation
+// length, hints/tasks/enrichment coverage, near-duplicates (lexical + semantic), 👍/👎 ratings, whether practicing a
+// variant fixed the original question, item-writing lint (lint.ts), option-level analytics from the learner's answers
+// (distractorReport) and blind-solve verdicts (verify.ts). Numbers cover active questions.
+// Every part is cached by what it depends on: the bank version (metrics, lint, lexical duplicates), the answers
+// (variant effect, distractors), ratings.md / verify.md; semantic duplicates come from a background job (embeddings.ts).
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { BANK_DIR, loadConfig } from '../config.ts';
 import type { BankState } from './bank.ts';
 import { aggregateRatings, loadRatings, lowRatedIds, ratingsMtime, type RatingEntry } from './ratings.ts';
+import { LINT_RULES, SHORT_EXPLANATION_WORDS, correctIsLongest, lintBank } from './lint.ts';
+import { mergeDuplicates, scheduleSemantic, semanticState } from './embeddings.ts';
+import { verifySummary } from './verify.ts';
 import { countWords } from '../../shared/timing.ts';
-import type { Attempt, BankQuality, DuplicatePair, Question } from '../../shared/types.ts';
+import type { AnswerRecord, Attempt, BankQuality, DistractorReport, DuplicatePair, LintSeverity, Question, VerifySummary } from '../../shared/types.ts';
 
-const LONGEST_RATIO = 1.15;
-const SHORT_EXPLANATION_WORDS = 15;
+export { correctIsLongest } from './lint.ts'; // one rule for metric, lint, filter (moved to lint.ts)
+
 const DUP_WORDS = 0.8; // Jaccard of significant words (stem + correct option)
 const DUP_TRIGRAMS = 0.6; // Jaccard of word trigrams
 const MAX_DUPLICATES = 50;
-
-/** (A) correct option is longer than every distractor by ≥ 15 % — length gives the answer away. */
-export function correctIsLongest(q: Pick<Question, 'options' | 'answer'>, ratio = LONGEST_RATIO): boolean {
-  if (q.options.length < 3 || !q.answer.length) return false;
-  const len = (keys: (k: string) => boolean) => Math.max(0, ...q.options.filter((o) => keys(o.key)).map((o) => o.text.trim().length));
-  const correct = len((k) => q.answer.includes(k));
-  const other = len((k) => !q.answer.includes(k));
-  return other > 0 && correct >= other * ratio;
-}
+export const MIN_EXPOSURES = 3; // distractor analytics: answers to the current version before an option is judged
+const MAX_WEAK = 60;
+const MAX_SUSPECTED = 40;
+const VERIFY_FILE = path.join(BANK_DIR, 'verify.md');
 
 // ── near-duplicates ─────────────────────────────────────────────────────────
 
@@ -88,11 +92,16 @@ export function findDuplicates(questions: Pick<Question, 'id' | 'stem' | 'option
       const t = tr >= DUP_TRIGRAMS ? jaccard(a.trigrams, b.trigrams) : 0;
       if (w >= DUP_WORDS || t >= DUP_TRIGRAMS) {
         const [p, q] = a.id < b.id ? [a.id, b.id] : [b.id, a.id];
-        pairs.push({ a: p, b: q, score: Math.round(Math.max(w, t) * 100) / 100 });
+        pairs.push({ a: p, b: q, score: Math.round(Math.max(w, t) * 100) / 100, kind: 'lexical' });
       }
     }
   }
   return pairs.sort((p, q) => q.score - p.score || p.a.localeCompare(q.a) || p.b.localeCompare(q.b)).slice(0, limit);
+}
+
+/** Lexical pairs among the active questions — depends on the bank only, so it is cached by bank version (not by answers). */
+export function lexicalDuplicates(bank: BankState): DuplicatePair[] {
+  return cached('lexical', bank.version || undefined, () => findDuplicates(bank.questions.filter((q) => q.status === 'active')));
 }
 
 // ── variant effectiveness ───────────────────────────────────────────────────
@@ -135,9 +144,121 @@ export function variantCycles(bank: Pick<BankState, 'questions' | 'byId'>, attem
   return cycles;
 }
 
+// ── option-level analytics: picks / strike-outs per option ─────────────────
+
+export interface OptionStats {
+  id: string;
+  exposures: number; // answers (a pick or a strike-out) to the current version, non-rushed attempts
+  correct: number;
+  options: Record<string, { picks: number; elims: number }>;
+  wrong: Record<string, { times: number; confident: number; why: string[] }>; // wrong picks ("B", "BD")
+}
+
+/** The answer was given to the question as it reads now: same hash (`h`), or — older answers — same key, no edit since. */
+function currentVersion(r: AnswerRecord, q: Question, key: string, editedSince: boolean): boolean {
+  if (r.h) return r.h === q.hash;
+  return !editedSince && !r.regraded && r.key === key;
+}
+
+/**
+ * Per question and option: how often it was picked / struck out, from non-rushed attempts and only for answers to the
+ * current version of the question (a rewritten distractor starts with a clean slate). Confident = not unsure, not hinted,
+ * not flagged.
+ */
+export function optionStats(bank: Pick<BankState, 'byId'>, attempts: Attempt[]): Map<string, OptionStats> {
+  // answers carry `h` since item versioning: an older hash proves an edit, so hash-less (older) answers are stale too
+  const edited = new Set<string>();
+  for (const a of attempts) for (const r of a.answers) if (r.h && bank.byId.get(r.q) && bank.byId.get(r.q)!.hash !== r.h) edited.add(r.q);
+  const out = new Map<string, OptionStats>();
+  for (const a of attempts) {
+    if (a.rushed) continue;
+    for (const r of a.answers) {
+      const q = bank.byId.get(r.q);
+      if (!q || (!r.pick && !r.elim)) continue;
+      const key = q.answer.join('');
+      if (!currentVersion(r, q, key, edited.has(q.id))) continue;
+      let s = out.get(q.id);
+      if (!s) {
+        s = { id: q.id, exposures: 0, correct: 0, options: Object.fromEntries(q.options.map((o) => [o.key, { picks: 0, elims: 0 }])), wrong: {} };
+        out.set(q.id, s);
+      }
+      s.exposures++;
+      for (const k of r.pick) if (s.options[k]) s.options[k].picks++;
+      for (const k of r.elim ?? '') if (s.options[k]) s.options[k].elims++;
+      if (!r.pick) continue;
+      if (r.pick === key) {
+        s.correct++;
+        continue;
+      }
+      const w = (s.wrong[r.pick] ??= { times: 0, confident: 0, why: [] });
+      w.times++;
+      if (!r.unsure && !r.hinted && !r.flag) w.confident++;
+      if (r.why) w.why.push(r.why);
+    }
+  }
+  return out;
+}
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/**
+ * Option-level analytics from the learner's answers: distractors never picked but struck out in at least half of the
+ * exposures (too easy to rule out → ENRICH "distractors" rewrite) and the same wrong option picked ≥ 2 times with
+ * ≥ 2 confident answers — and in at least a third of the answers, so occasional slips on a question answered dozens of
+ * times do not count (the key may be wrong → verify / report).
+ */
+export function distractorReport(bank: BankState, attempts: Attempt[], minExposures = MIN_EXPOSURES): DistractorReport {
+  const weak: DistractorReport['weakDistractors'] = [];
+  const suspected: DistractorReport['suspectedKeys'] = [];
+  let analysed = 0;
+  let answers = 0;
+  for (const s of optionStats(bank, attempts).values()) {
+    const q = bank.byId.get(s.id);
+    if (!q || q.status === 'retired') continue;
+    answers += s.exposures;
+    const key = q.answer.join('');
+    if (s.exposures >= minExposures) {
+      analysed++;
+      for (const o of q.options) {
+        const st = s.options[o.key];
+        if (q.answer.includes(o.key) || !st || st.picks > 0) continue;
+        if (st.elims >= 2 && st.elims * 2 >= s.exposures) weak.push({ id: q.id, key: o.key, exposures: s.exposures, elims: st.elims });
+      }
+    }
+    for (const [pick, w] of Object.entries(s.wrong)) {
+      if (w.times < Math.max(2, Math.ceil(s.exposures / 3)) || w.confident < 2) continue;
+      const why = [...new Set(w.why)].slice(-2).map((x) => `“${clip(x.replace(/\s+/g, ' '), 120)}”`);
+      suspected.push({
+        id: q.id,
+        key,
+        pick,
+        times: w.times,
+        confident: w.confident,
+        note:
+          `Chọn ${pick} ${w.times}/${s.exposures} lần (${w.confident} lần chắc chắn, không gợi ý) thay vì ${key}` +
+          (s.correct ? ` · đúng ${s.correct} lần` : ' · chưa lần nào chọn đúng') +
+          (why.length ? ` · lý do đã ghi: ${why.join(' | ')}` : ''),
+      });
+    }
+  }
+  weak.sort((a, b) => b.elims - a.elims || b.exposures - a.exposures || a.id.localeCompare(b.id) || a.key.localeCompare(b.key));
+  suspected.sort((a, b) => b.confident - a.confident || b.times - a.times || a.id.localeCompare(b.id));
+  return { minExposures, weakDistractors: weak.slice(0, MAX_WEAK), suspectedKeys: suspected.slice(0, MAX_SUSPECTED), analysed, answers };
+}
+
 // ── metrics ─────────────────────────────────────────────────────────────────
 
-let cache: { key: string; value: BankQuality } | undefined;
+const slots = new Map<string, { key: string; value: unknown }>();
+
+/** Memo per part: recomputed only when `key` changes; `key` undefined = no caching (explicit test inputs). */
+function cached<T>(slot: string, key: string | undefined, compute: () => T): T {
+  if (key === undefined) return compute();
+  const hit = slots.get(slot);
+  if (hit && hit.key === key) return hit.value as T;
+  const value = compute();
+  slots.set(slot, { key, value });
+  return value;
+}
 
 function attemptsKey(attempts: Attempt[]): string {
   return crypto
@@ -146,17 +267,26 @@ function attemptsKey(attempts: Attempt[]): string {
     .digest('hex');
 }
 
+function mtime(file: string): number {
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
 const median = (xs: number[]) => {
   if (!xs.length) return 0;
   const s = [...xs].sort((a, b) => a - b);
   return s.length % 2 ? s[(s.length - 1) / 2] : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2);
 };
 
-export function computeQuality(bank: BankState, attempts: Attempt[], ratings?: RatingEntry[]): BankQuality {
-  const key = ratings ? '' : `${bank.version}|${attemptsKey(attempts)}|${ratingsMtime()}`;
-  if (key && cache?.key === key) return cache.value;
+type BankMetrics = Pick<
+  BankQuality,
+  'singleAnswer' | 'letters' | 'lettersByOrigin' | 'correctLongest' | 'medianStemWords' | 'longForm' | 'shortExplanations' | 'withHint' | 'withTask' | 'enriched' | 'total'
+>;
 
-  const active = bank.questions.filter((q) => q.status === 'active');
+function bankMetrics(active: Question[]): BankMetrics {
   const singles = active.filter((q) => q.answer.length === 1);
   const letters: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
   const lettersByOrigin: Record<string, Record<string, number>> = {};
@@ -166,12 +296,7 @@ export function computeQuality(bank: BankState, attempts: Attempt[], ratings?: R
     const o = (lettersByOrigin[q.origin] ??= { A: 0, B: 0, C: 0, D: 0 });
     o[l] = (o[l] ?? 0) + 1;
   }
-  const votes = aggregateRatings(ratings ?? loadRatings());
-  const cycles = variantCycles(bank, attempts);
-  const fixed = cycles.filter((c) => c.ok).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
-
-  const value: BankQuality = {
-    version: bank.version,
+  return {
     singleAnswer: singles.length,
     letters,
     lettersByOrigin,
@@ -183,22 +308,70 @@ export function computeQuality(bank: BankState, attempts: Attempt[], ratings?: R
     withTask: active.filter((q) => q.task).length,
     enriched: active.filter((q) => q.enriched).length,
     total: active.length,
-    duplicates: findDuplicates(active),
+  };
+}
+
+const EMPTY_VERIFY: VerifySummary = { verified: 0, ok: 0, review: 0, stale: 0, pending: [] };
+
+function safeVerify(bank: BankState): VerifySummary {
+  try {
+    return verifySummary(bank) ?? EMPTY_VERIFY;
+  } catch (e) {
+    console.error('verifySummary failed', e);
+    return EMPTY_VERIFY;
+  }
+}
+
+/**
+ * Everything the "Chất lượng" tab and the coach snapshot show. Explicit `ratings` (tests) disable every cache and the
+ * background semantic job; otherwise each part is memoized and the semantic job is (re)scheduled when the bank changed.
+ */
+export function computeQuality(bank: BankState, attempts: Attempt[], ratings?: RatingEntry[], opts: { background?: boolean } = {}): BankQuality {
+  const pure = ratings !== undefined;
+  const v = pure ? undefined : bank.version;
+  const cfg = loadConfig();
+  const active = bank.questions.filter((q) => q.status === 'active');
+  const metrics = cached('metrics', v, () => bankMetrics(active));
+  const lexical = pure ? findDuplicates(active) : lexicalDuplicates(bank);
+  const learning = cached('learning', pure ? undefined : `${bank.version}|${attemptsKey(attempts)}`, () => ({
+    cycles: variantCycles(bank, attempts),
+    distractors: distractorReport(bank, attempts),
+  }));
+  const votes = cached('ratings', pure ? undefined : String(ratingsMtime()), () => aggregateRatings(ratings ?? loadRatings()));
+  const verification = cached('verify', pure ? undefined : `${bank.version}|${mtime(VERIFY_FILE)}`, () => safeVerify(bank));
+  if (opts.background ?? !pure) scheduleSemantic(bank, cfg); // no-op unless the bank / model changed
+  const sem = semanticState(cfg);
+  const activeIds = new Set(active.map((q) => q.id));
+  const fixed = learning.cycles.filter((c) => c.ok).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+  return {
+    version: bank.version,
+    ...metrics,
+    duplicates: mergeDuplicates(lexical, sem.pairs, (id) => activeIds.has(id)),
     ratings: votes,
     lowRated: lowRatedIds(votes).filter((id) => bank.byId.has(id) && bank.byId.get(id)!.status !== 'retired'),
-    variantEffect: { originals: cycles.length, fixedAfterVariant: fixed.length, examples: fixed.slice(0, 10).map((c) => c.id) },
+    variantEffect: { originals: learning.cycles.length, fixedAfterVariant: fixed.length, examples: fixed.slice(0, 10).map((c) => c.id) },
+    lint: lintBank(bank, { cache: !pure }),
+    distractors: learning.distractors,
+    semantic: sem.status,
+    verification,
   };
-  if (key) cache = { key, value };
-  return value;
 }
 
 // ── snapshot section ────────────────────────────────────────────────────────
 
 const pctOf = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
+const SEVERITY_VI: Record<LintSeverity, string> = { high: 'nặng', medium: 'vừa', low: 'nhẹ' };
+
+function optionText(q: Question | undefined, keys: string): string {
+  if (!q) return '';
+  const texts = [...keys].map((k) => q.options.find((o) => o.key === k)?.text.trim()).filter(Boolean) as string[];
+  return texts.length ? ` “${clip(texts.join(' + '), 70)}”` : '';
+}
 
 /** "## 14. Chất lượng ngân hàng" for coach/snapshot.md — only what the coach should act on. */
-export function qualitySnapshotLines(bank: BankState, attempts: Attempt[]): string[] {
-  const q = computeQuality(bank, attempts);
+export function qualitySnapshotLines(bank: BankState, attempts: Attempt[], opts: { background?: boolean } = {}): string[] {
+  const q = computeQuality(bank, attempts, undefined, opts);
   const o: string[] = ['## 14. Chất lượng ngân hàng', ''];
   const letters = Object.entries(q.letters)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -215,6 +388,42 @@ export function qualitySnapshotLines(bank: BankState, attempts: Attempt[]): stri
     `- Đáp án đúng dài nhất (≥ 15 %): **${q.correctLongest}**/${q.total} câu (${pctOf(q.correctLongest, q.total)}%) — ENRICH \`balance\` viết lại distractor cho cân độ dài`,
     `- Giải thích ngắn (< ${SHORT_EXPLANATION_WORDS} từ): ${q.shortExplanations} · có gợi ý: ${q.withHint} · có task: ${q.withTask} · đã ENRICH: ${q.enriched} · câu dài chuẩn thi: ${q.longForm} (${pctOf(q.longForm, q.total)}%, trung vị đề ${q.medianStemWords} từ)`,
   );
+
+  // item-writing flaws (lint.ts)
+  const lint = q.lint;
+  if (lint) {
+    o.push('', `### 🩺 Lỗi viết câu hỏi (lint — \`npm run validate -- --lint\`)`, '');
+    for (const sev of ['high', 'medium', 'low'] as LintSeverity[]) {
+      const rules = LINT_RULES.filter((r) => r.severity === sev);
+      const parts = rules.map((r) => ({ r, n: lint.byCode[r.code]?.count ?? 0 })).filter((x) => x.n > 0);
+      if (!parts.length) {
+        if (sev === 'high') o.push(`- Nặng: 0 câu ✓`);
+        continue;
+      }
+      o.push(`- ${sev === 'high' ? '❗ ' : ''}${SEVERITY_VI[sev][0].toUpperCase()}${SEVERITY_VI[sev].slice(1)}: ${parts.map((x) => `${x.r.label} ${x.n}`).join(' · ')}`);
+      if (sev === 'high') {
+        for (const { r } of parts) o.push(`  - \`${r.code}\`: ${(lint.ids?.[r.code] ?? []).slice(0, 8).map((id) => `\`${id}\``).join(', ')} → ${r.fix}`);
+      }
+    }
+    o.push(`- Câu mới / sửa câu: tránh các lỗi trên (SCHEMA §6) — patch làm phát sinh lỗi *nặng* mới bị từ chối.`);
+  }
+
+  // option analytics from the learner's answers
+  const dr = q.distractors;
+  if (dr && (dr.weakDistractors.length || dr.suspectedKeys.length)) {
+    o.push('', `### 🎯 Phương án nhiễu — từ bài làm của bạn (câu gặp ≥ ${dr.minExposures} lần)`, '');
+    if (dr.weakDistractors.length) {
+      o.push(`- Phương án nhiễu quá dễ (chưa chọn lần nào, hay bị gạch) — ENRICH \`distractors\` viết lại cho hấp dẫn (giữ nguyên đáp án đúng):`);
+      for (const w of dr.weakDistractors.slice(0, 10)) o.push(`  - \`${w.id}\` ${w.key}${optionText(bank.byId.get(w.id), w.key)} — gạch ${w.elims}/${w.exposures} lần`);
+    }
+    if (dr.suspectedKeys.length) {
+      o.push(`- Nghi đáp án sai (cùng một phương án sai được chọn chắc chắn nhiều lần) — kiểm tra lại bằng notes; sai thì sửa \`answer\` + \`reason\`, mơ hồ thì viết lại hoặc retire:`);
+      for (const s of dr.suspectedKeys.slice(0, 10)) {
+        const qq = bank.byId.get(s.id);
+        o.push(`  - \`${s.id}\` đáp án ${s.key}${optionText(qq, s.key)} · ${s.note.replace(/^Chọn (\S+)/, `chọn $1${optionText(qq, s.pick)}`)}`);
+      }
+    }
+  }
 
   const ratings = loadRatings();
   const downs = ratings.filter((r) => r.value === 'down' && !r.resolution);
@@ -235,8 +444,13 @@ export function qualitySnapshotLines(bank: BankState, attempts: Attempt[]): stri
   }
 
   if (q.duplicates.length) {
-    o.push('', `### Câu gần trùng nhau (${q.duplicates.length}${q.duplicates.length >= MAX_DUPLICATES ? '+' : ''}) — gộp/retire bớt hoặc viết lại cho khác tình huống`, '');
-    for (const d of q.duplicates.slice(0, 10)) o.push(`- \`${d.a}\` ≈ \`${d.b}\` (${d.score})`);
+    const semantic = q.duplicates.filter((d) => d.kind === 'semantic').length;
+    o.push(
+      '',
+      `### Câu gần trùng nhau (${q.duplicates.length}${q.duplicates.length >= MAX_DUPLICATES ? '+' : ''}${semantic ? `, ${semantic} theo nghĩa` : ''}) — gộp/retire bớt hoặc viết lại cho khác tình huống`,
+      '',
+    );
+    for (const d of q.duplicates.slice(0, 10)) o.push(`- \`${d.a}\` ≈ \`${d.b}\` (${d.score}${d.kind === 'semantic' ? ', theo nghĩa' : ''})`);
   }
   const ve = q.variantEffect;
   if (ve.originals) {
@@ -249,6 +463,23 @@ export function qualitySnapshotLines(bank: BankState, attempts: Attempt[]): stri
       `- ${ve.fixedAfterVariant}/${ve.originals} câu gốc làm đúng ở lần làm lại đầu tiên sau khi luyện biến thể${ve.examples.length ? ` (vd ${ve.examples.slice(0, 5).map((x) => `\`${x}\``).join(', ')})` : ''}`,
     );
     if (failed.length) o.push(`- Vẫn sai sau biến thể (cần cách giải thích khác): ${failed.slice(0, 10).join(', ')}`);
+  }
+
+  const vs = q.verification;
+  if (vs && (vs.verified || vs.review || vs.stale)) {
+    o.push('', `### 🧪 Giải mù (model thứ hai trả lời không xem đáp án) — \`trainer/bank/verify.md\``, '');
+    o.push(`- ${vs.verified} câu đã kiểm · ${vs.ok} khớp đáp án · **${vs.review}** chờ duyệt (lệch / mơ hồ) · ${vs.stale} kết quả cũ (câu đã sửa sau đó)`);
+    if (vs.pending.length) {
+      o.push(`- Chờ duyệt — đọc lại đề + notes: đáp án sai thì sửa \`answer\` + \`reason\`, đề mơ hồ thì viết lại cho chỉ một đáp án đúng, không cứu được thì \`status: retired\`:`);
+      const OUTCOME_VI: Record<string, string> = { mismatch: '❌ lệch đáp án', ambiguous: '⚠️ mơ hồ', error: '💥 lỗi', ok: '✅ khớp' };
+      for (const p of vs.pending.slice(0, 15)) {
+        const qq = bank.byId.get(p.qid);
+        const pick = p.picked ? `model chọn ${p.picked}${optionText(qq, p.picked)}${p.confidence ? ` (tin cậy ${({ high: 'cao', medium: 'vừa', low: 'thấp' } as Record<string, string>)[p.confidence] ?? p.confidence})` : ''}` : '';
+        const key = p.key ? `đáp án ${p.key}${optionText(qq, p.key)}` : '';
+        o.push(`  - \`${p.qid}\` ${OUTCOME_VI[p.outcome] ?? p.outcome}${qq?.status === 'draft' ? ' · đang draft' : ''} — ${[pick, key].filter(Boolean).join(' · ')}${p.reason ? ` — ${clip(p.reason.replace(/\s+/g, ' '), 160)}` : ''}`);
+      }
+      if (vs.pending.length > 15) o.push(`  - … và ${vs.pending.length - 15} câu nữa (Ngân hàng → Chất lượng → 🧪 Giải mù)`);
+    }
   }
   o.push('');
   return o;

@@ -1,6 +1,7 @@
-// AI bulk edits to existing questions (ENRICH / coach): coach/patches/<runId>.yaml → validated,
-// block-level rewrites of the packs. Format: bank/SCHEMA.md §8. Every item is checked against the
-// question's content hash (`base`), re-serialized with serializeQuestion() and re-parsed; an item that
+// AI bulk edits to existing questions (ENRICH / coach / blind-solve decisions): coach/patches/<runId>.yaml (or items
+// built in memory) → validated, block-level rewrites of the packs. Format: bank/SCHEMA.md §8. Every item is checked
+// against the question's content hash (`base`), re-serialized with serializeQuestion(), re-parsed and re-linted
+// (lint.ts: a new high-severity item-writing flaw rejects the item, other new flaws are warnings); an item that
 // introduces errors is reverted and reported, the others are kept.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,12 +9,13 @@ import YAML from 'yaml';
 import { DATA_DIR, rel } from '../config.ts';
 import { asStringList } from './frontmatter.ts';
 import { loadBank } from './bank.ts';
+import { correctIsLongest as longestRule, lintQuestion, newFlaws } from './lint.ts';
 import { LETTER_REF_RE, parsePack, questionHash, serializeQuestion, toDraft, type QuestionDraft } from './pack-format.ts';
 import { loadMigrations, type MigrationRecord } from './migrations.ts';
 import { normalizeDomain } from './taxonomy.ts';
 import { stampParts } from './time.ts';
 import { countWords, estimateQuestionTime } from '../../shared/timing.ts';
-import type { BankProblem, Difficulty, Question, QuestionStatus, Taxonomy } from '../../shared/types.ts';
+import type { BankProblem, Difficulty, LintFlaw, Option, Question, QuestionStatus, Taxonomy } from '../../shared/types.ts';
 
 export interface PatchItemResult {
   id: string;
@@ -38,9 +40,13 @@ export interface PatchResult {
   error?: string; // fatal: unreadable / invalid patch file
 }
 
+/** Item-writing-flaw checker (lint.ts `lintQuestion`); injectable so tests can use a stand-in rule. */
+export type LintFn = (q: Question, tax: Taxonomy) => LintFlaw[];
+
 export interface ApplyOptions {
   dryRun?: boolean;
   today?: string; // YYYY-MM-DD for `enriched` (tests)
+  lint?: LintFn; // default lintQuestion
 }
 
 const SET_KEYS = ['domain', 'task', 'topic', 'services', 'tags', 'difficulty', 'time', 'concept', 'refs', 'hint', 'variant_of', 'status'] as const;
@@ -60,12 +66,38 @@ function parseKeys(v: unknown): string[] {
   return [...new Set(raw.toUpperCase().match(/[A-H]/g) ?? [])].sort();
 }
 
-/** True when a single-answer question's correct option is ≥ 15 % longer than every distractor. */
+/** True when the (a) correct option is ≥ 15 % longer than every distractor — lint.ts rule (one rule everywhere). */
 export function correctIsLongest(options: { key: string; text: string }[], answer: string[]): boolean {
-  if (answer.length !== 1 || options.length < 3) return false;
-  const correct = options.find((o) => o.key === answer[0])?.text.length ?? 0;
-  const others = options.filter((o) => o.key !== answer[0]).map((o) => o.text.length);
-  return others.length > 0 && correct >= Math.max(...others) * 1.15;
+  return longestRule({ options, answer });
+}
+
+/** A hint must not give the answer away: no verbatim correct option, no option letter. */
+export function hintReveals(hint: string, options: Option[], answer: string[]): boolean {
+  const h = hint.toLowerCase();
+  const verbatim = answer.some((k) => {
+    const t = options.find((o) => o.key === k)?.text.toLowerCase().replace(/[.。]+$/, '').trim() ?? '';
+    return t.length >= 8 && h.includes(t);
+  });
+  return verbatim || /(?:đáp án|lựa chọn|phương án|option|answer|choice)\s+[A-H](?![\p{L}\p{N}])/iu.test(hint);
+}
+
+const flawText = (f: LintFlaw) => `${f.message} [${f.code}${f.option ? ` · ${f.option}` : ''}]`;
+
+/**
+ * Flaws an edit introduces (lint.ts): high severity → errors (the edit is rejected), the rest → warnings.
+ * `before` = undefined for a brand-new question (every flaw is new). A crashing linter never blocks an edit.
+ */
+export function lintDelta(before: Question | undefined, after: Question, tax: Taxonomy, lint: LintFn = lintQuestion): { errors: string[]; warnings: string[] } {
+  let added: LintFlaw[];
+  try {
+    added = newFlaws(before ? lint(before, tax) : [], lint(after, tax));
+  } catch (e) {
+    return { errors: [], warnings: [`lint không chạy được: ${(e as Error).message}`] };
+  }
+  return {
+    errors: added.filter((f) => f.severity === 'high').map((f) => `lint (mức cao): ${flawText(f)}`),
+    warnings: added.filter((f) => f.severity !== 'high').map((f) => `lint: ${flawText(f)}`),
+  };
 }
 
 /** Problems for one question id, keyed without line numbers (lines shift when a block grows). */
@@ -324,13 +356,8 @@ function contentChecks(cur: Question, d: QuestionDraft, changes: string[], error
     if (words < MIN_EXPLANATION_WORDS) warnings.push(`explanation chỉ ${words} từ (nên ≥ ${MIN_EXPLANATION_WORDS}: vì sao đúng + từng distractor + 🇻🇳)`);
     if (!/🇻🇳/.test(d.explanation)) warnings.push('explanation thiếu dòng tóm tắt "> 🇻🇳 …"');
   }
-  if (d.hint && (changed('hint') || changed('options') || changed('answer'))) {
-    const hint = d.hint.toLowerCase();
-    const reveals = d.answer.some((k) => {
-      const t = d.options.find((o) => o.key === k)?.text.toLowerCase().replace(/[.。]+$/, '').trim() ?? '';
-      return t.length >= 8 && hint.includes(t);
-    });
-    if (reveals || /(?:đáp án|lựa chọn|phương án|option|answer|choice)\s+[A-H](?![\p{L}\p{N}])/iu.test(d.hint)) errors.push('hint làm lộ đáp án (chứa nguyên văn đáp án đúng hoặc chữ cái) — chỉ gợi hướng suy nghĩ');
+  if (d.hint && (changed('hint') || changed('options') || changed('answer')) && hintReveals(d.hint, d.options, d.answer)) {
+    errors.push('hint làm lộ đáp án (chứa nguyên văn đáp án đúng hoặc chữ cái) — chỉ gợi hướng suy nghĩ');
   }
   if (changed('options') && correctIsLongest(d.options, d.answer)) warnings.push('đáp án đúng vẫn dài hơn mọi distractor ≥ 15 % — cân lại độ dài');
   if (changed('answer') && d.answer.length !== cur.answer.length) warnings.push(`số đáp án đổi ${cur.answer.length} → ${d.answer.length}: kiểm tra "(Choose N)" trong đề`);
@@ -388,27 +415,32 @@ function readPatch(abs: string): { runId?: string; items: Record<string, unknown
 
 /**
  * Applies a patch file to the bank. Items are processed per pack in order; each is verified (base hash, field rules,
- * re-parse of the pack) and reverted on failure. Packs are rewritten atomically unless `dryRun`.
+ * re-parse + lint of the pack) and reverted on failure. Packs are rewritten atomically unless `dryRun`.
  */
 export function applyPatch(file: string, opts: ApplyOptions = {}): PatchResult {
   const abs = path.resolve(file);
   const shown = abs.startsWith(DATA_DIR + path.sep) ? rel(abs) : abs;
-  const result: PatchResult = { patch: shown, dryRun: !!opts.dryRun, items: [], applied: 0, unchanged: 0, skipped: 0, failed: 0, files: [] };
-  if (!fs.existsSync(abs)) {
-    result.error = `Không tìm thấy file patch: ${file}`;
-    return result;
-  }
+  if (!fs.existsSync(abs)) return { ...emptyResult(shown, opts), error: `Không tìm thấy file patch: ${file}` };
   const parsed = readPatch(abs);
-  result.runId = parsed.runId;
-  if (parsed.error) {
-    result.error = parsed.error;
-    return result;
-  }
+  if (parsed.error) return { ...emptyResult(shown, opts), runId: parsed.runId, error: parsed.error };
+  return applyPatchItems(parsed.items, { ...opts, label: shown, runId: parsed.runId, ledgerFile: ledgerPath(abs) });
+}
+
+function emptyResult(label: string, opts: ApplyOptions): PatchResult {
+  return { patch: label, dryRun: !!opts.dryRun, items: [], applied: 0, unchanged: 0, skipped: 0, failed: 0, files: [] };
+}
+
+/**
+ * Same as applyPatch for items built in memory (structured AI output, blind-solve decisions). `ledgerFile` lets a
+ * re-run recognise items it already applied; without it every item is checked against its `base` only.
+ */
+export function applyPatchItems(items: Record<string, unknown>[], opts: ApplyOptions & { label?: string; runId?: string; ledgerFile?: string } = {}): PatchResult {
+  const result: PatchResult = { ...emptyResult(opts.label ?? '(patch)', opts), runId: opts.runId };
   const today = opts.today ?? stampParts().date;
   const bank = loadBank();
   const tax = bank.taxonomy;
-  const ledgerFile = ledgerPath(abs);
-  const ledger = readLedger(ledgerFile);
+  const ledgerFile = opts.ledgerFile;
+  const ledger = ledgerFile ? readLedger(ledgerFile) : {};
   const ledgerBefore = JSON.stringify(ledger);
   let migrations: MigrationRecord[] = [];
   try {
@@ -420,12 +452,15 @@ export function applyPatch(file: string, opts: ApplyOptions = {}): PatchResult {
   // group items by pack, keeping patch order
   const byFile = new Map<string, { item: Record<string, unknown>; res: PatchItemResult }[]>();
   const seen = new Set<string>();
-  parsed.items.forEach((item, i) => {
+  items.forEach((item, i) => {
     const id = str(item.id)?.trim() ?? '';
     const res: PatchItemResult = { id: id || `#${i + 1}`, status: 'failed', changes: [], errors: [], warnings: [] };
     result.items.push(res);
     if ('__invalid' in item) res.errors.push('item phải là một map (id, base, …)');
-    else if (!id) res.errors.push('item thiếu `id`');
+    else if (item.id !== undefined && typeof item.id !== 'string') res.errors.push(`id phải là chuỗi trong ngoặc kép (YAML đọc ${String(item.id)} thành số): id: "…"`);
+    else if (item.base !== undefined && typeof item.base !== 'string') {
+      res.errors.push(`base phải là chuỗi trong ngoặc kép — YAML đọc hash không có dấu ngoặc (vd 46794516e3) thành số ${String(item.base)}: viết base: "<hash>"`);
+    } else if (!id) res.errors.push('item thiếu `id`');
     else if (seen.has(id)) res.errors.push('id lặp lại trong patch — gộp các thay đổi vào một item');
     else if (!bank.byId.has(id)) res.errors.push('id không tồn tại trong ngân hàng (hoặc câu đang lỗi định dạng)');
     if (res.errors.length) return;
@@ -455,8 +490,15 @@ export function applyPatch(file: string, opts: ApplyOptions = {}): PatchResult {
         continue;
       }
       let effective = item;
-      // re-running the same patch after fixing other items: the ledger knows the hash this item produced
-      if (base !== cur.hash && ledger[res.id] !== cur.hash) {
+      if (base !== cur.hash && ledger[res.id] === cur.hash) {
+        // re-running the same patch (after fixing other items, file-mode post-check, repair round): this item produced the
+        // current version and nothing changed since → done. Never apply it again: its letters may follow an older answer
+        // layout that the first run re-keyed, and re-applying them to the new layout would swap option texts.
+        res.status = 'unchanged';
+        res.hash = cur.hash;
+        continue;
+      }
+      if (base !== cur.hash) {
         const remap = migrationRemap(cur, [base, ledger[res.id]].filter(Boolean), migrations);
         if (!remap) {
           res.status = 'skipped';
@@ -511,11 +553,15 @@ export function applyPatch(file: string, opts: ApplyOptions = {}): PatchResult {
       if (explanationChanged && q2 && LETTER_REF_RE.test(q2.explanation.replace(/\*\*Answer:?\*\*.*$/m, ''))) {
         newErrors.push('explanation nhắc tới chữ cái đáp án (vd "option B", "answer a", "(C)", "= D", dòng bắt đầu "A:"/"A.") — app xáo thứ tự đáp án: gọi lựa chọn bằng nội dung');
       }
+      // item-writing flaws (lint.ts) this item introduces: high severity → rejected, others → warnings
+      const lint = q2 ? lintDelta(cur, q2, tax, opts.lint) : { errors: [], warnings: [] };
+      const lettersReported = newErrors.some((e) => e.startsWith('explanation nhắc tới chữ cái'));
+      newErrors.push(...lint.errors.filter((e) => !(lettersReported && e.includes('[letter-ref'))));
       if (newErrors.length) {
         res.errors.push(...newErrors);
         continue; // reverted: `text` stays as before this item
       }
-      res.warnings.push(...newWarnings.filter((m) => !/option letters/i.test(m)));
+      res.warnings.push(...newWarnings.filter((m) => !/option letters/i.test(m)), ...lint.warnings);
       text = candidate;
       dirty = true;
       res.status = 'applied';
@@ -538,7 +584,7 @@ export function applyPatch(file: string, opts: ApplyOptions = {}): PatchResult {
     if (r.status === 'failed' && !r.errors.length) r.errors.push('lỗi không xác định');
     result[r.status]++;
   }
-  if (!opts.dryRun && JSON.stringify(ledger) !== ledgerBefore) {
+  if (!opts.dryRun && ledgerFile && JSON.stringify(ledger) !== ledgerBefore) {
     try {
       fs.writeFileSync(ledgerFile, JSON.stringify(ledger, null, 1) + '\n');
     } catch {
@@ -549,8 +595,26 @@ export function applyPatch(file: string, opts: ApplyOptions = {}): PatchResult {
 }
 
 /** `<patch>.applied.json`: qid → content hash produced by this patch (lets a re-run recognise its own edits). */
-function ledgerPath(patchAbs: string): string {
+export function ledgerPath(patchAbs: string): string {
   return patchAbs.replace(/\.ya?ml$/i, '') + '.applied.json';
+}
+
+/** A follow-up apply (repair round) laid over the first result: per question id the later result wins. */
+export function combineResults(first: PatchResult, later: PatchResult): PatchResult {
+  const byId = new Map(first.items.map((it) => [it.id, it]));
+  for (const it of later.items) byId.set(it.id, it);
+  const items = [...byId.values()];
+  const count = (s: PatchItemResult['status']) => items.filter((i) => i.status === s).length;
+  return {
+    ...first,
+    items,
+    applied: count('applied'),
+    unchanged: count('unchanged'),
+    skipped: count('skipped'),
+    failed: count('failed'),
+    files: [...new Set([...first.files, ...later.files])],
+    error: later.error ?? first.error,
+  };
 }
 
 function readLedger(file: string): Record<string, string> {

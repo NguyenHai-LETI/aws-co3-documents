@@ -19,6 +19,7 @@ const PAGES = [
   ['/history', 'history'],
   ['/bank', 'bank'],
   ['/coach', 'coach'],
+  ['/tools', 'tools'],
 ];
 
 const results = []; // { name, ok, detail }

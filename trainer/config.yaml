@@ -7,6 +7,7 @@ coach:
     generate: "sonnet"      # sinh câu hỏi từ tài liệu
     enrich: "sonnet"        # bảo trì ngân hàng: giải thích, gợi ý, phân loại, cân độ dài, câu dài
     ask: "sonnet"           # "Hỏi AI về câu này"
+    verify: "opus"          # model thứ hai "giải mù" câu mới / câu vừa sửa (nên khác model sinh câu)
   effort: ""                # trống = mặc định; low | medium | high | xhigh | max
   max_budget_usd: 0         # chỉ áp dụng khi Claude Code dùng API key; 0 = không giới hạn
   skip_if_no_new_results: true   # lượt chạy theo lịch bỏ qua phân tích nếu không có bài làm/issue mới
@@ -17,6 +18,11 @@ coach:
   hosts: []                 # tên máy được phép chạy coach theo lịch (vd ["ntqs-Mac-mini"]); [] = mọi máy
   claude_bin: ""            # đường dẫn Claude Code CLI nếu app không tự tìm thấy
   use_api_key: false        # false = luôn dùng đăng nhập claude.ai (bỏ ANTHROPIC_API_KEY khỏi môi trường của coach)
+  structured_output: true   # sinh câu / ENRICH / câu dài trả JSON (--json-schema), app tự kiểm tra rồi ghi file — AI không cần quyền ghi
+  verify:
+    auto: true              # sau lượt AI: model thứ hai giải mù câu mới / câu vừa sửa (không xem đáp án)
+    auto_draft: true        # giải mù không khớp / mơ hồ → câu do AI viết chuyển sang draft, chờ bạn duyệt (Ngân hàng → Chất lượng)
+    batch_size: 10          # số câu mỗi lần gọi model kiểm tra
 
 srs:
   algorithm: fsrs           # fsrs (khuyến nghị) | leitner
@@ -25,6 +31,9 @@ srs:
   mastered_stability_days: 21   # FSRS: độ bền trí nhớ ≥ N ngày = "đã thuộc"
   intervals_days: [1, 3, 7, 14, 30]   # chỉ dùng khi algorithm = leitner
   mastered_box: 4                     # chỉ dùng khi algorithm = leitner
+  weights: []               # FSRS-6: bộ tham số tự đặt; [] = dùng tham số cá nhân (nếu đã tối ưu) hoặc mặc định
+  optimize: auto            # auto | manual | off — tối ưu tham số FSRS theo lịch sử làm bài của bạn
+  optimize_min_reviews: 400 # cần tối thiểu N lượt ôn trước khi tối ưu
 
 practice:
   default_count: 20
@@ -34,6 +43,22 @@ practice:
 stats:
   rushed_median_seconds: 5      # bài có thời gian trung vị/câu dưới ngưỡng = "làm vội", không tính vào thống kê
   recency_half_life_days: 14    # mức sẵn sàng: kết quả cũ hơn N ngày có trọng số giảm một nửa
+
+quality:
+  embeddings: auto          # auto | ollama | off — tìm câu trùng theo nghĩa bằng model embedding chạy trên máy (Ollama)
+  ollama_url: "http://127.0.0.1:11434"
+  embedding_model: embeddinggemma   # ollama pull embeddinggemma (hoặc nomic-embed-text)
+  semantic_threshold: 0.88  # độ tương đồng cosine ≥ ngưỡng = nghi trùng
+
+server:
+  lan: false                # true = mở cho điện thoại trong cùng mạng Wi-Fi (cần mã truy cập, xem trang 🧰 Công cụ)
+
+export:
+  anki_deck: "AWS SAA-C03"  # tên deck khi xuất sang Anki
+  ankiconnect_url: "http://127.0.0.1:8765"
+
+cache:
+  sqlite: true              # chỉ mục SQLite dựng lại được (trainer/.cache/, không đưa lên git): khởi động nhanh + tìm kiếm toàn văn
 
 sync:
   data_paths: [trainer/results, trainer/coach, trainer/bank]   # thư mục được "⇅ Đồng bộ" commit + push

@@ -39,7 +39,7 @@ export function rel(abs: string, base: string = DATA_DIR): string {
 export interface AppConfig {
   coach: {
     model: string; // default model for every task ('' = Claude Code default)
-    models: { analyze: string; generate: string; enrich: string; ask: string }; // per-task override ('' = use `model`)
+    models: { analyze: string; generate: string; enrich: string; ask: string; verify: string }; // per-task override ('' = use `model`)
     effort: string;
     max_budget_usd: number;
     skip_if_no_new_results: boolean;
@@ -50,6 +50,12 @@ export interface AppConfig {
     enrich_on_idle: boolean; // scheduled run without new data → run one ENRICH batch instead
     enrich_batch_size: number;
     max_runs_per_day: number; // safety cap for scheduled runs
+    structured_output: boolean; // generate / enrich / longform return JSON (--json-schema) and the app writes the files
+    verify: {
+      auto: boolean; // blind-solve new and just-edited questions after AI runs
+      auto_draft: boolean; // mismatch / ambiguous verdict on an AI-written question → status: draft until reviewed
+      batch_size: number; // questions per verifier call
+    };
   };
   srs: {
     algorithm: 'fsrs' | 'leitner';
@@ -58,9 +64,28 @@ export interface AppConfig {
     mastered_stability_days: number; // FSRS stability ≥ this = mastered
     intervals_days: number[]; // Leitner only
     mastered_box: number; // Leitner only
+    weights: number[]; // FSRS-6 parameters set by hand ([] = personal parameters if optimized, else defaults)
+    optimize: 'auto' | 'manual' | 'off'; // fit personal FSRS parameters from the review history
+    optimize_min_reviews: number; // reviews needed before optimizing
   };
   practice: { default_count: number; quick_count: number; shuffle_options: boolean };
   stats: { rushed_median_seconds: number; recency_half_life_days: number };
+  quality: {
+    embeddings: 'auto' | 'ollama' | 'off'; // semantic duplicates with a local embedding model (auto = Ollama when it runs)
+    ollama_url: string;
+    embedding_model: string;
+    semantic_threshold: number; // cosine similarity ≥ this = likely duplicate
+  };
+  server: {
+    lan: boolean; // also listen on the local network (phone access with an access token)
+  };
+  export: {
+    anki_deck: string;
+    ankiconnect_url: string;
+  };
+  cache: {
+    sqlite: boolean; // rebuildable SQLite index (parse cache + full-text search) in trainer/.cache/ (git-ignored)
+  };
   sync: {
     data_paths: string[];
     before_ai: boolean; // AI coach runs sync first, so the AI sees results / bank changes from the other machine
@@ -71,7 +96,7 @@ export interface AppConfig {
 const DEFAULT_CONFIG: AppConfig = {
   coach: {
     model: '',
-    models: { analyze: '', generate: '', enrich: '', ask: '' },
+    models: { analyze: '', generate: '', enrich: '', ask: '', verify: '' },
     effort: '',
     max_budget_usd: 0,
     skip_if_no_new_results: true,
@@ -82,10 +107,26 @@ const DEFAULT_CONFIG: AppConfig = {
     enrich_on_idle: true,
     enrich_batch_size: 20,
     max_runs_per_day: 6,
+    structured_output: true,
+    verify: { auto: true, auto_draft: true, batch_size: 10 },
   },
-  srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4 },
+  srs: {
+    algorithm: 'fsrs',
+    desired_retention: 0.9,
+    daily_limit: 50,
+    mastered_stability_days: 21,
+    intervals_days: [1, 3, 7, 14, 30],
+    mastered_box: 4,
+    weights: [],
+    optimize: 'auto',
+    optimize_min_reviews: 400,
+  },
   practice: { default_count: 20, quick_count: 10, shuffle_options: true },
   stats: { rushed_median_seconds: 5, recency_half_life_days: 14 },
+  quality: { embeddings: 'auto', ollama_url: 'http://127.0.0.1:11434', embedding_model: 'embeddinggemma', semantic_threshold: 0.88 },
+  server: { lan: false },
+  export: { anki_deck: 'AWS SAA-C03', ankiconnect_url: 'http://127.0.0.1:8765' },
+  cache: { sqlite: true },
   sync: { data_paths: ['trainer/results', 'trainer/coach', 'trainer/bank'], before_ai: true, after_ai: true },
 };
 
@@ -98,11 +139,16 @@ export function loadConfig(): AppConfig {
   }
   const coach = { ...DEFAULT_CONFIG.coach, ...(raw.coach ?? {}) };
   coach.models = { ...DEFAULT_CONFIG.coach.models, ...((raw.coach as Partial<AppConfig['coach']> | undefined)?.models ?? {}) };
+  coach.verify = { ...DEFAULT_CONFIG.coach.verify, ...((raw.coach as Partial<AppConfig['coach']> | undefined)?.verify ?? {}) };
   return {
     coach,
     srs: { ...DEFAULT_CONFIG.srs, ...(raw.srs ?? {}) },
     practice: { ...DEFAULT_CONFIG.practice, ...(raw.practice ?? {}) },
     stats: { ...DEFAULT_CONFIG.stats, ...(raw.stats ?? {}) },
+    quality: { ...DEFAULT_CONFIG.quality, ...(raw.quality ?? {}) },
+    server: { ...DEFAULT_CONFIG.server, ...(raw.server ?? {}) },
+    export: { ...DEFAULT_CONFIG.export, ...(raw.export ?? {}) },
+    cache: { ...DEFAULT_CONFIG.cache, ...(raw.cache ?? {}) },
     sync: { ...DEFAULT_CONFIG.sync, ...(raw.sync ?? {}) },
   };
 }

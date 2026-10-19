@@ -224,6 +224,8 @@ export interface AnswerRecord {
   hinted?: boolean;
   why?: string;
   scored?: boolean; // false = pilot (unscored) question in a pearson exam
+  h?: string; // Question.hash when graded (item versioning — tells which version of the question was answered)
+  regraded?: boolean; // computed on load, never stored: `ok` re-evaluated because the answer key changed since
 }
 
 export interface Attempt {
@@ -338,6 +340,13 @@ export interface StatsResponse {
   trend: { id: string; finished: string; score: number; total: number; mode: TestMode; title: string }[];
   daily: { date: string; answers: number; correct: number; seconds: number }[];
   mostMissed: { id: string; wrong: number; attempts: number; topic: string; stem: string }[];
+  regraded?: number; // answers re-graded because the answer key changed after they were given
+  fsrs?: FsrsInfo; // scheduler version + parameters in use
+  workload?: WorkloadDay[]; // reviews falling due per day (next 30 days, or until the exam)
+  goal?: ExamGoal;
+  forecast?: ExamForecast; // expected score on the exam date
+  external?: ExternalScore[]; // scores logged from official / third-party practice exams
+  externalCalibration?: ExternalCalibration;
 }
 
 // ── AI coach ────────────────────────────────────────────────────────────────
@@ -364,7 +373,7 @@ export interface Plan {
   body: string; // Markdown without front matter
 }
 
-export type CoachTask = 'analyze' | 'generate' | 'enrich' | 'longform';
+export type CoachTask = 'analyze' | 'generate' | 'enrich' | 'longform' | 'verify';
 
 export interface CoachRunInfo {
   id: string;
@@ -410,6 +419,7 @@ export interface DuplicatePair {
   a: string;
   b: string;
   score: number; // 0..1 similarity
+  kind?: 'lexical' | 'semantic'; // how the pair was found (default lexical)
 }
 
 export interface BankQuality {
@@ -429,6 +439,10 @@ export interface BankQuality {
   ratings: Record<string, { up: number; down: number }>;
   lowRated: string[]; // ids with down ≥ 2 and down > up
   variantEffect: { originals: number; fixedAfterVariant: number; examples: string[] };
+  lint?: LintSummary; // deterministic item-writing-flaw checks
+  distractors?: DistractorReport; // option pick / strike-out analytics from the learner's answers
+  semantic?: SemanticStatus; // local embedding provider used for semantic duplicates
+  verification?: VerifySummary; // blind-solve verdicts (second model answers without the key)
 }
 
 export interface EnrichStatus {
@@ -476,3 +490,317 @@ export interface ClaudeStatus {
   hint?: string;
   auth?: { loggedIn: boolean; method?: string; plan?: string };
 }
+
+// ═══ v3 contracts — each block is owned by one workstream; add types only inside your own block ═══
+
+// ── [P] performance, cache & search ─────────────────────────────────────────
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+/** A score point of the history chart. */
+export interface AttemptPoint {
+  id: string;
+  finished: string;
+  title: string;
+  score: number;
+  correct: number;
+  total: number;
+}
+
+/**
+ * GET /api/results?limit=&offset=[&mode=<TestMode|pearson>&q=<title words>&rushed=0] — one page of the (filtered)
+ * history, newest first, plus what the History page shows about the whole filtered set.
+ */
+export interface ResultsPage extends Page<AttemptSummary> {
+  modes: TestMode[]; // modes present in the whole history (filter menu)
+  pearson: number; // Pearson simulations in the whole history
+  rushed: number; // rushed attempts matching mode/q (shown even when hidden with rushed=0)
+  counted: number; // non-rushed attempts in the filtered set
+  avgScore: number; // mean score of the counted attempts
+  timeUsed: number; // seconds over the filtered set
+  trend: AttemptPoint[]; // last 40 counted attempts of the filtered set, oldest first
+}
+
+export type PlanSummary = Omit<Plan, 'body'>;
+
+/** GET /api/plans (newest first) — with ?limit=&offset= only that slice, plus total/offset/limit. */
+export interface PlansResponse {
+  plans: PlanSummary[];
+  newSince: { attempts: number; answers: number };
+  total?: number;
+  offset?: number;
+  limit?: number;
+}
+
+/** Data versions pushed by the SSE `data` event and returned in /api/meta and /api/state (`versions`). */
+export interface DataVersions {
+  bank: string;
+  results: string;
+  plans: string;
+  params?: string; // results/fsrs-params.json (personal FSRS parameters)
+  config?: string; // config.yaml
+  day?: string; // local date (due counts, retrievability)
+}
+
+export interface SearchHit {
+  kind: 'question' | 'note';
+  id: string; // question id, or note path relative to the repo
+  title: string;
+  snippet: string; // plain text with «…» around matches
+  score: number;
+  anchor?: string; // note heading slug
+  sub?: string; // secondary line: topic · pack (question) or note title (note section)
+  status?: QuestionStatus; // question status (draft / retired are shown dimmed)
+}
+
+export interface SearchResponse {
+  q: string;
+  hits: SearchHit[];
+  engine: 'fts5' | 'fallback';
+  tookMs: number;
+  total?: { questions: number; notes: number }; // matches before the limit (per kind)
+}
+// ── [P] end ──
+
+// ── [L] learning engine, forecast & calibration ─────────────────────────────
+
+export interface FsrsInfo {
+  version: 'fsrs-6' | 'leitner';
+  params: 'default' | 'personal' | 'config'; // config = srs.weights in config.yaml
+  weights: number[];
+  desiredRetention: number;
+  optimizedAt?: string;
+  reviews?: number; // reviews used by the last optimization
+  minReviews: number; // srs.optimize_min_reviews
+  metrics?: { logLoss?: number; rmse?: number; defaultLogLoss?: number; defaultRmse?: number };
+  optimizer: 'available' | 'unavailable'; // optional native optimizer package installed?
+  mode?: 'auto' | 'manual' | 'off'; // srs.optimize
+  historyReviews?: number; // reviews in the optimizer's training set now (rushed attempts and never-viewed blanks left out; the scheduler still counts blanks)
+  trainingItems?: number; // optimizer items they make (reviews ≥ 1 day after the previous answer)
+  adopted?: boolean; // the last optimization predicts the history better than the defaults → used
+  running?: boolean; // an optimization is running in the background
+  lastError?: string;
+  lastOutcome?: 'adopted' | 'kept-default' | 'not-enough-data' | 'error'; // last run in this server process
+  blocked?: string; // why the optimizer cannot run now (Vietnamese), undefined = it can
+  note?: string;
+  binding?: string; // optimizer package version
+}
+
+export interface WorkloadDay {
+  date: string; // YYYY-MM-DD
+  due: number;
+  overdue?: number; // first day only: reviews already overdue (included in `due`)
+}
+
+export interface ExamGoal {
+  examDate?: string; // YYYY-MM-DD
+  targetScaled?: number; // default taxonomy exam.pass_scaled
+}
+
+export interface ExamForecast {
+  examDate: string;
+  daysLeft: number;
+  ifStopNow: number; // expected % on exam day with no further study
+  onSchedule: number; // expected % if due reviews are done on time
+  byDomain: { domain: string; ifStopNow: number; onSchedule: number; coverage?: number; firstTry?: number; weight?: number }[];
+  coverage: number; // % of the active bank seen at least once
+  note?: string;
+  seen?: number; // active questions answered at least once
+  active?: number; // active questions in the bank
+  firstTry?: number; // % first-attempt accuracy (Laplace prior) — the estimate used for unseen questions
+  reviewsUntilExam?: number; // reviews falling due between today and the exam (on-schedule plan)
+}
+
+export interface ExternalScore {
+  id: string;
+  date: string; // YYYY-MM-DD
+  source: string; // e.g. "AWS Official Practice Exam"
+  score: number; // percent 0..100
+  scaled?: number; // 100..1000 when known
+  readinessAtDate?: number; // app readiness on that date (computed)
+  note?: string;
+  file: string;
+}
+
+export interface ExternalCalibration {
+  samples: number;
+  offset: number; // mean(external score − readiness on that date), percent points
+  adjustedReadiness: number;
+  readiness?: number; // current app readiness the offset is applied to
+}
+
+/** GET /api/progress (and the body of the progress POST routes). */
+export interface ProgressResponse {
+  today: string; // YYYY-MM-DD, server local date
+  fsrs: FsrsInfo;
+  workload: WorkloadDay[];
+  goal: ExamGoal;
+  forecast?: ExamForecast; // needs goal.examDate
+  external: ExternalScore[]; // newest first
+  externalCalibration?: ExternalCalibration;
+  regraded?: number; // answers re-graded against a changed answer key (non-rushed attempts)
+}
+// ── [L] end ──
+
+// ── [Q] question quality: lint, distractors, semantic duplicates ────────────
+
+export type LintSeverity = 'high' | 'medium' | 'low';
+
+export interface LintFlaw {
+  code: string; // stable id: 'stem-echo' | 'longest-correct' | 'absolute-terms' | 'negative-stem' | 'all-none-above' | 'duplicate-options' | …
+  severity: LintSeverity;
+  message: string; // Vietnamese, one line
+  option?: string; // option key the flaw is about
+}
+
+export interface LintSummary {
+  checked: number;
+  flagged: number; // questions with ≥ 1 flaw
+  byCode: Record<string, { severity: LintSeverity; label: string; count: number }>; // every rule, count = questions
+  questions: { id: string; flaws: LintFlaw[] }[]; // worst first, capped
+  bySeverity?: Record<LintSeverity, number>; // questions by their worst flaw
+  ids?: Record<string, string[]>; // rule code → every flagged question id (uncapped)
+}
+
+export interface DistractorReport {
+  minExposures: number;
+  weakDistractors: { id: string; key: string; exposures: number; elims: number }[]; // never picked, often struck out
+  suspectedKeys: { id: string; key: string; pick: string; times: number; confident: number; note: string }[];
+  analysed?: number; // questions answered ≥ minExposures times (current version, non-rushed attempts)
+  answers?: number; // answers counted
+}
+
+export interface SemanticStatus {
+  provider: 'ollama' | 'lexical' | 'off';
+  model?: string;
+  available: boolean;
+  embedded?: number; // questions with a cached embedding
+  hint?: string; // how to enable semantic duplicates on this machine
+  state?: 'idle' | 'running' | 'done' | 'error'; // background job
+  total?: number; // active questions to embed
+  pairs?: number; // semantic pairs found (cosine ≥ threshold)
+  threshold?: number;
+  version?: string; // bank version the semantic pairs belong to
+  checkedAt?: string; // ISO time of the last run / probe
+  error?: string; // last failure, Vietnamese
+}
+// ── [Q] end ──
+
+// ── [D] AI pipeline: structured output & blind-solve verification ───────────
+
+export type VerifyOutcome = 'ok' | 'mismatch' | 'ambiguous' | 'error';
+
+export interface VerifyVerdict {
+  line?: number; // line in bank/verify.md
+  date: string; // YYYY-MM-DD
+  qid: string;
+  hash: string; // Question.hash the verdict applies to (stale once the question changes)
+  outcome: VerifyOutcome;
+  model?: string;
+  picked?: string; // verifier's keys, e.g. "B" or "BD"
+  key?: string; // answer key at verification time
+  confidence?: 'high' | 'medium' | 'low';
+  reason?: string;
+  decision?: 'approved' | 'retired' | 'drafted';
+  runId?: string;
+  at?: string; // ISO time (orders lines that a union merge interleaved)
+}
+
+export interface VerifySummary {
+  verified: number; // questions whose latest verdict matches their current hash
+  ok: number;
+  review: number; // mismatch / ambiguous waiting for a decision
+  stale: number; // verdict exists but the question changed afterwards
+  pending: VerifyVerdict[]; // review queue, newest first
+}
+
+/** Extra fields of an AI run record (`/api/coach` runs, coach/runs/<id>.json) beyond CoachRunInfo. */
+export interface CoachRunOutcome {
+  structured?: boolean; // generate / enrich / longform answered in JSON (coach.structured_output)
+  repaired?: number; // items / questions fixed by the repair round (--resume)
+  rejected?: { id: string; errors: string[] }[]; // still failing after the repair round → not written
+  // enrich: final apply of coach/patches/<runId>.yaml
+  patch?: string | null;
+  updated?: number;
+  skipped?: number;
+  failed?: number;
+  missing?: string[];
+  // generate / longform: the new pack
+  pack?: string | null;
+  questions?: number;
+  longForm?: number;
+  errors?: number;
+  // blind-solve (verify runs, or the auto phase after a run that added / changed questions)
+  verify?: { checked: number; ok: number; mismatch: number; ambiguous: number; error: number; drafted: string[]; reactivated?: string[]; remaining?: number };
+}
+// ── [D] end ──
+
+// ── [X] LAN access & Anki export ────────────────────────────────────────────
+
+export type LanSource = 'runtime' | 'cli' | 'env' | 'config' | 'off';
+
+export interface LanInfo {
+  enabled: boolean;
+  urls: string[]; // http://<ip>:<port>
+  tokenUrl?: string; // first-visit URL carrying the access token (only shown on this machine)
+  qrSvg?: string;
+  hint?: string;
+  local?: boolean; // the request comes from this machine (only then: token, QR, controls)
+  source?: LanSource; // what decided the current state: Tools page toggle, --lan, LAN=1, config server.lan
+  configured?: boolean; // config.yaml server.lan
+  token?: string; // access code grouped for typing (this machine only)
+  error?: string; // LAN listener failure (port in use, …)
+  ui?: 'dist' | 'dev'; // what LAN devices get: production build (fast on phones) or the Vite dev server
+  devices?: { ip: string; at: string; ua?: string }[]; // devices that used the access code recently (this machine only)
+  failures?: number; // wrong access codes since the server started (this machine only)
+}
+
+export interface AnkiExportRequest {
+  scope: 'filter' | 'ids' | 'wrong' | 'due' | 'flagged' | 'all';
+  filters?: SelectionFilters;
+  ids?: string[];
+  deck?: string;
+  includeExplanation?: boolean;
+  everWrong?: boolean; // scope 'wrong': also questions answered wrong before (default: last answer wrong)
+  model?: string; // Anki note type (default "Basic"; first two fields = front / back)
+}
+
+/** `POST /api/export/anki?preview=1` — how many notes a request exports, plus one rendered card. */
+export interface AnkiPreview {
+  count: number;
+  missing: string[]; // scope 'ids': ids not in the bank (or retired)
+  deck: string;
+  sample?: { id: string; front: string; back: string; tags: string[] };
+}
+
+/** `GET /api/export/anki/status` — export defaults and whether AnkiConnect answers. */
+export interface AnkiStatus {
+  url: string; // AnkiConnect endpoint (config export.ankiconnect_url)
+  deck: string; // default deck (config export.anki_deck)
+  available: boolean;
+  version?: number; // AnkiConnect API version
+  decks?: string[];
+  models?: string[];
+  error?: string;
+  hint?: string;
+}
+
+/** `POST /api/export/anki?push=1` — AnkiConnect push outcome (HTTP 200 with ok:false when Anki is unreachable). */
+export interface AnkiPushResult {
+  ok: boolean;
+  deck: string;
+  model?: string;
+  total: number;
+  added: number;
+  updated: number; // notes this app pushed before (matched by the SAA-C03::id::<qid> tag), fields refreshed
+  duplicates: number; // same front already in the deck from elsewhere — skipped
+  failed: number;
+  errors: string[];
+  hint?: string;
+}
+// ── [X] end ──
