@@ -291,7 +291,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
       <section>
         <div className="grid auto">
           {MODES.map((m) => {
-            if (m === 'sealed' && !sealedForms.length) return null; // no forms (exam.sealed_forms: 0) → no card
+            if (m === 'sealed' && !sealedForms.length && !meta?.sealedError) return null; // no forms (exam.sealed_forms: 0) → no card
             const info = MODE_INFO[m];
             const c = countsByMode[m];
             const disabled = (['retry-wrong', 'srs', 'flagged', 'slow'].includes(m) && !c) || (m === 'sealed' && !openForms.length) || (m === 'diagnostic' && !diag.n);
@@ -333,6 +333,11 @@ export function NewTest({ query }: { query: URLSearchParams }) {
 
           {mode === 'sealed' && (
             <>
+              {meta.sealedError && (
+                <div className="alert bad ins-wrap" role="alert">
+                  ⛔ {meta.sealedError}
+                </div>
+              )}
               <div className="alert info">
                 🔒 <b>Đề niêm phong</b>: {sealedMeta?.count ?? meta.exam.questions - PILOT} câu tính điểm <b>chưa từng xuất hiện</b> khi luyện (cả tìm kiếm, Ngân hàng và Anki
                 đều không hiện) + {pilots} câu thử nghiệm không tính điểm — mô phỏng Pearson VUE: không tạm dừng, màn hình xem lại cuối bài, đồng hồ theo tải đọc đề thật. Điểm
@@ -364,7 +369,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
                   </div>
                 </div>
               )}
-              {!openForms.length && (
+              {!openForms.length && !meta.sealedError && (
                 <div className="alert warn">
                   {sealedForms.length ? (
                     <>

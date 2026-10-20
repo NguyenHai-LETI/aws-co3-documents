@@ -40,7 +40,8 @@ function StatusBadges({ f }: { f: SealedFormProgress }) {
 }
 
 export function SealedPanel({ progress }: { progress: ProgressResponse }) {
-  const { refresh } = useData();
+  const { refresh, meta } = useData();
+  const broken = meta?.sealedError; // [γ] results/sealed.md unreadable: questions stay hidden, nothing can be created / opened
   const forms = useSealedForms(progress);
   const [busy, setBusy] = useState<string>();
   const next = nextSealedForm(forms);
@@ -89,18 +90,23 @@ export function SealedPanel({ progress }: { progress: ProgressResponse }) {
             Câu chưa từng gặp, giữ riêng để đo “điểm trên câu mới”
           </div>
         </div>
-        {!next && (
+        {!next && !broken && (
           <button className="btn sm" disabled={busy === 'create'} onClick={() => void create()}>
             🔒 Tạo đề niêm phong
           </button>
         )}
       </div>
+      {broken && (
+        <div className="alert bad small ins-wrap" role="alert">
+          ⛔ {broken}
+        </div>
+      )}
       <div className="small dim">
         Câu trong đề niêm phong không xuất hiện khi luyện tập, tìm kiếm, Anki hay trong Ngân hàng. Làm như thi thật (mô phỏng Pearson, thêm câu thử nghiệm) để có{' '}
         <b>điểm trên câu mới</b> — thước đo trung thực nhất vì đề thật toàn câu bạn chưa gặp. Làm xong (hoặc mở sớm) thì câu trở lại luyện tập.
       </div>
       {!forms.length ? (
-        <div className="small muted">Chưa có đề niêm phong nào. Bấm “Tạo đề niêm phong” để giữ lại các câu chưa gặp ngay từ bây giờ.</div>
+        broken ? null : <div className="small muted">Chưa có đề niêm phong nào. Bấm “Tạo đề niêm phong” để giữ lại các câu chưa gặp ngay từ bây giờ.</div>
       ) : (
         <div className="lrn-sealed-list" role="list">
           {forms.map((f) => (

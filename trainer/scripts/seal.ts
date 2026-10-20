@@ -6,10 +6,12 @@
 //   npm run seal -- --release S1                     open a form early: its questions return to practice, no sealed score
 //   npm run seal -- --reset [--forms N] [--size M]   forget every form, then create new ones (config exam.* or the flags;
 //                                                    --forms 0 = none). Attempt files keep their sealed_form.
+//   npm run seal -- --reset --force                  the same while results/sealed.md is broken (otherwise every write is
+//                                                    refused until the file is fixed by hand, and its ids stay hidden)
 import { loadConfig } from '../server/config.ts';
 import { loadBank } from '../server/lib/bank.ts';
 import { loadAttempts } from '../server/lib/results.ts';
-import { SealedError, createForms, releaseForm, resetSealed, sealedStatus, type CreateResult } from '../server/lib/sealed.ts';
+import { SealedError, createForms, releaseForm, resetSealed, sealedError, sealedStatus, type CreateResult } from '../server/lib/sealed.ts';
 import type { SealedFormSummary } from '../shared/types.ts';
 
 const argv = process.argv.slice(2);
@@ -39,6 +41,10 @@ const day = (iso?: string) => (iso ? iso.slice(0, 16).replace('T', ' ') : '');
 
 function printStatus() {
   const s = sealedStatus();
+  if (s.error) {
+    console.log(`⛔ ${s.error}`);
+    return;
+  }
   if (!s.forms.length) {
     console.log('🔒 Chưa có đề niêm phong. Tạo: npm run seal -- --forms 2 --size 50 (hoặc config.yaml → exam.sealed_forms, tạo khi mở app).');
     return;
@@ -70,7 +76,7 @@ try {
     const f = releaseForm(release);
     console.log(`✓ Đã mở sớm ${f.id}: ${f.ids.length} câu trở lại các chế độ luyện (không có điểm niêm phong).`);
   } else if (flag('reset')) {
-    resetSealed();
+    resetSealed({ force: flag('force') });
     console.log('✓ Đã xoá mọi đề niêm phong (file kết quả cũ vẫn giữ nguyên).');
     const cfg = loadConfig();
     const want = forms ?? cfg.exam.sealed_forms;
@@ -79,10 +85,11 @@ try {
     if (forms === 0) usage('--forms 0 chỉ dùng cùng --reset');
     const cfg = loadConfig();
     printCreated(createForms(loadBank(), loadAttempts(cfg), cfg, { forms, size }));
-  } else if (argv.some((a) => a.startsWith('--') && a !== '--status')) {
+  } else if (argv.some((a) => a.startsWith('--') && a !== '--status' && a !== '--force')) {
     usage(`không hiểu tham số: ${argv.join(' ')}`);
   }
   printStatus();
+  if (sealedError()) process.exitCode = 1;
 } catch (e) {
   if (e instanceof SealedError) {
     console.error(`✗ ${e.message}`);

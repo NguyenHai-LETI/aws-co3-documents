@@ -5,7 +5,7 @@
 // npm run test:e2e (Started with pipes, like CI: no terminal — the "terminal closed" SIGHUP path is checked by hand.)
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -323,4 +323,124 @@ test('auto sync (sync.auto: idle): startup pull BEFORE the sealed forms are prep
   assert.notEqual(remoteHead(), afterSecond, 'pushed at shutdown');
   assert.match(git(sb.remote!, 'show', '--name-only', '--format=%s', 'main'), new RegExp(second.attempt.file.replace(/^results\//, 'trainer/results/').replace(/[.]/g, '\\.')));
   assert.equal(git(sb.repo!, 'status', '--porcelain', '--', 'trainer/results'), '', 'nothing left behind');
+});
+
+// ── v4 review fixes ──────────────────────────────────────────────────────────
+
+/** The real server started by hand (startServer waits for /api/meta, but the startup pull runs before listening). */
+function spawnServer(home: string, repo: string, port: number, env: Record<string, string> = {}) {
+  if (port === 3003) throw new Error('port 3003 belongs to the real app');
+  const e: NodeJS.ProcessEnv = { ...process.env, TRAINER_HOME: home, TRAINER_REPO: repo, PORT: String(port), ...env };
+  for (const k of ['OPEN', 'NODE_TEST_CONTEXT', 'NODE_OPTIONS', 'ANTHROPIC_API_KEY', 'TRAINER_LAUNCHER']) if (!(k in env)) delete e[k];
+  const proc = spawn(process.execPath, ['server/index.ts'], { cwd: TRAINER_ROOT, env: e, stdio: ['ignore', 'pipe', 'pipe'] });
+  let logs = '';
+  proc.stdout!.on('data', (b: Buffer) => (logs += b.toString()));
+  proc.stderr!.on('data', (b: Buffer) => (logs += b.toString()));
+  const done = new Promise<number | null>((r) => proc.once('exit', (c) => r(c)));
+  return { proc, logs: () => logs, done };
+}
+
+test('a signal during the startup pull waits for git: no half-rebased repo, the pull finishes, the data is pushed, exit 0', T, async () => {
+  const { sb, other } = gitSandbox((t) => t.replace(/^(\s+auto:\s*)off\b/m, '$1idle'));
+  pushFrom(other, { 'trainer/results/2026/10/2026-10-20_090000_quick.md': '---\nid: from-b\n---\n' }, 'trainer: sync từ B');
+  fs.mkdirSync(path.join(sb.home, 'results', '2026', '10'), { recursive: true });
+  fs.writeFileSync(path.join(sb.home, 'results', '2026', '10', '2026-10-20_091000_quick.md'), '---\nid: from-a\n---\n');
+  const slow = path.join(sb.root, 'slow-upload-pack');
+  fs.writeFileSync(slow, '#!/bin/sh\nsleep 3\nexec git-upload-pack "$@"\n', { mode: 0o755 });
+  git(sb.repo!, 'config', 'remote.origin.uploadpack', slow);
+  const s = spawnServer(sb.home, sb.repo!, await freePort());
+  try {
+    await waitFor(() => (/^trainer: sync từ/.test(git(sb.repo!, 'log', '-1', '--format=%s')) ? true : undefined), 20_000, 'the startup sync committed (the pull is next)');
+    await new Promise((r) => setTimeout(r, 500)); // inside the slow fetch
+    s.proc.kill('SIGINT'); // Ctrl+C before the app even listens
+    assert.equal(await s.done, 0, s.logs());
+  } finally {
+    s.proc.kill('SIGKILL');
+  }
+  assert.equal(fs.existsSync(path.join(sb.repo!, '.git', 'rebase-merge')), false, 'no rebase left behind');
+  assert.ok(fs.existsSync(path.join(sb.home, 'results', '2026', '10', '2026-10-20_090000_quick.md')), 'the pull finished');
+  assert.match(git(sb.remote!, 'log', '-1', '--format=%s', 'main'), /^trainer: sync từ/, 'and the local result was pushed');
+  assert.equal(git(sb.repo!, 'rev-parse', 'HEAD'), git(sb.remote!, 'rev-parse', 'main'));
+  assert.match(s.logs(), /Đợi lượt đồng bộ đang chạy xong/);
+  assert.doesNotMatch(s.logs(), /AWS SAA-C03 Trainer →/, 'the server never started listening');
+});
+
+test('code pulled by ANOTHER process (npm run sync, a scheduled coach run) raises the update banner too', T, async () => {
+  const { sb, other } = gitSandbox();
+  const srv = await startServer({ home: sb.home, repo: sb.repo });
+  servers.push(srv);
+  const api = apiClient(srv.base);
+  const sse = listenAll(srv.base);
+  try {
+    await waitFor(() => sse.of('hello')[0], 8000, 'hello');
+    assert.equal((await api.get('/api/update')).body.update, undefined);
+    pushFrom(other, { 'trainer/server/new-feature.ts': 'export const f = 1;\n', 'trainer/web/NewPage.tsx': 'export const p = 1;\n' }, 'code from the other machine');
+    const cli = spawnSync(process.execPath, ['scripts/sync.ts'], { cwd: TRAINER_ROOT, env: { ...process.env, TRAINER_HOME: sb.home, TRAINER_REPO: sb.repo }, encoding: 'utf8' });
+    assert.equal(cli.status, 0, cli.stdout + cli.stderr);
+    const st = (await api.get('/api/update')).body;
+    assert.deepEqual([...st.update.files].sort(), ['trainer/server/new-feature.ts', 'trainer/web/NewPage.tsx']);
+    // open pages hear it without polling (the server looks every few seconds while an SSE client is connected)
+    await waitFor(() => sse.of('update')[0], 10_000, 'SSE update');
+  } finally {
+    sse.close();
+  }
+});
+
+test('restart: refused while files with conflict markers are left (no restart into broken code)', T, async () => {
+  const { sb } = gitSandbox();
+  const repo = sb.repo!;
+  const srv = await startServer({ home: sb.home, repo, env: { TRAINER_LAUNCHER: '1' } });
+  servers.push(srv);
+  const api = apiClient(srv.base);
+  // a merge left half-done: one file with conflict markers
+  git(repo, 'checkout', '-q', '-b', 'side');
+  fs.writeFileSync(path.join(sb.home, 'config.yaml'), fs.readFileSync(path.join(sb.home, 'config.yaml'), 'utf8') + '\n# side\n');
+  git(repo, 'commit', '-q', '-am', 'side');
+  git(repo, 'checkout', '-q', 'main');
+  fs.writeFileSync(path.join(sb.home, 'config.yaml'), fs.readFileSync(path.join(sb.home, 'config.yaml'), 'utf8') + '\n# main\n');
+  git(repo, 'commit', '-q', '-am', 'main');
+  assert.throws(() => git(repo, 'merge', '-q', 'side'));
+  const refused = await api.post('/api/restart', {});
+  assert.equal(refused.status, 409);
+  assert.match(refused.body.error, /xung đột/);
+  assert.match(refused.body.error, /config\.yaml/);
+  git(repo, 'merge', '--abort');
+  const ok = await api.post('/api/restart', {});
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(await exited(srv), 75);
+});
+
+test('start.sh: only quick restart loops are capped — a run longer than the window starts the count again', T, async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-launcher-')));
+  sandboxes.push({ root, home: root, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) });
+  fs.copyFileSync(path.join(TRAINER_ROOT, 'start.sh'), path.join(root, 'start.sh'));
+  fs.mkdirSync(path.join(root, 'server'));
+  fs.mkdirSync(path.join(root, 'node_modules'));
+  fs.writeFileSync(path.join(root, 'package-lock.json'), '{}\n');
+  fs.writeFileSync(path.join(root, 'node_modules', '.trainer-lock.json'), '{}\n');
+  // fake server: "restart me" (75) for the first `LIMIT` runs, then a normal exit
+  fs.writeFileSync(
+    path.join(root, 'server', 'index.ts'),
+    "import fs from 'node:fs';\nfs.appendFileSync('runs.log', 'run\\n');\nconst n = fs.readFileSync('runs.log', 'utf8').split('\\n').filter(Boolean).length;\nprocess.exit(n <= Number(process.env.LIMIT) ? 75 : 0);\n",
+  );
+  const port = await freePort();
+  const launch = (env: Record<string, string>) =>
+    new Promise<{ code: number | null; out: string }>((resolve) => {
+      fs.rmSync(path.join(root, 'runs.log'), { force: true });
+      const p = spawn('bash', [path.join(root, 'start.sh')], { cwd: root, env: { ...process.env, PORT: String(port), TRAINER_PAUSE: '', TRAINER_NPM: 'false', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      p.stdout.on('data', (b) => (out += b));
+      p.stderr.on('data', (b) => (out += b));
+      p.on('exit', (code) => resolve({ code, out }));
+    });
+  const runs = () => fs.readFileSync(path.join(root, 'runs.log'), 'utf8').split('\n').filter(Boolean).length;
+  // quick restarts over and over (a broken update): stopped after 20 restarts
+  const looping = await launch({ LIMIT: '1000' });
+  assert.equal(looping.code, 1, looping.out);
+  assert.match(looping.out, /quá nhiều lần liên tiếp/);
+  assert.equal(runs(), 21);
+  // a long session sees many updates: every run longer than the window resets the count (window 0 s here)
+  const long = await launch({ LIMIT: '25', TRAINER_RESTART_WINDOW: '0' });
+  assert.equal(long.code, 0, long.out);
+  assert.equal(runs(), 26, '25 restarts, then a normal exit');
 });

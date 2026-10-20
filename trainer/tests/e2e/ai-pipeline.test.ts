@@ -386,3 +386,92 @@ test('coach-run.ts --verify: a mistyped --pack or --scope fails clearly (exit 2)
   assert.equal(s.code, 2, s.out);
   assert.match(s.out, /--scope không hợp lệ: everything/);
 });
+
+// ── [γ] B9: ENRICH the questions the learner is about to meet, right after an analyze ─────────────────────────
+
+/** The follow-up run (params.after = analyze run id) as soon as its record exists. */
+async function followUpOf(id: string): Promise<Run> {
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    const f = (await api.get<{ runs: Run[] }>('/api/coach')).body.runs.find((x) => x.params?.after === id);
+    if (f) return f;
+    if (Date.now() > deadline) throw new Error(`no follow-up run after ${id}`);
+    await new Promise((res) => setTimeout(res, 150));
+  }
+}
+
+test('[γ] coach.enrich_after_analyze: a successful analyze starts a 10-question ENRICH run over the questions the learner meets next (app and coach-run.ts)', async () => {
+  const before = fs.readFileSync(cfgFile, 'utf8');
+  assert.match(before, /enrich_after_analyze: false/);
+  fs.writeFileSync(cfgFile, before.replace('enrich_after_analyze: false', 'enrich_after_analyze: true'));
+  try {
+    const { run, log } = await runAi('analyze', {});
+    assert.equal(run.status, 'success', log);
+    const follow = await followUpOf(run.id);
+    assert.equal(follow.task, 'enrich');
+    assert.equal(follow.trigger, run.trigger);
+    assert.equal(follow.params?.upcoming, true);
+    assert.equal(follow.params?.size, 10);
+    assert.equal(follow.params?.upcomingItems, 10, 'every question of the batch is one the learner meets next');
+    const done = await waitRun(follow.id);
+    assert.equal(done.run.status, 'success', done.log);
+    assert.ok((done.run.outcome?.updated ?? 0) >= 9, JSON.stringify(done.run.outcome));
+    const batch = fs.readFileSync(path.join(home, String(follow.params?.batch).replace(/^trainer\//, '')), 'utf8');
+    assert.equal((batch.match(/⏭ người học sắp gặp câu này/g) ?? []).length, 10);
+
+    // terminal / scheduler path: coach-run.ts waits for the follow-up run and keeps the analyze run's exit code
+    const r = await coachRun(['--force']);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /▶ ENRICH câu sắp gặp sau phân tích \(coach\.enrich_after_analyze\): \S+_enrich/);
+    assert.match(r.out, /Bảo trì ngân hàng \(ENRICH\) · 10 câu/);
+  } finally {
+    fs.writeFileSync(cfgFile, before);
+  }
+  // switched off (the default): an analyze run is not followed by anything
+  const { run } = await runAi('analyze', {});
+  await new Promise((res) => setTimeout(res, 500));
+  assert.ok(!(await api.get<{ runs: Run[] }>('/api/coach')).body.runs.some((x) => x.params?.after === run.id));
+});
+
+// ── [γ] review R2 #4: AI features never surface a sealed question ───────────────────────────────────────────
+
+test('[R2 #4] "Hỏi AI" runs with read-deny rules for trainer/** and practice-exams/**; a blind-solve of a sealed question logs no pick, key or reason', async () => {
+  const start = calls().length;
+  const r = await api.post<{ answer: string; error?: string }>('/api/ask', { qid: V2.id, question: 'Vì sao đáp án này đúng?' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const askCall = calls().slice(start).find((c) => flag(c, '--output-format') === 'json');
+  assert.ok(askCall, 'the fake CLI saw the "Hỏi AI" call');
+  const i = askCall.argv.indexOf('--disallowedTools');
+  assert.deepEqual(askCall.argv.slice(i + 1, i + 3), ['Read(./trainer/**)', 'Read(./practice-exams/**)']);
+  assert.match(flag(askCall, '-p') ?? '', /KHÔNG đọc, tìm hay trích các câu hỏi khác của ngân hàng/);
+
+  // V1 sealed (hand-written form): the explicit verify run still solves it, the log keeps its details out
+  const file = path.join(home, 'results', 'sealed.md');
+  fs.writeFileSync(file, `---\nkind: sealed\nsize: 1\nforms:\n  - id: S1\n    status: sealed\n    ids: [ ${V1.id} ]\n---\n`);
+  try {
+    const run = await api.post<{ run: Run; error?: string }>('/api/verify/run', { ids: [V1.id] });
+    assert.equal(run.status, 200, JSON.stringify(run.body));
+    const { log } = await waitRun(run.body.run.id);
+    assert.match(log, /⚠️ 1 câu đang niêm phong: mơ hồ \(chi tiết ẩn/);
+    assert.doesNotMatch(log, /Hai phương án cùng đúng/, 'the reason stays out of Coach → Xem log');
+    assert.ok(!log.includes(`${V1.id}: mơ hồ`));
+    // a pack run never picks it
+    const pack = await api.post<{ run: Run; error?: string }>('/api/verify/run', { pack: bankPackOf(V1.id) });
+    if (pack.status === 200) {
+      const done = await waitRun(pack.body.run.id);
+      assert.ok(!(done.run.params?.ids as string[] | undefined)?.includes(V1.id), 'a pack run skips the sealed question');
+    } else assert.equal(pack.status, 409, JSON.stringify(pack.body)); // nothing left to verify in that pack
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+/** Pack id of a question (sandbox bank). */
+function bankPackOf(id: string): string {
+  const dir = path.join(home, 'bank', 'packs', 'imported');
+  for (const f of fs.readdirSync(dir)) {
+    const text = fs.readFileSync(path.join(dir, f), 'utf8');
+    if (text.includes(`## Q ${id}\n`)) return /^pack:\s*(\S+)/m.exec(text)?.[1] ?? f;
+  }
+  throw new Error(`no pack for ${id}`);
+}

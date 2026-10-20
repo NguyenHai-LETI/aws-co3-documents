@@ -19,6 +19,7 @@ interface SyncRecord {
   message: string;
   hint?: string;
   source: SyncSource;
+  blocked?: string; // waits for the learner (code commits, uncommitted edits, a conflict…)
 }
 
 /** GET /api/sync/status (contract fields + optional extras the server may add). */
@@ -40,6 +41,9 @@ export interface SyncStatus {
   lastOkAt?: string; // last successful sync of the server process
   unpushedSince?: string; // oldest data change not on the remote yet
   stale?: boolean; // unpushedSince older than 24 h
+  unpushedCode?: string[]; // local commits outside the data folders: automatic syncs keep the push back
+  dirtyCode?: string[]; // uncommitted edits outside the data folders: automatic syncs do not pull
+  unmerged?: string[]; // files with conflict markers: every sync stops
   auto?: {
     mode: 'idle' | 'off';
     delayMinutes: number;
@@ -67,6 +71,8 @@ const hhmm = (iso: string) => {
 
 /** Age without "trước": "26 giờ", "2 ngày". */
 const age = (iso: string) => fmtRelative(iso).replace(/ trước$/, '');
+
+const fileList = (files: string[], max = 3) => files.slice(0, max).join(', ') + (files.length > max ? `, … (+${files.length - max})` : '');
 
 type RunResult = SyncResult & { hint?: string; conflicts?: string[]; dryRun?: boolean; migrated?: number };
 
@@ -157,7 +163,9 @@ export function SyncButton() {
   const files = st?.dirtyFiles ?? (Array.isArray(st?.dirtyData) ? st.dirtyData : []);
   const host = st?.host || meta?.host || '';
   const coachHosts = meta?.coachHosts ?? [];
-  const problem = !disabled && (st?.error || (stErr && !unsupported));
+  // something the learner should look at: git errors, conflicts, code commits held back, a failed / blocked auto sync
+  const problem =
+    !disabled && (st?.error || (stErr && !unsupported) || !!st?.unmerged?.length || !!st?.unpushedCode?.length || (st?.auto?.last && !st.auto.last.ok));
   const resultHints = result && !result.ok ? (result.hint ? [result.hint] : syncHints([result.message, ...result.steps.filter((s) => !s.ok).map((s) => s.output)].join('\n'))) : [];
   const lastAt = lastSyncAt(st);
   const stale = !disabled && !!st?.stale && !!st.unpushedSince;
@@ -197,7 +205,9 @@ export function SyncButton() {
             </div>
             <div className="tiny muted ins-wrap">
               {lastAt ? `Đồng bộ lần cuối: ${fmtDateTime(lastAt)} (${fmtRelative(lastAt)})` : 'Chưa có lần đồng bộ nào trên nhánh này.'}
-              {st.lastRun && !st.lastRun.ok ? ` · lần thử gần nhất (${SOURCE_LABEL[st.lastRun.source]}, ${fmtRelative(st.lastRun.at)}) lỗi: ${st.lastRun.message}` : ''}
+              {st.lastRun && !st.lastRun.ok && (st.lastRun.source === 'manual' || st.lastRun.source === 'ai') // automatic ones: see the line below
+                ? ` · lần thử gần nhất (${SOURCE_LABEL[st.lastRun.source]}, ${fmtRelative(st.lastRun.at)}) lỗi: ${st.lastRun.message}`
+                : ''}
               {st.fetchedAt ? ` · đã kiểm tra remote ${fmtRelative(st.fetchedAt)}` : ''}
               {st.remoteUrl ? ` · ${st.remoteUrl}` : ''}
             </div>
@@ -205,6 +215,24 @@ export function SyncButton() {
               <div className="ins-wrap alert warn small" role="status">
                 ⏳ Có dữ liệu học chưa đẩy lên GitHub từ <b>{fmtDateTime(st.unpushedSince)}</b> ({fmtRelative(st.unpushedSince)}) — máy kia chưa thấy các bài
                 này. Bấm <b>⇅ Đồng bộ ngay</b>.
+              </div>
+            )}
+            {!!st.unmerged?.length && (
+              <div className="ins-wrap alert bad small" role="alert">
+                ⛔ Repo còn file đang xung đột: <code>{fileList(st.unmerged)}</code> — mọi lần đồng bộ (và nút khởi động lại) dừng cho tới khi sửa xong.
+                <HintList hints={st.lastRun?.hint ? [st.lastRun.hint] : ['Mở Terminal tại thư mục repo: `git checkout HEAD -- <file>` để lấy bản đã commit, hoặc sửa tay rồi `git add <file>`.']} />
+              </div>
+            )}
+            {!!st.unpushedCode?.length && (
+              <div className="ins-wrap alert warn small" role="status">
+                ⚠️ Có commit code chưa đẩy lên GitHub (<code>{fileList(st.unpushedCode)}</code>) — đồng bộ tự động chỉ đẩy dữ liệu học nên đang giữ lại cả các bài mới.
+                Đẩy code bằng tay (<code>git push</code>, qua kiểm tra pre-push) hoặc bấm <b>⇅ Đồng bộ ngay</b> để đẩy tất cả.
+              </div>
+            )}
+            {!!st.dirtyCode?.length && auto?.mode === 'idle' && !st.unmerged?.length && (
+              <div className="tiny muted ins-wrap">
+                Có sửa đổi chưa commit ngoài thư mục dữ liệu (<code>{fileList(st.dirtyCode)}</code>) — đồng bộ tự động không cất tạm code của bạn nên chưa kéo dữ liệu
+                máy kia về; <b>⇅ Đồng bộ ngay</b> sẽ cất tạm rồi áp lại.
               </div>
             )}
           </>
@@ -216,6 +244,7 @@ export function SyncButton() {
                 ⇅ <b>Tự đồng bộ khi rảnh: bật</b> — {auto.delayMinutes} phút sau mỗi bài nộp (nếu chưa bắt đầu bài mới), kéo về khi mở app, đẩy lên khi tắt app.
                 {auto.running ? ' Đang tự đồng bộ…' : auto.dueAt ? ` Lần tới: ${hhmm(auto.dueAt)}${auto.reason === 'retry' ? ' (thử lại sau lỗi)' : ''}.` : ''}
                 {auto.last ? ` Lần tự đồng bộ gần nhất (${SOURCE_LABEL[auto.last.source]}, ${fmtRelative(auto.last.at)}): ${auto.last.ok ? '✓' : '✗'} ${auto.last.message}` : ''}
+                {auto.last && !auto.last.ok && auto.last.hint && !st?.unpushedCode?.length && !st?.dirtyCode?.length && !st?.unmerged?.length ? ` 💡 ${auto.last.hint}` : ''}
                 {auto.failures > 1 ? ` · lỗi ${auto.failures} lần liền` : ''} Tắt: <code>sync.auto: off</code> trong <code>trainer/config.yaml</code>.
               </>
             ) : (
@@ -322,9 +351,13 @@ export function SyncButton() {
             ? 'Server chưa hỗ trợ đồng bộ'
             : st?.error
               ? st.error
-              : stale && st?.unpushedSince
-                ? `Có dữ liệu chưa đẩy lên GitHub từ ${fmtDateTime(st.unpushedSince)} (${fmtRelative(st.unpushedSince)}) — máy kia chưa thấy các bài này. Bấm để đồng bộ.`
-                : `Đồng bộ dữ liệu học qua git (học trên 2 máy)${lastAt ? ` · lần cuối ${fmtDateTime(lastAt)} (${fmtRelative(lastAt)})` : ''}`
+              : st?.unmerged?.length
+                ? `Repo còn file đang xung đột: ${fileList(st.unmerged)} — bấm để xem cách sửa.`
+                : st?.auto?.last && !st.auto.last.ok
+                  ? `Tự đồng bộ: ${st.auto.last.message}`
+                  : stale && st?.unpushedSince
+                    ? `Có dữ liệu chưa đẩy lên GitHub từ ${fmtDateTime(st.unpushedSince)} (${fmtRelative(st.unpushedSince)}) — máy kia chưa thấy các bài này. Bấm để đồng bộ.`
+                    : `Đồng bộ dữ liệu học qua git (học trên 2 máy)${lastAt ? ` · lần cuối ${fmtDateTime(lastAt)} (${fmtRelative(lastAt)})` : ''}`
         }
       >
         <span>⇅ Đồng bộ</span>

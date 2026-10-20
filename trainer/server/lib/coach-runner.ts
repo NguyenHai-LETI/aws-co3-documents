@@ -44,6 +44,7 @@ import {
   type PackTarget,
   type StructuredTask,
 } from './ai-output.ts';
+import { sealedIds } from './sealed.ts';
 import { MAX_VERIFY, VERIFY_SCHEMA, appendVerdicts, autoDraft, draftCandidates, latestVerdicts, reactivate, verdictsFor, verifyBatches, verifyPrompt, verifyTargets } from './verify.ts';
 import type { QuestionDraft } from './pack-format.ts';
 import type { ClaudeStatus, CoachEvent, CoachRunInfo, CoachRunOutcome, CoachTask, CostSummary, Question, VerifyVerdict } from '../../shared/types.ts';
@@ -73,6 +74,20 @@ export type RunOutcome = CoachRunOutcome;
 
 /** Nothing left to do for this task (empty ENRICH batch, no long-form target, nothing to verify) — not an error. */
 export class NothingToDoError extends Error {}
+
+/**
+ * A blind-solve verdict as a run-log line (Coach → Xem log). [γ] A sealed question shows no id, pick, key or reason —
+ * the learner reads this log, and the line would give the answer away.
+ */
+export function verdictLogLine(v: Pick<VerifyVerdict, 'qid' | 'outcome' | 'picked' | 'key' | 'reason'>, sealed: ReadonlySet<string>): string {
+  const icon = v.outcome === 'mismatch' ? '❌' : v.outcome === 'ambiguous' ? '⚠️' : v.outcome === 'ok' ? '✅' : '💥';
+  if (sealed.has(v.qid)) {
+    const label = v.outcome === 'mismatch' ? 'lệch đáp án' : v.outcome === 'ambiguous' ? 'mơ hồ' : v.outcome === 'ok' ? 'khớp' : 'không trả lời được';
+    return `${icon} 1 câu đang niêm phong: ${label} (chi tiết ẩn tới khi bạn làm đề hoặc mở sớm)`;
+  }
+  const what = v.outcome === 'mismatch' ? `model chọn ${v.picked}, đáp án ${v.key}` : v.outcome === 'ambiguous' ? `mơ hồ (model chọn ${v.picked ?? '—'})` : v.outcome === 'ok' ? 'khớp' : 'không trả lời được';
+  return `${icon} ${v.qid}: ${what}${v.reason ? ` — ${v.reason.slice(0, 200)}` : ''}`;
+}
 
 // ── locating the CLI ────────────────────────────────────────────────────────
 
@@ -1403,6 +1418,7 @@ export class CoachRunner extends EventEmitter {
       return;
     }
     const model = modelFor('verify', cfg);
+    const sealed = sealedIds(); // the log (Coach → Xem log) never shows a sealed question's pick, key or reason
     const batches = verifyBatches(qs, cfg.coach.verify.batch_size);
     const deadline = Date.now() + VERIFY_TIMEOUT_MS;
     emit('start', `🧪 Giải mù ${qs.length} câu · model ${model}${/sonnet/i.test(model) ? '' : ' (dự phòng sonnet)'} · ${batches.length} lượt gọi — model chỉ thấy đề + lựa chọn`);
@@ -1430,8 +1446,7 @@ export class CoachRunner extends EventEmitter {
         sum.checked++;
         sum[v.outcome]++;
         if (v.outcome === 'ok') continue;
-        const what = v.outcome === 'mismatch' ? `model chọn ${v.picked}, đáp án ${v.key}` : v.outcome === 'ambiguous' ? `mơ hồ (model chọn ${v.picked ?? '—'})` : 'không trả lời được';
-        emit(v.outcome === 'error' ? 'stderr' : 'result', `${v.outcome === 'mismatch' ? '❌' : v.outcome === 'ambiguous' ? '⚠️' : '💥'} ${v.qid}: ${what}${v.reason ? ` — ${v.reason.slice(0, 200)}` : ''}`);
+        emit(v.outcome === 'error' ? 'stderr' : 'result', verdictLogLine(v, sealed));
       }
     }
     // drafted by an earlier blind-solve and solved correctly now (fixed by ENRICH, or re-verified) → back to active

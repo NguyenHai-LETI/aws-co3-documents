@@ -75,10 +75,15 @@ ensure_deps || pause_on_error
 echo "→ Đang khởi động… (Ctrl+C hoặc đóng cửa sổ này để dừng)"
 OPEN_NOW=1
 RESTARTS=0
+# Only a server that asks for a restart right after starting, over and over, is stopped: a run longer than this many
+# seconds starts the count again (a long study session may see any number of updates). Tests shorten it.
+WINDOW="${TRAINER_RESTART_WINDOW:-60}"
 while :; do
+  STARTED=$(date +%s)
   OPEN=$OPEN_NOW PORT="$PORT" TRAINER_LAUNCHER=1 node server/index.ts "$@"
   code=$?
   [ "$code" -eq "$RESTART_CODE" ] || break
+  if [ $(($(date +%s) - STARTED)) -ge "$WINDOW" ]; then RESTARTS=0; fi
   RESTARTS=$((RESTARTS + 1))
   if [ "$RESTARTS" -gt 20 ]; then
     echo "✗ Server xin khởi động lại quá nhiều lần liên tiếp — dừng. Chạy lại ./start.sh để thử tiếp."

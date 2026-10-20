@@ -458,6 +458,74 @@ test('enrich: batch file lists base hashes, todo and a patch skeleton; long-form
   assert.match(fs.readFileSync(lf, 'utf8'), /id câu `ai-20261016-1200-lf01`/);
 });
 
+test('[γ] enrich: the "upcoming" tier (plan sessions not done → reviews due by tomorrow → next never-seen in newOrder) goes first; sealed and out-of-scope questions are never long-form originals', () => {
+  resetPack();
+  const bank = loadBank();
+  const cfg = loadConfig();
+  const day = 86_400_000;
+  const now = Date.now();
+  const states = new Map([
+    ['t-02', { ...state('t-02', 2, 2), dueAt: new Date(now + day / 2).toISOString() }], // seen, due by tomorrow
+    ['t-01', { ...state('t-01', 1, 1), dueAt: new Date(now + 10 * day).toISOString() }], // seen, not due
+  ]);
+  const plans = [
+    {
+      id: 'p1',
+      file: 'coach/plans/p1.md',
+      created: new Date(now).toISOString(),
+      newPacks: [],
+      body: '',
+      sessions: [
+        { id: 's1', title: 'done', questions: ['t-01'], done: [{ attemptId: 'a1', score: 80, finished: new Date(now).toISOString() }] },
+        { id: 's2', title: 'next', questions: ['t-04', 't-05', 'nope'] }, // t-05 retired, nope unknown
+      ],
+    },
+  ];
+  const up = enrich.upcomingIds({ bank, states, attempts: [], plans, cfg, now, sealed: new Set() });
+  assert.deepEqual(up, ['t-04', 't-02', 't-03'], 'plan session · due tomorrow · never seen (t-04 only once)');
+  assert.deepEqual(enrich.upcomingIds({ bank, states, attempts: [], plans, cfg, now, sealed: new Set(['t-04', 't-02']) }), ['t-03'], 'sealed questions are never upcoming');
+  assert.deepEqual(enrich.upcomingIds({ bank, states, attempts: [], plans: [], cfg, now, sealed: new Set(), newCount: 0 }), ['t-02']);
+
+  const items = enrich.selectBatch(bank, states, { size: 10, upcoming: up });
+  assert.deepEqual(
+    items.map((i) => [i.q.id, i.tier]),
+    [
+      ['t-04', 'upcoming'],
+      ['t-02', 'upcoming'],
+      ['t-03', 'upcoming'],
+      ['t-01', 'seen'],
+    ],
+    'upcoming first, soonest first',
+  );
+  assert.deepEqual(enrich.selectBatch(bank, states, { size: 2, upcoming: up, onlyUpcoming: true }).map((i) => i.q.id), ['t-04', 't-02']);
+  assert.deepEqual(enrich.selectBatch(bank, states, { upcoming: [], onlyUpcoming: true }), [], 'nothing upcoming → empty batch (the follow-up run is skipped)');
+  const file = enrich.writeBatchFile('2026-10-20_120000_enrich', items.slice(0, 2), bank, {});
+  assert.match(fs.readFileSync(file, 'utf8'), /## 1\. `t-04` — todo: [^\n]* · ⏭ người học sắp gặp câu này/);
+
+  // long-form originals: never a sealed question (a variant would leak it) nor an out-of-scope one
+  assert.deepEqual(enrich.longformTargets(bank, new Map(), 5, new Set()).map((t) => t.q.id).sort(), ['t-01', 't-02']);
+  assert.deepEqual(enrich.longformTargets(bank, new Map(), 5, new Set(['t-02'])).map((t) => t.q.id), ['t-01']);
+  const t01 = bank.byId.get('t-01')!;
+  t01.outOfScope = true;
+  try {
+    assert.deepEqual(enrich.longformTargets(bank, new Map(), 5, new Set()).map((t) => t.q.id), ['t-02']);
+  } finally {
+    delete t01.outOfScope;
+  }
+  assert.equal(enrich.enrichStatus(bank, [], new Set()).longFormCandidates, 2);
+  assert.equal(enrich.enrichStatus(bank, [], new Set(['t-01'])).longFormCandidates, 1);
+});
+
+test('[γ] scheduledRunsToday: a follow-up run (params.after, coach.enrich_after_analyze) rides on its analyze run', () => {
+  const now = new Date();
+  const runs = [
+    { id: 'a', task: 'analyze', trigger: 'schedule', status: 'success', startedAt: now.toISOString() },
+    { id: 'b', task: 'enrich', trigger: 'schedule', status: 'success', startedAt: now.toISOString(), params: { size: 10, upcoming: true, after: 'a' } },
+  ] as CoachRunInfo[];
+  assert.equal(runner.scheduledRunsToday(runs, now), 1);
+  assert.equal(runner.AFTER_ANALYZE_BATCH, 10);
+});
+
 // ── coach runner policy, costs, CLI discovery ───────────────────────────────
 
 test('coach runner: refused on a TRAINER_HOME copy, per-task models and least-privilege tools', async () => {
@@ -592,6 +660,35 @@ test('ask: prompt names options by content, Q&A log round-trips (even with "-->"
   assert.deepEqual(ask.askCostsSince(Date.parse('2026-10-16T00:00:00+07:00')), { count: 2, costUsd: 0.02 });
   fs.rmSync(path.join(home, 'coach', 'qa', 't-01.md'));
   assert.deepEqual(ask.qaSnapshotLines(bank), ['## 15. Câu người học hỏi AI (`trainer/coach/qa/`)', '', '_Chưa có._', '']);
+});
+
+test('[R2 #4] "Hỏi AI" cannot read the bank, sealed forms, ENRICH batches or the exam sources; blind-solve pack/scope runs skip sealed questions and the run log never shows their pick, key or reason', () => {
+  resetPack();
+  const bank = loadBank();
+  const q = bank.byId.get('t-01')!;
+  const prompt = ask.buildAskPrompt(q, 'Vì sao?', '', bank);
+  assert.match(prompt, /KHÔNG đọc, tìm hay trích các câu hỏi khác của ngân hàng \(`trainer\/`, `practice-exams\/`\)/);
+  for (const version of ['2.1.301', '1.0.0']) {
+    const args = ask.askArgs(prompt, loadConfig(), version);
+    const i = args.indexOf('--disallowedTools');
+    assert.ok(i > 0, `deny rules on CLI ${version}`);
+    assert.deepEqual(args.slice(i + 1, i + 3), ['Read(./trainer/**)', 'Read(./practice-exams/**)']);
+    assert.equal(args[i + 3], '--allowedTools', 'the variadic list ends before the next flag');
+  }
+  assert.deepEqual(ask.ASK_DENY, ['Read(./trainer/**)', 'Read(./practice-exams/**)']);
+
+  const sealed = new Set(['t-02']);
+  assert.ok(!verify.verifyTargets(bank, { pack: 't-pack' }, [], sealed).ids.includes('t-02'), 'pack run');
+  assert.ok(!verify.verifyTargets(bank, { scope: 'changed' }, [], sealed).ids.includes('t-02'), 'scope run');
+  assert.ok(verify.verifyTargets(bank, { pack: 't-pack' }, [], new Set()).ids.includes('t-02'), 'not sealed → verified as before');
+  assert.deepEqual(verify.verifyTargets(bank, { ids: ['t-02'] }, [], sealed).ids, ['t-02'], 'an explicit id is still allowed');
+
+  const v = { qid: 't-02', outcome: 'mismatch' as const, picked: 'C', key: 'B', reason: 'Lý do lộ đáp án' };
+  assert.equal(runner.verdictLogLine(v, new Set()), '❌ t-02: model chọn C, đáp án B — Lý do lộ đáp án');
+  const hidden = runner.verdictLogLine(v, sealed);
+  assert.equal(hidden, '❌ 1 câu đang niêm phong: lệch đáp án (chi tiết ẩn tới khi bạn làm đề hoặc mở sớm)');
+  assert.ok(!/t-02|C|Lý do/.test(hidden.replace('chi tiết', '')));
+  assert.equal(runner.verdictLogLine({ ...v, outcome: 'ambiguous' }, sealed), '⚠️ 1 câu đang niêm phong: mơ hồ (chi tiết ẩn tới khi bạn làm đề hoặc mở sớm)');
 });
 
 // ── scheduler text (pure functions) ─────────────────────────────────────────

@@ -11,6 +11,8 @@
 // - `recognized`: a repeat (exposure ≥ 2) answered correctly faster than reading the stem + options at
 //   stats.recognized_wpm — likely recognition of a known item rather than reasoning. FSRS caps its grade at "good" and
 //   readiness weighs it × RECOGNIZED_WEIGHT.
+// - `seenBefore` (never-viewed answers of non-rushed attempts): the question had a viewed answer earlier — the result
+//   page counts it as "đã gặp", otherwise as a first-time question answered wrong (never an exposure itself).
 import type { AppConfig } from '../config.ts';
 import type { BankState } from './bank.ts';
 import { isCorrect, normalizeKeys } from '../../shared/scoring.ts';
@@ -65,19 +67,20 @@ export function recognitionSeconds(q: Question, wpm: number): number {
 }
 
 /** Copy of `r` with exactly these computed flags (same object when nothing changes). */
-function withFlags(r: AnswerRecord, unviewed: boolean, exposure: number | undefined, recognized: boolean): AnswerRecord {
-  if (!!r.unviewed === unviewed && r.exposure === exposure && !!r.recognized === recognized) return r;
-  const { unviewed: _u, exposure: _e, recognized: _r, ...rest } = r;
+function withFlags(r: AnswerRecord, unviewed: boolean, exposure: number | undefined, recognized: boolean, seenBefore: boolean): AnswerRecord {
+  if (!!r.unviewed === unviewed && r.exposure === exposure && !!r.recognized === recognized && !!r.seenBefore === seenBefore) return r;
+  const { unviewed: _u, exposure: _e, recognized: _r, seenBefore: _s, ...rest } = r;
   const next: AnswerRecord = { ...rest };
   if (unviewed) next.unviewed = true;
   if (exposure !== undefined) next.exposure = exposure;
   if (recognized) next.recognized = true;
+  if (seenBefore) next.seenBefore = true;
   return next;
 }
 
 /**
  * Attempts as the learning engine sees them: re-graded against the current answer keys and annotated with
- * `unviewed` / `exposure` / `recognized` (see the header). Copies only — the input is never mutated. Unchanged answers
+ * `unviewed` / `exposure` / `recognized` / `seenBefore` (see the header). Copies only — the input is never mutated. Unchanged answers
  * and attempts keep their identity, so an already annotated history comes back as the same array (idempotent).
  * `cfg` supplies stats.recognized_wpm (default DEFAULT_RECOGNIZED_WPM).
  */
@@ -110,13 +113,16 @@ export function regradeAttempts(attempts: Attempt[], bank: BankState, cfg?: Pick
       const unviewed = isUnviewed(r);
       let exposure: number | undefined;
       let recognized = false;
+      let seenBefore = false;
       if (!unviewed && !a.rushed) {
         exposure = (seen.get(r.q) ?? 0) + 1;
         seen.set(r.q, exposure);
         const q = bank.byId.get(r.q);
         recognized = exposure >= 2 && r.ok && !!r.pick && r.t > 0 && !!q && r.t < recognitionSeconds(q, wpm);
+      } else if (unviewed && !a.rushed) {
+        seenBefore = (seen.get(r.q) ?? 0) > 0; // not an exposure: the count does not move
       }
-      const next = withFlags(r, unviewed, exposure, recognized);
+      const next = withFlags(r, unviewed, exposure, recognized, seenBefore);
       if (next === r) return;
       answers ??= [...a.answers];
       answers[j] = next;
@@ -143,6 +149,9 @@ export function countRegraded(attempts: Attempt[], opts: { includeRushed?: boole
 /**
  * Annotations for the result page from the annotated (regradeAttempts) version of an attempt. `stored` = the attempt as
  * graded at the time (default: the annotated one) — the `fresh` split uses its `ok` / `scored`, like the page's score.
+ * fresh: every scored answer is either "seen before" (a repeat, or a never-viewed question answered earlier) or first-time
+ * (never-viewed first-time questions count as wrong, as in the score). No split for a rushed attempt: its answers are
+ * not part of the exposure history.
  */
 export function resultAnnotations(annotated: Attempt | undefined, stored: Attempt | undefined = annotated): ResultAnnotations {
   const out: ResultAnnotations = { exposure: {}, recognized: [], unviewed: [] };
@@ -152,15 +161,17 @@ export function resultAnnotations(annotated: Attempt | undefined, stored: Attemp
     if (r.recognized) out.recognized.push(r.q);
     if (r.unviewed) out.unviewed.push(r.q);
   }
+  if (annotated.rushed || stored?.rushed) return out;
+  const learning = new Map(annotated.answers.map((r) => [r.q, r]));
   const scored = (stored ?? annotated).answers.filter((r) => r.scored !== false);
   const fresh = { total: scored.length, seenBefore: 0, answers: 0, correct: 0 };
   for (const r of scored) {
-    const e = out.exposure[r.q];
-    if (e === undefined) continue;
-    if (e >= 2) fresh.seenBefore++;
+    const l = learning.get(r.q);
+    if (!l) continue;
+    if (l.unviewed ? l.seenBefore : (l.exposure ?? 1) >= 2) fresh.seenBefore++;
     else {
       fresh.answers++;
-      if (r.ok) fresh.correct++;
+      if (r.ok && !l.unviewed) fresh.correct++;
     }
   }
   out.fresh = fresh;

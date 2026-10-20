@@ -202,3 +202,37 @@ test('outbox: a refused submit (4xx) is marked permanent — automatic flushes l
     globalThis.fetch = realFetch;
   }
 });
+
+test('outbox: storage full / disabled → the entry lives in this tab’s memory and is still sent (once)', T, async () => {
+  const realFetch = globalThis.fetch;
+  const store = new Map<string, string>();
+  Object.assign(globalThis, {
+    localStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        if (k === 'trainer.outbox.v1') throw new DOMException('quota', 'QuotaExceededError');
+        store.set(k, v);
+      },
+      removeItem: (k: string) => store.delete(k),
+    },
+  });
+  let posts = 0;
+  globalThis.fetch = ((url: string | URL | Request, init?: RequestInit) => {
+    if (url === '/api/results' && init?.method === 'POST') posts++; // the outbox's submits (not the test helpers' calls)
+    return realFetch(typeof url === 'string' && url.startsWith('/') ? srv.base + url : url, init);
+  }) as typeof fetch;
+  try {
+    const outbox = await import('../../web/lib/session.ts');
+    const { session, questions } = await buildTest(api, { mode: 'quick' });
+    const t = { ...outbox.startActive(session, questions), answers: Object.fromEntries(questions.map((q) => [q.id, q.answer])), spent: Object.fromEntries(questions.map((q) => [q.id, 25])) };
+    outbox.queueSubmit(outbox.buildSubmitRequest(t, false));
+    assert.equal(outbox.loadOutbox().filter((e) => e.req.session.sessionId === session.sessionId).length, 1, 'kept in memory');
+    const r = await outbox.sendQueued(session.sessionId);
+    assert.ok('attempt' in r, JSON.stringify(r));
+    assert.equal(posts, 1, 'POSTed once');
+    assert.equal(r.attempt.sessionId, session.sessionId);
+    assert.equal(outbox.loadOutbox().filter((e) => e.req.session.sessionId === session.sessionId).length, 0, 'removed after the server confirmed');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

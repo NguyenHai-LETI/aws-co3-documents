@@ -48,27 +48,65 @@ export class SealedError extends Error {
 
 interface Loaded {
   state: SealedState;
-  sealed: Set<string>; // ids of forms with status 'sealed'
+  sealed: Set<string>; // ids of forms with status 'sealed' — on a broken file: every id the file lists (fail closed)
   key: string; // short hash of the sealed ids ('' = none)
   exists: boolean;
-  error?: string; // the file exists but cannot be read — treated as "no forms", never overwritten automatically
+  error?: string; // the file exists but cannot be read: no form is usable, nothing is written until it is fixed
 }
 
 const EMPTY: SealedState = { forms: [], size: 0 };
 let memo: { sig: string; loaded: Loaded } | undefined;
+const ID_LIKE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
+/**
+ * Every question id the raw text lists after an `ids:` key — a flow list (`ids: [a, b]`, possibly over several lines) or a
+ * block list (`ids:` then `- a` lines). Used when the file cannot be read: those questions stay hidden (fail closed).
+ */
+export function idsInText(text: string): string[] {
+  const out = new Set<string>();
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\s*(?:-\s*)?ids:\s*(.*)$/.exec(lines[i]);
+    if (!m) continue;
+    const rest = m[1].trim();
+    if (rest.startsWith('[')) {
+      let body = rest.slice(1);
+      for (let j = i; !body.includes(']') && j + 1 < lines.length; ) body += ` ${lines[++j]}`;
+      for (const x of body.split(']')[0].split(',')) {
+        const id = x.trim().replace(/^['"]|['"]$/g, '');
+        if (ID_LIKE.test(id)) out.add(id);
+      }
+    } else if (!rest) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const b = /^\s*-\s+['"]?([A-Za-z0-9][\w-]*)['"]?\s*$/.exec(lines[j]);
+        if (!b) break;
+        out.add(b[1]);
+      }
+    }
+  }
+  return [...out];
+}
+
+const STATUSES: readonly SealedForm['status'][] = ['sealed', 'used', 'released'];
+
+/** Strict parse: any doubt (conflict markers, YAML error, missing / duplicate form id, unknown status) is an error. */
 function parseSealed(text: string): { state: SealedState; error?: string } {
+  if (/^(?:<{7}|={7}|>{7})(?:\s|$)/m.test(text)) return { state: EMPTY, error: 'còn dấu xung đột git (<<<<<<< / ======= / >>>>>>>)' };
   const fm = splitFrontMatter(text);
   if (!fm.hasFrontMatter || fm.error) return { state: EMPTY, error: fm.error ?? 'không có front matter' };
   const d = fm.data;
   if (d.kind !== 'sealed') return { state: EMPTY, error: 'front matter không có kind: sealed' };
+  if (!Array.isArray(d.forms)) return { state: EMPTY, error: 'thiếu danh sách forms' };
   const forms: SealedForm[] = [];
-  for (const raw of Array.isArray(d.forms) ? d.forms : []) {
-    if (!raw || typeof raw !== 'object') continue;
+  for (const [n, raw] of d.forms.entries()) {
+    if (!raw || typeof raw !== 'object') return { state: EMPTY, error: `mục thứ ${n + 1} của forms không hợp lệ` };
     const r = raw as Record<string, unknown>;
     const id = asString(r.id)?.trim();
-    if (!id || forms.some((f) => f.id === id)) continue;
-    const f: SealedForm = { id, ids: [...new Set(asStringList(r.ids))], status: r.status === 'used' || r.status === 'released' ? r.status : 'sealed' };
+    if (!id) return { state: EMPTY, error: `đề thứ ${n + 1} thiếu id` };
+    if (forms.some((f) => f.id === id)) return { state: EMPTY, error: `id đề trùng: ${id}` };
+    if (!STATUSES.includes(r.status as SealedForm['status'])) return { state: EMPTY, error: `status của ${id} không hợp lệ (“${String(r.status ?? '')}”)` };
+    if (!Array.isArray(r.ids)) return { state: EMPTY, error: `${id} thiếu danh sách ids` };
+    const f: SealedForm = { id, ids: [...new Set(asStringList(r.ids))], status: r.status as SealedForm['status'] };
     const usedAt = asString(r.used_at);
     const attempt = asString(r.attempt_id);
     const releasedAt = asString(r.released_at);
@@ -95,13 +133,33 @@ function current(): Loaded {
       readError = (e as Error).message;
     }
     const p = readError ? { state: EMPTY, error: readError } : parseSealed(text);
-    if (p.error) console.warn(`  ⚠️ ${rel(SEALED_FILE)} không đọc được (${p.error}) — tạm coi như không có đề niêm phong.`);
-    const sealed = new Set(p.state.forms.filter((f) => f.status === 'sealed').flatMap((f) => f.ids));
+    // fail closed: a file that cannot be trusted keeps every id it lists hidden (a conflict or hand edit never releases)
+    const sealed = new Set(p.error ? idsInText(text) : p.state.forms.filter((f) => f.status === 'sealed').flatMap((f) => f.ids));
+    if (p.error) console.warn(`  ⚠️ ${rel(SEALED_FILE)} đang lỗi (${p.error}) — ${sealed.size} câu trong file vẫn được giữ kín, app không ghi vào file cho tới khi sửa xong.`);
     const key = sealed.size ? crypto.createHash('sha1').update([...sealed].sort().join(',')).digest('hex').slice(0, 12) : '';
     loaded = { state: p.state, sealed, key, exists: true, error: p.error };
   }
   memo = { sig, loaded };
   return loaded;
+}
+
+/**
+ * What is wrong with results/sealed.md and how to fix it (Vietnamese, shown by /api/sealed, /api/meta, Thống kê and Tạo
+ * bài test) — undefined while the file is fine or absent.
+ */
+export function sealedError(): string | undefined {
+  const cur = current();
+  if (!cur.error) return undefined;
+  return (
+    `${rel(SEALED_FILE)} đang lỗi: ${cur.error}. ${cur.sealed.size} câu có trong file vẫn được giữ kín và app không ghi gì vào file cho tới khi sửa xong. ` +
+    'Cách sửa: mở file, bỏ các dòng xung đột <<<<<<< / ======= / >>>>>>> (giữ một phiên bản đầy đủ), mỗi đề một id riêng (S1, S2…), ' +
+    'status là sealed / used / released — hoặc chạy `npm run seal -- --reset --force` để bỏ mọi đề rồi tạo lại.'
+  );
+}
+
+/** Refuses a write while the file is broken (it would overwrite what the learner still has to fix). */
+function assertWritable(cur: Loaded): void {
+  if (cur.error) throw new SealedError(409, sealedError() ?? `${rel(SEALED_FILE)} đang lỗi`);
 }
 
 const STATUS_VI: Record<SealedForm['status'], string> = { sealed: '🔒 niêm phong', used: '✅ đã làm', released: '🔓 đã mở sớm' };
@@ -185,7 +243,8 @@ function summary(f: SealedForm): SealedFormSummary {
 /** GET /api/sealed: the forms without any question id. */
 export function sealedStatus(): SealedStatus {
   const cur = current();
-  return { forms: cur.state.forms.map(summary), size: cur.state.size, ...(cur.exists ? { file: rel(SEALED_FILE) } : {}), sealed: cur.sealed.size };
+  const error = sealedError();
+  return { forms: cur.state.forms.map(summary), size: cur.state.size, ...(cur.exists ? { file: rel(SEALED_FILE) } : {}), sealed: cur.sealed.size, ...(error ? { error } : {}) };
 }
 
 // ── transitions ─────────────────────────────────────────────────────────────
@@ -198,8 +257,12 @@ export function sealedStatus(): SealedStatus {
 export function markFormUsed(formId: string, attemptId: string, at: string): void {
   try {
     const cur = current();
+    if (cur.error) {
+      console.warn(`  ⚠️ Chưa đánh dấu được đề ${formId} đã làm (bài ${attemptId}): ${rel(SEALED_FILE)} đang lỗi (${cur.error}) — sửa file rồi đánh dấu lại.`);
+      return;
+    }
     const form = cur.state.forms.find((f) => f.id === formId);
-    if (cur.error || !form || form.status !== 'sealed') return;
+    if (!form || form.status !== 'sealed') return;
     saveSealed({ ...cur.state, forms: cur.state.forms.map((f) => (f.id === formId ? { ...f, status: 'used' as const, usedAt: at, attempt: attemptId } : f)) });
   } catch (e) {
     console.error('markFormUsed failed', e);
@@ -211,6 +274,7 @@ export function releaseForm(formId: string): SealedForm {
   const id = String(formId ?? '').trim();
   if (!id) throw new SealedError(400, 'Thiếu mã đề (form), ví dụ “S1”.');
   const cur = current();
+  assertWritable(cur);
   const form = cur.state.forms.find((f) => f.id === id);
   if (!form) throw new SealedError(404, `Không có đề niêm phong “${id}”.`);
   if (form.status !== 'sealed') throw new SealedError(409, `Đề ${id} không còn niêm phong (đã làm hoặc đã mở sớm).`);
@@ -219,8 +283,12 @@ export function releaseForm(formId: string): SealedForm {
   return released;
 }
 
-/** `npm run seal -- --reset`: forget every form (attempt files keep their `sealed_form`; new forms continue the numbering). */
-export function resetSealed(): void {
+/**
+ * `npm run seal -- --reset`: forget every form (attempt files keep their `sealed_form`; new forms continue the numbering).
+ * Refused while the file is broken unless `force` (`--reset --force`): fixing the file by hand keeps the forms.
+ */
+export function resetSealed(opts: { force?: boolean } = {}): void {
+  if (!opts.force) assertWritable(current());
   fs.rmSync(SEALED_FILE, { force: true });
   memo = undefined;
 }
@@ -449,7 +517,7 @@ export interface CreateResult {
  */
 export function createForms(bank: BankState, attempts: Attempt[], cfg: AppConfig, opts: { forms?: number; size?: number } = {}): CreateResult {
   const cur = current();
-  if (cur.error) throw new SealedError(409, `${rel(SEALED_FILE)} đang lỗi (${cur.error}) — sửa hoặc xoá file (npm run seal -- --reset) rồi thử lại.`);
+  assertWritable(cur);
   const open = cur.state.forms.filter((f) => f.status === 'sealed');
   if (open.length) throw new SealedError(409, `Đang có đề niêm phong chưa làm (${open.map((f) => f.id).join(', ')}) — làm hoặc mở sớm các đề đó trước khi tạo đề mới.`);
   const n = clampInt(opts.forms ?? (cfg.exam?.sealed_forms > 0 ? cfg.exam.sealed_forms : 2), 1, MAX_FORMS, 2);

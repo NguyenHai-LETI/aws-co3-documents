@@ -20,7 +20,7 @@ import {
   setQuestionMeta,
   writeMigration,
 } from '../server/lib/migrations.ts';
-import { computeQuality, correctIsLongest, distractorReport, findDuplicates, lexicalDuplicates, optionStats, qualitySnapshotLines, variantCycles } from '../server/lib/quality.ts';
+import { computeQuality, correctIsLongest, distractorReport, findDuplicates, lexicalDuplicates, optionStats, qualitySnapshotLines, scopeReport, variantCycles } from '../server/lib/quality.ts';
 import { mergeDuplicates } from '../server/lib/embeddings.ts';
 import { addRating, aggregateRatings, loadRatings, lowRatedIds, type RatingEntry } from '../server/lib/ratings.ts';
 import type { BankState } from '../server/lib/bank.ts';
@@ -475,4 +475,65 @@ test('mergeDuplicates: lexical pairs first-class, semantic-only pairs added, ina
   assert.deepEqual(mergeDuplicates([{ a: 'q1', b: 'q2', score: 0.85 }], []), [{ a: 'q1', b: 'q2', score: 0.85, kind: 'lexical' }]);
   const many = Array.from({ length: 40 }, (_, i) => ({ a: `s${i}`, b: `t${i}`, score: 0.9, kind: 'semantic' as const }));
   assert.equal(mergeDuplicates(many.map((p) => ({ ...p, kind: 'lexical' as const })), many.map((p) => ({ ...p, a: `u${p.a}` }))).length, 50, 'merged list ≤ 50');
+});
+
+// ── [γ] exam scope + sealed questions ───────────────────────────────────────
+
+test('scopeReport: out-of-scope answers vs distractors, per-service tallies, the practice exclusion flag; snapshot §14 tells the coach', () => {
+  const bank = bankOf(
+    packText('sc-pack', [
+      { id: 'sc-ans', options: ['Use AWS CodeCommit', 'Use Amazon S3', 'Use Amazon EFS', 'Use Amazon EBS'], answer: ['A'] },
+      { id: 'sc-dis', options: ['Use Amazon S3', 'Use Amazon Lightsail', 'Use AWS CodeBuild', 'Use Amazon EBS'], answer: ['A'] },
+      { id: 'sc-ok', options: opts4(1), answer: ['A'] },
+    ]),
+  );
+  const r = scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true } });
+  assert.deepEqual(r.answer, [{ id: 'sc-ans', services: ['CodeCommit'] }]);
+  assert.deepEqual(r.distractor, [{ id: 'sc-dis', options: [{ key: 'B', services: ['Lightsail'] }, { key: 'C', services: ['CodeBuild'] }] }]);
+  assert.equal(r.excluded, true);
+  const svc = Object.fromEntries(r.services.map((s) => [s.name, [s.answers, s.distractors]]));
+  assert.deepEqual([svc.CodeCommit, svc.Lightsail, svc.CodeBuild, svc.Braket], [[1, 0], [0, 1], [0, 1], [0, 0]]);
+  assert.equal(r.services[0].name, 'CodeCommit', 'services the bank uses as answers first');
+  assert.ok(r.services.length >= 30, 'every `scope: out` service of the taxonomy is listed');
+  assert.deepEqual(r.services.find((s) => s.name === 'Location Service')?.aliases, ['Amazon Location Service']);
+  assert.equal(scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false } }).excluded, false);
+  assert.deepEqual(computeQuality(bank, [], []).scope?.answer.map((x) => x.id), ['sc-ans']);
+  const lines = qualitySnapshotLines(bank, [], { background: false }).join('\n');
+  assert.match(lines, /### 🎯 Phạm vi đề thi/);
+  assert.match(lines, /1 câu có \*\*đáp án đúng\*\* là dịch vụ ngoài phạm vi[^\n]*`sc-ans` \(CodeCommit\)/);
+  assert.match(lines, /1 câu dùng dịch vụ ngoài phạm vi làm \*\*phương án nhiễu\*\*/);
+  assert.match(lines, /\*\*không\*\* dùng CodeCommit, CodeBuild, Lightsail/);
+});
+
+test('computeQuality leaves sealed questions out of every number and list; BankQuality.sealed counts them', () => {
+  const stem = 'A company stores signed invoices in a durable archive for seven years and must retrieve them rarely. Which service?';
+  const bank = bankOf(
+    packText('sl-pack', [
+      { id: 'sl-1', options: opts4(1), answer: ['A'], explanation: 'x' },
+      { id: 'sl-2', options: opts4(2), answer: ['A'], explanation: 'x' },
+      { id: 'sl-dup-a', stem, options: opts4(3), answer: ['A'] },
+      { id: 'sl-dup-b', stem, options: opts4(3), answer: ['A'] },
+      { id: 'sl-oos', options: ['Use AWS CodeCommit', 'Use Amazon S3', 'Use Amazon EFS', 'Use Amazon EBS'], answer: ['A'] },
+    ]),
+  );
+  const ratings: RatingEntry[] = [
+    { line: 1, date: '2026-10-01', qid: 'sl-2', value: 'down', note: 'mơ hồ' },
+    { line: 2, date: '2026-10-02', qid: 'sl-2', value: 'down' },
+  ];
+  const open = computeQuality(bank, [], ratings);
+  assert.equal(open.total, 5);
+  assert.equal(open.sealed, 0);
+  assert.ok(open.duplicates.some((d) => d.a === 'sl-dup-a' && d.b === 'sl-dup-b'));
+  assert.deepEqual(open.lowRated, ['sl-2']);
+  assert.deepEqual(open.scope?.answer.map((x) => x.id), ['sl-oos']);
+
+  const sealed = new Set(['sl-2', 'sl-dup-b', 'sl-oos']);
+  const q = computeQuality(bank, [], ratings, { sealed });
+  assert.equal(q.sealed, 3);
+  assert.equal(q.total, 2, 'metrics cover the visible questions only');
+  assert.deepEqual(q.duplicates, []);
+  assert.deepEqual(q.lowRated, []);
+  assert.deepEqual(q.scope?.answer, []);
+  assert.equal(q.lint?.checked, 2);
+  for (const ids of Object.values(q.lint?.ids ?? {})) for (const id of ids) assert.ok(!sealed.has(id), `${id} listed by lint`);
 });

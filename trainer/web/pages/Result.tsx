@@ -291,8 +291,11 @@ export function ResultPage({ id }: { id: string }) {
   const unviewed = new Set(ann?.unviewed ?? ans.filter((r) => !r.pick && !r.t).map((r) => r.q));
   const recognized = new Set(ann?.recognized ?? []);
   const diag = isDiagnostic(a);
-  const sealedForm = a.sealedForm ?? (a.mode === 'sealed' ? '?' : undefined);
-  const fresh = (a.mode === 'exam' || a.pearson) && !sealedForm ? freshSplit(a, ann) : undefined;
+  // "điểm trên câu mới" only for the sitting results/sealed.md records for its form (the first submit); another sitting
+  // of a sealed form (a second session, or one opened early with "Mở sớm") is a retake of known questions
+  const sealedForm = ann?.sealedOfficial;
+  const sealedRetake = a.mode === 'sealed' && !sealedForm;
+  const fresh = (a.mode === 'exam' || a.pearson) && !sealedForm && !a.rushed ? freshSplit(a, ann) : undefined;
   const freshPct = fresh?.answers ? Math.round((fresh.correct / fresh.answers) * 1000) / 10 : undefined;
   const realism = isExamLike(a) ? a.realism : undefined;
   const lowRealism = realismLow(realism);
@@ -327,8 +330,13 @@ export function ResultPage({ id }: { id: string }) {
             <span>{a.title}</span>
             <AttemptBadges a={a} />
             {sealedForm && (
-              <span className="badge accent" title={`Đề niêm phong${sealedForm !== '?' ? ` ${sealedForm}` : ''}: câu chưa từng xuất hiện khi luyện tập`}>
+              <span className="badge accent" title={`Đề niêm phong ${sealedForm}: câu chưa từng xuất hiện khi luyện tập`}>
                 🔒 điểm trên câu mới
+              </span>
+            )}
+            {sealedRetake && (
+              <span className="badge" title="Làm lại câu của một đề niêm phong đã làm hoặc đã mở sớm — không tính là điểm trên câu mới">
+                🔁 làm lại đề niêm phong
               </span>
             )}
             {realism && (
@@ -344,7 +352,7 @@ export function ResultPage({ id }: { id: string }) {
               🔁 Làm lại {wrongIds.length} câu sai
             </button>
           )}
-          {sealedForm ? (
+          {sealedForm || sealedRetake ? (
             <button className="btn" onClick={() => navigate('/new?mode=exam')} title="Đề niêm phong chỉ làm một lần — thi thử Pearson trên ngân hàng thường">
               🎯 Thi thử khác
             </button>
@@ -367,9 +375,15 @@ export function ResultPage({ id }: { id: string }) {
           được lưu). Ngưỡng ở <code>trainer/config.yaml</code> → <code>stats.rushed_median_seconds</code>.
         </div>
       )}
+      {sealedRetake && (
+        <div className="ins-wrap alert" style={{ marginBottom: 16 }}>
+          🔁 <b>Làm lại đề niêm phong — câu đã gặp, không tính là điểm trên câu mới.</b> Đề này đã được làm (hoặc mở sớm) trước bài này, nên điểm
+          chỉ là một bài thi thử thường; điểm trên câu mới của đề là lần nộp đầu tiên.
+        </div>
+      )}
       {sealedForm && (
         <div className="ins-wrap alert info" style={{ marginBottom: 16 }}>
-          🔒 <b>Đề niêm phong{sealedForm !== '?' ? ` ${sealedForm}` : ''} — điểm trên câu mới.</b> {a.total} câu tính điểm chưa từng xuất hiện khi bạn luyện tập, nên đây là ước tính
+          🔒 <b>Đề niêm phong {sealedForm} — điểm trên câu mới.</b> {a.total} câu tính điểm chưa từng xuất hiện khi bạn luyện tập, nên đây là ước tính
           trung thực nhất về năng lực với câu mới như đề thật. Điểm này nằm trong <a href={href('/stats?focus=exam')}>danh sách điểm thi thử</a> như một điểm hiệu chỉnh nội
           bộ; các câu của đề nay đã trở lại ngân hàng luyện tập.
         </div>

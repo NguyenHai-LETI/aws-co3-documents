@@ -2,14 +2,14 @@
 // Never touches the real repository. Run: npm run test:e2e
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { appendFile, git, isolateGitConfig, makeGitWorld, writeFile, type GitWorld } from '../helpers/git.ts';
-import { TRAINER_ROOT } from '../helpers/paths.ts';
+import { REPO_ROOT, TRAINER_ROOT } from '../helpers/paths.ts';
 import {
   AUTO_SYNC_BUSY_RETRY_MS,
   AUTO_SYNC_MAX_BACKOFF_MS,
@@ -694,4 +694,264 @@ test('pre-push hook: code pushes run the check, data / notes / docs pushes pass,
   assert.equal(git(w.remote, 'rev-parse', 'main'), remoteBefore, 'nothing reached the remote');
   git(a, 'push', '-q', '--no-verify', 'origin', 'main'); // the documented escape hatch
   assert.equal(git(w.remote, 'rev-parse', 'main'), git(a, 'rev-parse', 'HEAD'));
+});
+
+// ── what a sync must never do (v4 review) ────────────────────────────────────
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function until(what: string, fn: () => boolean, ms: number): Promise<void> {
+  const end = Date.now() + ms;
+  while (!fn()) {
+    if (Date.now() > end) throw new Error(`timeout: ${what}`);
+    await sleep(150);
+  }
+}
+
+/** The repo's pre-push gate, installed in a throwaway clone like `npm run hooks:install` does. */
+function installHook(clone: string) {
+  const hooks = path.join(clone, 'trainer', '.githooks');
+  fs.mkdirSync(hooks, { recursive: true });
+  fs.copyFileSync(path.join(TRAINER_ROOT, '.githooks', 'pre-push'), path.join(hooks, 'pre-push'));
+  fs.chmodSync(path.join(hooks, 'pre-push'), 0o755);
+  git(clone, 'config', 'core.hooksPath', 'trainer/.githooks');
+}
+
+test('unattended syncs push learner data only: local code commits stay local; a manual sync pushes them through the pre-push gate', async () => {
+  const w = world();
+  const a = w.clone('a');
+  writeFile(a, 'trainer/server/code.ts', 'export const x: number = "WIP";\n');
+  git(a, 'add', '-A');
+  git(a, 'commit', '-q', '-m', 'WIP: half-done refactor (not ready)');
+  writeFile(a, 'trainer/results/2026/10/2026-10-20_150000_quick.md', '---\nid: r1\n---\n');
+  for (const source of ['auto', 'startup', 'ai', 'shutdown'] as const) {
+    const r = await sync(a, 'mac-a', { source, pushOnly: source === 'shutdown' });
+    assert.equal(r.ok, false, `${source}: ${r.message}`);
+    assert.equal(r.blocked, 'code', source);
+    assert.deepEqual(r.heldBack, ['trainer/server/code.ts'], source);
+    assert.ok(!r.steps.some((s) => /^git push (?!\()/.test(s.cmd)), `${source}: never pushes (--no-verify would skip the gate)`);
+    assert.match(r.hint ?? '', /chỉ đẩy dữ liệu học/);
+  }
+  assert.equal(subject(w.remote, 'main'), 'init', 'nothing reached GitHub');
+  assert.match(subject(a), /^trainer: sync từ mac-a/, 'the learner data is committed locally (a restore point)');
+  const st = await syncStatus({ repoDir: a, dataPaths: DATA, fetch: false });
+  assert.deepEqual(st.unpushedCode, ['trainer/server/code.ts']);
+
+  // ⇅ pressed by hand: everything goes, but through the gate (no --no-verify when code is pushed)
+  installHook(a);
+  process.env.TRAINER_HOOK_CMD = 'echo gate-says-no >&2; exit 1';
+  try {
+    const refused = await sync(a, 'mac-a');
+    assert.equal(refused.ok, false);
+    const push = refused.steps.find((s) => s.cmd.startsWith('git push origin'));
+    assert.ok(push && !push.ok, JSON.stringify(refused.steps.map((s) => s.cmd)));
+    assert.match(push.output, /gate-says-no/);
+    assert.equal(subject(w.remote, 'main'), 'init');
+    process.env.TRAINER_HOOK_CMD = 'true';
+    const ok = await sync(a, 'mac-a');
+    assert.equal(ok.ok, true, ok.message);
+    assert.equal(ok.pushed, 2);
+  } finally {
+    delete process.env.TRAINER_HOOK_CMD;
+  }
+  assert.equal((await syncStatus({ repoDir: a, dataPaths: DATA, fetch: false })).unpushedCode, undefined);
+});
+
+test('a branch that merely tracks main is never synced (HEAD would be pushed into main)', async () => {
+  const w = world();
+  const a = w.clone('a');
+  git(a, 'checkout', '-q', '-b', 'feature-x', 'origin/main');
+  writeFile(a, 'trainer/web/Experimental.tsx', 'export const e = 1;\n');
+  git(a, 'add', '-A');
+  git(a, 'commit', '-q', '-m', 'experiment');
+  writeFile(a, 'trainer/results/2026/10/2026-10-20_160000_quick.md', '---\nid: r2\n---\n');
+  for (const source of ['manual', 'auto'] as const) {
+    const r = await sync(a, 'mac-a', { source });
+    assert.equal(r.ok, false, source);
+    assert.equal(r.blocked, 'branch');
+    assert.match(r.message, /feature-x/);
+    assert.match(r.hint ?? '', /git switch main/);
+    assert.equal(r.steps.length, 0, 'stops before git add');
+  }
+  assert.equal(subject(w.remote, 'main'), 'init');
+});
+
+test('unattended syncs never stash: uncommitted code → no pull (and why); a manual autostash conflict → ok:false, precise hint, no update banner', async () => {
+  const w = world();
+  const a = w.clone('a');
+  const b = w.clone('b');
+  writeFile(b, 'trainer/server/code.ts', 'export const x = 2; // from B\n');
+  writeFile(b, 'trainer/results/2026/10/2026-10-20_170000_quick.md', '---\nid: b\n---\n');
+  git(b, 'add', '-A');
+  git(b, 'commit', '-q', '-m', 'code + result from B');
+  git(b, 'push', '-q', 'origin', 'main');
+  writeFile(a, 'trainer/server/code.ts', 'export const x = 3; // local WIP on A\n'); // uncommitted, conflicts with B
+  writeFile(a, 'trainer/results/2026/10/2026-10-20_171000_quick.md', '---\nid: a\n---\n');
+
+  const auto = await sync(a, 'mac-a', { source: 'auto' });
+  assert.equal(auto.ok, false);
+  assert.equal(auto.blocked, 'dirty');
+  assert.deepEqual(auto.pullSkipped, ['trainer/server/code.ts']);
+  assert.match(auto.message, /chưa kéo về/);
+  assert.match(auto.hint ?? '', /stash/);
+  assert.equal(auto.codeFiles, undefined);
+  assert.equal(read(a, 'trainer/server/code.ts'), 'export const x = 3; // local WIP on A\n', 'the edit is untouched (no markers)');
+  assert.equal(git(a, 'stash', 'list'), '', 'nothing stashed behind the learner’s back');
+  assert.ok(!auto.steps.some((s) => s.cmd.startsWith('git pull --')));
+  assert.deepEqual((await syncStatus({ repoDir: a, dataPaths: DATA, fetch: false })).dirtyCode, ['trainer/server/code.ts']);
+
+  // ⇅ pressed by hand: autostash, B's version arrives, the stashed edit conflicts with it
+  const manual = await sync(a, 'mac-a');
+  assert.equal(manual.ok, false, manual.message);
+  assert.equal(manual.blocked, 'stash');
+  assert.deepEqual(manual.conflicts, ['trainer/server/code.ts']);
+  assert.equal(manual.codeFiles, undefined, 'no restart banner into conflict markers');
+  assert.equal(manual.received, 1);
+  assert.ok((manual.pushed ?? 0) >= 1, 'the learner data still went out');
+  assert.match(manual.hint ?? '', /git checkout HEAD --/);
+  assert.match(manual.hint ?? '', /git stash/);
+  assert.doesNotMatch(manual.hint ?? '', /rebase --continue/);
+
+  // every sync stops with the same precise state until it is resolved
+  writeFile(a, 'trainer/results/2026/10/2026-10-20_172000_quick.md', '---\nid: a2\n---\n');
+  const next = await sync(a, 'mac-a', { source: 'auto' });
+  assert.equal(next.blocked, 'unmerged');
+  assert.deepEqual(next.conflicts, ['trainer/server/code.ts']);
+  assert.equal(next.steps.length, 0, 'nothing committed on top of a conflicted tree');
+  assert.deepEqual((await syncStatus({ repoDir: a, dataPaths: DATA, fetch: false })).unmerged, ['trainer/server/code.ts']);
+  // following the hint (keep the committed version) clears it; the learner's edit is still in the stash
+  git(a, 'checkout', 'HEAD', '--', 'trainer/server/code.ts');
+  const after = await sync(a, 'mac-a', { source: 'auto' });
+  assert.equal(after.ok, true, after.message);
+  assert.match(git(a, 'stash', 'show', '-p'), /local WIP on A/);
+});
+
+test('a sync never signs its commits: a signing prompt nobody answers cannot leave .git/index.lock behind', async () => {
+  const w = world();
+  const a = w.clone('a');
+  const b = w.clone('b');
+  writeFile(b, 'trainer/results/2026/10/2026-10-20_180000_quick.md', '---\nid: b\n---\n');
+  git(b, 'add', '-A');
+  git(b, 'commit', '-q', '-m', 'from B');
+  git(b, 'push', '-q', 'origin', 'main'); // A's commit gets rebased: the rebase would sign too
+  const signer = path.join(w.root, 'slow-signer.sh');
+  fs.writeFileSync(signer, '#!/bin/sh\nsleep 30\n', { mode: 0o755 }); // a pinentry / 1Password prompt nobody answers
+  git(a, 'config', 'commit.gpgsign', 'true');
+  git(a, 'config', 'gpg.program', signer);
+  writeFile(a, 'trainer/results/2026/10/2026-10-20_181000_quick.md', '---\nid: a\n---\n');
+  const t0 = Date.now();
+  const r = await sync(a, 'mac-a', { source: 'auto', timeoutMs: 5000 });
+  assert.equal(r.ok, true, r.message);
+  assert.ok(Date.now() - t0 < 5000, `took ${Date.now() - t0} ms`);
+  assert.equal(r.received, 1);
+  assert.equal(fs.existsSync(path.join(a, '.git', 'index.lock')), false);
+  assert.equal(git(w.remote, 'log', '-1', '--format=%G?', 'main'), 'N', 'unsigned');
+});
+
+test('the app killed in the middle of a pull: the orphaned git finishes the rebase and re-applies the autostash (output to files, not pipes)', async () => {
+  const w = world();
+  const a = w.clone('a');
+  const b = w.clone('b');
+  writeFile(b, 'trainer/results/2026/10/2026-10-20_090000_quick.md', '---\nid: from-b\n---\n');
+  git(b, 'add', '-A');
+  git(b, 'commit', '-q', '-m', 'trainer: sync từ B');
+  git(b, 'push', '-q', 'origin', 'main');
+  appendFile(a, 'trainer/server/code.ts', '// MY UNCOMMITTED EDIT\n'); // a manual sync autostashes it, the rebase re-applies it
+  writeFile(a, 'trainer/results/2026/10/2026-10-20_091000_quick.md', '---\nid: from-a\n---\n');
+  const slow = path.join(w.root, 'slow-upload-pack');
+  fs.writeFileSync(slow, '#!/bin/sh\nsleep 2\nexec git-upload-pack "$@"\n', { mode: 0o755 });
+  git(a, 'config', 'remote.origin.uploadpack', slow);
+  // a child process plays the app: it starts the sync and dies abruptly (SIGKILL) while git waits for the slow remote
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-sync-home-'));
+  const syncTs = new URL('../../server/lib/sync.ts', import.meta.url).href;
+  const script = `const m = await import(${JSON.stringify(syncTs)}); void m.runSync({ repoDir: ${JSON.stringify(a)}, dataPaths: ${JSON.stringify(DATA)}, host: 'mac-a', force: true }); setInterval(() => {}, 1000);`;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, TRAINER_HOME: home, TRAINER_REPO: home }, stdio: 'ignore' });
+  try {
+    await until('the data commit (the pull comes next)', () => /^trainer: sync từ mac-a/.test(subject(a)), 15_000);
+    await sleep(400); // inside the slow fetch now
+    child.kill('SIGKILL');
+    await until(
+      'the orphaned pull finished',
+      () => !fs.existsSync(path.join(a, '.git', 'rebase-merge')) && fs.existsSync(path.join(a, 'trainer/results/2026/10/2026-10-20_090000_quick.md')) && /MY UNCOMMITTED EDIT/.test(read(a, 'trainer/server/code.ts')),
+      20_000,
+    );
+  } finally {
+    child.kill('SIGKILL');
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+  await sleep(300);
+  assert.equal(git(a, 'stash', 'list'), '', 'the autostash was applied, not left behind');
+  assert.equal(git(a, 'rev-list', '--count', 'origin/main..HEAD'), '1', 'the local data commit sits on top of B');
+  assert.equal(git(a, 'status', '--porcelain', '--', 'trainer/results'), '');
+  // nothing is broken: the next unattended sync skips the pull (uncommitted edit) but pushes the data commit as is
+  const next = await sync(a, 'mac-a', { source: 'auto' });
+  assert.equal(next.blocked, 'dirty', next.message);
+  assert.equal(next.pushed, 1);
+  assert.match(subject(w.remote, 'main'), /^trainer: sync từ mac-a/);
+  const manual = await sync(a, 'mac-a');
+  assert.equal(manual.ok, true, manual.message);
+});
+
+test('a rebase left behind: hint = `rebase --quit` + `stash pop` when only the autostash is there, `rebase --abort` otherwise — never --continue', async () => {
+  const w = world();
+  // (a) what a pull killed by an older version left: rebase-merge/ with nothing but the autostash
+  const a = w.clone('a');
+  appendFile(a, 'trainer/server/code.ts', '// MY UNCOMMITTED EDIT\n');
+  const stash = git(a, 'stash', 'create');
+  git(a, 'checkout', '--', 'trainer/server/code.ts'); // the edit now lives only in the autostash commit
+  fs.mkdirSync(path.join(a, '.git', 'rebase-merge'));
+  fs.writeFileSync(path.join(a, '.git', 'rebase-merge', 'autostash'), `${stash}\n`);
+  const r = await sync(a, 'mac-a', { source: 'auto' });
+  assert.equal(r.ok, false);
+  assert.equal(r.blocked, 'operation');
+  assert.match(r.hint ?? '', /git rebase --quit/);
+  assert.match(r.hint ?? '', /git stash pop/);
+  assert.doesNotMatch((r.hint ?? '').replace(/Đừng dùng `git rebase --continue`/g, ''), /--continue/);
+  git(a, 'rebase', '--quit'); // following the hint gives the edit back
+  git(a, 'stash', 'pop');
+  assert.match(read(a, 'trainer/server/code.ts'), /MY UNCOMMITTED EDIT/);
+
+  // (b) a rebase that stopped on a conflict
+  const b = w.clone('b');
+  const c = w.clone('c');
+  writeFile(b, 'trainer/coach/learner-profile.md', '# Learner profile\n\nfocus: B\n');
+  git(b, 'commit', '-q', '-am', 'B');
+  git(b, 'push', '-q', 'origin', 'main');
+  writeFile(c, 'trainer/coach/learner-profile.md', '# Learner profile\n\nfocus: C\n');
+  git(c, 'commit', '-q', '-am', 'C (local data commit)');
+  assert.throws(() => git(c, 'pull', '-q', '--rebase', 'origin', 'main'));
+  assert.ok(fs.existsSync(path.join(c, '.git', 'rebase-merge')));
+  const r2 = await sync(c, 'mac-c');
+  assert.equal(r2.blocked, 'operation');
+  assert.match(r2.hint ?? '', /git rebase --abort/);
+  assert.doesNotMatch((r2.hint ?? '').replace(/Đừng dùng `git rebase --continue`/g, ''), /--continue/);
+  git(c, 'rebase', '--abort');
+  assert.equal(subject(c), 'C (local data commit)', 'abort keeps the local commit');
+});
+
+test('pre-push hook checks the commit being pushed (temporary worktree), not the working tree; inbox/ and Markdown are not code; LF pinned', async () => {
+  const w = world();
+  const a = w.clone('a');
+  installHook(a);
+  const marker = path.join(w.root, 'checked.log');
+  writeFile(a, 'trainer/server/code.ts', 'export const v = "PUSHED";\n');
+  git(a, 'add', '-A', '--', 'trainer/server');
+  git(a, 'commit', '-q', '-m', 'the version to push');
+  writeFile(a, 'trainer/server/code.ts', 'export const v = "WORKING TREE";\n'); // uncommitted
+  process.env.TRAINER_HOOK_CMD = `cat server/code.ts >> "${marker}"`;
+  try {
+    git(a, 'push', '-q', 'origin', 'main');
+    assert.equal(fs.readFileSync(marker, 'utf8'), 'export const v = "PUSHED";\n', 'checked exactly what was pushed');
+    assert.equal(git(a, 'worktree', 'list').split('\n').length, 1, 'the temporary checkout is gone');
+    for (const rel of ['trainer/inbox/aws-notes.md', 'trainer/inbox/paper.txt', 'trainer/ci/README.md', 'trainer/tests/fixtures/x.md']) {
+      writeFile(a, rel, `# ${rel}\n`);
+      git(a, 'add', '--', rel);
+      git(a, 'commit', '-q', '-m', rel);
+      git(a, 'push', '-q', 'origin', 'main');
+    }
+    assert.equal(fs.readFileSync(marker, 'utf8').split('\n').filter(Boolean).length, 1, 'inbox/ and Markdown pushes: no check');
+  } finally {
+    delete process.env.TRAINER_HOOK_CMD;
+  }
+  // a CRLF checkout (core.autocrlf=true on Windows) would break every push: the repo pins the hook to LF
+  assert.match(fs.readFileSync(path.join(REPO_ROOT, '.gitattributes'), 'utf8'), /^trainer\/\.githooks\/\* text eol=lf$/m);
 });

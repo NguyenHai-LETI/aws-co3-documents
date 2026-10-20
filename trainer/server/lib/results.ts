@@ -11,7 +11,7 @@ import { ParseCache, statSig, type FileParse } from './index-db.ts';
 import { detectFeatures, detectServices } from './classify.ts';
 import { fmtLocal, localIso, stampParts } from './time.ts';
 import { isCorrect, normalizeKeys, pct, scaledScore } from '../../shared/scoring.ts';
-import { markFormUsed } from './sealed.ts';
+import { loadSealed, markFormUsed } from './sealed.ts';
 import { fmtDuration } from '../../shared/timing.ts';
 import { FEEDBACK_INFO, MODE_INFO } from '../../shared/labels.ts';
 import type { AnswerInput, AnswerRecord, Attempt, AttemptPoint, AttemptSummary, Question, ResultsPage, SubmitRequest, Taxonomy, TestMode } from '../../shared/types.ts';
@@ -529,6 +529,9 @@ export function gradeAndSave(req: SubmitRequest, bank: BankState): Attempt {
   const passPct = bank.taxonomy.exam.pass_pct;
   const { ids: _ids, ...selection } = session.selection ?? { mode };
   const medianTime = attemptMedianTime(g.records);
+  // [β1] the first submit of a form that is still sealed is its official sitting ("điểm trên câu mới"); another session
+  // of the same form, or one submitted after "Mở sớm", stays mode 'sealed' without sealed_form (its questions are known)
+  const officialForm = session.sealedForm && loadSealed().forms.some((f) => f.id === session.sealedForm && f.status === 'sealed') ? session.sealedForm : undefined;
   const attempt: Attempt = {
     id,
     mode,
@@ -547,7 +550,7 @@ export function gradeAndSave(req: SubmitRequest, bank: BankState): Attempt {
     passed: g.score >= passPct,
     plan: session.plan,
     sessionId: session.sessionId,
-    sealedForm: session.sealedForm,
+    sealedForm: officialForm,
     diagnostic: session.diagnostic ? true : undefined,
     realism: session.realism,
     selection,
@@ -558,9 +561,22 @@ export function gradeAndSave(req: SubmitRequest, bank: BankState): Attempt {
     medianTime,
     rushed: isRushed(medianTime, cfg.stats.rushed_median_seconds),
   };
-  const data = frontMatterData(attempt, {}, { estimate_total: session.estimateTotal, timing: session.timingPreset });
-  writeAtomic(file, stringifyFrontMatter(data, ['answers']) + '\n' + renderBody(attempt, g.questions, bank, session.estimateTotal, cfg));
-  if (session.sealedForm) markFormUsed(session.sealedForm, attempt.id, attempt.finished); // its questions return to the practice pool
+  const write = () =>
+    writeAtomic(file, stringifyFrontMatter(frontMatterData(attempt, {}, { estimate_total: session.estimateTotal, timing: session.timingPreset }), ['answers']) + '\n' + renderBody(attempt, g.questions, bank, session.estimateTotal, cfg));
+  write();
+  if (officialForm) {
+    // the form becomes 'used' by this attempt and its questions return to the practice pool. sealed.md may refuse the
+    // write (unreadable file, disk error, the form opened or used meanwhile): the attempt stays, without the official mark
+    try {
+      markFormUsed(officialForm, attempt.id, attempt.finished);
+    } catch (e) {
+      console.error('markFormUsed failed', e);
+    }
+    if (!loadSealed().forms.some((f) => f.id === officialForm && f.status === 'used' && f.attempt === attempt.id)) {
+      attempt.sealedForm = undefined;
+      write();
+    }
+  }
   resultParses.drop(file, cfg.cache?.sqlite !== false); // a stored row of a deleted file with the same name must not come back
   if (attempt.sessionId && sessions && !sessions.has(attempt.sessionId)) sessions.set(attempt.sessionId, attempt);
   return attempt;

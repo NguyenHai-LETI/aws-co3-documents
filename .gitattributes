@@ -11,3 +11,4 @@ trainer/results/fsrs-params.json merge=union
 trainer/*.bat text eol=crlf
 trainer/*.sh text eol=lf
 trainer/*.command text eol=lf
+trainer/.githooks/* text eol=lf

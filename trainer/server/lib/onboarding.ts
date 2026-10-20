@@ -190,7 +190,7 @@ export function onboardingPlan(ctx: OnboardingCtx, opts: { attemptId?: string; n
       title: `Đề niêm phong ${firstSealed.id} — điểm trên câu mới`,
       why: `Ngày thi ${goal.examDate}: nên làm đề niêm phong ${firstSealed.id} vào khoảng ${firstSealed.suggested} để đo năng lực trên câu chưa từng gặp.`,
       feedback: 'exam',
-      filter: { mode: 'sealed' },
+      filter: { mode: 'sealed', form: firstSealed.id }, // pinned: the title names this form (start.ts confirms before it starts)
       how: `${firstSealed.count} câu tính điểm + câu thử nghiệm, như thi thật (không tạm dừng). Điểm này được so với mức sẵn sàng của app để hiệu chỉnh dự báo.`,
     });
   } else {

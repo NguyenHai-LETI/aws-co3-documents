@@ -78,7 +78,7 @@ test('A3 + B2: never-viewed answers leave no trace; repeats carry their exposure
   assert.deepEqual(new Set(d1.annotations.unviewed), new Set([b1.id, b2.id]));
   assert.deepEqual(d1.annotations.exposure, { [r1.id]: 1, [r2.id]: 1, [w1.id]: 1, [w2.id]: 1 });
   assert.deepEqual(d1.annotations.recognized, []);
-  assert.deepEqual(d1.annotations.fresh, { total: 6, seenBefore: 0, answers: 4, correct: 2 });
+  assert.deepEqual(d1.annotations.fresh, { total: 6, seenBefore: 0, answers: 6, correct: 2 }, 'R2 #3: the 2 never-viewed first-time questions count as wrong');
   assert.ok(d1.attempt.answers.every((r) => r.unviewed === undefined && r.exposure === undefined), 'the stored attempt carries no computed field');
   const st1 = await state();
   assert.equal(st1.states[b1.id], undefined, 'no state: still a new question');

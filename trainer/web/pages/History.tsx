@@ -6,6 +6,8 @@ import { ChartCard, LineChart, Meter } from '../components/charts.tsx';
 import { AttemptBadges } from '../components/insights.tsx';
 import { Empty, ErrorBox, Loading } from '../components/ui.tsx';
 import { MODE_INFO } from '../../shared/labels.ts';
+import { noVerdict } from '../components/onboarding/rules.ts';
+import { useStudyStart } from '../components/onboarding/useStudyStart.ts';
 import type { ResultsPage, TestMode } from '../../shared/types.ts';
 
 const PAGE = 50;
@@ -22,6 +24,7 @@ function setQuery(patch: Record<string, string | number | undefined>, current: U
 }
 
 export function History() {
+  const studyStart = useStudyStart(); // diagnostic / first-week short tests get no pass-fail verdict (same rule as Dashboard)
   const { query } = useRoute();
   const page = Math.max(0, Number(query.get('page') ?? 1) - 1) || 0;
   const mode = query.get('mode') ?? '';
@@ -171,7 +174,11 @@ export function History() {
                         {a.timedOut ? ' ⏰' : ''}
                       </td>
                       <td>
-                        <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.passed ? '✓ Đạt' : '✗'}</span>
+                        {noVerdict(a, studyStart) ? (
+                          <span className="badge" title="Bài chẩn đoán hoặc bài ngắn trong tuần đầu — không xét đạt/chưa đạt">—</span>
+                        ) : (
+                          <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.passed ? '✓ Đạt' : '✗'}</span>
+                        )}
                       </td>
                     </tr>
                   ))}

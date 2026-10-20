@@ -125,7 +125,8 @@ test('freshSplit: the server split when present, else counted from the exposure 
   const answers = [rec('a', true), rec('b', false), rec('c', true), rec('d', true, { scored: false }), rec('e', false, { pick: '', t: 0 })];
   assert.equal(freshSplit({ answers }), undefined, 'no annotations (older server)');
   const ann: ResultAnnotations = { exposure: { a: 1, b: 1, c: 3, d: 1 }, recognized: ['c'], unviewed: ['e'] };
-  assert.deepEqual(freshSplit({ answers }, ann), { total: 4, seenBefore: 1, answers: 2, correct: 1 });
+  assert.equal(freshSplit({ answers }, ann), undefined, 'no server split (e.g. a rushed attempt) → nothing shown, not re-derived from the exposure map');
+  assert.deepEqual(freshSplit({ answers }, { ...ann, fresh: { total: 4, seenBefore: 1, answers: 3, correct: 1 } }), { total: 4, seenBefore: 1, answers: 3, correct: 1 }, 'a server split counting the never-viewed e as a wrong first try passes through unchanged');
   const fresh = { total: 50, seenBefore: 12, answers: 38, correct: 27 };
   assert.deepEqual(freshSplit({ answers }, { ...ann, fresh }), fresh);
 });

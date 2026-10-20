@@ -707,8 +707,10 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   }, [qTask]);
 
   const states = state?.states ?? {};
+  // [γ] sealed questions are hidden from every list until their form is taken or opened early (only their count shows)
+  const sealedSet = useMemo(() => new Set(bank?.sealed ?? []), [bank]);
   const list = useMemo(() => {
-    let qs = bank?.questions ?? [];
+    let qs = (bank?.questions ?? []).filter((q) => !sealedSet.has(q.id));
     if (status !== 'all') qs = qs.filter((q) => q.status === status);
     qs = applyFilters(qs, { ...filters, tasks: undefined }); // tasks handled below (supports "none")
     const taskSel = filters.tasks ?? [];
@@ -721,7 +723,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
     if (progress === 'mastered') qs = qs.filter((q) => mastered(states[q.id], meta));
     if (progress === 'flagged') qs = qs.filter((q) => states[q.id]?.lastFlag || states[q.id]?.lastUnsure);
     return qs;
-  }, [bank, filters, status, progress, feature, states, meta, lintCode, lintIds]);
+  }, [bank, sealedSet, filters, status, progress, feature, states, meta, lintCode, lintIds]);
   useEffect(() => setPage(0), [filters, status, progress, feature, lintCode]);
 
   if (!meta || !bank) return null;
@@ -761,6 +763,14 @@ export function BankPage({ query }: { query: URLSearchParams }) {
           <p>
             {bank.questions.length} câu trong {bank.packs.length} pack · nguồn sự thật là các file Markdown trong <code>trainer/bank/packs/</code> (định dạng: <code>bank/SCHEMA.md</code>).
           </p>
+          {sealedSet.size > 0 && (
+            <p className="small sc-sealed-note">
+              <a href={href('/stats')} className="badge" title="Đề niêm phong: câu chưa từng gặp, giữ riêng để đo điểm trên câu mới">
+                🔒 {sealedSet.size} câu đang niêm phong
+              </a>
+              <span className="muted">ẩn khỏi danh sách, tìm kiếm và Anki cho tới khi bạn làm đề hoặc mở sớm (trang Thống kê).</span>
+            </p>
+          )}
         </div>
       </div>
       <Tabs

@@ -107,7 +107,8 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | **6. AI & vận hành (v2)** | #13–#17 §7 | ✅ v2 |
 | **7. Hiệu năng & chất lượng câu hỏi (v3, đợt 2)** | #18–#23 §7.4 | ✅ v3 |
 | **8. Nâng cao (v3, đợt 3)** | #24–#29 §7.5 | ✅ v3 |
-| **9. Tiếp theo** | §7.6 | 💡 đề xuất |
+| **9. Đo trung thực & quick wins (v4, đợt A + B của buổi brainstorm)** | #30–#43 §7.6 | ✅ v4 |
+| **10. Tiếp theo** | §7.7 + backlog | 💡 đề xuất |
 
 ## 7. Tính năng
 
@@ -172,10 +173,36 @@ bằng LLM (2025–2026): AI tự sửa câu thì 56–68 % bản sửa phát si
 | 28 | Câu trùng theo nghĩa | embedding chạy trên máy qua Ollama (`embeddinggemma`), cache theo nội dung, chạy nền, cosine ≥ 0,88, gộp với trùng từ khoá |
 | 29 | Điện thoại (LAN) + Anki | LAN opt-in: listener 0.0.0.0, mã truy cập + cookie HMAC, Host allow-list, giao diện đóng gói cho điện thoại, QR; Anki: TSV có GUID cố định + AnkiConnect (cập nhật thẻ cũ) |
 
-### 7.6 Lộ trình tiếp theo (đề xuất)
+### 7.6 Đo trung thực & quick wins (v4 — đợt A + B của buổi brainstorm 9 lăng kính)
 
-1. **Đợt 1 của bản rà soát (chưa làm theo yêu cầu)**: câu bỏ trống chưa xem vẫn bị FSRS tính là quên; mức sẵn sàng dựa cả câu ôn lặp lại /
-   gợi ý (σ chỉ có sai số mẫu → xác suất đỗ quá tự tin); `taxonomy.yaml` lỗi làm sập app; kế hoạch AI có `feedback` sai làm nộp bài lỗi 500;
+Buổi brainstorm (20/10/2026, 9 agent mỗi agent một lăng kính → 106 ý tưởng, 18 chủ đề; backlog đầy đủ ở trang "Backlog Trainer v4") cho thấy:
+ngân hàng chưa giống đề thật (đề trung vị 18 từ so với ~60–115 từ của đề mẫu; một bài thi thử ≈ 2.300/7.500 từ), 36 % là câu anh em → rủi ro
+học vẹt; sau ~4 tuần hết câu chưa gặp nên mọi con số chỉ còn đo trí nhớ câu ngân hàng.
+
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 30 | Đề niêm phong | 2 đề × 50 câu giữ riêng từ trước buổi luyện đầu (`results/sealed.md`, tất định, phân tầng domain/task, ưu tiên câu chưa gặp, loại câu ngoài phạm vi / có câu anh em); ẩn khỏi mọi chế độ, tìm kiếm, Anki, Ngân hàng, Chất lượng, snapshot AI; làm = Pearson 50 + 15 thử nghiệm → "điểm trên câu mới" thành điểm hiệu chỉnh nội bộ; gợi ý T−21 / T−7; `npm run seal` |
+| 31 | Ngày đầu | trình hướng dẫn 3 bước (mục tiêu → chẩn đoán 28 câu 2/task → Bản đồ xuất phát) + kế hoạch tuần 1 tự lập (`coach/plans/<ngày>-onboarding.md`, không AI) |
+| 32 | Câu chưa xem không phải lượt ôn | `!pick && !t` → không vào FSRS/trạng thái/pool/hạn mức/mức sẵn sàng/thống kê; vẫn sai trong điểm bài (sửa lỗi đợt 1) |
+| 33 | Thi thử trung thực | `shared/realism.ts`: câu giống đề thật (≥ 55 từ, phương án ≥ 8 từ), huy hiệu "Giống đề thật a/N · w/W từ", "điểm lạc quan"; đồng hồ **theo tải đọc đề thật** mặc định (130′ × số chữ/7.475, kẹp [Σ chuẩn, 2′/câu]) + ESL ×160/130 |
+| 34 | Lần đầu gặp / gặp lại | `exposure`, `recognized` (gặp lại mà đúng nhanh hơn 300 từ/phút) → FSRS tối đa Good, mức sẵn sàng ×0,3; thống kê 14 ngày; "đã gặp n/N · điểm phần câu mới" |
+| 35 | Cặp hay nhầm đã lọc nhiễu | tỉ lệ chọn X khi đáp án Y ÷ số lần cùng xuất hiện; xác nhận ≥ 4 lần, ≥ 3 câu, cận dưới 80 % > 2× mức nền; gộp cùng gốc; "Luyện cặp này"; thay §9 thô của snapshot |
+| 36 | Theo tiêu chí đề | `Question.requirements` từ `taxonomy.keywords` (cost/ops/resilient/performance/secure/negative); thẻ thống kê + bộ lọc Tùy chỉnh |
+| 37 | Phạm vi đề thi | danh sách ngoài phạm vi chính thức + alias đổi tên; `Question.outOfScope`; lint `oos-answer`/`oos-distractor`; loại khỏi chế độ luyện (`practice.exclude_out_of_scope`) |
+| 38 | Checklist ngày thi | 8 mục có hạn + link chính thức (ESL +30 phải xin trước khi đặt lịch, OnVUE, hạn dời lịch…); goal.md lưu lịch học, giờ thi, hình thức thi, ESL |
+| 39 | Thời gian đọc & nộp an toàn | `rt` tách khỏi `t` sau "Kiểm tra"; nộp bài idempotent theo `sessionId` + hộp thư đi khi mất mạng |
+| 40 | Tự đồng bộ khi rảnh | `sync.auto: idle`: đồng bộ vài phút sau bài nộp, kéo về khi mở app (trước khi chuẩn bị đề niêm phong), đẩy khi tắt |
+| 41 | Code mới sau đồng bộ | `codeVersion`, SSE `update`/`hello`, banner, `POST /api/restart` (exit 75) + vòng lặp launcher |
+| 42 | Cổng kiểm tra | `npm run check` / `check:fast`, `.githooks/pre-push` (`npm run hooks:install`), preflight trình duyệt cho UI smoke, test golden parse |
+| 43 | ENRICH câu sắp gặp | lô ENRICH ưu tiên câu đến hạn ngày mai / câu chưa làm kế tiếp / phiên kế hoạch; `coach.enrich_after_analyze` |
+
+### 7.7 Lộ trình tiếp theo (đề xuất)
+
+0. **Backlog brainstorm, đợt C + D** (trang "Backlog Trainer v4"): nút "Học hôm nay" theo quỹ phút, lịch ôn & giai đoạn bám ngày thi, chống
+   học vẹt bằng cụm câu anh em / câu song sinh, luyện phân biệt cặp dễ nhầm, câu tình huống dài theo đề cương 189 mục, chữa bài có hướng dẫn,
+   lá chắn thống kê; sau đó MCP server, gia sư Socratic, kiểm chứng bằng tài liệu AWS…
+1. **Đợt 1 của bản rà soát (phần còn lại; mục "câu chưa xem" đã làm ở v4 #32)**: mức sẵn sàng dựa cả câu ôn lặp lại /
+   gợi ý (σ chỉ có sai số mẫu → xác suất đỗ quá tự tin; v4 đã giảm trọng số câu nhận diện); `taxonomy.yaml` lỗi làm sập app; kế hoạch AI có `feedback` sai làm nộp bài lỗi 500;
    tự đặt `coach.hosts` khi cài lịch; kiểm tra đăng nhập sau khi CLI cập nhật (`--bare` có thể thành mặc định cho `-p`); thu hẹp quyền ghi
    của phân tích (không ghi `bank/migrations/`); bỏ `ANTHROPIC_AUTH_TOKEN` khỏi môi trường coach; kiểm tra `session.mode` phía server.
 2. **Hạn mức & token (bỏ qua theo yêu cầu)**: nhận biết hết hạn mức 5 giờ/tuần, hẹn chạy lại, bớt token mỗi lượt.
@@ -226,3 +253,15 @@ bằng LLM (2025–2026): AI tự sửa câu thì 56–68 % bản sửa phát si
 | Ngân hàng thật (chỉ đọc) | validate 0 lỗi / 0 cảnh báo · lint: 0 câu lỗi nặng, 480 câu lỗi vừa (đáp án đúng dài nhất 348, lặp từ đề 273, từ tuyệt đối 168) |
 | Claude CLI thật (sandbox, 6 lượt) | giải mù 3/3 · ENRICH 2/2 + giải mù · sinh 2 câu từ tài liệu + giải mù · câu dài 1 · `--resume` + `--json-schema` OK — ≈ $0,62 quy đổi API |
 | Rà soát độc lập | 26 lỗi được tái hiện (AI 11, học/hiệu năng 10, bảo mật LAN 5) → 25 đã sửa kèm test hồi quy (+1 lỗi sập server do EPIPE khi upgrade bị reset); 1 để lại vì thuộc đợt 1 (FSRS vẫn tính câu bỏ trống chưa xem là quên) |
+
+**v4** (đợt A + B của buổi brainstorm 9 lăng kính; 5 sub-agent làm song song theo vùng file riêng → tích hợp → 2 agent rà soát độc lập → sửa → kiểm lại):
+
+| Hạng mục | Kết quả |
+|----------|---------|
+| Typecheck · build | `tsc --noEmit` sạch · `vite build` OK |
+| Unit (`npm test`) | 224/224 — thêm đề niêm phong (chọn câu tất định, trạng thái, file hỏng → vẫn giữ kín), tín hiệu học (câu chưa xem, đã gặp/nhận ra, cặp nhầm lẫn, nhóm yêu cầu, điểm phần câu mới), độ giống đề thật + đồng hồ theo tải đọc, chẩn đoán, onboarding + checklist, ngoài phạm vi đề, golden fixtures cho bộ đọc Markdown (35 pack + kết quả mẫu) |
+| E2E API (`npm run test:e2e`) | 156/156 (2 lần liên tiếp) — thêm: câu niêm phong không lộ ở mọi chế độ, tìm kiếm, Anki, Ngân hàng, Chất lượng, file thô, snapshot, Hỏi AI, nhật ký giải mù; tiến độ v4; nộp bài idempotent + outbox; tự đồng bộ (kéo khi mở, đẩy khi rảnh / khi tắt, tắt giữa lúc đồng bộ, không đẩy commit code, không autostash); cập nhật code + khởi động lại (exit 75); pre-push gate |
+| UI smoke (`npm run test:ui`) | 22/22; các agent tự soát thêm bằng Playwright (1440/390 px, sáng/tối) mọi màn hình mới |
+| Đề niêm phong trên ngân hàng thật | 748 câu → 420 đủ điều kiện (loại 22 câu đáp án ngoài phạm vi đề, 306 câu là cặp V1/V2 hoặc biến thể của câu khác) → 2 đề × 50 câu theo trọng số domain; `npm run seal` và lúc mở app cho cùng kết quả · validate 0 lỗi / 0 cảnh báo |
+| Rà soát độc lập | 17 lỗi được xác nhận (gần như tất cả tái hiện bằng script trên sandbox) → **17/17 đã sửa kèm test hồi quy**. Vận hành 9: tắt app giữa lúc đồng bộ để lại rebase dở và gợi ý `--continue` làm mất kết quả; tự đồng bộ đẩy commit code bỏ qua pre-push; autostash để lại conflict marker mà vẫn báo ổn; hỏi ký GPG để lại `index.lock`; hook CRLF trên Windows; code do tiến trình khác kéo về không báo cập nhật; pre-push kiểm working tree thay vì commit được đẩy; giới hạn khởi động lại không reset; outbox khi localStorage đầy. Đề niêm phong & tín hiệu học 8: file pack thô (📄) lộ câu niêm phong kèm đáp án; làm lại đề vẫn tính "điểm trên câu mới"; điểm phần câu mới bỏ qua câu chưa xem; `sealed.md` hỏng → mở hết câu; ngày gợi ý sai khi đã dùng đề trước; kế hoạch onboarding không ghim đề; snapshot nêu id câu niêm phong; Hỏi AI / giải mù có thể lộ câu niêm phong. Agent tự tìm thêm 2 lỗi cùng loại (`practice-exams/` chứa đáp án gốc; snapshot §16 lấy cả lần làm lại) |
+| Lỗi tìm thấy & sửa khi tích hợp | xuất bài bỏ mất bộ lọc `requirements`; huy hiệu đạt/chưa đạt ở Lịch sử trong tuần đầu (nay trung tính); trang không tải lại danh sách câu khi đề niêm phong đổi trạng thái; bỏ dở đề niêm phong không cảnh báo; 3 server sandbox của test chạy sót |

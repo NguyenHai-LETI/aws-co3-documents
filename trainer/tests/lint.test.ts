@@ -404,3 +404,61 @@ test('validate --lint prints a summary + list, --json carries it, --lint=<code> 
   assert.equal(validate(home, '--lint=nope').code, 2);
   assert.doesNotMatch(validate(home).out, /🩺 Lint/, 'plain validate is unchanged');
 });
+
+// ── [γ] exam scope + sealed exclusion ───────────────────────────────────────
+
+test('exam scope (taxonomy scope: out): oos-answer (medium) for a correct option, oos-distractor (low) per distractor — only with the taxonomy', () => {
+  const ans = mk({ options: ['Store the code in AWS CodeCommit', 'Store the code in Amazon S3', 'Store the code on Amazon EFS', 'Store the code on an EBS volume'], answer: ['A'] });
+  const flaws = lintQuestion(ans, tax);
+  const f = flaws.find((x) => x.code === 'oos-answer');
+  assert.ok(f, JSON.stringify(flaws));
+  assert.equal(f.severity, 'medium');
+  assert.equal(f.option, 'A');
+  assert.match(f.message, /ngoài phạm vi đề thi \(CodeCommit\)/);
+  assert.ok(!flaws.some((x) => x.code === 'oos-distractor'), 'an off-exam question is not flagged again per distractor');
+  assert.ok(!has(ans, 'oos-answer'), 'without the taxonomy the scope rules do not run');
+
+  const dis = mk({ options: ['Convert the DB instance to a Multi-AZ deployment', 'Move the database to Amazon Lightsail', 'Run the database on AWS IoT Greengrass devices', 'Add two read replicas behind a Route 53 record'] });
+  const d = lintQuestion(dis, tax).filter((x) => x.code === 'oos-distractor');
+  assert.deepEqual(d.map((x) => [x.option, x.severity]), [['B', 'low'], ['C', 'low']]);
+  assert.match(d[0].message, /\(Lightsail\)/);
+  assert.match(d[1].message, /\(IoT Core\)/);
+  // in scope, or merely unlisted (CodePipeline): no scope flaw
+  const unlisted = mk({ options: ['Convert the DB instance to a Multi-AZ deployment', 'Orchestrate the release with AWS CodePipeline', 'Take hourly snapshots and restore them elsewhere', 'Add two read replicas behind a Route 53 record'] });
+  assert.deepEqual(lintQuestion(unlisted, tax).filter((x) => x.code.startsWith('oos-')), []);
+  // an AI edit that brings out-of-scope distractors: new (warning-level) flaws for the pipeline
+  assert.deepEqual(newFlaws(lintQuestion(mk(), tax), lintQuestion(dis, tax)).map((x) => x.code).filter((c) => c.startsWith('oos-')), ['oos-distractor', 'oos-distractor']);
+  assert.deepEqual(
+    LINT_RULES.filter((r) => r.code.startsWith('oos-')).map((r) => [r.code, r.severity]),
+    [['oos-answer', 'medium'], ['oos-distractor', 'low']],
+  );
+});
+
+test('lintBank / lintQuestionsFor leave `exclude` (sealed questions) out of every count and list; the cache keys on it', () => {
+  const bank = bankOf([mk({ id: 'e-short', explanation: 'Because.' }), mk({ id: 'e-short2', explanation: 'Because.' }), mk({ id: 'e-clean' })]);
+  const all = lintBank(bank);
+  assert.equal(all.byCode['short-explanation'].count, 2);
+  const ex = lintBank(bank, { exclude: new Set(['e-short2']) });
+  assert.equal(ex.checked, 2);
+  assert.equal(ex.byCode['short-explanation'].count, 1);
+  assert.deepEqual(ex.ids?.['short-explanation'], ['e-short']);
+  assert.notEqual(ex, all);
+  assert.equal(lintBank(bank, { exclude: new Set(['e-short2']) }), ex, 'same exclusion → cached');
+  assert.deepEqual(lintQuestionsFor(bank, 'short-explanation', new Set(['e-short2'])).map((x) => x.id), ['e-short']);
+  assert.deepEqual(lintQuestionsFor(bank, 'short-explanation').map((x) => x.id), ['e-short', 'e-short2']);
+});
+
+test('validate --lint lists the exam-scope rules: an out-of-scope answer (medium) and distractor (low, with --warnings)', () => {
+  const home = lintHome();
+  const block = (id: string, options: string[], answer: string) =>
+    [`## Q ${id}`, '- domain: resilient', '- topic: devtools', '- difficulty: easy', '- time: 45', '', 'A team needs a managed place for its source code and builds. Which service should it use?', '', ...options.map((o, i) => `- ${'ABCD'[i]}. ${o}`), '', `**Answer:** ${answer}`, '', `**Explanation:** ${LONG_EXPLANATION}`, ''].join('\n');
+  fs.writeFileSync(
+    path.join(home, 'bank', 'packs', 'manual', 'oos.md'),
+    `---\npack: oos-pack\ntitle: OOS\norigin: manual\n---\n\n# OOS\n\n${block('v-oos', ['Use AWS CodeCommit repositories', 'Use Amazon S3 buckets with versioning', 'Use Amazon EFS file systems', 'Use Amazon EBS volumes'], 'A')}\n---\n\n${block('v-oos-d', ['Use Amazon S3 buckets with versioning', 'Use Amazon Lightsail instances', 'Use Amazon EFS file systems', 'Use Amazon EBS volumes'], 'A')}`,
+  );
+  const out = validate(home, '--lint', '--warnings').out;
+  assert.match(out, /⚠️ +bank\/packs\/manual\/oos\.md:\d+ \[v-oos\] oos-answer \(A\): Đáp án đúng nêu dịch vụ ngoài phạm vi đề thi \(CodeCommit\)/);
+  assert.match(out, /· bank\/packs\/manual\/oos\.md:\d+ \[v-oos-d\] oos-distractor \(B\)/);
+  assert.match(out, /medium +oos-answer +1 +Đáp án là dịch vụ ngoài phạm vi đề/);
+  assert.match(out, /low +oos-distractor +1/);
+});

@@ -329,7 +329,7 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   o.push('## 13. Bank health', '');
   const errors = bank.problems.filter((p) => p.level === 'error');
   o.push(`- ${bank.questions.length} câu trong ${bank.packs.length} pack · ${errors.length} lỗi · ${bank.problems.length - errors.length} cảnh báo`);
-  for (const p of errors.slice(0, 15)) o.push(`  - ❗ ${p.file}:${p.line} ${p.qid ? `\`${p.qid}\` ` : ''}${p.message}`);
+  for (const p of errors.filter((x) => !x.qid || open(x.qid)).slice(0, 15)) o.push(`  - ❗ ${p.file}:${p.line} ${p.qid ? `\`${p.qid}\` ` : ''}${p.message}`);
   o.push('');
 
   o.push(...safeLines(() => qualitySnapshotLines(bank, attempts), 'chất lượng ngân hàng'));
@@ -348,7 +348,8 @@ function sealedLines(all: Attempt[]): string[] {
     return o;
   }
   for (const f of s.forms) {
-    const used = f.status === 'used' ? all.find((a) => a.id === f.attempt) ?? all.find((a) => a.sealedForm === f.id) : undefined;
+    // only the sitting sealed.md recorded (form.attempt) is official — a retake or a sitting after a release has no score
+    const used = f.status === 'used' && f.attempt ? all.find((a) => a.id === f.attempt) : undefined;
     const what =
       f.status === 'sealed'
         ? '🔒 đang niêm phong'

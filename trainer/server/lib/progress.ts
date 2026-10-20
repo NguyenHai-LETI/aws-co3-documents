@@ -468,33 +468,27 @@ export function sealedOffset(i: number, n: number): number {
   return Math.round(SEALED_FIRST_OFFSET - (i * (SEALED_FIRST_OFFSET - SEALED_LAST_OFFSET)) / (n - 1));
 }
 
-/** The attempt that used a form: the recorded one, else the latest non-rushed sealed attempt of that form. */
-function formAttempt(formId: string, attemptId: string | undefined, attempts: Attempt[]): Attempt | undefined {
-  const recorded = attemptId ? attempts.find((a) => a.id === attemptId) : undefined;
-  if (recorded) return recorded;
-  for (let i = attempts.length - 1; i >= 0; i--) if (attempts[i].sealedForm === formId && !attempts[i].rushed) return attempts[i];
-  return undefined;
-}
-
-/** Sealed forms for GET /api/progress: no question ids; suggested dates need an exam date that has not passed. */
+/**
+ * Sealed forms for GET /api/progress (no question ids). A used form shows the score of the attempt sealed.md records for
+ * it — the first submit (results.ts); later sittings of the same questions are not "điểm trên câu mới". Suggested dates
+ * (a future exam date needed) are spread over the forms that are still sealed: the first ≈ exam − 21 days, the last ≈ − 7.
+ */
 export function sealedProgress(state: SealedState, attempts: Attempt[], goal: ExamGoal, now = Date.now()): SealedFormProgress[] {
   const today = localDay(now);
   const exam = goal.examDate ? dayOfKey(goal.examDate) : undefined;
-  return state.forms.map((f, i) => {
+  const open = state.forms.filter((f) => f.status === 'sealed');
+  const byId = new Map(attempts.map((a) => [a.id, a]));
+  return state.forms.map((f) => {
     const p: SealedFormProgress = { id: f.id, status: f.status, count: f.ids.length };
     if (f.usedAt) p.usedAt = f.usedAt;
     if (f.attempt) p.attempt = f.attempt;
-    if (f.status === 'used') {
-      const a = formAttempt(f.id, f.attempt, attempts);
-      if (a) {
-        p.attempt ??= a.id;
-        p.usedAt ??= a.finished;
-        p.score = a.score;
-        p.scaled = a.scaled;
-      }
+    const a = f.status === 'used' && f.attempt ? byId.get(f.attempt) : undefined;
+    if (a) {
+      p.score = a.score;
+      p.scaled = a.scaled;
     }
     if (f.status === 'sealed' && exam !== undefined && exam >= today) {
-      const day = Math.max(today, exam - sealedOffset(i, state.forms.length));
+      const day = Math.max(today, exam - sealedOffset(open.indexOf(f), open.length));
       p.suggested = dayKey(day);
       p.due = day <= today;
     }
@@ -503,19 +497,23 @@ export function sealedProgress(state: SealedState, attempts: Attempt[], goal: Ex
 }
 
 /**
- * Used sealed forms as internal calibration points ("Đề niêm phong S1", internal: true): the score on never-practised
- * questions, compared with the app readiness just before that attempt (the attempt itself left out).
+ * Used sealed forms as internal calibration points ("Đề niêm phong S1", internal: true): the score of the sitting that
+ * sealed.md records for the form (its first submit) on never-practised questions, compared with the app readiness just
+ * before that attempt (the attempt itself left out). Rushed sittings and attempts carrying a stray `sealed_form` that
+ * sealed.md does not record are no calibration points.
  */
-export function sealedScores(attempts: Attempt[], bank: BankState, cfg: AppConfig): ExternalScore[] {
+export function sealedScores(attempts: Attempt[], bank: BankState, cfg: AppConfig, state: SealedState = loadSealed()): ExternalScore[] {
+  const byId = new Map(attempts.map((a) => [a.id, a]));
   const out: ExternalScore[] = [];
-  for (const a of attempts) {
-    if (!a.sealedForm || a.rushed) continue;
+  for (const f of state.forms) {
+    const a = f.status === 'used' && f.attempt ? byId.get(f.attempt) : undefined;
+    if (!a || a.rushed) continue;
     const at = Date.parse(a.finished);
     if (!Number.isFinite(at)) continue;
     const s: ExternalScore = {
       id: `sealed-${a.id}`,
       date: localDateKey(a.finished),
-      source: `Đề niêm phong ${a.sealedForm}`,
+      source: `Đề niêm phong ${f.id}`,
       score: a.score,
       scaled: a.scaled,
       note: `điểm trên câu mới · ${a.correct}/${a.total} câu tính điểm`,
@@ -588,7 +586,7 @@ function computeHeavy(ctx: ProgressCtx, goal: ExamGoal, stored: ExternalScore[],
       const r = readinessAt(attempts, bank, cfg, dayStartMs(day + 1) - 1);
       return r.answers >= MIN_CALIBRATION_ANSWERS ? { ...s, readinessAtDate: r.readiness } : s;
     }),
-    ...sealedScores(attempts, bank, cfg),
+    ...sealedScores(attempts, bank, cfg, sealed),
   ].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   const current = readinessAt(attempts, bank, cfg, now);
   let studyStart: string | undefined;

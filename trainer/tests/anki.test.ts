@@ -301,3 +301,19 @@ test('an endpoint that is not AnkiConnect is reported as such', async () => {
     srv.close();
   }
 });
+
+test('[γ] sealed questions are never exported: every scope leaves them out, an explicit id is skipped without being "missing"', () => {
+  const qs = [q('k-1'), q('k-2'), q('k-3', { domain: 'secure' }), q('k-4', { status: 'retired' })];
+  const bank = { questions: qs, byId: new Map(qs.map((x) => [x.id, x])) };
+  const st = (id: string): QuestionState => ({ id, attempts: 1, correct: 0, everWrong: true, lastOk: false, streak: 0, box: 1, avgTime: 30, slowCount: 0, wrongPicks: {} });
+  const states: Record<string, QuestionState> = { 'k-1': st('k-1'), 'k-2': st('k-2') };
+  const sealed = new Set(['k-2', 'k-3']);
+  const ids = (r: AnkiExportRequest) => selectForAnki(r, bank, states, sealed).questions.map((x) => x.id);
+  assert.deepEqual(ids({ scope: 'all' }), ['k-1']);
+  assert.deepEqual(ids({ scope: 'filter', filters: { domains: ['secure'] } }), []);
+  assert.deepEqual(ids({ scope: 'wrong' }), ['k-1']);
+  const sel = selectForAnki({ scope: 'ids', ids: ['k-3', 'k-1', 'k-4', 'nope'] }, bank, states, sealed);
+  assert.deepEqual(sel.questions.map((x) => x.id), ['k-1']);
+  assert.deepEqual(sel.missing, ['k-4', 'nope'], 'sealed ids are skipped silently (the Anki card explains why)');
+  assert.deepEqual(selectForAnki({ scope: 'all' }, bank, states, new Set()).questions.map((x) => x.id), ['k-1', 'k-2', 'k-3'], 'nothing sealed → as before');
+});

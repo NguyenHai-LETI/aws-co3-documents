@@ -7,9 +7,9 @@ import { context } from '../context.ts';
 import { loadBank } from '../lib/bank.ts';
 import { addIssue, loadIssues } from '../lib/issues.ts';
 import { findClaude } from '../lib/coach-runner.ts';
-import { listNotes, readNote } from '../lib/notes.ts';
+import { guardFile, listNotes, notePath } from '../lib/notes.ts';
 import { ensureSnapshot, scheduleSnapshot } from '../lib/snapshot.ts';
-import { loadSealed, sealedIds } from '../lib/sealed.ts';
+import { loadSealed, sealedError, sealedIds } from '../lib/sealed.ts';
 import { codeVersion } from '../lib/version.ts';
 import os from 'node:os';
 
@@ -40,6 +40,7 @@ route('GET', '/api/meta', () => {
     coachHosts: cfg.coach.hosts,
     syncAi: { before: cfg.sync.before_ai, after: cfg.sync.after_ai }, // AI Coach runs sync before / after themselves
     sealed: loadSealed().forms.map(({ ids, ...f }) => ({ ...f, count: ids.length })), // never the question ids
+    sealedError: sealedError(), // [γ] results/sealed.md broken: what to fix (its ids stay hidden, nothing is written meanwhile)
     codeVersion: codeVersion(), // code the server process runs (the UI offers a restart when a sync brings newer code)
     launcher: process.env.TRAINER_LAUNCHER === '1', // started by start.sh/.bat/.command (can restart itself)
   };
@@ -63,21 +64,26 @@ route('POST', '/api/issues', async (req) => {
 
 route('GET', '/api/notes', () => listNotes());
 
+/** A note (study notes, inbox, packs, result reports…) — sealed questions hidden or the file refused ([γ] guardFile). */
 route('GET', '/api/note', (_req, url) => {
   const p = url.searchParams.get('path') ?? '';
-  const content = readNote(p);
-  if (content === undefined) throw new HttpError(404, 'Note not found');
-  return { path: p, content };
+  const abs = notePath(p);
+  if (!abs) throw new HttpError(404, 'Note not found');
+  const g = guardFile(abs);
+  if (g.refused !== undefined) throw new HttpError(403, g.refused);
+  return { path: p, content: g.content };
 });
 
-/** Raw Markdown of any file under the data root (result reports, plans, snapshot, packs). */
+/** Raw Markdown of any file under the data root (result reports, plans, snapshot, packs) — same sealed guard as /api/note. */
 route('GET', '/api/file', (_req, url) => {
   const p = url.searchParams.get('path') ?? '';
   const abs = path.resolve(DATA_DIR, p);
   if (!abs.startsWith(DATA_DIR + path.sep) || !abs.endsWith('.md') || abs.includes(`${path.sep}node_modules${path.sep}`) || !fs.existsSync(abs)) {
     throw new HttpError(404, 'File not found');
   }
-  return { path: rel(abs), content: fs.readFileSync(abs, 'utf8') };
+  const g = guardFile(abs);
+  if (g.refused !== undefined) throw new HttpError(403, g.refused);
+  return { path: rel(abs), content: g.content };
 });
 
 /** coach/snapshot.md — rebuilt first when stale (a scheduled write is pending or the data changed since it was written). */

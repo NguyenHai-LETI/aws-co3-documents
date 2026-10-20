@@ -50,7 +50,19 @@ export interface SyncRunResult extends SyncResult {
   /** App code files (server/, shared/, web/, package files…) changed by the received commits — restart / reload needed. */
   codeFiles?: string[];
   source?: SyncSource;
+  /** Needs the learner, not a retry: the repo is not in a state the app may touch on its own (see SyncBlock). */
+  blocked?: SyncBlock;
+  heldBack?: string[]; // unattended sync: local commits change files outside the data folders → nothing pushed
+  pullSkipped?: string[]; // unattended sync: uncommitted edits outside the data folders → no pull (never stashed)
 }
+
+/**
+ * Why a sync stopped before finishing, waiting for the learner: `repo` (not a repo / no upstream / detached HEAD),
+ * `branch` (current branch ≠ upstream branch name), `operation` (a rebase / merge in progress), `unmerged` (files with
+ * conflict markers), `code` (local code commits an unattended sync must not push), `dirty` (uncommitted code edits an
+ * unattended sync must not stash), `stash` (the learner's stashed edits did not apply cleanly after a manual sync).
+ */
+export type SyncBlock = 'repo' | 'branch' | 'operation' | 'unmerged' | 'code' | 'dirty' | 'stash';
 
 /** One finished sync of this process (any source). */
 export interface SyncRecord {
@@ -59,6 +71,7 @@ export interface SyncRecord {
   message: string;
   hint?: string;
   source: SyncSource;
+  blocked?: SyncBlock;
   committed?: number;
   received?: number;
   pushed?: number;
@@ -94,6 +107,9 @@ export interface SyncStatus {
   lastOkAt?: string; // last successful sync of this server process (ISO)
   unpushedSince?: string; // oldest data change not on the remote yet: uncommitted data file (mtime) or local commit (ISO)
   stale?: boolean; // unpushedSince is older than 24 h → the other machine misses these results
+  unpushedCode?: string[]; // local commits change these files outside the data folders (automatic syncs keep them back)
+  dirtyCode?: string[]; // uncommitted edits to tracked files outside the data folders (automatic syncs do not pull)
+  unmerged?: string[]; // files with conflict markers left by an earlier merge (every sync stops until resolved)
   auto?: AutoSyncStatus;
 }
 
@@ -137,38 +153,91 @@ function killTree(child: ChildProcess) {
   }
 }
 
+// git writes its output into temp files, never into pipes: when this process dies mid-sync (Ctrl+C, the window closed,
+// the shutdown's hard exit), an orphaned `git pull --rebase` must not be killed by SIGPIPE halfway through the rebase —
+// with a file it finishes the rebase and re-applies the autostash on its own.
+let outDir: string | undefined;
+let outSeq = 0;
+function gitOutputFile(kind: 'out' | 'err'): string {
+  if (!outDir) {
+    outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-git-'));
+    const dir = outDir;
+    process.once('exit', () => {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true }); // an orphaned git keeps writing to its (unlinked) file
+      } catch {
+        // Windows: a file still open by git — left for the OS temp cleanup
+      }
+    });
+  }
+  return path.join(outDir, `${++outSeq}.${kind}`);
+}
+
+/** The last 200 KB of a git output file ('' when unreadable). */
+function readTail(file: string): string {
+  try {
+    const size = fs.statSync(file).size;
+    const len = Math.min(size, 200_000);
+    const buf = Buffer.alloc(len);
+    const fd = fs.openSync(file, 'r');
+    try {
+      fs.readSync(fd, buf, 0, len, size - len);
+    } finally {
+      fs.closeSync(fd);
+    }
+    return buf.toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
 export function runGit(args: string[], cwd: string, timeoutMs = SYNC_STEP_TIMEOUT_MS): Promise<GitRun> {
   return new Promise((resolve) => {
-    let stdout = '';
-    let stderr = '';
     let timedOut = false;
     let settled = false;
+    let outFile = '';
+    let errFile = '';
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (r: Omit<GitRun, 'stdout' | 'stderr' | 'timedOut'>) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      const stdout = outFile ? readTail(outFile) : '';
+      const stderr = errFile ? readTail(errFile) : '';
+      for (const f of [outFile, errFile]) if (f) fs.rmSync(f, { force: true });
       resolve({ ...r, stdout, stderr, timedOut });
     };
     let child: ChildProcess;
     try {
-      child = spawn('git', ['-c', 'core.quotepath=off', ...args], {
-        cwd,
-        env: gitEnv(),
-        stdio: ['ignore', 'pipe', 'pipe'],
-        // Own session without a controlling terminal: ssh / gpg cannot open /dev/tty to ask for a passphrase.
-        detached: process.platform !== 'win32',
-        windowsHide: true,
-      });
+      outFile = gitOutputFile('out');
+      errFile = gitOutputFile('err');
+      const out = fs.openSync(outFile, 'w');
+      const err = fs.openSync(errFile, 'w');
+      try {
+        // never sign (a signing prompt nobody answers would hold .git/index.lock until the timeout kills git); give up
+        // on a transfer stalled for a minute (an orphaned git has no timer left to kill it)
+        const cfg = ['-c', 'core.quotepath=off', '-c', 'commit.gpgsign=false', '-c', 'http.lowSpeedLimit=1000', '-c', 'http.lowSpeedTime=60'];
+        child = spawn('git', [...cfg, ...args], {
+          cwd,
+          env: gitEnv(),
+          stdio: ['ignore', out, err],
+          // Own session / no console: ssh / gpg cannot open /dev/tty to ask for a passphrase, and Ctrl+C in the app's
+          // terminal (or console window on Windows) never reaches git in the middle of a rebase.
+          detached: true,
+          windowsHide: true,
+        });
+      } finally {
+        fs.closeSync(out); // the child has its own copies
+        fs.closeSync(err);
+      }
     } catch (e) {
-      resolve({ code: null, stdout, stderr, timedOut, error: (e as Error).message });
+      finish({ code: null, error: (e as Error).message });
       return;
     }
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       timedOut = true;
       killTree(child);
     }, timeoutMs);
-    child.stdout?.on('data', (b: Buffer) => (stdout = (stdout + b.toString('utf8')).slice(-200_000)));
-    child.stderr?.on('data', (b: Buffer) => (stderr = (stderr + b.toString('utf8')).slice(-200_000)));
     child.on('error', (e) => finish({ code: null, error: e.message }));
     child.on('close', (code) => finish({ code }));
   });
@@ -243,6 +312,11 @@ export function explainGitError(output: string, opts: { timedOut?: boolean; repo
 let running: Promise<SyncRunResult> | undefined;
 export function isSyncing(): boolean {
   return !!running;
+}
+
+/** The sync this process is running right now (shutdown waits for it instead of abandoning git mid-rebase). */
+export function syncInFlight(): Promise<SyncRunResult> | undefined {
+  return running;
 }
 
 /** Sync only makes sense when the app's data lives inside the git work tree (not in a TRAINER_HOME test sandbox). */
@@ -348,6 +422,69 @@ export function appDirOf(dataPaths: string[]): string {
   return parents.size === 1 && only !== '.' ? only : '';
 }
 
+/** Repo-relative data paths without trailing slashes / backslashes ("trainer/results"). */
+export function normalizePaths(paths: string[]): string[] {
+  return paths.map((p) => p.trim().replace(/\\/g, '/').replace(/\/+$/, '')).filter(Boolean);
+}
+
+/** `file` (repo-relative) lies inside one of the (normalized) data paths. */
+export function inDataPaths(file: string, dataPaths: string[]): boolean {
+  return dataPaths.some((p) => file === p || file.startsWith(p + '/'));
+}
+
+/** Tracked files with uncommitted changes (staged or not) outside the data paths. */
+async function dirtyOutside(repoDir: string, dataPaths: string[], timeoutMs: number): Promise<string[]> {
+  const r = await runGit(['status', '--porcelain=v1', '-z', '--untracked-files=no'], repoDir, timeoutMs);
+  return r.code === 0 ? parsePorcelain(r.stdout).filter((f) => !inDataPaths(f, dataPaths)) : [];
+}
+
+/** Files changed by the local commits not on `upRef` yet (what a push would send), outside the data paths. */
+async function outgoingOutside(repoDir: string, upRef: string, dataPaths: string[], timeoutMs: number): Promise<string[]> {
+  const r = await runGit(['diff', '--name-only', '-z', `${upRef}...HEAD`, '--'], repoDir, timeoutMs);
+  return r.code === 0 ? r.stdout.split('\0').filter(Boolean).filter((f) => !inDataPaths(f, dataPaths)) : [];
+}
+
+/** Paths with unresolved conflicts (conflict markers in the working tree). */
+async function unmergedFiles(repoDir: string, timeoutMs: number): Promise<string[]> {
+  const r = await runGit(['diff', '--name-only', '-z', '--diff-filter=U'], repoDir, timeoutMs);
+  return r.code === 0 ? [...new Set(r.stdout.split('\0').filter(Boolean))] : [];
+}
+
+/** Files with conflict markers in the synced repo ([] when it is not a repo) — e.g. no restart into them. */
+export function conflictedFiles(repoDir: string = REPO_DIR): Promise<string[]> {
+  return unmergedFiles(repoDir, 10_000);
+}
+
+const listed = (files: string[], max = 5) => files.slice(0, max).join(', ') + (files.length > max ? `, … (+${files.length - max})` : '');
+
+/** How to get out of conflicts left in the working tree — never `--continue` blindly, nothing gets dropped. */
+function conflictHint(files: string[], repoDir: string): string {
+  return (
+    `Mở Terminal tại ${repoDir}. Các file này còn dấu xung đột (<<<<<<< … >>>>>>>): ${listed(files)}. ` +
+    'Cách 1 — giữ bản đã commit (bản từ GitHub): `git checkout HEAD -- <file>`. Cách 2 — sửa tay rồi `git add <file>`. ' +
+    'Nếu `git stash list` còn bản cất tạm (autostash) thì đó là sửa đổi chưa commit của bạn: xem bằng `git stash show -p`, áp lại khi cần ' +
+    '(`git stash pop`) hoặc bỏ (`git stash drop`). Xong thì bấm ⇅ Đồng bộ lại.'
+  );
+}
+
+/**
+ * A rebase left behind (the app was killed mid-pull by an older version, a crash…). Only `autostash` in rebase-merge =
+ * the rebase never started: quit it, which returns the stashed edits to the stash list. Otherwise abort, which puts the
+ * branch back where it was (the local data commit included). Never `--continue`: it can drop the commit being replayed.
+ */
+function rebaseRecoveryHint(repoDir: string, rebaseMergeDir: string | undefined): string {
+  let onlyAutostash = false;
+  try {
+    const entries = rebaseMergeDir ? fs.readdirSync(rebaseMergeDir) : [];
+    onlyAutostash = entries.length > 0 && entries.every((e) => e === 'autostash');
+  } catch {
+    // rebase-apply or unreadable: abort below
+  }
+  return onlyAutostash
+    ? `Mở Terminal tại ${repoDir}: chạy \`git rebase --quit\` rồi \`git stash pop\` (lấy lại các sửa đổi chưa commit), sau đó bấm ⇅ Đồng bộ lại. Đừng dùng \`git rebase --continue\`.`
+    : `Mở Terminal tại ${repoDir}: chạy \`git rebase --abort\` (đưa nhánh về như trước lần đồng bộ dở — dữ liệu học vẫn nằm trong commit cục bộ và các sửa đổi chưa commit được áp lại), sau đó bấm ⇅ Đồng bộ lại. Đừng dùng \`git rebase --continue\`: nó có thể làm mất commit đang dở.`;
+}
+
 /** Repo-relative files that changed between two commits and belong to the app code (server/, shared/, web/, …). */
 export async function changedCodeFiles(repoDir: string, from: string, to: string, appDir: string, timeoutMs = 20_000): Promise<string[]> {
   const r = await runGit(['diff', '--name-only', '-z', from, to, '--'], repoDir, timeoutMs);
@@ -396,9 +533,14 @@ export async function syncStatus(opts: { repoDir?: string; dataPaths?: string[];
   const head = await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], repoDir, 10_000);
   const branch = head.stdout.trim();
   if (!branch) return { ...base, branch: 'HEAD', error: 'Repo đang ở trạng thái “detached HEAD” — chuyển về nhánh chính (git switch main) rồi đồng bộ.' };
-  const dataPaths = await usablePaths(repoDir, opts.dataPaths ?? loadConfig().sync.data_paths, 10_000);
+  const configured = opts.dataPaths ?? loadConfig().sync.data_paths;
+  const dataNorm = normalizePaths(configured);
+  const dataPaths = await usablePaths(repoDir, configured, 10_000);
 
   const status: SyncStatus = { ...base, branch };
+  const [dirtyCode, unmerged] = await Promise.all([dirtyOutside(repoDir, dataNorm, 10_000), unmergedFiles(repoDir, 10_000)]);
+  if (dirtyCode.length) status.dirtyCode = dirtyCode.slice(0, 20);
+  if (unmerged.length) status.unmerged = unmerged.slice(0, 20);
   let oldest = Infinity; // oldest change that is not on the remote yet (epoch ms)
   if (dataPaths.length) {
     const st = await runGit(['status', '--porcelain=v1', '-z', '-uall', '--', ...dataPaths], repoDir, 20_000);
@@ -441,6 +583,9 @@ export async function syncStatus(opts: { repoDir?: string; dataPaths?: string[];
     const firstLocal = await runGit(['log', '--reverse', '--format=%cI', `${up.ref}..HEAD`], repoDir, 10_000);
     const t = Date.parse(firstLocal.stdout.split('\n')[0] ?? '');
     if (Number.isFinite(t)) oldest = Math.min(oldest, t);
+    // local commits that are not learner data: automatic syncs keep the whole push back until they are pushed by hand
+    const code = await outgoingOutside(repoDir, up.ref, dataNorm, 10_000);
+    if (code.length) status.unpushedCode = code.slice(0, 20);
   }
   return withAge(status, oldest, opts.now);
 }
@@ -472,6 +617,7 @@ function processRecords(): Pick<SyncStatus, 'lastRun' | 'lastOkAt'> {
 function recordRun(r: SyncRunResult, source: SyncSource): SyncRecord {
   const rec: SyncRecord = { at: new Date().toISOString(), ok: r.ok, message: r.message, source };
   if (r.hint) rec.hint = r.hint;
+  if (r.blocked) rec.blocked = r.blocked;
   for (const k of ['committed', 'received', 'pushed'] as const) if (r[k] !== undefined) rec[k] = r[k];
   lastRun = rec;
   if (r.ok) lastOkAt = rec.at;
@@ -505,6 +651,8 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
   const repoDir = opts.repoDir ?? REPO_DIR;
   const host = opts.host ?? os.hostname();
   const timeoutMs = opts.timeoutMs ?? SYNC_STEP_TIMEOUT_MS;
+  // nobody watches auto / startup / shutdown / AI syncs: they never stash the learner's edits and push learner data only
+  const unattended = (opts.source ?? 'manual') !== 'manual';
   const steps: SyncStep[] = [];
   const codeFiles = new Set<string>(); // app code received from the other machine
   // `message` = one-line outcome; the advice for failures goes to `hint` (the UI shows it as its own 💡 line)
@@ -533,22 +681,34 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
   // 1. preconditions
   const disabled = opts.repoDir ? undefined : syncDisabledReason(repoDir);
   if (disabled) return result(false, disabled);
-  if (!fs.existsSync(repoDir)) return result(false, `Không tìm thấy thư mục repo ${repoDir}.`);
+  if (!fs.existsSync(repoDir)) return result(false, `Không tìm thấy thư mục repo ${repoDir}.`, { blocked: 'repo' });
   const top = await step(['rev-parse', '--show-toplevel'], false);
-  if (!top.ok) return result(false, 'Không đồng bộ được.', { hint: explainGitError(top.output, { repoDir, timedOut: top.timedOut }) ?? clip(top.output) });
+  if (!top.ok) return result(false, 'Không đồng bộ được.', { blocked: 'repo', hint: explainGitError(top.output, { repoDir, timedOut: top.timedOut }) ?? clip(top.output) });
   const busy = !opts.force && coachRunning();
   if (busy) return result(false, `AI Coach đang chạy (${busy}) — đợi lượt chạy xong rồi đồng bộ, để không commit file đang ghi dở.`);
   const op = await operationInProgress(repoDir);
   if (op) {
-    return result(false, `Repo đang có một ${op} dở dang.`, {
-      hint: `Mở Terminal tại ${repoDir}: hoàn tất (git ${op} --continue) hoặc huỷ (git ${op} --abort), rồi đồng bộ lại.`,
-    });
+    const hint = op === 'rebase' ? rebaseRecoveryHint(repoDir, await gitPath(repoDir, 'rebase-merge')) : `Mở Terminal tại ${repoDir}: huỷ bằng \`git ${op} --abort\`, rồi bấm ⇅ Đồng bộ lại.`;
+    return result(false, `Repo đang có một ${op} dở dang.`, { blocked: 'operation', hint });
   }
   const branch = (await step(['symbolic-ref', '--short', '-q', 'HEAD'], false)).stdout.trim();
-  if (!branch) return result(false, 'Repo đang ở trạng thái “detached HEAD”.', { hint: 'Chuyển về nhánh chính (git switch main) rồi đồng bộ lại.' });
+  if (!branch) return result(false, 'Repo đang ở trạng thái “detached HEAD”.', { blocked: 'repo', hint: 'Chuyển về nhánh chính (git switch main) rồi đồng bộ lại.' });
   const up = await upstreamOf(repoDir, branch);
-  if (!up) return result(false, `Nhánh ${branch} chưa có upstream.`, { branch, hint: explainGitError('no upstream', { repoDir }) });
+  if (!up) return result(false, `Nhánh ${branch} chưa có upstream.`, { branch, blocked: 'repo', hint: explainGitError('no upstream', { repoDir }) });
+  if (up.branch !== branch) {
+    // e.g. `git checkout -b feature-x origin/main`: pushing HEAD to main would publish the feature branch there
+    return result(false, `Nhánh hiện tại (${branch}) theo dõi ${up.ref} — khác tên nhánh nên app không đồng bộ, để không đẩy nhầm nhánh.`, {
+      branch,
+      blocked: 'branch',
+      hint: `Đồng bộ trên nhánh chính: \`git switch ${up.branch}\`. Hoặc cho nhánh này một nhánh cùng tên trên GitHub: \`git push -u ${up.remote} ${branch}\`.`,
+    });
+  }
+  const unmerged = await unmergedFiles(repoDir, timeoutMs);
+  if (unmerged.length) {
+    return result(false, `Repo còn file đang xung đột: ${listed(unmerged)}.`, { branch, blocked: 'unmerged', conflicts: unmerged, hint: conflictHint(unmerged, repoDir) });
+  }
   const configuredPaths = opts.dataPaths ?? loadConfig().sync.data_paths;
+  const dataNorm = normalizePaths(configuredPaths); // what counts as learner data (everything else is code / notes)
   const dataPaths = await usablePaths(repoDir, configuredPaths, timeoutMs);
   const appDir = appDirOf(configuredPaths);
 
@@ -591,10 +751,13 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
   if (typeof first !== 'number') return first;
   let committed = first;
 
-  // 4. pull --rebase (autostash keeps unrelated local edits); on conflict abort and keep the local commit
+  // 4. pull --rebase; on conflict abort and keep the local commit. A manual sync stashes unrelated local edits
+  // (--autostash) and puts them back; an unattended one never touches them: with tracked edits outside the data folders
+  // it does not pull at all (and says why), so no conflict markers can ever land in app code behind the learner's back.
   let received = 0;
   let migrated = 0;
-  let autostashNote = '';
+  let pullSkipped: string[] | undefined;
+  let stashConflict: string[] | undefined;
   const dataDir = opts.dataDir ?? DATA_DIR;
   const ownData = !syncDisabledReason(repoDir, dataDir); // never migrate files outside the work tree being synced
   /** Result files pulled from the other machine may predate a layout migration → remap now and commit them too. */
@@ -616,24 +779,29 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
     return undefined;
   };
   const pull = async (): Promise<SyncRunResult | undefined> => {
-    const before = await step(['rev-parse', '-q', '--verify', 'HEAD^{commit}'], false); // local tip before the pull
-    const r = await step(['pull', '--rebase', '--autostash', up.remote, up.branch]);
-    if (/autostash resulted in conflicts|changes are safe in the stash/i.test(r.output)) {
-      autostashNote = ' Lưu ý: thay đổi chưa commit ngoài thư mục dữ liệu không áp lại được (xung đột) — vẫn còn trong `git stash list`, chạy `git stash pop` để lấy lại.';
+    if (unattended) {
+      const dirty = await dirtyOutside(repoDir, dataNorm, timeoutMs);
+      if (dirty.length) {
+        pullSkipped = dirty;
+        steps.push({ cmd: 'git pull (bỏ qua)', ok: false, output: `Có sửa đổi chưa commit ngoài thư mục dữ liệu: ${listed(dirty, 10)} — đồng bộ tự động không cất tạm (stash) code của bạn.` });
+        return undefined;
+      }
     }
+    const before = await step(['rev-parse', '-q', '--verify', 'HEAD^{commit}'], false); // local tip before the pull
+    const r = await step(['pull', '--rebase', unattended ? '--no-autostash' : '--autostash', up.remote, up.branch]);
     if (!r.ok) {
       const rebasing = (await operationInProgress(repoDir)) === 'rebase';
       if (rebasing) {
-        const unmerged = await step(['diff', '--name-only', '--diff-filter=U'], false);
-        const conflicts = unmerged.stdout.split('\n').filter(Boolean);
-        const abort = await step(['rebase', '--abort']);
+        const conflicts = await unmergedFiles(repoDir, timeoutMs);
+        const abort = await step(['rebase', '--abort']); // also puts a manual sync's autostash back
         return result(false, `Xung đột khi gộp dữ liệu hai máy${conflicts.length ? `: ${conflicts.join(', ')}` : ''}.`, {
           branch,
           conflicts,
           committed,
           hint:
             (abort.ok ? 'Đã huỷ rebase — dữ liệu máy này vẫn an toàn trong commit cục bộ (chưa đẩy lên GitHub). ' : 'Không huỷ được rebase — chạy `git rebase --abort` trong Terminal. ') +
-            `Cách xử lý: mở Terminal tại ${repoDir}, chạy \`git pull --rebase\`, sửa các file xung đột, \`git add <file>\` rồi \`git rebase --continue\`, sau đó bấm Đồng bộ lại.`,
+            `Cách xử lý: mở Terminal tại ${repoDir}, chạy \`git pull --rebase\`, sửa các file xung đột, \`git add <file>\` rồi \`git rebase --continue\` ` +
+            '(chỉ sau khi đã sửa và add mọi file xung đột — muốn bỏ dở thì `git rebase --abort`), sau đó bấm Đồng bộ lại.',
         });
       }
       return fail('git pull', r, { branch, committed });
@@ -643,6 +811,14 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
     received += got;
     // app code among them (the local commits were in `before` already, so the diff is what arrived)
     if (got > 0) for (const f of await changedCodeFiles(repoDir, before.stdout.trim(), 'HEAD', appDir, timeoutMs)) codeFiles.add(f);
+    if (!unattended) {
+      // the autostash did not apply cleanly: conflict markers in the learner's own (uncommitted) files
+      const conflicts = await unmergedFiles(repoDir, timeoutMs);
+      if (conflicts.length || /autostash resulted in conflicts|changes are safe in the stash/i.test(r.output)) {
+        stashConflict = conflicts.length ? conflicts : ['(xem `git status`)'];
+        return undefined; // no migration commit on top of a conflicted working tree; it runs at the next start
+      }
+    }
     return afterPull();
   };
   if (!opts.pushOnly) {
@@ -650,37 +826,85 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
     if (pulled) return pulled;
   }
 
-  // 5. push (retry once when the other machine pushed in between — except push-only: data stays committed locally)
+  // 5. push (retry once when the other machine pushed in between — except push-only: data stays committed locally).
+  // An unattended sync pushes learner data only: local commits that change anything else (WIP code, notes) stay local —
+  // they would skip the pre-push gate (--no-verify). A manual sync pushes them through that gate.
   let pushed = await countRange(repoDir, `${up.ref}..HEAD`, timeoutMs);
+  let heldBack: string[] | undefined;
   if (pushed > 0) {
-    let push = await step(['push', '--no-verify', up.remote, `HEAD:refs/heads/${up.branch}`]);
-    const rejected = !push.ok && /\[rejected\]|non-fast-forward|fetch first/i.test(push.output);
-    if (rejected && opts.pushOnly) {
-      return result(false, 'Máy kia vừa đẩy dữ liệu mới nên chưa đẩy được — dữ liệu máy này đã nằm trong commit cục bộ.', {
-        branch,
-        committed,
-        pushed: 0,
-        hint: 'Lần mở app sau (hoặc khi bấm ⇅ Đồng bộ) app sẽ kéo dữ liệu máy kia về rồi đẩy lên.',
-      });
+    const code = await outgoingOutside(repoDir, up.ref, dataNorm, timeoutMs);
+    if (code.length && unattended) {
+      heldBack = code;
+      pushed = 0;
+      steps.push({ cmd: 'git push (giữ lại)', ok: false, output: `Các commit chưa đẩy có thay đổi ngoài thư mục dữ liệu: ${listed(code, 10)} — đồng bộ tự động chỉ đẩy dữ liệu học.` });
+    } else {
+      const pushArgs = [...(code.length ? [] : ['--no-verify']), up.remote, `HEAD:refs/heads/${up.branch}`];
+      let push = await step(['push', ...pushArgs]);
+      const rejected = !push.ok && /\[rejected\]|non-fast-forward|fetch first/i.test(push.output);
+      if (rejected && pullSkipped) {
+        return result(false, `Máy kia vừa đẩy dữ liệu mới, nhưng chưa kéo về được (có sửa đổi chưa commit ngoài thư mục dữ liệu: ${listed(pullSkipped)}) nên chưa đẩy được — dữ liệu máy này đã nằm trong commit cục bộ.`, {
+          branch,
+          committed,
+          pushed: 0,
+          blocked: 'dirty',
+          pullSkipped,
+          hint: dirtyHint,
+        });
+      }
+      if (rejected && opts.pushOnly) {
+        return result(false, 'Máy kia vừa đẩy dữ liệu mới nên chưa đẩy được — dữ liệu máy này đã nằm trong commit cục bộ.', {
+          branch,
+          committed,
+          pushed: 0,
+          hint: 'Lần mở app sau (hoặc khi bấm ⇅ Đồng bộ) app sẽ kéo dữ liệu máy kia về rồi đẩy lên.',
+        });
+      }
+      if (rejected) {
+        const again = await pull();
+        if (again) return again;
+        pushed = await countRange(repoDir, `${up.ref}..HEAD`, timeoutMs);
+        push = await step(['push', ...pushArgs]);
+      }
+      if (!push.ok) return fail('git push', push, { branch, committed, received, migrated, pushed: 0 });
     }
-    if (rejected) {
-      const again = await pull();
-      if (again) return again;
-      pushed = await countRange(repoDir, `${up.ref}..HEAD`, timeoutMs);
-      push = await step(['push', '--no-verify', up.remote, `HEAD:refs/heads/${up.branch}`]);
-    }
-    if (!push.ok) return fail('git push', push, { branch, committed, received, migrated, pushed: 0 });
   }
 
-  if (!opts.pushOnly) fetchState.set(repoDir, { at: Date.now(), ok: true, okAt: Date.now() }); // pull just fetched
+  if (!opts.pushOnly && !pullSkipped) fetchState.set(repoDir, { at: Date.now(), ok: true, okAt: Date.now() }); // pull just fetched
   const parts: string[] = [];
   if (committed) parts.push(`commit ${committed} file dữ liệu`);
   if (pushed) parts.push(`đẩy ${pushed} commit lên GitHub`);
   if (received) parts.push(`nhận ${received} commit từ máy khác`);
   if (migrated) parts.push(`chuyển ${migrated} file kết quả theo bố cục đáp án mới`);
-  const message = (parts.length ? `Đã đồng bộ: ${parts.join(', ')}.` : 'Đã đồng bộ — không có gì mới.') + autostashNote;
-  return result(true, message, { branch, committed, received, pushed, migrated });
+  const counts = { branch, committed, received, pushed, migrated };
+  if (stashConflict) {
+    codeFiles.clear(); // the working tree has conflict markers: never offer a restart into it
+    return result(false, `${parts.length ? `Đã đồng bộ: ${parts.join(', ')} — nhưng` : 'Nhưng'} sửa đổi chưa commit của bạn không áp lại được (xung đột): ${listed(stashConflict)}.`, {
+      ...counts,
+      blocked: 'stash',
+      conflicts: stashConflict,
+      hint: conflictHint(stashConflict, repoDir),
+    });
+  }
+  if (heldBack || pullSkipped) {
+    const why = [
+      heldBack ? `chưa đẩy lên vì các commit chưa đẩy có thay đổi ngoài dữ liệu học (${listed(heldBack)})` : '',
+      pullSkipped ? `chưa kéo dữ liệu máy kia về vì có sửa đổi chưa commit ngoài thư mục dữ liệu (${listed(pullSkipped)})` : '',
+    ].filter(Boolean);
+    return result(false, `Đồng bộ tự động chỉ làm được một phần${parts.length ? ` (${parts.join(', ')})` : ''}: ${why.join('; ')}.`, {
+      ...counts,
+      blocked: heldBack ? 'code' : 'dirty',
+      ...(heldBack ? { heldBack } : {}),
+      ...(pullSkipped ? { pullSkipped } : {}),
+      hint: [heldBack ? heldBackHint : '', pullSkipped ? dirtyHint : ''].filter(Boolean).join(' '),
+    });
+  }
+  return result(true, parts.length ? `Đã đồng bộ: ${parts.join(', ')}.` : 'Đã đồng bộ — không có gì mới.', counts);
 }
+
+const heldBackHint =
+  'Đồng bộ tự động chỉ đẩy dữ liệu học, không đẩy code thay bạn (sẽ bỏ qua kiểm tra pre-push). Đẩy code bằng tay (`git push`) hoặc bấm ⇅ Đồng bộ ngay để đẩy tất cả; dữ liệu học đã nằm an toàn trong commit cục bộ.';
+const dirtyHint =
+  'Đồng bộ tự động không cất tạm (stash) code đang sửa của bạn. Commit hoặc `git stash` các thay đổi đó — hoặc bấm ⇅ Đồng bộ ngay (app cất tạm rồi áp lại).';
 
 // ── auto-sync around AI coach runs (config sync.before_ai / sync.after_ai) ──
 
@@ -761,9 +985,22 @@ export class AutoSync {
     this.deps = deps;
   }
 
-  /** On, and possible here. */
-  active(): boolean {
+  private stopped = false;
+
+  /** Configured on (sync.auto: idle) and possible here. */
+  enabled(): boolean {
     return this.deps.settings().mode === 'idle' && !this.deps.disabled();
+  }
+
+  /** Enabled and not shutting down. */
+  active(): boolean {
+    return !this.stopped && this.enabled();
+  }
+
+  /** Shutting down: nothing new starts (a submit answered during the shutdown must not start a sync). */
+  stop(): void {
+    this.stopped = true;
+    this.cancel();
   }
 
   /** A test was submitted: quiet sync after `auto_delay_minutes` (or the current backoff after failures). */
@@ -855,11 +1092,17 @@ export class AutoSync {
       .then((r) => {
         this.last = { at: new Date(this.deps.now()).toISOString(), ok: r.ok, message: r.message, source };
         if (r.hint) this.last.hint = r.hint;
+        if (r.blocked) this.last.blocked = r.blocked;
         for (const k of ['committed', 'received', 'pushed'] as const) if (r[k] !== undefined) this.last[k] = r[k];
         const label = source === 'startup' ? 'Đồng bộ khi mở app' : 'Tự đồng bộ';
         if (r.ok) {
           this.failures = 0;
           this.deps.log?.(`⇅ ${label}: ${r.message}`);
+          return r;
+        }
+        if (r.blocked) {
+          // waits for the learner (code commits, uncommitted edits, a conflict…): retrying changes nothing
+          this.deps.log?.(`⚠️ ${label}: ${r.message}`);
           return r;
         }
         this.failures++;
@@ -924,8 +1167,8 @@ export async function hasUnpushed(opts: { repoDir?: string; dataPaths?: string[]
  * syncing is impossible here. Resolves undefined when skipped or out of time (a push still running finishes on its own).
  */
 export async function shutdownPush(maxMs = 15_000, onPush?: () => void): Promise<SyncRunResult | undefined> {
-  autoSync.cancel();
-  if (!autoSync.active() || isSyncing() || coachRunning()) return undefined;
+  autoSync.stop();
+  if (!autoSync.enabled() || isSyncing() || coachRunning()) return undefined;
   const deadline = Date.now() + maxMs;
   if (!(await hasUnpushed())) return undefined;
   const left = deadline - Date.now();

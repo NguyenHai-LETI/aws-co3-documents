@@ -233,3 +233,31 @@ test('semantic duplicates off (config) → provider off, button refused, only le
   assert.match(r.body.error, /quality\.embeddings/);
   assert.ok(q.verification && typeof q.verification.review === 'number', 'blind-solve summary present');
 });
+
+test('[γ] exam scope: /api/quality lists out-of-scope answers and distractors (lint oos-*), POST /api/quality/retire retires the version shown', T, async () => {
+  const q = await quality();
+  const sc = q.scope!;
+  assert.ok(sc && sc.excluded, 'practice.exclude_out_of_scope is on by default');
+  assert.ok(sc.answer.length >= 10, `the imported bank has off-exam answers (CodeCommit, Lightsail, IoT…): ${sc.answer.length}`);
+  const cc = sc.answer.find((x) => x.services.includes('CodeCommit'))!;
+  assert.ok(cc, JSON.stringify(sc.answer.slice(0, 3)));
+  assert.ok(sc.services.find((s) => s.name === 'CodeCommit')!.answers >= 1);
+  assert.equal(q.lint?.byCode['oos-answer'].count, sc.answer.length, 'the lint rule counts the same questions');
+  assert.equal(q.lint?.byCode['oos-answer'].severity, 'medium');
+  const flagged = bank.find((x) => x.id === cc.id)!;
+  assert.equal(flagged.outOfScope, true, 'Question.outOfScope is set by the bank loader');
+
+  // retire: a stale version is refused, the version shown is retired, bad input → 400
+  const stale = await api.post<{ retired: string[]; failed: { id: string; errors: string[] }[] }>('/api/quality/retire', { items: [{ id: cc.id, hash: 'not-the-hash' }] });
+  assert.equal(stale.status, 200);
+  assert.deepEqual(stale.body.retired, []);
+  assert.match(stale.body.failed[0].errors[0], /Câu đã thay đổi sau khi bạn xem/);
+  assert.equal((await api.post('/api/quality/retire', { items: [] })).status, 400);
+  assert.equal((await api.post('/api/quality/retire', { items: [{ id: 'nope', hash: 'x' }] })).status, 400);
+  assert.equal((await api.post('/api/quality/retire', { items: Array.from({ length: 61 }, () => ({ id: cc.id })) })).status, 400);
+  const ok = await api.post<{ retired: string[]; failed: unknown[] }>('/api/quality/retire', { items: [{ id: cc.id, hash: flagged.hash }] });
+  assert.deepEqual(ok.body, { retired: [cc.id], failed: [] });
+  const after = (await api.get<{ questions: Question[] }>('/api/bank')).body.questions.find((x) => x.id === cc.id)!;
+  assert.equal(after.status, 'retired');
+  assert.ok(!(await quality()).scope!.answer.some((x) => x.id === cc.id), 'a retired question leaves the list');
+});

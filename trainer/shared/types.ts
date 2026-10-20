@@ -247,6 +247,7 @@ export interface AnswerRecord {
   unviewed?: boolean; // computed: no pick and t = 0 — the question was never shown long enough to answer (not a review)
   exposure?: number; // computed: 1 = first time this question was answered, 2 = second time, …
   recognized?: boolean; // computed: a repeat answered correctly faster than reading the question (likely recognition)
+  seenBefore?: boolean; // computed, never-viewed answers only: the question had been answered (viewed) before this attempt
 }
 
 export interface Attempt {
@@ -757,7 +758,10 @@ export interface ResultAnnotations {
   exposure: Record<string, number>; // qid → 1 = first time answered, 2 = second time, … (viewed answers of non-rushed attempts)
   recognized: string[]; // repeats answered right faster than reading the question (likely recognition)
   unviewed: string[]; // never viewed (no pick, no time): not reviews, left out of stats — still wrong in the score
-  fresh?: { total: number; seenBefore: number; answers: number; correct: number }; // scored answers: seen before vs first time (as graded)
+  // scored answers: seen before vs first time (as graded; never-viewed ones count as wrong, first time unless the question
+  // was answered before). Absent for a rushed attempt (not part of the exposure history) — show no split then.
+  fresh?: { total: number; seenBefore: number; answers: number; correct: number };
+  sealedOfficial?: string; // form id when results/sealed.md records this attempt as that form's sitting — the only "điểm trên câu mới"
 }
 // ── [L] end ──
 
@@ -962,6 +966,7 @@ export interface SealedStatus {
   size: number; // questions per form (0 = no forms)
   file?: string; // results/sealed.md when it exists
   sealed: number; // questions held back right now (forms with status 'sealed')
+  error?: string; // results/sealed.md cannot be read: every id it lists stays hidden, nothing is written — what to fix (Vietnamese)
   released?: string; // POST /api/sealed/release: the form just opened
   created?: string[]; // POST /api/sealed/create: the new form ids
   notes?: string[]; // POST /api/sealed/create: warnings (a form came out smaller than asked, …)

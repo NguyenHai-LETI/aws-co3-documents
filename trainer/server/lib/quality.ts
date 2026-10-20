@@ -495,7 +495,8 @@ export function qualitySnapshotLines(bank: BankState, attempts: Attempt[], opts:
   }
 
   const ratings = loadRatings();
-  const downs = ratings.filter((r) => r.value === 'down' && !r.resolution);
+  const sealed = sealedIds(); // a 👎 or a note given before sealing must not name the question now
+  const downs = ratings.filter((r) => r.value === 'down' && !r.resolution && !sealed.has(r.qid));
   o.push('', `### 👎 Câu bị đánh giá thấp — \`trainer/bank/ratings.md\``, '');
   if (!q.lowRated.length && !downs.length) o.push('_Chưa có._');
   for (const id of q.lowRated.slice(0, 15)) {

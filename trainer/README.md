@@ -10,6 +10,8 @@
   **ENRICH** làm giàu giải thích, gợi ý, phân loại, cân độ dài đáp án, viết lại phương án nhiễu, sinh câu dài chuẩn đề thật; **Hỏi AI** về
   từng câu. AI trả **JSON**, app tự kiểm tra (lint lỗi viết câu) rồi mới ghi; **model thứ hai giải mù** mọi câu mới / câu vừa sửa.
 - **Học mọi nơi**: 🔎 tìm kiếm toàn văn câu hỏi + tài liệu, 📱 mở trên điện thoại qua Wi-Fi (mã truy cập), 🗂️ xuất sang Anki.
+- **Đo trung thực** (v4): 🔒 **đề niêm phong** giữ riêng câu chưa từng gặp để đo "điểm trên câu mới", 🧭 chẩn đoán đầu vào theo 14 mục
+  exam guide, huy hiệu "Giống đề thật", tách điểm **lần đầu gặp / gặp lại** để lộ ra học vẹt.
 
 ```
  ┌──────────── bank/packs/*.md ◄─────────────────────────────────────────────┐
@@ -49,7 +51,8 @@ trainer/
 │   ├── migrations/           lịch sử migration (vd cân lại vị trí đáp án)
 │   └── packs/{imported,ai,docs,manual}/*.md
 ├── results/YYYY/MM/*.md      📝 KẾT QUẢ — front matter (máy đọc) + báo cáo (người/AI đọc)
-│   ├── goal.md · external/*.md   ngày thi + điểm mục tiêu · điểm thi thử bên ngoài
+│   ├── goal.md · external/*.md   mục tiêu (ngày thi, điểm, lịch học, ESL, checklist) · điểm thi thử bên ngoài
+│   ├── sealed.md             đề niêm phong (id câu + trạng thái; app quản lý, đồng bộ cùng kết quả)
 │   └── fsrs-params.json      tham số FSRS cá nhân (do app tối ưu)
 ├── coach/                    🤖 AI
 │   ├── COACH.md · GENERATE.md · ENRICH.md   prompt chuẩn (dùng chung cho app, lịch, Cowork, Claude Code)
@@ -63,22 +66,29 @@ trainer/
 ├── config.yaml               model theo tác vụ, lịch, FSRS, chất lượng, LAN, Anki, cache, đồng bộ
 ├── server/ · shared/ · web/  code (Node + React/Vite)
 ├── scripts/                  import, validate, rebalance, classify-tasks, apply-patch, enrich-batch, snapshot, coach-run, schedule, sync
-└── tests/                    unit · e2e API · UI smoke (Playwright)
+├── .githooks/pre-push        (tuỳ chọn, `npm run hooks:install`) chạy `check:fast` trước khi push code
+└── tests/                    unit · e2e API · UI smoke (Playwright) · golden parse (fixtures/golden)
 ```
 
 ## ✍️ Các chế độ test
 
 | Chế độ | Lấy câu nào |
 |--------|-------------|
-| 🎯 Thi thử SAA-C03 | 65 câu theo trọng số domain 30/26/24/20, ưu tiên câu lâu chưa gặp và câu dài. **Mô phỏng Pearson VUE**: 15 câu thử nghiệm không tính điểm (chỉ lộ sau khi nộp), màn hình Review cuối bài, không tạm dừng, 130 phút, cảnh báo 15′/5′, phân tích sức bền theo từng phần tư |
+| 🎯 Thi thử SAA-C03 | 65 câu theo trọng số domain 30/26/24/20, ưu tiên câu chưa gặp, rồi câu giống đề thật; không bao giờ lấy cả câu gốc lẫn biến thể của nó. **Mô phỏng Pearson VUE**: 15 câu thử nghiệm không tính điểm (chỉ lộ sau khi nộp), màn hình Review cuối bài, không tạm dừng, cảnh báo 15′/5′, phân tích sức bền theo từng phần tư. Đồng hồ mặc định **theo tải đọc đề thật** (xem dưới) |
+| 🔒 Đề niêm phong | 50 câu **chưa từng xuất hiện khi luyện** + 15 câu thử nghiệm, mô phỏng Pearson; chỉ **lần nộp đầu tiên** của mỗi đề là **điểm trên câu mới** (điểm hiệu chỉnh nội bộ) — làm lại = luyện thường (🔁). 2 đề được giữ riêng từ trước buổi luyện đầu tiên (`exam.sealed_forms`, `exam.sealed_size`); gợi ý làm ≈ 3 tuần và ≈ 1 tuần trước ngày thi |
+| 🧭 Chẩn đoán đầu vào | 2 câu cho mỗi mục exam guide 1.1–4.4 (28 câu, chia được 2 × 14), ưu tiên câu chưa gặp, không xét đạt/chưa đạt → **Bản đồ xuất phát** |
 | 📚 Theo chủ đề | chọn 1+ chủ đề (+ domain, độ khó) |
 | 📦 Theo bộ đề | làm lại nguyên 1 pack |
 | 🧠 Ôn tập ngắt quãng | câu đến hạn theo **FSRS-6** (ưu tiên câu sắp quên nhất), tối đa `srs.daily_limit` câu/ngày, phần dư thành “tồn” |
 | 🔁 Làm lại câu sai | câu mà lần gần nhất trả lời sai |
 | 💪 Củng cố điểm yếu | lấy mẫu có trọng số: topic/tag/service tỉ lệ thấp, câu sai, câu “chưa chắc” |
-| 🆕 Câu chưa làm · 🚩 Cờ/chưa chắc · 🐢 Tốc độ · ⚡ Luyện nhanh | như tên |
-| 🛠️ Tùy chỉnh | lọc tự do: domain, **mục exam guide**, chủ đề, độ khó, nguồn, service, tag, từ khoá |
+| 🆕 Câu chưa làm · 🚩 Cờ/chưa chắc · 🐢 Tốc độ · ⚡ Luyện nhanh | như tên (🆕 đi theo thứ tự cố định, cân theo domain) |
+| 🛠️ Tùy chỉnh | lọc tự do: domain, **mục exam guide**, chủ đề, độ khó, nguồn, service, tag, **tiêu chí đề** (Chi phí, Vận hành, Sẵn sàng cao, Hiệu năng, Bảo mật, Phủ định), từ khoá |
 | 🤖 Kế hoạch AI Coach · 📌 Danh sách | phiên của coach · danh sách chọn tay / “làm lại N câu sai” (câu đang chờ duyệt — draft — luôn bị bỏ qua) |
+
+Câu đang niêm phong và câu có đáp án là dịch vụ **ngoài phạm vi đề** (CodeCommit, IoT…, `practice.exclude_out_of_scope`) không xuất hiện
+trong các chế độ luyện (trừ khi chọn hẳn bộ đề / danh sách id). Mọi bài có huy hiệu **“Giống đề thật a/N · w/W từ”** (câu dài ≥ 55 từ,
+phương án đủ câu; đề thật ≈ 115 từ/câu) và cảnh báo **“điểm lạc quan”** khi thấp.
 
 Tuỳ chọn mọi chế độ: **chấm cuối bài** hoặc **xem đáp án ngay** · **xáo đáp án (mặc định bật)** · preset thời gian ·
 **🧠 Nhớ trước khi xem đáp án** (viết đáp án mình nghĩ trước, rồi mới hiện lựa chọn).
@@ -90,7 +100,11 @@ overhead, highly available…) · **💡 gợi ý** (chế độ xem đáp án n
 
 Mỗi câu có `time` (giây) theo rubric chuẩn SAA-C03 (130 phút/65 câu ≈ 120 s cho câu dài ~170 từ; câu ngắn ít hơn) —
 xem `bank/SCHEMA.md §4`. **Đồng hồ = Σ time các câu × hệ số preset** (Chuẩn ×1.0 · Áp lực ×0.8 · ESL +30′ · Thoải mái ×1.5 ·
-Chuẩn đề thật 2′/câu · Tự nhập · Không giới hạn). Hết giờ → tự nộp; cảnh báo khi còn 15′ và 5′; thanh trên cho biết nhanh/chậm so với chuẩn.
+Chuẩn đề thật 2′/câu · **Theo tải đọc đề thật** · Tự nhập · Không giới hạn). Hết giờ → tự nộp; cảnh báo khi còn 15′ và 5′; thanh trên cho
+biết nhanh/chậm so với chuẩn. **Theo tải đọc đề thật** (mặc định của thi thử và đề niêm phong): 130′ tính theo số chữ phải đọc so với đề
+thật, không ít hơn Σ chuẩn, tối đa 2′/câu — ngân hàng hiện có câu ngắn nên một bài 65 câu ≈ 57–60′ thay vì 130′ thừa thãi. Ô **🌐 ESL +30′**
+(×160/130) bật sẵn khi mục tiêu thi có ESL. Ở chế độ xem đáp án ngay, thời gian đọc giải thích sau khi bấm **Kiểm tra** được lưu riêng
+(`rt`), không làm câu bị tính là chậm.
 
 Phím tắt: `1`–`5`/`A`–`E` chọn · `Shift`+số gạch · `←` `→` chuyển câu · `Enter` tiếp/kiểm tra · `F` cờ · `U` chưa chắc · `H` gợi ý ·
 `/` ô tìm kiếm.
@@ -108,6 +122,22 @@ Phím tắt: `1`–`5`/`A`–`E` chọn · `Shift`+số gạch · `←` `→` ch
   theo domain / **mục exam guide** / chủ đề / service / khái niệm · độ bền trí nhớ (FSRS-6) · hiệu chỉnh độ tự tin (chắc vs chưa chắc) ·
   số lần **gạch nhầm đáp án đúng** · tỉ lệ “nhớ trước” đúng · câu dài vs câu ngắn · tốc độ · hoạt động.
 - **Bài làm vội** (thời gian trung vị/câu < `stats.rushed_median_seconds`) được đánh dấu và **không tính** vào thống kê/lịch ôn.
+- **Câu chưa xem không phải lượt ôn**: câu bỏ trống chưa mở (không chọn, 0 giây) vẫn tính sai trong điểm bài, nhưng không vào FSRS, lịch ôn,
+  "Làm lại câu sai", hạn mức ôn/ngày, mức sẵn sàng hay thống kê — câu đó vẫn là câu mới.
+- **Lần đầu gặp và gặp lại**: gặp lại mà đúng nhanh hơn thời gian đọc đề + phương án (`stats.recognized_wpm`, 300 từ/phút) là **nhận diện
+  mặt chữ** — FSRS chấm tối đa “Good”, mức sẵn sàng chỉ tính 0,3. Thống kê so tỉ lệ đúng lần đầu / gặp lại (14 ngày); kết quả thi thử ghi
+  “đã gặp n/N · điểm phần câu mới”; câu nhận diện có dấu ⚡.
+- **Thống kê** thêm **🎯 Theo tiêu chí đề** (Chi phí / Vận hành / Sẵn sàng cao / Hiệu năng / Bảo mật / Phủ định so với câu không nêu tiêu chí)
+  và **🔀 Cặp hay nhầm**: tỉ lệ chọn phương án chứa X khi đáp án chứa Y, chia cho số lần cả hai cùng xuất hiện; chỉ xác nhận khi ≥ 4 lần chọn
+  ở ≥ 3 câu và cận dưới 80 % > 2× mức nhầm nền của bạn; nút **Luyện cặp này**.
+- Trong 7 ngày đầu, bài ngắn không phải thi thử không bị chấm đạt/chưa đạt; bài chẩn đoán không bao giờ.
+
+### 🚀 Ngày đầu
+
+Khi chưa có kết quả nào, **Tổng quan** hướng dẫn 3 bước: ① mục tiêu (ngày thi hoặc “Chưa đặt lịch — gợi ý 6–8 tuần”, điểm mục tiêu gợi ý
+≥ 780, số phút mỗi ngày, ngày nghỉ, giờ học, ESL +30′) → ② bài chẩn đoán 28 câu (chia được 2 × 14) → ③ **Bản đồ xuất phát** ✓/~/✗ theo
+từng mục exam guide và nút **🗓️ Lập kế hoạch tuần 1** (tự lập, không cần AI: vá các task yếu nhất theo trọng số, ôn ngắt quãng, thi thử
+Pearson hoặc đề niêm phong cuối tuần; ghi `coach/plans/<ngày>-onboarding.md`). Bỏ qua được; không hiện lại sau bài đầu tiên.
 
 ### 🎯 Ngày thi, dự báo & FSRS-6
 
@@ -116,7 +146,19 @@ Phím tắt: `1`–`5`/`A`–`E` chọn · `Shift`+số gạch · `←` `→` ch
   lịch*; câu chưa gặp = tỉ lệ đúng lần đầu của bạn; kèm độ phủ ngân hàng và **📆 lịch ôn sắp tới** (số câu đến hạn mỗi ngày tới ngày thi).
   Trang Tổng quan có thẻ đếm ngược. Dự báo đo khả năng nhớ *câu trong ngân hàng* nên lạc quan hơn đề thật — dùng điểm thi thử bên ngoài để hiệu chỉnh.
 - **📝 Điểm thi thử bên ngoài** (AWS Official Practice Exam, Tutorials Dojo…, lưu `results/external/`): app so với mức sẵn sàng của chính nó
-  vào ngày đó → **mức sẵn sàng hiệu chỉnh** (độ lệch trung bình 5 lần gần nhất).
+  vào ngày đó → **mức sẵn sàng hiệu chỉnh** (độ lệch trung bình 5 lần gần nhất). Đề niêm phong đã làm cũng vào danh sách này như một điểm
+  hiệu chỉnh nội bộ (🔒 câu mới).
+- **🔒 Đề niêm phong** (Thống kê → 🎯 Ngày thi): trạng thái, ngày gợi ý, **Làm đề niêm phong**, **Mở sớm** (trả câu về ngân hàng luyện, không
+  tính điểm). `npm run seal -- --status` xem trạng thái từ terminal. Chỉ **lần nộp đầu tiên** của mỗi đề được tính (ghi vào `sealed.md`);
+  làm lại, hoặc nộp sau khi đã Mở sớm, là bài luyện thường (🔁 trên trang kết quả). Bỏ dở giữa chừng thì đề vẫn niêm phong — nếu đã xem nhiều
+  câu, hãy Mở sớm để điểm sau không bị thổi phồng. Câu niêm phong bị ẩn khỏi chế độ luyện, tìm kiếm, Anki, Ngân hàng, mục Chất lượng, nhật
+  ký giải mù, snapshot và Hỏi AI; trong app, file pack (📄) hiện một dòng 🔒 thay cho câu niêm phong, còn `sealed.md`, `coach/enrich/` và
+  `practice-exams/` không mở được khi còn đề niêm phong (tự giác: đừng mở các file này bằng trình soạn thảo). Nếu `sealed.md` hỏng (sửa tay,
+  xung đột git), app **vẫn giữ kín** mọi câu có trong file, báo lỗi ở Thống kê và Tạo bài, và từ chối ghi cho tới khi sửa file
+  (hoặc `npm run seal -- --reset --force` để tạo lại).
+- **✅ Checklist ngày thi**: xin ESL +30′ (đề SAA-C03 không có tiếng Việt, phải xin **trước khi đặt lịch**), đặt lịch, giấy tờ trùng tên,
+  tổng duyệt đúng giờ thi, hạn dời lịch (≥ 24 h, tối đa 2 lần), system test OnVUE / trung tâm thi, sau khi thi — có hạn theo ngày thi và link
+  chính thức; thẻ đếm ngược ở Tổng quan nhắc việc kế tiếp và đề niêm phong kế tiếp.
 - **FSRS-6** (thư viện ts-fsrs, tính theo ngày: câu đến hạn từ đầu ngày). **⚙️ Tham số FSRS → 🎛️ Tối ưu tham số FSRS** học bộ tham số riêng
   từ lịch sử của bạn (tiến trình nền, cần ≥ `srs.optimize_min_reviews` lượt ôn; chỉ dùng khi dự đoán tốt hơn mặc định; lưu
   `results/fsrs-params.json`). `srs.optimize: auto` tự tối ưu lại tối đa 1 lần/tuần khi lịch sử tăng ≥ 20 % · `manual` · `off`;
@@ -143,7 +185,11 @@ Phím tắt: `1`–`5`/`A`–`E` chọn · `Shift`+số gạch · `←` `→` ch
   👍 Duyệt · 🧹 Sửa bằng ENRICH · 🚩 Báo lỗi · 🗑️ Loại; chạy cho câu AI chưa kiểm, câu đã sửa, một bộ đề hoặc các câu đang chọn
   (tab Câu hỏi → “🔎 Giải mù N câu”).
 
-Khung chi tiết câu hỏi hiện lỗi viết câu và kết quả giải mù của câu đó. AI Coach đọc cả bốn phần này trong snapshot §14.
+- **🎯 Phạm vi đề thi**: dịch vụ ngoài phạm vi theo danh sách chính thức của AWS (CodeCommit/CodeBuild/CodeDeploy, IoT, Lightsail…) và tên
+  mới của dịch vụ đã đổi tên; câu có đáp án ngoài phạm vi (luật lint `oos-answer`) bị bỏ khỏi các chế độ luyện, có nút loại câu hoặc gửi ENRICH
+  thay phương án nhiễu (`oos-distractor`).
+
+Khung chi tiết câu hỏi hiện lỗi viết câu và kết quả giải mù của câu đó (câu đang niêm phong chỉ hiện 🔒). AI Coach đọc các phần này trong snapshot.
 Migration đã áp cho bộ đề gốc: `npm run rebalance` (cân vị trí đáp án — kết quả cũ được tự chuyển đổi theo `bank/migrations/`) và
 `npm run classify-tasks` (gắn mục exam guide theo heuristic; AI tinh chỉnh dần qua ENRICH).
 
@@ -156,12 +202,15 @@ Migration đã áp cho bộ đề gốc: `npm run rebalance` (cân vị trí đ�
 | **Câu dài** (long-form) | sinh phiên bản đề dài chuẩn thi thật (60–120 từ) cho khái niệm cốt lõi | `coach/ENRICH.md` |
 | **Sinh từ tài liệu** | đọc notes/inbox → pack mới trong `packs/docs/` | `coach/GENERATE.md` |
 | **🧪 Giải mù** | model thứ hai (`coach.models.verify`, mặc định opus) giải câu **không xem đáp án/giải thích** → `bank/verify.md` | — |
-| **Hỏi AI** | hỏi tiếp về 1 câu (“vì sao không phải C?”) — chỉ đọc, lưu vào `coach/qa/<id>.md` | — |
+| **Hỏi AI** | hỏi tiếp về 1 câu (“vì sao không phải C?”) — chỉ đọc tài liệu ôn ở thư mục gốc (không đọc `trainer/`, `practice-exams/`), lưu vào `coach/qa/<id>.md` | — |
 
 **AI trả JSON, app tự kiểm tra** (`coach.structured_output: true`, mặc định): Sinh câu, ENRICH và Câu dài chạy Claude **chỉ đọc**
 (`--tools Read,Glob,Grep`, `--json-schema`); app tự ghi patch `coach/patches/<run>.yaml` hoặc pack mới sau khi kiểm tra từng câu (định dạng,
 task cùng domain, chữ cái đáp án trong giải thích, gợi ý lộ đáp án, “Choose N”, lint lỗi nặng). Câu lỗi được gửi lại **một lần** trong cùng
 phiên (`--resume`) để AI sửa; còn lỗi thì bỏ qua và ghi log. Mọi patch (ENRICH, coach, `npm run apply-patch`) đều chạy lint sau từng item.
+**ENRICH ưu tiên câu sắp gặp**: câu đến hạn ngày mai, các câu "chưa làm" kế tiếp và câu trong phiên kế hoạch được làm giàu giải thích trước
+(lần gặp đầu là lúc phản hồi đáng giá nhất); `coach.enrich_after_analyze: true` chạy thêm một lô 10 câu sau mỗi lượt phân tích (tốn thêm quota).
+Câu đang niêm phong không bao giờ được dùng làm nguồn câu biến thể / câu dài.
 **Giải mù tự động** (`coach.verify.auto`): sau mỗi lượt AI có câu mới hoặc câu bị đổi đề/phương án/đáp án, model thứ hai giải các câu đó;
 câu do AI viết bị **lệch đáp án / mơ hồ** tự chuyển `draft` (`coach.verify.auto_draft`) chờ bạn duyệt — câu đề gốc không bao giờ tự bị chuyển draft.
 `/trainer-enrich`, `/trainer-generate` và Cowork vẫn dùng chế độ tương tác (AI tự ghi file).
@@ -216,6 +265,19 @@ nên **xuất lại sau khi câu được sửa sẽ cập nhật thẻ cũ, gi�
   đồng bộ **trước** khi gọi Claude (AI thấy cả bài làm của máy kia; ENRICH / câu dài chọn lại lô câu nếu vừa nhận dữ liệu từ máy kia) và **sau** lượt chạy thành công
   (kế hoạch, câu mới, patch lên GitHub ngay). Lịch tự động đồng bộ trước khi xét "có bài mới không". Đồng bộ lỗi chỉ ghi cảnh báo vào log —
   AI vẫn chạy với dữ liệu trên máy. "Hỏi AI" không đồng bộ (chỉ đọc câu hỏi).
+- **Tự đồng bộ khi rảnh** (`sync.auto: idle`, mặc định bật; `sync.auto_delay_minutes: 4`): nộp bài xong mà vài phút không bắt đầu bài mới
+  thì app tự ⇅ Đồng bộ im lặng (không chạy khi AI Coach hay một lượt đồng bộ khác đang chạy; lỗi mạng → thử lại thưa dần tới 1 giờ). Mở app →
+  **kéo về trước** (chờ tối đa 8 giây) để lịch ôn, kế hoạch và đề niêm phong thấy bài của máy kia; tắt app (Ctrl+C) → **đẩy phần còn lại**
+  (tối đa ~12 giây, chờ lượt đồng bộ đang chạy xong trước; Ctrl+C lần nữa để bỏ qua). Nút ⇅ hiện lần đồng bộ cuối, cảnh báo **⏳** khi dữ liệu
+  chưa đẩy quá 24 giờ và **⚠** khi lần tự đồng bộ gần nhất lỗi hoặc bị chặn. Tự đồng bộ **không bao giờ cất tạm (stash) code đang sửa**
+  (có file code chưa commit → bỏ qua bước kéo về), **chỉ đẩy dữ liệu học** (có commit code chưa đẩy → giữ lại, bấm ⇅ để đẩy và chạy hook
+  pre-push) và không chạy khi nhánh hiện tại khác tên nhánh upstream. Repo kẹt giữa chừng (rebase dở, còn conflict marker) → nút ⇅ chỉ
+  đúng lệnh gỡ (`git rebase --abort`, hoặc `git rebase --quit` + `git stash pop`). Tắt: `sync.auto: off`.
+- **Code mới từ máy kia**: khi đồng bộ nhận thay đổi code, app hiện banner **🔄 Ứng dụng vừa được cập nhật** — mở bằng `start.command` /
+  `start.sh` / `start.bat` thì bấm **↻ Khởi động lại** (tự `npm install` khi thư viện đổi, trang tự tải lại); chạy bằng `npm start` thì tắt rồi
+  chạy lại.
+- **Nộp bài an toàn**: nộp lại cùng một bài (mạng chập chờn, bấm hai lần) chỉ tạo **một** file kết quả; mất kết nối khi nộp → bài chuyển sang
+  **⏳ chờ nộp** (lưu trên trình duyệt), tự nộp lại khi có mạng / mở lại trang, giữ nguyên giờ nộp.
 - `config.yaml → coach.hosts: ["<tên-máy>"]` để **chỉ một máy** chạy coach theo lịch (tránh conflict). `issues.md`, `ratings.md`, `verify.md`,
   `coach/qa/*`, `results/fsrs-params.json` dùng `merge=union` (`.gitattributes`) nên ghi song song không conflict.
 
@@ -239,10 +301,18 @@ App tự nạp lại khi file thay đổi. Câu lỗi định dạng bị loại
 | `npm run coach [-- …]` | chạy AI 1 lần (xem bảng trên, gồm `--verify`) |
 | `npm run schedule -- install\|status\|run\|uninstall` | lịch chạy tự động (launchd / crontab / Task Scheduler) |
 | `npm run sync [-- --dry-run \| --status \| --force]` | đồng bộ dữ liệu học qua git (xem trước · trạng thái · chạy cả khi coach đang chạy) |
-| `npm run typecheck` · `npm test` · `npm run test:e2e` · `npm run test:ui` | kiểm tra kiểu · unit · e2e API · UI smoke (Playwright) |
+| `npm run seal [-- --status \| --release S1 \| --forms N --size M \| --reset]` | đề niêm phong: trạng thái · mở sớm · tạo · tạo lại |
+| `npm run typecheck` · `npm test` · `npm run test:e2e` · `npm run test:ui` | kiểm tra kiểu · unit · e2e API · UI smoke (Playwright; thiếu trình duyệt → in lệnh `npx playwright install chromium`) |
+| `npm run check` · `npm run check:fast` · `npm run hooks:install` | validate + typecheck + unit + e2e (~40 s) · typecheck + unit (~10 s) · bật hook pre-push trên máy này |
 
-CI (GitHub Actions): workflow nằm sẵn ở `trainer/ci/trainer-ci.yml` (validate + typecheck + unit + e2e + UI smoke). Để bật: chuyển file vào
-`.github/workflows/trainer-ci.yml` rồi push — token GitHub cần quyền **`workflow`** (GitHub từ chối token chỉ có quyền `repo`).
+**Hook pre-push** (bật một lần mỗi máy: `cd trainer && npm run hooks:install`): push có thay đổi code sẽ chạy `check:fast` trên **đúng commit
+được đẩy** (trong một git worktree tạm, không lẫn file đang sửa dở; bỏ qua: `git push --no-verify`); push chỉ có dữ liệu học, `inbox/` hay
+tài liệu `*.md` đi thẳng. Test **golden parse** giữ nguyên cách đọc ngân hàng / file kết quả; đổi parser có
+chủ đích → `GOLDEN_UPDATE=1 node --test tests/golden.test.ts` rồi xem `git diff`.
+
+CI (GitHub Actions): workflow nằm sẵn ở `trainer/ci/trainer-ci.yml` (validate + typecheck + unit + e2e + UI smoke). Để bật: trên GitHub chọn
+*Add file → Create new file*, đặt tên `.github/workflows/trainer-ci.yml`, dán nội dung file rồi Commit (không cần token đặc biệt); hoặc từ
+máy: `gh auth refresh -s workflow` (token cần quyền **`workflow`**), chuyển file vào `.github/workflows/` rồi push.
 
 ## 🔒 Bảo mật
 

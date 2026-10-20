@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DATA_DIR, TRAINER_DIR } from '../config.ts';
+import { DATA_DIR, REPO_DIR, TRAINER_DIR } from '../config.ts';
 
 /** EX_TEMPFAIL: "run me again" for the launcher scripts. */
 export const RESTART_EXIT_CODE = 75;
@@ -136,7 +136,91 @@ export function pendingUpdate(): UpdateInfo | undefined {
 }
 
 export function updateStatus(): UpdateStatus {
+  checkCodeChange();
   return { codeVersion: codeVersion(), launcher: launcherActive(), watch: watchMode(), ...(update ? { update } : {}) };
+}
+
+// ── code pulled by ANOTHER process ───────────────────────────────────────────
+// A scheduled coach run (scripts/coach-run.ts → syncForAi), `npm run sync` or a `git pull` in a terminal can bring app
+// code while the server runs: its own onSyncDone never sees that. So the server remembers the code paths at HEAD of the
+// synced repo when it starts and compares again whenever a ref file moved (a few stats — cheap enough for every poll).
+
+interface CodeWatch {
+  repoDir: string;
+  appDir: string; // app folder inside the repo ("trainer"; '' = the repo root)
+  head: string; // commit the server started from
+  tree: string; // `git ls-tree` of the code paths at that commit
+  refs: string[]; // files that change when HEAD moves (HEAD, the branch ref, packed-refs)
+  refSig: string;
+}
+let codeWatch: CodeWatch | undefined;
+
+function gitOut(args: string[], cwd: string): string | undefined {
+  try {
+    const r = spawnSync('git', ['-c', 'core.quotepath=off', ...args], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 5000,
+      windowsHide: true,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C' },
+    });
+    return r.status === 0 ? r.stdout : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const codePaths = (appDir: string) => [...CODE_DIRS, ...CODE_FILES].map((p) => (appDir ? `${appDir}/${p}` : p));
+const refSig = (files: string[]) =>
+  files
+    .map((f) => {
+      try {
+        const st = fs.statSync(f);
+        return `${st.mtimeMs}:${st.size}:${st.ino}`;
+      } catch {
+        return '-';
+      }
+    })
+    .join('|');
+
+/** Startup: remember the code paths at HEAD of the repo the app syncs (no-op when the data lives outside a repo). */
+export function initCodeWatch(repoDir: string = REPO_DIR, dataDir: string = DATA_DIR): void {
+  codeWatch = undefined;
+  const rel = path.relative(path.resolve(repoDir), path.resolve(dataDir));
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return; // TRAINER_HOME sandbox: nothing is synced there
+  const appDir = rel.split(path.sep).join('/');
+  const head = gitOut(['rev-parse', '-q', '--verify', 'HEAD^{commit}'], repoDir)?.trim();
+  const gitDir = gitOut(['rev-parse', '--git-dir'], repoDir)?.trim();
+  if (!head || !gitDir) return;
+  const abs = path.resolve(repoDir, gitDir);
+  const branchRef = gitOut(['symbolic-ref', '-q', 'HEAD'], repoDir)?.trim(); // refs/heads/main
+  const refs = [path.join(abs, 'HEAD'), path.join(abs, 'packed-refs'), ...(branchRef ? [path.join(abs, ...branchRef.split('/'))] : [])];
+  codeWatch = { repoDir, appDir, head, tree: gitOut(['ls-tree', head, '--', ...codePaths(appDir)], repoDir) ?? '', refs, refSig: refSig(refs) };
+}
+
+/**
+ * The code at HEAD differs from what the server started with → marks the update. Never while files with conflict
+ * markers are left (restarting into them would fail — the sync reported the conflict instead). True = new files marked.
+ */
+export function checkCodeChange(): boolean {
+  const w = codeWatch;
+  if (!w || watchMode()) return false;
+  const sig = refSig(w.refs);
+  if (sig === w.refSig) return false;
+  const tree = gitOut(['ls-tree', 'HEAD', '--', ...codePaths(w.appDir)], w.repoDir);
+  if (tree === undefined) return false; // git busy / unreadable right now: look again next time
+  if (tree === w.tree) {
+    w.refSig = sig; // only data moved
+    return false;
+  }
+  const unmerged = (gitOut(['diff', '--name-only', '--diff-filter=U'], w.repoDir) ?? '').trim();
+  if (unmerged) return false; // not settled: refSig kept, checked again later
+  w.refSig = sig;
+  const files = (gitOut(['diff', '--name-only', w.head, 'HEAD', '--', ...codePaths(w.appDir)], w.repoDir) ?? '').split('\n').filter(Boolean);
+  if (!files.length) return false;
+  const known = new Set(update?.files ?? []);
+  markUpdate(files);
+  return files.some((f) => !known.has(f));
 }
 
 // ── restart (exit 75 → the launcher runs the server again) ────────────────

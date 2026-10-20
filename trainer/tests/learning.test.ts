@@ -34,6 +34,8 @@ const { applyFilters, modePool } = await import('../shared/filters.ts');
 const { computeTimeLimit } = await import('../shared/timing.ts');
 const { regradeAttempts, resultAnnotations, recognitionSeconds, readingWords } = await import('../server/lib/regrade.ts');
 const { firstTryByDomain } = await import('../server/lib/forecast.ts');
+const sealedLib = await import('../server/lib/sealed.ts');
+const { sealedToConfirm } = await import('../web/components/onboarding/rules.ts');
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -693,7 +695,7 @@ it('B2: exposure counts viewed answers of non-rushed attempts in time order; fas
   assert.deepEqual(s.exposure, { days: 14, first: { answers: 0, correct: 0 }, repeat: { answers: 3, correct: 2 }, recognized: 1 });
   // result page annotations: the stored attempt + the learning view of it
   assert.deepEqual(resultAnnotations(h[3], raw[3]), { exposure: { [q.id]: 2 }, recognized: [q.id], unviewed: [], fresh: { total: 1, seenBefore: 1, answers: 0, correct: 0 } });
-  assert.deepEqual(resultAnnotations(h[2], raw[2]), { exposure: {}, recognized: [], unviewed: [q.id], fresh: { total: 1, seenBefore: 0, answers: 0, correct: 0 } });
+  assert.deepEqual(resultAnnotations(h[2], raw[2]), { exposure: {}, recognized: [], unviewed: [q.id], fresh: { total: 1, seenBefore: 1, answers: 0, correct: 0 } }, 'never viewed, but answered before → seen before');
   assert.deepEqual(resultAnnotations(h[1], raw[1]).exposure, {}, 'rushed attempts have no exposures');
   assert.deepEqual(resultAnnotations(undefined), { exposure: {}, recognized: [], unviewed: [] });
 });
@@ -736,4 +738,110 @@ it('B4 + A1: requirement buckets (baseline "none" last); sealed questions out of
   const open = stats.computeStats(history, b2, states, cfg, NOW, noSealed);
   assert.equal(open.totals.due - s.totals.due, [qs[3], qs[4]].filter((q) => stats.isDue(states.get(q.id), NOW)).length, 'sealed questions are not due');
   assert.equal(open.totals.bankActive, 100);
+});
+
+// ── v4 review R2: the first sealed submit is the only "điểm trên câu mới" (#2), honest fresh split (#3), confirm (#6) ──
+
+/** results/sealed.md fixture in the sealed.ts format (tmp + rename: a new inode, so every reader re-parses). */
+function writeSealedFixture(forms: { id: string; status: 'sealed' | 'used' | 'released'; ids: string[] }[]): string {
+  const file = path.join(HOME, 'results', 'sealed.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(`${file}.tmp`, stringifyFrontMatter({ kind: 'sealed', size: 10, forms }) + '\n# 🔒 Đề niêm phong (test)\n');
+  fs.renameSync(`${file}.tmp`, file);
+  return file;
+}
+
+it('#3 fresh split: never-viewed scored answers count as wrong (first time unless answered before); no split for a rushed attempt', () => {
+  const [p1, n1, n2, s1, s2, b1, b2] = bank.questions.slice(70, 77);
+  const prior = attempt(5, [right(s1), right(s2)]);
+  // a timed-out mock: n1 right, n2 wrong (first time), s1 right again, b1/b2 never viewed (never seen), s2 never viewed (seen before)
+  const mock = attempt(1, [right(n1), wrong(n2), right(s1, { t: 40 }), blank(b1), blank(b2), blank(s2), right(p1, { scored: false })], { mode: 'exam', pearson: true, timedOut: true });
+  const h = regradeAttempts([prior, mock], bank, cfg);
+  assert.deepEqual(
+    h[1].answers.map((r) => [r.exposure, !!r.unviewed, !!r.seenBefore]),
+    [[1, false, false], [1, false, false], [2, false, false], [undefined, true, false], [undefined, true, false], [undefined, true, true], [1, false, false]],
+  );
+  // score 2/6 scored = 33 %; first time 1/4 = 25 % (n1 ✓, n2 ✗, b1 ✗, b2 ✗) — not 1/2 = 50 % from the viewed answers alone
+  assert.deepEqual(resultAnnotations(h[1], mock).fresh, { total: 6, seenBefore: 2, answers: 4, correct: 1 });
+  // a never-viewed answer is no exposure: the next viewed answer of b1 is its first
+  const later = attempt(0.5, [right(b1, { t: 30 })]);
+  assert.equal(regradeAttempts([prior, mock, later], bank, cfg)[2].answers[0].exposure, 1);
+  // a rushed attempt is not part of the exposure history: no split at all (not "đã gặp 0/N · không có câu mới")
+  const rushed = attempt(0.2, [right(n1, { t: 2 }), right(n2, { t: 2 })], { mode: 'exam', pearson: true, rushed: true });
+  const hr = regradeAttempts([prior, mock, rushed], bank, cfg)[2];
+  assert.equal(resultAnnotations(hr, rushed).fresh, undefined);
+  assert.deepEqual(resultAnnotations(hr, rushed).exposure, {});
+});
+
+it('#2 sealed form: only the first submit while the form is sealed is official; a second session, a release or a refused sealed.md keep the attempt without sealed_form', () => {
+  const ids = (from: number) => bank.questions.slice(from, from + 10).map((q) => q.id);
+  const file = writeSealedFixture([
+    { id: 'S1', status: 'sealed', ids: ids(80) },
+    { id: 'S2', status: 'sealed', ids: ids(90) },
+    { id: 'S3', status: 'sealed', ids: ids(0) },
+  ]);
+  const sealedSession = (form: string, from: number) => session(ids(from), { mode: 'sealed', sealedForm: form, pearson: true, unscored: [], title: `Đề niêm phong ${form}` });
+  const written: string[] = [];
+  const save = (form: string, from: number, daysAgo: number) => {
+    const a = results.gradeAndSave(submit(sealedSession(form, from), () => ({}), daysAgo), bank);
+    written.push(a.file);
+    return { a, text: fs.readFileSync(path.join(HOME, a.file), 'utf8') };
+  };
+  const form = (id: string) => sealedLib.loadSealed().forms.find((f) => f.id === id)!;
+  try {
+    // two sessions of S1 (two tabs, or abandoned and restarted): the first submit wins
+    const first = save('S1', 80, 2);
+    assert.equal(first.a.sealedForm, 'S1');
+    assert.match(first.text, /^sealed_form: S1$/m);
+    assert.deepEqual([form('S1').status, form('S1').attempt], ['used', first.a.id]);
+    const second = save('S1', 80, 1);
+    assert.equal(second.a.sealedForm, undefined, 'a second sitting is not "điểm trên câu mới"');
+    assert.equal(second.a.mode, 'sealed');
+    assert.doesNotMatch(second.text, /sealed_form/);
+    assert.equal(form('S1').attempt, first.a.id, 'sealed.md keeps the first sitting');
+    // "Mở sớm" while a session runs, then submit: no sealed_form, the form stays released
+    sealedLib.releaseForm('S2');
+    const released = save('S2', 90, 0.5);
+    assert.equal(released.a.sealedForm, undefined);
+    assert.deepEqual([form('S2').status, form('S2').attempt], ['released', undefined]);
+    // sealed.md refuses the write (here: a read-only results/ folder) → the attempt is saved without the official mark
+    const resultsDir = path.join(HOME, 'results');
+    fs.mkdirSync(path.join(resultsDir, ...first.a.file.split('/').slice(1, 3)), { recursive: true });
+    fs.chmodSync(resultsDir, 0o555);
+    let blocked = false;
+    try {
+      fs.writeFileSync(path.join(resultsDir, 'probe.tmp'), '');
+      fs.rmSync(path.join(resultsDir, 'probe.tmp'));
+    } catch {
+      blocked = true;
+    }
+    try {
+      if (blocked) {
+        const refused = save('S3', 0, 0.2);
+        assert.equal(refused.a.sealedForm, undefined, 'markFormUsed refused → no sealed_form');
+        assert.doesNotMatch(refused.text, /sealed_form/);
+        assert.equal(form('S3').status, 'sealed');
+      }
+    } finally {
+      fs.chmodSync(resultsDir, 0o755);
+    }
+    // an unreadable sealed.md (fails closed): nothing is official, the submit still works
+    fs.writeFileSync(file, '---\nkind: [unclosed\n---\n');
+    const broken = save('S3', 0, 0.1);
+    assert.equal(broken.a.sealedForm, undefined);
+    assert.ok(fs.existsSync(path.join(HOME, broken.a.file)));
+  } finally {
+    for (const f of written) fs.rmSync(path.join(HOME, f), { force: true });
+    fs.rmSync(file, { force: true });
+  }
+});
+
+it('#6 a sealed exam is confirmed before it starts: mode sealed up front, any other request (a plan session) once it turns out sealed', () => {
+  assert.equal(sealedToConfirm({ mode: 'sealed' }), '', 'next sealed form');
+  assert.equal(sealedToConfirm({ mode: 'sealed', form: 'S2' }), 'S2');
+  assert.equal(sealedToConfirm({ mode: 'coach' }), undefined, 'not known before building');
+  assert.equal(sealedToConfirm({ mode: 'coach' }, { sealedForm: 'S1' }), 'S1', 'an onboarding / AI plan session that builds a sealed exam');
+  assert.equal(sealedToConfirm({ mode: 'coach' }, {}), undefined);
+  assert.equal(sealedToConfirm({ mode: 'sealed', form: 'S1' }, { sealedForm: 'S1' }), undefined, 'already confirmed before building');
+  assert.equal(sealedToConfirm({ mode: 'exam' }, {}), undefined);
 });

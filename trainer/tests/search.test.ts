@@ -241,3 +241,23 @@ it('a corrupt index database is rebuilt on the next search', () => {
   assert.equal(r.engine, 'fts5');
   assert.equal(ids(r, 'note')[0], '02-storage.md#do-ben-durability-11-9s');
 });
+
+it('[γ] sealed questions are neither indexed nor found — by words or by exact id, FTS5 and fallback — until their form is used', () => {
+  const file = path.join(HOME, 'results', 'sealed.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const seal = (status: string) => fs.writeFileSync(file, `---\nkind: sealed\nsize: 1\nforms:\n  - id: S1\n    status: ${status}\n    ids: [db-02]\n---\n`);
+  const found = (q: string, fts: boolean) => S.search(q, { scope: 'questions', fts }).hits.some((h) => h.id === 'db-02');
+  for (const fts of [true, false]) assert.ok(found('automatic failover standby', fts), `visible before sealing (fts ${fts})`);
+  seal('sealed');
+  try {
+    for (const fts of [true, false]) {
+      assert.equal(found('automatic failover standby', fts), false, `words (fts ${fts})`);
+      assert.equal(found('db-02', fts), false, `exact id (fts ${fts})`);
+      assert.equal(S.search('automatic failover standby', { scope: 'questions', fts }).total?.questions, 0, 'not counted either');
+    }
+    seal('used'); // the form was taken: its questions are searchable again (the index refreshes on the sealed set)
+    for (const fts of [true, false]) assert.ok(found('automatic failover standby', fts), `visible after use (fts ${fts})`);
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});

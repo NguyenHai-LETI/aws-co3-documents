@@ -10,6 +10,7 @@ import { newDataSince, scheduleSnapshot } from '../lib/snapshot.ts';
 import { attemptBySession } from '../lib/results.ts'; // [δ] idempotent submit
 import { autoSync } from '../lib/sync.ts'; // [δ] quiet sync after a submit
 import { resultAnnotations } from '../lib/regrade.ts'; // [β1] GET /api/results/:id annotations
+import { loadSealed } from '../lib/sealed.ts'; // [β1] official sealed sitting (annotations.sealedOfficial)
 import type { Attempt, AttemptSummary, BuildTestRequest, PlansResponse, SelectionFilters, SubmitRequest } from '../../shared/types.ts';
 
 const PAGE_DEFAULT = 50;
@@ -108,13 +109,16 @@ route('GET', '/api/results', (_req, url) => {
 
 /**
  * [β1] The stored attempt (as graded at the time) + `annotations` from the learning view of the history (ResultAnnotations:
- * exposure per question, recognized repeats, never-viewed answers, seen-before vs first-time split of the scored ones).
+ * exposure per question, recognized repeats, never-viewed answers, seen-before vs first-time split of the scored ones,
+ * `sealedOfficial` = the form whose sitting sealed.md records as this attempt — the only "điểm trên câu mới").
  */
 route('GET', '/api/results/:id', (_req, _url, [id]) => {
   const bank = loadBank();
   const attempt = attemptById(loadAttempts(currentConfig()), decodeURIComponent(id));
   if (!attempt) throw new HttpError(404, 'Result not found');
   const annotations = resultAnnotations(attemptById(context().attempts, attempt.id), attempt);
+  const official = loadSealed().forms.find((f) => f.status === 'used' && f.attempt === attempt.id);
+  if (official) annotations.sealedOfficial = official.id;
   return { attempt, summary: summarize(attempt, bank), questions: attempt.answers.map((r) => bank.byId.get(r.q) ?? null), annotations };
 });
 

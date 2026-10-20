@@ -300,38 +300,48 @@ export function loadOutbox(): OutboxEntry[] {
   return outboxSnap;
 }
 
+let storageOk = true; // false after a failed write (storage full / disabled): this tab's memory is the outbox then
+
 function writeOutbox(list: OutboxEntry[]): void {
   outboxSnap = list;
   try {
     if (list.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(list));
     else localStorage.removeItem(OUTBOX_KEY);
+    storageOk = true;
   } catch {
-    // storage full / disabled — the entry lives in memory until the page closes
+    storageOk = false; // the entries live in memory until the page closes — still sent from here
   }
   for (const fn of outboxListeners) fn();
 }
 
+/** The current entries: storage (another tab may have changed it), or this tab's memory when storage failed. */
+function entries(): OutboxEntry[] {
+  return storageOk ? readOutbox() : (outboxSnap ?? []);
+}
+
 function patchEntry(sessionId: string, fn: (e: OutboxEntry) => OutboxEntry): void {
-  const list = readOutbox(); // another tab may have changed it
-  writeOutbox(list.map((e) => (e.req.session.sessionId === sessionId ? fn(e) : e)));
+  writeOutbox(entries().map((e) => (e.req.session.sessionId === sessionId ? fn(e) : e)));
 }
 
 /** Stores a finished test before sending it (replaces an older entry of the same session). */
 export function queueSubmit(req: SubmitRequest, now = Date.now()): OutboxEntry {
   const entry: OutboxEntry = { req, queuedAt: now, tries: 0 };
-  writeOutbox([...readOutbox().filter((e) => e.req.session.sessionId !== req.session.sessionId), entry]);
+  writeOutbox([...entries().filter((e) => e.req.session.sessionId !== req.session.sessionId), entry]);
   return entry;
 }
 
 export function dropFromOutbox(sessionId: string): void {
-  writeOutbox(readOutbox().filter((e) => e.req.session.sessionId !== sessionId));
+  writeOutbox(entries().filter((e) => e.req.session.sessionId !== sessionId));
 }
 
 function subscribeOutbox(fn: () => void): () => void {
   outboxListeners.add(fn);
   const onStorage = (e: StorageEvent) => {
     if (e.key === OUTBOX_KEY || e.key === null) {
-      outboxSnap = readOutbox();
+      const stored = readOutbox();
+      // memory-only entries of this tab (its storage writes failed) are kept
+      const mine = storageOk ? [] : (outboxSnap ?? []).filter((x) => !stored.some((y) => y.req.session.sessionId === x.req.session.sessionId));
+      outboxSnap = [...stored, ...mine];
       fn();
     }
   };
@@ -355,7 +365,7 @@ const sending = new Map<string, Promise<SendOutcome>>();
 export function sendQueued(sessionId: string, now = Date.now()): Promise<SendOutcome> {
   const running = sending.get(sessionId);
   if (running) return running;
-  const entry = readOutbox().find((e) => e.req.session.sessionId === sessionId);
+  const entry = entries().find((e) => e.req.session.sessionId === sessionId);
   if (!entry) return Promise.resolve({ error: 'Không còn bài này trong hàng chờ.', retryable: false });
   patchEntry(sessionId, (e) => ({ ...e, tries: e.tries + 1, lastTry: now }));
   const p = api
@@ -387,7 +397,7 @@ export function flushOutbox(opts: { explicit?: boolean } = {}): Promise<SentSubm
   if (flushing && !opts.explicit) return flushing;
   const run = (async () => {
     const sent: SentSubmit[] = [];
-    for (const e of readOutbox()) {
+    for (const e of entries()) {
       const sid = e.req.session.sessionId;
       if (!opts.explicit && (e.permanent || sending.has(sid))) continue;
       const r = await sendQueued(sid);

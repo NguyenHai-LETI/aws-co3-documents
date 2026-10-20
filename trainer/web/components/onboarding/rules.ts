@@ -1,7 +1,7 @@
 // [β2] Pure rules of the v4 learning screens (no React, no fetch — unit-tested in tests/learning-ui.test.ts): when a
 // score gets a pass/fail verdict, the diagnostic test (2 questions per exam-guide task, or 2 parts × 1 per task), the
 // starting map per task, first vs repeat exposure on a result, the next exam-day checklist item.
-import type { AnswerRecord, Attempt, AttemptSummary, ChecklistItem, OnboardingTask, ResultAnnotations, TaskDef } from '../../../shared/types.ts';
+import type { AnswerRecord, Attempt, AttemptSummary, BuildTestRequest, ChecklistItem, OnboardingTask, ResultAnnotations, TaskDef, TestSession } from '../../../shared/types.ts';
 
 /** Fewer scored questions than this = a short practice test (no pass/fail verdict during the first week). */
 export const SHORT_TEST = 30;
@@ -91,13 +91,25 @@ export function fixFirst(cells: TaskCell[], weightOf: (domain: string) => number
 
 // ── result: first vs repeat exposure ────────────────────────────────────────
 
-/** Scored answers seen before vs first time: the server's `fresh`, else counted from the exposure map. */
-export function freshSplit(a: Pick<Attempt, 'answers'>, ann?: ResultAnnotations): ResultAnnotations['fresh'] {
-  if (!ann) return undefined;
-  if (ann.fresh) return ann.fresh;
-  const scored = a.answers.filter((r) => r.scored !== false);
-  const first = scored.filter((r) => ann.exposure[r.q] === 1);
-  return { total: scored.length, seenBefore: scored.filter((r) => (ann.exposure[r.q] ?? 0) >= 2).length, answers: first.length, correct: first.filter((r) => r.ok).length };
+/**
+ * Scored answers seen before vs first time — the server's `fresh` only. It counts never-viewed answers as wrong (first
+ * time unless answered earlier), which the exposure map alone cannot tell, and it is absent for a rushed attempt: no
+ * split is shown then.
+ */
+export function freshSplit(_a: Pick<Attempt, 'answers'>, ann?: ResultAnnotations): ResultAnnotations['fresh'] {
+  return ann?.fresh;
+}
+
+// ── sealed forms: one measurement each ──────────────────────────────────────
+
+/**
+ * The sealed form to confirm before a test starts ('' = the next sealed form), or undefined when no confirmation is due.
+ * Without `session` (before building): a `sealed` request. With the built session: any other request that turned out to
+ * be a sealed exam — an AI / onboarding plan session (mode coach) whose filter is a sealed form.
+ */
+export function sealedToConfirm(req: Pick<BuildTestRequest, 'mode' | 'form'>, session?: Pick<TestSession, 'sealedForm'>): string | undefined {
+  if (!session) return req.mode === 'sealed' ? (req.form ?? '') : undefined;
+  return req.mode !== 'sealed' && session.sealedForm ? session.sealedForm : undefined;
 }
 
 // ── exam-day checklist ──────────────────────────────────────────────────────

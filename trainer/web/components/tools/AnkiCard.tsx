@@ -149,7 +149,8 @@ async function downloadFile(req: AnkiExportRequest): Promise<string> {
 }
 
 export function AnkiCard({ query }: { query: URLSearchParams }) {
-  const { version } = useData();
+  const { version, bank } = useData();
+  const sealed = useMemo(() => new Set(bank?.sealed ?? []), [bank]); // [γ] never exported (the server leaves them out)
   const [init] = useState(() => fromQuery(query));
   const [scope, setScope] = useState<Scope>(init.scope ?? 'all');
   const [filters, setFilters] = useState<SelectionFilters>(init.filters);
@@ -370,6 +371,12 @@ export function AnkiCard({ query }: { query: URLSearchParams }) {
               {preview.missing.length > 8 ? '…' : ''}
             </div>
           ) : null}
+          {sealed.size > 0 && (
+            <div className="tiny muted">
+              🔒 {sealed.size} câu đang niêm phong không bao giờ được xuất (giữ riêng để đo điểm trên câu mới)
+              {scope === 'ids' && ids.some((id) => sealed.has(id)) ? ` — ${ids.filter((id) => sealed.has(id)).length} id bạn nhập thuộc đề niêm phong nên bị bỏ qua` : ''}.
+            </div>
+          )}
           <button className="btn primary" disabled={!count || !!busy} onClick={() => void download()}>
             {busy === 'download' ? <Spinner /> : '⬇️'} Tải file cho Anki (.txt)
           </button>

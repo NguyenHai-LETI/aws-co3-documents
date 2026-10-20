@@ -37,6 +37,7 @@ export interface Meta {
   coachHosts: string[];
   syncAi?: { before: boolean; after: boolean }; // config sync.before_ai / after_ai (older servers: undefined)
   sealed?: { id: string; status: 'sealed' | 'used' | 'released'; count: number; usedAt?: string; attempt?: string }[]; // sealed forms (no ids)
+  sealedError?: string; // [γ] results/sealed.md is broken: what to fix (its questions stay hidden, nothing is written meanwhile)
   codeVersion?: string; // code the server runs (compare with the page's to offer a restart/reload)
   launcher?: boolean; // started by a launcher script that restarts the server on exit code 75
   versions?: DataVersions; // {bank, results, plans} — same values as the SSE `data` event (older servers: undefined)

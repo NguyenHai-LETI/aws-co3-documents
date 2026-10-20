@@ -553,15 +553,43 @@ it('sealed forms: suggested dates ≈ exam − 21 / − 7 (never before today, n
   const forms = [{ ...state.forms[0], status: 'used' as const, attempt: a.id, usedAt: a.finished }, { ...state.forms[1], status: 'released' as const }];
   const used = prog.sealedProgress({ ...state, forms }, [a], { examDate: fsrs.dayKey(today + 10) }, NOW);
   assert.deepEqual(used.map((f) => [f.status, f.score, f.scaled, f.attempt, f.suggested]), [['used', 70, 700, a.id, undefined], ['released', undefined, undefined, undefined, undefined]]);
-  // a used form without a recorded attempt id: the latest sealed attempt of that form
-  assert.equal(prog.sealedProgress({ ...state, forms: [{ ...state.forms[0], status: 'used' as const }] }, [a], {}, NOW)[0].score, 70);
+  // R2 #2: only the sitting sealed.md records is the form's score — not the latest attempt carrying sealed_form
+  assert.equal(prog.sealedProgress({ ...state, forms: [{ ...state.forms[0], status: 'used' as const }] }, [a], {}, NOW)[0].score, undefined);
+  const retake = attempt(1, ids.slice(0, 10).map((q) => ans(q, true)), { sealedForm: 'S1', score: 100, scaled: 1000, total: 10, correct: 10 });
+  assert.equal(prog.sealedProgress({ ...state, forms }, [a, retake], {}, NOW)[0].score, 70, 'a later sitting of the same form does not replace it');
 });
 
-it('computeProgress v4: a used sealed form is an internal calibration point; checklist, studyStart, goal echo', () => {
+it('R2 #5 sealed forms: suggested dates are spread over the forms that are still sealed', () => {
+  const today = fsrs.localDay(NOW);
+  const exam = today + 42;
+  const mk = (id: string, status: 'sealed' | 'used' | 'released') => ({ id, status, ids: ['a', 'b'] });
+  const dates = (forms: ReturnType<typeof mk>[]) => prog.sealedProgress({ forms, size: 2 }, [], { examDate: fsrs.dayKey(exam) }, NOW).map((f) => `${f.id}:${f.suggested ? exam - fsrs.dayOfKey(f.suggested)! : '-'}`);
+  assert.deepEqual(dates([mk('S1', 'sealed'), mk('S2', 'sealed')]), ['S1:21', 'S2:7']);
+  assert.deepEqual(dates([mk('S1', 'used'), mk('S2', 'used'), mk('S3', 'sealed'), mk('S4', 'sealed')]), ['S1:-', 'S2:-', 'S3:21', 'S4:7'], 'new forms after used ones start at T−21');
+  assert.deepEqual(dates([mk('S1', 'used'), mk('S2', 'used'), mk('S3', 'sealed')]), ['S1:-', 'S2:-', 'S3:7'], 'one form left → the last check, T−7');
+  assert.deepEqual(dates([mk('S1', 'released'), mk('S2', 'sealed'), mk('S3', 'sealed'), mk('S4', 'sealed')]), ['S1:-', 'S2:21', 'S3:14', 'S4:7']);
+});
+
+/** results/sealed.md fixture in the sealed.ts format (tmp + rename: a new inode, so every reader re-parses). */
+function writeSealedFixture(forms: Record<string, unknown>[]): string {
+  const file = path.join(RESULTS_DIR, 'sealed.md');
+  fs.mkdirSync(RESULTS_DIR, { recursive: true });
+  fs.writeFileSync(`${file}.tmp`, stringifyFrontMatter({ kind: 'sealed', size: 20, forms }) + '\n# 🔒 Đề niêm phong (test)\n');
+  fs.renameSync(`${file}.tmp`, file);
+  return file;
+}
+
+it('computeProgress v4: the sitting sealed.md records is the only internal calibration point; checklist, studyStart, goal echo', () => {
   const history = simulatedHistory(120, 21).filter((a) => Date.parse(a.finished) < NOW - 3 * DAY);
   const sealedAttempt = attempt(2, ids.slice(0, 20).map((q, i) => ans(q, i % 2 === 0)), { sealedForm: 'S1', score: 50, scaled: 500, total: 20, correct: 10, file: 'results/2026/10/sealed-exam.md' });
+  // R2 #2: a second sitting of S1 written before the fix (it still carries sealed_form) — never a calibration point
+  const retake = attempt(1, ids.slice(0, 20).map((q) => ans(q, true)), { sealedForm: 'S1', score: 100, scaled: 1000, total: 20, correct: 20, file: 'results/2026/10/sealed-retake.md' });
   const rushedEarly = attempt(300, [ans(ids[0], true, { t: 1 })], { rushed: true });
-  const atts = regradeAttempts([rushedEarly, ...history, sealedAttempt], bank, cfg);
+  const sealedFile = writeSealedFixture([
+    { id: 'S1', status: 'used', used_at: sealedAttempt.finished, attempt_id: sealedAttempt.id, ids: ids.slice(0, 20) },
+    { id: 'S2', status: 'sealed', ids: ids.slice(20, 40) },
+  ]);
+  const atts = regradeAttempts([rushedEarly, ...history, sealedAttempt, retake], bank, cfg);
   const states = stats.computeStates(atts, cfg, NOW);
   prog.saveGoal({ examDate: fsrs.dayKey(fsrs.localDay(NOW) + 30), delivery: 'center', checklist: { booked: true } }, 720);
   const p = prog.computeProgress({ cfg, bank, attempts: atts, states }, NOW);
@@ -580,7 +608,12 @@ it('computeProgress v4: a used sealed form is an internal calibration point; che
   assert.deepEqual(p.goal, { examDate: fsrs.dayKey(fsrs.localDay(NOW) + 30), targetScaled: 720, delivery: 'center', checklist: { booked: true } });
   assert.ok(p.checklist?.some((c) => c.id === 'center' && c.due) && p.checklist.find((c) => c.id === 'booked')!.done);
   assert.equal(p.checklistChecked, prog.CHECKLIST_CHECKED);
-  assert.deepEqual(p.sealed, [], 'no sealed forms in this data root');
+  assert.deepEqual(p.sealed?.map((f) => [f.id, f.status, f.attempt, f.score]), [['S1', 'used', sealedAttempt.id, 50], ['S2', 'sealed', undefined, undefined]]);
+  assert.equal(p.sealed?.[1].suggested, fsrs.dayKey(fsrs.localDay(NOW) + 30 - 7), 'the only form still sealed → exam − 7');
+  // nothing recorded in sealed.md (e.g. a form released before the submit) → no calibration point at all
+  writeSealedFixture([{ id: 'S1', status: 'released', ids: ids.slice(0, 20) }]);
+  assert.deepEqual(prog.computeProgress({ cfg, bank, attempts: atts, states }, NOW).external.filter((x) => x.internal), []);
+  fs.rmSync(sealedFile, { force: true });
   assert.equal(prog.computeProgress({ cfg, bank, attempts: [], states: new Map() }, NOW).studyStart, undefined);
   prog.saveGoal({ examDate: null, delivery: null, checklist: null }, 720);
 });
@@ -651,4 +684,28 @@ it('onboarding: week-1 plan from the diagnostic halves — weakest tasks first, 
   assert.deepEqual(onboarding.diagnosticSource(atts, half1.id).map((a) => a.id), [half1.id, half2.id], 'either part finds the other, oldest first');
   assert.deepEqual(onboarding.diagnosticSource([later]).map((a) => a.id), [later.id], 'no diagnostic → what there is');
   fs.rmSync(PLANS_DIR, { recursive: true, force: true });
+});
+
+it('R2 #6 onboarding: when the first sealed form is due this week, the plan session is pinned to that form', () => {
+  fs.rmSync(PLANS_DIR, { recursive: true, force: true });
+  const today = fsrs.localDay(NOW);
+  const sealedFile = writeSealedFixture([
+    { id: 'S1', status: 'used', ids: ids.slice(0, 10) },
+    { id: 'S2', status: 'sealed', ids: ids.slice(10, 20) },
+    { id: 'S3', status: 'sealed', ids: ids.slice(20, 30) },
+  ]);
+  prog.saveGoal({ examDate: fsrs.dayKey(today + 10) }, 720);
+  try {
+    const diag = attempt(0.5, ids.slice(30, 40).map((q, i) => ans(q, i % 2 === 0)), { mode: 'diagnostic', diagnostic: true });
+    const atts = regradeAttempts([diag], bank, cfg);
+    const r = onboarding.onboardingPlan({ cfg, bank, attempts: atts, states: stats.computeStates(atts, cfg, NOW) }, { now: NOW });
+    const last = r.plan.sessions.at(-1)!;
+    assert.deepEqual([last.filter?.mode, last.filter?.form], ['sealed', 'S2'], 'the form the title names (the next sealed one), not "whichever is next" at start time');
+    assert.match(last.title, /S2/);
+    assert.ok(!r.plan.sessions.some((s) => s.questions?.some((id) => ids.slice(10, 30).includes(id))), 'no sealed question in the plan');
+  } finally {
+    fs.rmSync(sealedFile, { force: true });
+    fs.rmSync(PLANS_DIR, { recursive: true, force: true });
+    prog.saveGoal({ examDate: null }, 720);
+  }
 });

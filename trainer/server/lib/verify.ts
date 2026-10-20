@@ -9,6 +9,7 @@ import path from 'node:path';
 import YAML from 'yaml';
 import { BANK_DIR, PATCHES_DIR } from '../config.ts';
 import { loadBank, type BankState } from './bank.ts';
+import { sealedIds } from './sealed.ts';
 import { applyPatch, applyPatchItems } from './patch.ts';
 import { ID_RE } from './pack-format.ts';
 import { localDateKey, localIso } from './time.ts';
@@ -269,9 +270,14 @@ export interface VerifyParams {
  *   new           never verified, not imported from the practice exams
  *   unverified-ai written by AI (origin ai / doc) without a verdict for the current version
  *   changed       verified before, edited since (no verdict for the current version)
- * Retired questions are never verified. At most MAX_VERIFY, AI-written first, newest first.
+ * Retired questions are never verified; sealed ones only when named explicitly. At most MAX_VERIFY, AI-written first, newest first.
  */
-export function verifyTargets(bank: BankState, params: VerifyParams, verdicts: VerifyVerdict[] = loadVerdicts()): { ids: string[]; total: number } {
+export function verifyTargets(
+  bank: BankState,
+  params: VerifyParams,
+  verdicts: VerifyVerdict[] = loadVerdicts(),
+  sealed: ReadonlySet<string> = sealedIds(),
+): { ids: string[]; total: number } {
   const usable = (q: Question | undefined): q is Question => !!q && q.status !== 'retired';
   if (Array.isArray(params.ids)) {
     const ids = [...new Set(params.ids.map((x) => String(x).trim()))].filter((id) => usable(bank.byId.get(id)));
@@ -282,7 +288,7 @@ export function verifyTargets(bank: BankState, params: VerifyParams, verdicts: V
   const scope = (VERIFY_SCOPES as readonly string[]).includes(String(params.scope)) ? (params.scope as VerifyScope) : params.pack ? undefined : 'unverified-ai';
   const pack = typeof params.pack === 'string' && params.pack ? params.pack : undefined;
   const pool = bank.questions.filter((q) => {
-    if (!usable(q)) return false;
+    if (!usable(q) || sealed.has(q.id)) return false; // [γ] a pack / scope run never touches a sealed question
     if (pack && q.pack !== pack && q.file !== pack) return false;
     const current = !!per.get(q.id)?.solve;
     if (scope === 'new') return q.origin !== 'imported' && !everSolved.has(q.id);

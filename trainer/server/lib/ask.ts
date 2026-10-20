@@ -1,6 +1,8 @@
 // "Ask AI about this question": a read-only Claude Code run (`claude -p --output-format json`, tools limited to
 // Read/Glob/Grep inside the repo) that answers the learner in Vietnamese. Every Q&A is appended to
 // coach/qa/<qid>.md — the coach reads these (snapshot §15) to see what still confuses the learner.
+// [γ] The run may read the study notes only: trainer/** (bank packs, results/sealed.md, ENRICH batches, ledgers…) and
+// practice-exams/** (the imported questions with their keys) are denied, so it can never quote a sealed question.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +11,7 @@ import { HttpError } from '../http.ts';
 import { loadBank, type BankState } from './bank.ts';
 import { MODERN_CLI, claudeCommand, cliEnv, coachGuard, findClaude, modelFor, versionAtLeast } from './coach-runner.ts';
 import { ID_RE } from './pack-format.ts';
+import { sealedIds } from './sealed.ts';
 import { DAY_MS, fmtLocal, localIso } from './time.ts';
 import type { QaEntry, Question } from '../../shared/types.ts';
 
@@ -45,6 +48,7 @@ export function buildAskPrompt(q: Question, question: string, pick: string, bank
     '- Bám đề: chỉ ra từ khoá/qualifier trong đề quyết định đáp án; nếu người học chọn sai, nói vì sao lựa chọn đó hấp dẫn nhưng sai.',
     `- Chỉ nêu con số/giới hạn khi chắc chắn. Được dùng Grep/Read (chỉ đọc) trong notes \`*.md\` ở thư mục gốc repo để kiểm chứng${notes.length ? ` (gợi ý: ${notes.join(', ')})` : ''}; nếu có dùng, ghi tên file notes ở cuối để người học đọc thêm.`,
     '- Nếu đề/đáp án trong ngân hàng có vẻ sai hoặc mơ hồ, nói thẳng và gợi ý bấm “🐞 Báo lỗi”.',
+    '- Chỉ đọc notes; KHÔNG đọc, tìm hay trích các câu hỏi khác của ngân hàng (`trainer/`, `practice-exams/`) — một số câu đang được giữ kín để đo điểm thật của người học.',
     '- Không sửa file, không chạy lệnh. Trả lời ngay, không mở đầu/kết thúc xã giao.',
     '',
     `## Câu hỏi \`${q.id}\` (${q.domain}${q.task ? ` · task ${q.task}` : ''} · ${q.topic}${q.services.length ? ` · ${q.services.join(', ')}` : ''})`,
@@ -64,6 +68,9 @@ export function buildAskPrompt(q: Question, question: string, pick: string, bank
   ].join('\n');
 }
 
+/** Paths (relative to the repo root = the run's cwd) the "Hỏi AI" run may not read: everything but the study notes. */
+export const ASK_DENY = ['Read(./trainer/**)', 'Read(./practice-exams/**)'];
+
 export function askArgs(prompt: string, cfg: AppConfig, version?: string): string[] {
   const modern = versionAtLeast(version, MODERN_CLI);
   const args = [
@@ -74,6 +81,9 @@ export function askArgs(prompt: string, cfg: AppConfig, version?: string): strin
     '--permission-mode',
     'dontAsk',
     ...(modern ? ['--permission-prompts', 'none', '--no-session-persistence', '--tools', 'Read,Glob,Grep'] : []),
+    // Read deny rules also cover Grep / Glob: the bank, sealed forms, batch files and the exam sources stay out of reach
+    '--disallowedTools',
+    ...ASK_DENY,
     '--allowedTools',
     'Glob',
     'Grep',
@@ -306,7 +316,10 @@ const oneLine = (s: string, max: number) => {
 
 /** Markdown lines appended to coach/snapshot.md: the learner's recent questions to the AI. */
 export function qaSnapshotLines(bank: BankState): string[] {
-  const all = allQa().sort((a, b) => Date.parse(b.e.at) - Date.parse(a.e.at));
+  const sealed = sealedIds(); // questions asked about before they were sealed are not named (the coach must not see them)
+  const all = allQa()
+    .filter((x) => !sealed.has(x.qid))
+    .sort((a, b) => Date.parse(b.e.at) - Date.parse(a.e.at));
   const o = ['## 15. Câu người học hỏi AI (`trainer/coach/qa/`)', ''];
   if (!all.length) {
     o.push('_Chưa có._', '');

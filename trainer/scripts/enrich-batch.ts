@@ -11,7 +11,7 @@ import { context } from '../server/context.ts';
 import { distractorReport, optionStats } from '../server/lib/quality.ts';
 import { latestVerdicts } from '../server/lib/verify.ts';
 import { stampParts } from '../server/lib/time.ts';
-import { MAX_BATCH, MAX_LONGFORM, enrichStatus, idList, learnerNotes, longformTargets, parseTasks, patchPath, repoRel, selectBatch, writeBatchFile, writeLongformFile } from '../server/lib/enrich.ts';
+import { MAX_BATCH, MAX_LONGFORM, enrichStatus, idList, learnerNotes, longformTargets, parseTasks, patchPath, repoRel, selectBatch, upcomingIds, writeBatchFile, writeLongformFile } from '../server/lib/enrich.ts';
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(`--${name}`);
@@ -24,7 +24,7 @@ const int = (v: string | undefined, dflt: number, max: number) => {
   return Number.isFinite(n) && n > 0 ? Math.min(max, n) : dflt;
 };
 
-const { cfg, bank, attempts, states } = context(); // re-graded attempts: answer-key fixes count against the new key
+const { cfg, bank, attempts, states, plans } = context(); // re-graded attempts: answer-key fixes count against the new key
 
 if (flag('status')) {
   const st = enrichStatus(bank);
@@ -67,7 +67,10 @@ if (longform) {
   const { todos } = parseTasks(opt('tasks'));
   const distractors = todos.includes('distractors');
   const report = distractors ? distractorReport(bank, attempts) : undefined;
-  const items = selectBatch(bank, states, { size: int(opt('size'), cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks'), ids: idList(opt('ids')), report });
+  const ids = idList(opt('ids'));
+  // same order as the app's ENRICH runs: questions the learner is about to meet first (B9)
+  const upcoming = ids.length ? [] : upcomingIds({ bank, states, attempts, plans, cfg });
+  const items = selectBatch(bank, states, { size: int(opt('size'), cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks'), ids, report, upcoming });
   if (!items.length) {
     console.log('✓ Không còn câu nào cần ENRICH cho lựa chọn này.');
     process.exit(0);

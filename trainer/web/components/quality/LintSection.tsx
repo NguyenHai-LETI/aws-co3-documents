@@ -29,7 +29,10 @@ export const LINT_ENRICH: Record<string, { tasks: string; label: string }> = {
   'overlapping-options': { tasks: 'distractors', label: 'viết lại phương án nhiễu' },
   'letter-ref': { tasks: 'explain', label: 'viết lại giải thích' },
   'short-explanation': { tasks: 'explain', label: 'viết lại giải thích' },
+  'oos-distractor': { tasks: 'distractors', label: 'thay phương án nhiễu ngoài phạm vi' },
 };
+/** [γ] Rules handled in Bank → Chất lượng → 🎯 Phạm vi đề thi (retire / ENRICH with the out-of-scope services named). */
+const SCOPE_RULES = new Set(['oos-answer', 'oos-distractor']);
 const ENRICH_MAX = 20;
 const PAGE = 25;
 
@@ -123,7 +126,12 @@ export function LintSection({ lint, rule, onRule, onOpen }: { lint?: LintSummary
                 🧹 ENRICH {enrich.label} ({Math.min(ENRICH_MAX, ids.length)} câu đầu)
               </button>
             )}
-            {!enrich && <span className="tiny muted">Lỗi này cần sửa tay trong file pack (hoặc 🐞 báo lỗi để AI Coach xử lý).</span>}
+            {SCOPE_RULES.has(rule) && (
+              <button className="btn sm" onClick={() => navigate('/bank?tab=quality&sec=scope')}>
+                🎯 Mở mục Phạm vi đề thi
+              </button>
+            )}
+            {!enrich && !SCOPE_RULES.has(rule) && <span className="tiny muted">Lỗi này cần sửa tay trong file pack (hoặc 🐞 báo lỗi để AI Coach xử lý).</span>}
           </div>
           {list.loading && !list.data ? (
             <div className="small muted">Đang tải danh sách…</div>
