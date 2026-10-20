@@ -8,6 +8,8 @@ coach:
     enrich: "sonnet"        # bảo trì ngân hàng: giải thích, gợi ý, phân loại, cân độ dài, câu dài
     ask: "sonnet"           # "Hỏi AI về câu này"
     verify: "opus"          # model thứ hai "giải mù" câu mới / câu vừa sửa (nên khác model sinh câu)
+    tutor: "sonnet"         # 🧑‍🏫 Gia sư (hỏi dẫn dắt nhiều lượt)
+    notebook: "sonnet"      # 📒 Sổ lỗi do AI viết
   effort: ""                # trống = mặc định; low | medium | high | xhigh | max
   max_budget_usd: 0         # chỉ áp dụng khi Claude Code dùng API key; 0 = không giới hạn
   skip_if_no_new_results: true   # lượt chạy theo lịch bỏ qua phân tích nếu không có bài làm/issue mới
@@ -20,10 +22,15 @@ coach:
   use_api_key: false        # false = luôn dùng đăng nhập claude.ai (bỏ ANTHROPIC_API_KEY khỏi môi trường của coach)
   structured_output: true   # sinh câu / ENRICH / câu dài trả JSON (--json-schema), app tự kiểm tra rồi ghi file — AI không cần quyền ghi
   enrich_after_analyze: false   # sau mỗi lượt phân tích, ENRICH thêm ~10 câu bạn sắp gặp (tốn thêm quota)
+  idle_tasks: [enrich]      # lượt theo lịch không có bài mới → làm việc đầu tiên còn việc: enrich | longform | twins | audit | notebook (tốn quota)
+  twins_per_run: 10         # số câu song sinh (diễn đạt lại / tương phản) mỗi lượt "twins"
+  tutor_daily_turns: 40     # 🧑‍🏫 Gia sư: số lượt AI trả lời mỗi ngày, tính cả câu hỏi mở đầu (0 = tắt)
   verify:
     auto: true              # sau lượt AI: model thứ hai giải mù câu mới / câu vừa sửa (không xem đáp án)
     auto_draft: true        # giải mù không khớp / mơ hồ → câu do AI viết chuyển sang draft, chờ bạn duyệt (Ngân hàng → Chất lượng)
     batch_size: 10          # số câu mỗi lần gọi model kiểm tra
+    grounded: true          # câu bị nghi sai / kiến thức cũ: kiểm chứng bằng tài liệu AWS (chỉ đọc docs.aws.amazon.com, aws.amazon.com)
+    local_model: ""         # model Ollama trò chuyện cho phiếu thứ ba (khác hãng, không tốn quota); "" = tắt
 
 srs:
   algorithm: fsrs           # fsrs (khuyến nghị) | leitner
@@ -35,12 +42,21 @@ srs:
   weights: []               # FSRS-6: bộ tham số tự đặt; [] = dùng tham số cá nhân (nếu đã tối ưu) hoặc mặc định
   optimize: auto            # auto | manual | off — tối ưu tham số FSRS theo lịch sử làm bài của bạn
   optimize_min_reviews: 400 # cần tối thiểu N lượt ôn trước khi tối ưu
+  exam_aware: true          # có ngày thi: hạn mức câu mới/ngày, giai đoạn ôn chốt trước thi, các pha "Đo & vá / Củng cố / Nhẹ"
+  final_review_days: 7      # câu có hạn ôn rơi sau ngày thi − 2 được kéo vào [thi − N, thi − 2] nếu xác suất nhớ hôm thi < 0,9
+  new_cutoff_days: 10       # gặp hết câu mới trước ngày thi − N ngày
+  load_balance: true        # rải hạn ôn (±5 % khoảng ôn) sang ngày ít câu nhất
+  final_retention: 0        # xác suất nhớ mục tiêu trong 14 ngày cuối (vd 0.95); 0 = giữ desired_retention
+  leech_lapses: 3           # số lần quên khiến một câu thành "câu dai dẳng"
+  sibling_swap_days: 7      # câu đã bền ≥ N ngày đến hạn → hỏi bằng câu anh em chưa gặp (đo hiểu thật, không thuộc mặt chữ)
 
 practice:
   default_count: 20
   quick_count: 10
   shuffle_options: true     # xáo thứ tự đáp án mặc định (chống nhớ vị trí)
   exclude_out_of_scope: true   # bỏ câu có đáp án là dịch vụ ngoài phạm vi đề (CodeCommit, IoT…) khỏi các chế độ luyện
+  today_minutes: 25         # quỹ phút mặc định của "▶ Học hôm nay" khi chưa đặt số phút/ngày trong Mục tiêu thi
+  relearn: true             # luyện có xem đáp án ngay: câu sai / phải xem gợi ý được hỏi lại sau 3–6 câu
 
 exam:
   sealed_forms: 2           # số đề niêm phong: câu được giữ lại, không xuất hiện khi luyện, để đo điểm trên câu mới
@@ -56,9 +72,14 @@ quality:
   ollama_url: "http://127.0.0.1:11434"
   embedding_model: embeddinggemma   # ollama pull embeddinggemma (hoặc nomic-embed-text)
   semantic_threshold: 0.88  # độ tương đồng cosine ≥ ngưỡng = nghi trùng
+  longform_target_per_task: 12   # số câu tình huống dài chuẩn đề mong muốn cho mỗi task 1.1–4.4
 
 server:
   lan: false                # true = mở cho điện thoại trong cùng mạng Wi-Fi (cần mã truy cập, xem trang 🧰 Công cụ)
+  lan_admin: false          # false = điện thoại chỉ luyện tập; true = cho phép cả AI, đồng bộ, giải mù, cài đặt từ điện thoại
+  https: off                # off | tailscale | mkcert — HTTPS cho điện thoại (cần cho cài app PWA, micro)
+  https_cert: ""            # mkcert: đường dẫn chứng chỉ / khoá ("" = trainer/.local/certs/)
+  https_key: ""
 
 export:
   anki_deck: "AWS SAA-C03"  # tên deck khi xuất sang Anki

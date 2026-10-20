@@ -1,15 +1,21 @@
-// Local HTTP server: JSON API + Vite (React UI) in middleware mode, bound to 127.0.0.1. Opt-in LAN access adds a
-// listener on the local network (server/lib/lan.ts): every request and websocket upgrade passes its gate first.
-// API routes live in server/routes/* and register themselves on import.
+// Local HTTP server: JSON API + the React UI, bound to 127.0.0.1. Opt-in LAN access adds a listener on the local network
+// (server/lib/lan.ts): every request and websocket upgrade passes its gate first, and [v5] LAN devices are limited to the
+// practice scope (server/lib/lan-scope.ts) unless server.lan_admin. API routes live in server/routes/* and register
+// themselves on import.
+// [v5] UI: `npm start` serves the production build (server/lib/lan-ui.ts) to every client; `npm run dev`, --dev or
+// TRAINER_UI=dev keep Vite in middleware mode with HMR for this machine. Vite is only loaded in dev mode, or as a fallback
+// when the build fails.
 import http from 'node:http';
+import type { ViteDevServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import tty from 'node:tty';
 import { spawn } from 'node:child_process';
 import { HOST, PORT, TRAINER_DIR, PACKS_DIR, RESULTS_DIR, PLANS_DIR, RUNS_DIR, INBOX_DIR, PATCHES_DIR, ENRICH_DIR, QA_DIR, loadConfig } from './config.ts';
-import { HttpError, RawResponse, broadcast, isLocalRequest, json, routes, sendRaw, sseClients } from './http.ts';
-import { gateRequest, gateUpgrade, lanBanner, lanEnabled, lanHostNames, setLanEnabled, startLan, stopLan, upgradePath } from './lib/lan.ts';
-import { serveLanUi } from './lib/lan-ui.ts';
+import { HttpError, RawResponse, broadcast, decodable, isLocalRequest, json, routes, sendRaw, sseClients } from './http.ts';
+import { clientScope, gateRequest, gateUpgrade, lanAdminState, lanBanner, lanEnabled, lanHostNames, setLanAdmin, setLanEnabled, setLocalUiMode, startLan, stopLan, upgradePath } from './lib/lan.ts';
+import { appUi, setUiFrozen } from './lib/lan-ui.ts';
+import { routeScope, scopeAllows, scopeRefusal } from './lib/lan-scope.ts';
 import { dataVersions } from './context.ts';
 import { loadBank } from './lib/bank.ts';
 import { loadAttempts } from './lib/results.ts';
@@ -30,6 +36,13 @@ import './routes/verify.ts';
 import './routes/search.ts';
 import './routes/export.ts';
 import './routes/sealed.ts';
+// [v5] new route files (owners: today σ · leeches λ · active ρ · pairs γ1 · tutor τ · micro π)
+import './routes/today.ts';
+import './routes/leeches.ts';
+import './routes/active.ts';
+import './routes/pairs.ts';
+import './routes/tutor.ts';
+import './routes/micro.ts';
 
 /** {bank, results, plans, params, config, day} — same helper as /api/meta and /api/state `versions` ([P]). */
 function versions() {
@@ -117,6 +130,11 @@ async function handleApi(req: http.IncomingMessage, res: http.ServerResponse, ur
     if (r.method !== req.method) continue;
     const m = url.pathname.match(r.re);
     if (!m) continue;
+    // [v5] least privilege: LAN devices may call practice routes; admin ones only with server.lan_admin, local ones never
+    const scope = routeScope(r.method, r.pattern);
+    if (!scopeAllows(scope, clientScope(req))) return json(res, 403, { error: scopeRefusal(scope), scope });
+    // route params arrive still %-encoded and handlers decode them: a malformed escape is the client's error, not a 500
+    if (!m.slice(1).every(decodable)) return json(res, 400, { error: 'Bad request: malformed %-encoding in the URL' });
     try {
       const out = await r.fn(req, url, m.slice(1));
       // a test was built = the learner is busy: no quiet auto sync mid-test (the next submit schedules one again)
@@ -173,7 +191,8 @@ async function main() {
     autoSync.stop(); // a submit answered while closing must not start another sync
     attempt('snapshot', flushSnapshot); // first, synchronously: a snapshot still waiting on its debounce
     attempt('coach cancel', () => coachRunner.cancel());
-    if (code === RESTART_EXIT_CODE) attempt('restart marker', () => writeRestartMarker({ lan: lanEnabled() }));
+    if (code === RESTART_EXIT_CODE) attempt('restart marker', () => writeRestartMarker({ lan: lanEnabled(), lanAdmin: lanAdminState().source === 'runtime' ? lanAdminState().enabled : undefined }));
+    attempt('UI build stop', () => appUi.stop());
     attempt('LAN stop', stopLan);
     attempt('server close', () => server?.close());
     const exit = () => process.exit(code);
@@ -252,23 +271,35 @@ async function main() {
   server = app;
   // Never listens: receives the websocket upgrades the LAN gate lets through, so Vite's HMR socket sees only those.
   const hmrHub = http.createServer();
-  const { createServer: createVite } = await import('vite');
-  const devServer = await createVite({
-    root: TRAINER_DIR,
-    configFile: path.join(TRAINER_DIR, 'vite.config.ts'),
-    appType: 'spa',
-    server: {
-      middlewareMode: true,
-      ws: { server: hmrHub },
-      allowedHosts: lanHostNames(), // <host>.local for LAN devices (IP hosts are always allowed; gateRequest decides first)
-      cors: false, // no page on another origin (e.g. another localhost port) may read what the dev server serves
-      // the data dir is the Vite root by default: never serve the LAN access token, caches, git internals, keys, env
-      fs: { deny: ['.env', '.env.*', '*.{crt,pem,key}', '**/.git/**', '**/.local/**', '**/.cache/**'] },
-      watch: { ignored: ['**/bank/**', '**/results/**', '**/coach/**', '**/inbox/**', '**/node_modules/**', '**/.cache/**', '**/.local/**', '**/dist/**'] },
-    },
-    logLevel: 'warn',
-  });
-  vite = devServer;
+  let devServer: ViteDevServer | undefined;
+  let devStarting: Promise<ViteDevServer> | undefined;
+  /** The Vite dev server: at startup in dev mode, lazily in dist mode (only when the production build failed). */
+  const dev = (): Promise<ViteDevServer> =>
+    (devStarting ??= (async () => {
+      const { createServer: createVite } = await import('vite');
+      const d = await createVite({
+        root: TRAINER_DIR,
+        configFile: path.join(TRAINER_DIR, 'vite.config.ts'),
+        appType: 'spa',
+        server: {
+          middlewareMode: true,
+          ws: { server: hmrHub },
+          allowedHosts: lanHostNames(), // <host>.local for LAN devices (IP hosts are always allowed; gateRequest decides first)
+          cors: false, // no page on another origin (e.g. another localhost port) may read what the dev server serves
+          // the data dir is the Vite root by default: never serve the LAN access token, caches, git internals, keys, env
+          fs: { deny: ['.env', '.env.*', '*.{crt,pem,key}', '**/.git/**', '**/.local/**', '**/.cache/**'] },
+          watch: { ignored: ['**/bank/**', '**/results/**', '**/coach/**', '**/inbox/**', '**/node_modules/**', '**/.cache/**', '**/.local/**', '**/dist/**'] },
+        },
+        logLevel: 'warn',
+      });
+      devServer = d;
+      vite = d;
+      return d;
+    })());
+  // the build follows the code this process runs: a code update received by sync waits for the restart
+  setUiFrozen(() => !!pendingUpdate());
+  setLocalUiMode(UI_MODE);
+  if (UI_MODE === 'dev') await dev();
   if (stopping) return; // a signal arrived while Vite was starting: shutdown() closes it and exits
   app.on('upgrade', (req, socket, head) => {
     // Node drops the server's socket error handler on upgrade: without this, a client resetting the connection while
@@ -276,8 +307,9 @@ async function main() {
     socket.on('error', () => socket.destroy());
     if (!gateUpgrade(req, socket)) return;
     const protocol = String(req.headers['sec-websocket-protocol'] ?? '');
-    // Vite answers its HMR socket and liveness ping on "/" only — anything else would stay open forever.
-    if ((protocol === 'vite-hmr' || protocol === 'vite-ping') && upgradePath(req) === '/') hmrHub.emit('upgrade', req, socket, head);
+    // Vite answers its HMR socket and liveness ping on "/" only — anything else would stay open forever. No dev server
+    // (production build): nothing to upgrade to.
+    if (devServer && (protocol === 'vite-hmr' || protocol === 'vite-ping') && upgradePath(req) === '/') hmrHub.emit('upgrade', req, socket, head);
     else socket.destroy();
   });
   const handleRequest = async (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -289,9 +321,21 @@ async function main() {
     }
     if (!gateRequest(req, res, url)) return;
     if (url.pathname.startsWith('/api/')) return handleApi(req, res, url);
-    // LAN devices (phones) get the production build — much faster than the dev server over Wi-Fi.
-    if (!isLocalRequest(req) && (await serveLanUi(req, res, url))) return;
-    devServer.middlewares(req, res);
+    // pages and assets are read-only: anything but GET / HEAD never reaches a file server (the Vite dev server would
+    // answer a POST with the raw file — config.yaml, results, sources)
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end('Method not allowed');
+    }
+    const local = isLocalRequest(req);
+    // the production build: every client in dist mode, LAN devices (phones) always — much faster over Wi-Fi
+    if ((UI_MODE === 'dist' || !local) && (await appUi.serve(req, res, url))) return;
+    // the Vite dev server only ever answers this machine: in dev mode, or in dist mode while the build is unavailable
+    if (!local || (UI_MODE === 'dist' && appUi.mode() !== 'dev')) {
+      res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Retry-After': '5' });
+      return res.end('Giao diện đang được dựng lại — thử lại sau vài giây.');
+    }
+    (await dev()).middlewares(req, res);
   };
   app.on('request', (req, res) => {
     handleRequest(req, res).catch((e) => {
@@ -317,6 +361,8 @@ async function main() {
     await startLan(app).catch((e) => console.error('LAN start failed', e)); // config server.lan · npm start -- --lan · LAN=1
     // restarted for a code update: LAN access switched on from 🧰 Công cụ stays on, phones keep working
     if (restarted?.lan && !lanEnabled()) await setLanEnabled(true).catch((e) => console.error('LAN restore failed', e));
+    if (restarted?.lanAdmin !== undefined) setLanAdmin(restarted.lanAdmin);
+    if (UI_MODE === 'dist') void appUi.ensure(); // warm the build (reused when the sources did not change)
     if (process.env.OPEN === '1' || process.argv.includes('--open')) openBrowser(lanEnabled() ? `${url}/#/tools` : url);
     const c = await claude;
     console.log(`     AI Coach: ${c?.available ? `Claude Code ${c.version} (${c.source})` : 'chưa tìm thấy Claude Code CLI — xem README'}`);
@@ -324,6 +370,13 @@ async function main() {
     if (autoOn) console.log('  ⇅ Tự đồng bộ khi rảnh: bật (sync.auto: idle) — kéo về khi mở app, đẩy lên vài phút sau mỗi bài nộp và khi tắt app');
   });
 }
+
+/**
+ * [v5] How this machine gets the UI: 'dist' (production build — `npm start`, start.sh, the service) or 'dev' (Vite with
+ * HMR — `npm run dev`, --dev, TRAINER_UI=dev; test sandboxes too).
+ */
+const UI_MODE: 'dist' | 'dev' =
+  process.argv.includes('--dev') || (process.env.TRAINER_UI ?? '').toLowerCase() === 'dev' || (watchMode() && (process.env.TRAINER_UI ?? '').toLowerCase() !== 'dist') ? 'dev' : 'dist';
 
 /** Upper bound for the push at shutdown (sync.auto: idle). */
 const SHUTDOWN_PUSH_MS = 12_000;

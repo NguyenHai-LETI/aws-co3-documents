@@ -17,13 +17,12 @@ import { mergeDuplicates, scheduleSemantic, semanticState } from './embeddings.t
 import { verifySummary } from './verify.ts';
 import { sealedIds, sealedKey } from './sealed.ts';
 import { outOfScopeIn, outOfScopeSet } from './taxonomy.ts';
+import { lexicalPairs } from './similarity.ts';
 import { countWords } from '../../shared/timing.ts';
 import type { AnswerRecord, Attempt, BankQuality, DistractorReport, DuplicatePair, LintSeverity, Question, ScopeReport, VerifySummary } from '../../shared/types.ts';
 
 export { correctIsLongest } from './lint.ts'; // one rule for metric, lint, filter (moved to lint.ts)
 
-const DUP_WORDS = 0.8; // Jaccard of significant words (stem + correct option)
-const DUP_TRIGRAMS = 0.6; // Jaccard of word trigrams
 const MAX_DUPLICATES = 50;
 export const MIN_EXPOSURES = 3; // distractor analytics: answers to the current version before an option is judged
 const MAX_WEAK = 60;
@@ -32,75 +31,14 @@ const VERIFY_FILE = path.join(BANK_DIR, 'verify.md');
 
 // ── near-duplicates ─────────────────────────────────────────────────────────
 
-const STOPWORDS = new Set(
-  (
-    'a an the and or but if then than to of in on at by for with from into onto over under as is are was were be been being ' +
-    'it its this that these those which what who whom whose when where how all any each both few more other some such no nor ' +
-    'only own same so too very can will just should must would could may might do does did has have had having we you they ' +
-    'their them our your i me my he she his her there here also per via use uses using used need needs needed require requires ' +
-    'required requirement requirements want wants company companies solution solutions architect aws amazon meet meets best ' +
-    'following provide provides option options choose'
-  ).split(' '),
-);
-
-function tokens(text: string): string[] {
-  return text.toLowerCase().replace(/[`*_>#|[\]()"“”'’.,;:!?/\\]+/g, ' ').match(/[\p{L}\p{N}][\p{L}\p{N}-]*/gu) ?? [];
-}
-
-interface Signature {
-  id: string;
-  words: number[]; // sorted unique ids of significant words
-  trigrams: number[]; // sorted unique ids of word trigrams
-}
-
-function jaccard(a: number[], b: number[]): number {
-  if (!a.length || !b.length) return 0;
-  let i = 0;
-  let j = 0;
-  let inter = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      inter++;
-      i++;
-      j++;
-    } else if (a[i] < b[j]) i++;
-    else j++;
-  }
-  return inter / (a.length + b.length - inter);
-}
-
-/** Near-duplicate pairs among `questions` (stem + correct option(s)), best first. */
+/**
+ * Near-duplicate pairs among `questions` (stem + correct option(s): significant words ≥ 0.8 or word trigrams ≥ 0.6),
+ * best first. [v5] One rule with the sibling clusters (similarity.ts), found by a prefix-filtered join instead of n².
+ */
 export function findDuplicates(questions: Pick<Question, 'id' | 'stem' | 'options' | 'answer'>[], limit = MAX_DUPLICATES): DuplicatePair[] {
-  const dict = new Map<string, number>();
-  const idOf = (s: string) => {
-    let n = dict.get(s);
-    if (n === undefined) dict.set(s, (n = dict.size));
-    return n;
-  };
-  const uniqSorted = (xs: number[]) => [...new Set(xs)].sort((x, y) => x - y);
-  const sigs: Signature[] = questions.map((q) => {
-    const correct = q.options.filter((o) => q.answer.includes(o.key)).map((o) => o.text).sort().join(' ');
-    const all = tokens(`${q.stem} ${correct}`);
-    const tri: number[] = [];
-    for (let i = 0; i + 2 < all.length; i++) tri.push(idOf(`${all[i]} ${all[i + 1]} ${all[i + 2]}`));
-    return { id: q.id, words: uniqSorted(all.filter((w) => !STOPWORDS.has(w)).map((w) => idOf(w))), trigrams: uniqSorted(tri) };
-  });
-  const pairs: DuplicatePair[] = [];
-  for (let x = 0; x < sigs.length; x++) {
-    for (let y = x + 1; y < sigs.length; y++) {
-      const a = sigs[x];
-      const b = sigs[y];
-      const wr = Math.min(a.words.length, b.words.length) / Math.max(a.words.length, b.words.length, 1);
-      const tr = Math.min(a.trigrams.length, b.trigrams.length) / Math.max(a.trigrams.length, b.trigrams.length, 1);
-      const w = wr >= DUP_WORDS ? jaccard(a.words, b.words) : 0; // size ratio bounds the Jaccard index
-      const t = tr >= DUP_TRIGRAMS ? jaccard(a.trigrams, b.trigrams) : 0;
-      if (w >= DUP_WORDS || t >= DUP_TRIGRAMS) {
-        const [p, q] = a.id < b.id ? [a.id, b.id] : [b.id, a.id];
-        pairs.push({ a: p, b: q, score: Math.round(Math.max(w, t) * 100) / 100, kind: 'lexical' });
-      }
-    }
-  }
-  return pairs.sort((p, q) => q.score - p.score || p.a.localeCompare(q.a) || p.b.localeCompare(q.b)).slice(0, limit);
+  return lexicalPairs(questions)
+    .slice(0, limit)
+    .map((p) => ({ ...p, kind: 'lexical' as const }));
 }
 
 /** Lexical pairs among the active questions — depends on the bank only, so it is cached by bank version (not by answers). */

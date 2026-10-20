@@ -1,0 +1,11 @@
+{
+  "name": "saa-trainer",
+  "owner": { "name": "SAA-C03 Trainer" },
+  "plugins": [
+    {
+      "name": "saa-trainer-micro",
+      "source": "./mod",
+      "description": "Câu hỏi nhanh SAA-C03 phía trên ô nhập khi Claude đang làm việc"
+    }
+  ]
+}

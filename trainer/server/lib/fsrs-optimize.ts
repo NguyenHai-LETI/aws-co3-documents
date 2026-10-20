@@ -1,6 +1,10 @@
 // [L] Personal FSRS-6 parameters fitted to the learner's own review history.
 // - Training set: per question the chronological (grade, whole days since the previous answer) pairs from non-rushed
 //   attempts; answers with no pick and t = 0 were never looked at (not real reviews) and are left out.
+//   [v5 λ] Same rules as computeStates: skipped blanks of a stopped-early test are left out; a self-grade (`grade`:
+//   listen, Anki) is the grade; answers from chat / micro breaks get no speed-based grade; relearning retries and retest
+//   answers are same-day steps graded at most "good" (reviewGrade). A sibling's `for` credit is NOT a review of the
+//   original here: the optimizer only sees answers to the question itself.
 // - Optimizer: @open-spaced-repetition/binding (fsrs-rs, optional native package) in a CHILD PROCESS — never on a
 //   request, and an invalid item makes the native code abort its whole process (Rust panic), which must not be the server.
 // - Result: results/fsrs-params.json (synced by git with the results). One JSON object per line, newest line wins, so a
@@ -13,7 +17,7 @@ import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { RESULTS_DIR, type AppConfig } from '../config.ts';
-import { FSRS_WEIGHTS, clampRetention, gradeAnswer, localDay, normalizeWeights } from './fsrs.ts';
+import { FSRS_WEIGHTS, clampRetention, localDay, normalizeWeights, reviewGrade } from './fsrs.ts';
 import { localIso } from './time.ts';
 import type { Attempt, FsrsInfo } from '../../shared/types.ts';
 
@@ -53,7 +57,7 @@ export interface TrainingSet {
   cards: [number, number][][]; // per question: [grade 1–4, whole days since the previous review (0 for the first)]
   reviews: number;
   items: number; // reviews after the first one of a question that are ≥ 1 day later (= optimizer items)
-  excluded: number; // answers left out: no pick and t = 0
+  excluded: number; // answers left out: no pick and t = 0 (no self-grade), or [v5] skipped blanks
 }
 
 const trainingCache = new WeakMap<Attempt[], TrainingSet>();
@@ -72,8 +76,9 @@ export function trainingSet(attempts: Attempt[]): TrainingSet {
   let excluded = 0;
   for (const { a, at } of ordered) {
     const day = localDay(at);
+    const timed = !a.source && a.mode !== 'retest';
     for (const r of a.answers) {
-      if (!r.pick && !r.t) {
+      if ((!r.pick && !r.t && !r.grade) || r.skipped) {
         excluded++;
         continue;
       }
@@ -81,7 +86,7 @@ export function trainingSet(attempts: Attempt[]): TrainingSet {
       const delta = prev ? Math.max(0, day - prev.last) : 0;
       if (prev && delta > 0) items++;
       const entry = prev ?? { last: day, seq: [] };
-      entry.seq.push([gradeAnswer(r), delta]);
+      entry.seq.push([reviewGrade(r, { timed: timed && !r.relearn, cap: r.relearn || a.mode === 'retest' ? 3 : undefined }), delta]);
       entry.last = day;
       byQ.set(r.q, entry);
       reviews++;

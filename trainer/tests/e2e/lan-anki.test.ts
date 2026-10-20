@@ -177,7 +177,7 @@ test('Anki not running: status and push answer 200 with ok:false and the add-on 
   assert.match(r.body.hint ?? '', /2055492159/);
 });
 
-test('a LAN device exports with the access code, and only with it', { ...T, skip: IP ? false : 'no LAN IPv4' }, async () => {
+test('a LAN device exports with the access code and server.lan_admin ([v5] Anki export is admin scope), and only with them', { ...T, skip: IP ? false : 'no LAN IPv4' }, async () => {
   const request = (headers: Record<string, string>, p = '/api/export/anki', body = '{"scope":"wrong"}') =>
     new Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }>((resolve, reject) => {
       const req = http.request(
@@ -199,7 +199,12 @@ test('a LAN device exports with the access code, and only with it', { ...T, skip
   });
   landing.resume();
   const cookie = String(landing.headers['set-cookie']?.[0]).split(';')[0];
+  const practice = await request({ Cookie: cookie });
+  assert.equal(practice.status, 403, 'practice scope: AnkiConnect / export stay on this machine');
+  assert.match(JSON.parse(practice.body).error, /chỉ có quyền luyện tập/);
+  assert.equal((await api.post('/api/lan/admin', { enabled: true })).status, 200);
   const ok = await request({ Cookie: cookie });
+  await api.post('/api/lan/admin', { enabled: false });
   assert.equal(ok.status, 200);
   assert.match(ok.headers['content-disposition'] ?? '', /anki-saa-c03-wrong-/);
   assert.ok(ok.body.startsWith('#separator:tab\n'));

@@ -4,6 +4,7 @@
 // address is that IP (not loopback) — exactly what a phone looks like to the server. Run: npm run test:e2e
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
@@ -189,13 +190,14 @@ test('wrong code → 401 without a cookie (counted for this machine)', { ...T, s
   assert.ok(((await lanInfo()).failures ?? 0) >= 1);
 });
 
-test('right code (QR link or typed) → HttpOnly SameSite=Strict cookie for 30 days, redirect without the code', { ...T, skip: NO_LAN }, async () => {
+test('right code (QR link or typed) → a token of its own in an HttpOnly SameSite=Strict cookie for 30 days, redirect without the code', { ...T, skip: NO_LAN }, async () => {
   const tok = fs.readFileSync(tokenFile(), 'utf8').trim();
   const typed = (await lanInfo()).token!.toUpperCase(); // grouped + upper case, as someone would type it
   const r = await raw(IP!, srv.port, `/?x=1&t=${encodeURIComponent(typed)}`);
   assert.equal(r.status, 200);
   const set = String(r.headers['set-cookie']?.[0] ?? '');
-  assert.match(set, new RegExp(`^trainer_lan_${srv.port}=[A-Za-z0-9_-]{43}; `));
+  assert.match(set, new RegExp(`^trainer_lan_${srv.port}=[0-9a-z]{8}\\.[A-Za-z0-9_-]{22}; `), 'per-device token <id>.<secret>');
+  assert.ok(!set.includes('Secure'), 'plain HTTP: no Secure attribute');
   for (const attr of ['Path=/', 'Max-Age=2592000', 'HttpOnly', 'SameSite=Strict']) assert.ok(set.split('; ').includes(attr), `${attr} in ${set}`);
   assert.ok(!set.includes(tok), 'the cookie is not the token');
   assert.equal(r.headers['cache-control'], 'no-store');
@@ -235,6 +237,132 @@ test('with the cookie: app + API work; token, QR and controls stay on this machi
   assert.ok(local.devices?.some((d) => d.ip === IP), 'device listed for this machine');
 });
 
+test('[v5] practice scope: LAN devices study, admin routes answer 403 with the reason; /api/meta says so', { ...T, skip: NO_LAN }, async () => {
+  const C = { Cookie: cookie };
+  const json = { ...C, 'Content-Type': 'application/json', 'X-Trainer': '1' };
+  for (const [method, p, body] of [
+    ['POST', '/api/sync', '{}'],
+    ['POST', '/api/coach/run', '{"task":"analyze"}'],
+    ['POST', '/api/ask', '{}'],
+    ['POST', '/api/fsrs/optimize', '{}'],
+    ['GET', '/api/coach', undefined],
+    ['GET', '/api/sync/status', undefined],
+    ['GET', '/api/snapshot', undefined],
+    ['GET', '/api/export/anki/status', undefined],
+  ] as const) {
+    const r = await raw(IP!, srv.port, p, { method, headers: method === 'GET' ? C : json, body });
+    assert.equal(r.status, 403, `${method} ${p}`);
+    const b = JSON.parse(r.body);
+    assert.equal(b.scope, 'admin');
+    assert.match(b.error, /chỉ có quyền luyện tập/);
+  }
+  for (const [p, body] of [
+    ['/api/lan/admin', '{"enabled":true}'],
+    ['/api/lan/devices/x/revoke', '{}'],
+  ]) {
+    const r = await raw(IP!, srv.port, p, { method: 'POST', headers: json, body });
+    assert.equal(r.status, 403, `${p} is for this machine only`);
+    assert.equal(JSON.parse(r.body).scope, 'local');
+  }
+  assert.equal((await raw(IP!, srv.port, '/api/counts', { method: 'POST', headers: json, body: '{}' })).status, 200, 'practice POST');
+  for (const p of ['/api/stats', '/api/progress', '/api/plans', '/api/search?q=s3']) assert.equal((await raw(IP!, srv.port, p, { headers: C })).status, 200, `GET ${p}`);
+  const meta = JSON.parse((await raw(IP!, srv.port, '/api/meta', { headers: C })).body);
+  assert.deepEqual({ local: meta.access.local, scope: meta.access.scope, lanAdmin: meta.access.lanAdmin, secure: meta.access.secure }, { local: false, scope: 'practice', lanAdmin: false, secure: false });
+  assert.equal(typeof JSON.parse((await raw(IP!, srv.port, '/api/meta', { headers: C })).body).claude.available, 'boolean', '[R3] cached Claude status only (no probe for LAN clients)');
+  const mine = (await api.get('/api/meta')).body;
+  assert.equal(mine.access.scope, 'local');
+  assert.equal(mine.access.secure, true);
+  const info = JSON.parse((await raw(IP!, srv.port, '/api/lan', { headers: C })).body) as LanInfo;
+  assert.equal(info.scope, 'practice');
+  assert.ok(info.device?.current && info.device.id === cookie.split('=')[1].split('.')[0], 'the device sees its own entry');
+  assert.equal(info.paired, undefined, 'no device list for LAN devices');
+});
+
+test('[v5] server.lan_admin toggle (this machine only): LAN devices may use admin routes until it is turned off', { ...T, skip: NO_LAN }, async () => {
+  const C = { Cookie: cookie };
+  const on = await api.post<LanInfo>('/api/lan/admin', { enabled: true });
+  assert.equal(on.status, 200);
+  assert.deepEqual(on.body.admin, { enabled: true, source: 'runtime' });
+  assert.equal((await raw(IP!, srv.port, '/api/coach', { headers: C })).status, 200, 'admin GET allowed now');
+  assert.equal(JSON.parse((await raw(IP!, srv.port, '/api/meta', { headers: C })).body).access.scope, 'admin');
+  const json = { ...C, 'Content-Type': 'application/json', 'X-Trainer': '1' };
+  assert.equal((await raw(IP!, srv.port, '/api/lan/rotate', { method: 'POST', headers: json, body: '{}' })).status, 403, 'LAN access itself stays local-only');
+  assert.equal((await api.post('/api/lan/admin', { enabled: 'yes' })).status, 400);
+  const off = await api.post<LanInfo>('/api/lan/admin', { enabled: false });
+  assert.deepEqual(off.body.admin, { enabled: false, source: 'off' });
+  assert.equal((await raw(IP!, srv.port, '/api/coach', { headers: C })).status, 403);
+});
+
+test('[v5] paired devices: listed for this machine, revoked one by one (open streams close), expired ones refused', { ...T, skip: NO_LAN }, async () => {
+  const tok = fs.readFileSync(tokenFile(), 'utf8').trim();
+  const devFile = path.join(sb.home, '.local', 'lan-devices.json');
+  if (process.platform !== 'win32') assert.equal(fs.statSync(devFile).mode & 0o777, 0o600);
+  const stored = fs.readFileSync(devFile, 'utf8');
+  assert.ok(!stored.includes(cookie.split('.')[1]), 'only a hash of the secret is stored');
+  // a second device (another user agent)
+  const second = await raw(IP!, srv.port, `/?t=${tok}`, { headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Version/18.0 Mobile/15E148 Safari/604.1' } });
+  const cookie2 = String(second.headers['set-cookie']?.[0]).split(';')[0];
+  const id2 = cookie2.split('=')[1].split('.')[0];
+  // scanning again on a paired device keeps its entry
+  const again = await raw(IP!, srv.port, `/?t=${tok}`, { headers: { Cookie: cookie2 } });
+  assert.equal(again.status, 200);
+  assert.equal(again.headers['set-cookie'], undefined, 'no new token for a paired device');
+  let info = (await api.get<LanInfo>('/api/lan')).body;
+  const entry = info.paired?.find((d) => d.id === id2);
+  assert.equal(entry?.name, 'iPhone · Safari');
+  assert.ok(entry && Date.parse(entry.expires) - Date.parse(entry.created) === 30 * 86_400_000, '30-day expiry');
+  assert.equal(info.paired?.filter((d) => d.id === id2).length, 1);
+  // rename
+  info = (await api.post<LanInfo>(`/api/lan/devices/${id2}`, { name: 'Điện thoại của tôi' })).body;
+  assert.equal(info.paired?.find((d) => d.id === id2)?.name, 'Điện thoại của tôi');
+  // revoke closes its open stream, the other device keeps working
+  const stream = await openStream(srv.port, cookie2);
+  assert.equal(stream.status, 200);
+  info = (await api.post<LanInfo>(`/api/lan/devices/${id2}/revoke`)).body;
+  assert.ok(info.paired?.find((d) => d.id === id2)?.revoked);
+  await within(stream.closed, 5000, 'revoked device stream closed');
+  const refused = await raw(IP!, srv.port, '/api/meta', { headers: { Cookie: cookie2 } });
+  assert.equal(refused.status, 401);
+  assert.match(JSON.parse(refused.body).error, /thu hồi/);
+  assert.match((await raw(IP!, srv.port, '/', { headers: { Cookie: cookie2 } })).body, /thu hồi/, 'the page says why');
+  assert.equal((await raw(IP!, srv.port, '/api/meta', { headers: { Cookie: cookie } })).status, 200, 'other device unaffected');
+  assert.equal((await api.post(`/api/lan/devices/${id2}/revoke`)).status, 404, 'already revoked');
+  // [R3] a malformed %-escape is a client error (the gate answers 404 for the path; route params are checked again → 400)
+  for (const [m, p] of [['POST', '/api/lan/devices/%E0%A4%A/revoke'], ['GET', '/api/results/%zz'], ['POST', '/api/lan/devices/%/x']] as const) {
+    const st = (m === 'GET' ? await api.get(p) : await api.post(p)).status;
+    assert.ok(st === 400 || st === 404, `${m} ${p} → ${st}`);
+  }
+  // expiry (the file is the source of truth: an entry past its date is refused)
+  const third = await raw(IP!, srv.port, `/?t=${tok}`);
+  const cookie3 = String(third.headers['set-cookie']?.[0]).split(';')[0];
+  const id3 = cookie3.split('=')[1].split('.')[0];
+  assert.equal((await raw(IP!, srv.port, '/api/meta', { headers: { Cookie: cookie3 } })).status, 200);
+  const data = JSON.parse(fs.readFileSync(devFile, 'utf8'));
+  for (const d of data.devices) if (d.id === id3) d.expires = new Date(Date.now() - 1000).toISOString();
+  fs.writeFileSync(devFile, JSON.stringify(data));
+  const expired = await raw(IP!, srv.port, '/api/meta', { headers: { Cookie: cookie3 } });
+  assert.equal(expired.status, 401);
+  assert.match(JSON.parse(expired.body).error, /hết hạn/);
+});
+
+test('[v5] pre-v5 cookie (HMAC of the code) still works as the "legacy" device and is swapped for a token of its own on a page load', { ...T, skip: NO_LAN }, async () => {
+  const tok = fs.readFileSync(tokenFile(), 'utf8').trim();
+  const legacy = `trainer_lan_${srv.port}=${crypto.createHmac('sha256', tok).update('trainer-lan-cookie-v1').digest('base64url')}`;
+  const apiCall = await raw(IP!, srv.port, '/api/meta', { headers: { Cookie: legacy } });
+  assert.equal(apiCall.status, 200, 'API calls of an open page keep working');
+  assert.equal(apiCall.headers['set-cookie'], undefined, 'no upgrade on API calls (a burst would mint several devices)');
+  const page = await raw(IP!, srv.port, '/', { headers: { Cookie: legacy, Accept: 'text/html', 'Sec-Fetch-Mode': 'navigate' } });
+  assert.equal(page.status, 200);
+  const upgraded = String(page.headers['set-cookie']?.[0] ?? '');
+  assert.match(upgraded, new RegExp(`^trainer_lan_${srv.port}=[0-9a-z]{8}\\.[A-Za-z0-9_-]{22}; `));
+  const info = (await api.get<LanInfo>('/api/lan')).body;
+  const entry = info.paired?.find((d) => d.legacy);
+  assert.ok(entry, 'legacy entry listed');
+  await api.post(`/api/lan/devices/${entry!.id}/revoke`);
+  assert.equal((await raw(IP!, srv.port, '/api/meta', { headers: { Cookie: legacy } })).status, 401, 'revoking the legacy entry refuses every old cookie');
+  assert.equal((await raw(IP!, srv.port, '/api/meta', { headers: { Cookie: upgraded.split(';')[0] } })).status, 200, 'the upgraded device keeps its own token');
+});
+
 test('LAN devices get the production build (gzip, immutable assets); this machine keeps the dev server', { ...T, skip: NO_LAN }, async () => {
   const page = await raw(IP!, srv.port, '/', { headers: { Cookie: cookie } });
   assert.equal(page.status, 200);
@@ -251,6 +379,12 @@ test('LAN devices get the production build (gzip, immutable assets); this machin
   // with the build in place the dev server (sources, node_modules, /@fs) is not reachable from the network at all
   for (const p of ['/@vite/client', '/web/main.tsx', '/server/config.ts', '/node_modules/react/package.json', `/@fs${path.join(sb.home, 'config.yaml')}`]) {
     assert.equal((await raw(IP!, srv.port, p, { headers: { Cookie: cookie } })).status, 404, `${p} not served to LAN devices`);
+  }
+  // [R3] other methods never reach a file server, whatever the path (dev server POST leak)
+  for (const p of ['/config.yaml', '/results/sealed.md', '/coach/COACH.md', '/server/lib/lan.ts', '/']) {
+    const r = await raw(IP!, srv.port, p, { method: 'POST', headers: { Cookie: cookie }, body: 'x' });
+    assert.equal(r.status, 405, `POST ${p}`);
+    assert.ok(r.body.length < 100, 'no file content');
   }
 });
 

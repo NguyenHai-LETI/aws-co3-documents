@@ -19,6 +19,9 @@ export interface FakeAnki {
   decks: Set<string>;
   models: Record<string, string[]>;
   calls: string[]; // action names in order
+  /** [v5] review log rows (cardReviews): add with review(); one card per note (the note id + 1). */
+  reviews: { deck: string; row: number[] }[];
+  review(noteId: number, button: number, at: number, durationMs?: number): void;
   close(): Promise<void>;
 }
 
@@ -40,6 +43,7 @@ export async function startFakeAnki(opts: { models?: Record<string, string[]>; a
   const decks = new Set(['Default']);
   let notes: FakeNote[] = [];
   const calls: string[] = [];
+  const reviews: { deck: string; row: number[] }[] = [];
   let nextId = 1_700_000_000_000;
   const first = (model: string, fields: Record<string, string>) => fields[models[model]?.[0] ?? ''] ?? '';
   const isDup = (deck: string, model: string, fields: Record<string, string>) => notes.some((n) => n.deck === deck && n.model === model && first(n.model, n.fields) === first(model, fields));
@@ -118,6 +122,16 @@ export async function startFakeAnki(opts: { models?: Record<string, string[]>; a
         }
         return ids;
       }
+      // [v5] review import: cards are note id + 1; rows [reviewTime, cardID, usn, button, ivl, lastIvl, factor, duration, type]
+      case 'cardReviews':
+        return reviews.filter((r) => r.deck === params.deck && r.row[0] > Number(params.startID ?? 0)).map((r) => r.row);
+      case 'getLatestReviewID':
+        return Math.max(0, ...reviews.filter((r) => r.deck === params.deck).map((r) => r.row[0]));
+      case 'cardsInfo':
+        return (params.cards as number[]).map((c) => {
+          const n = notes.find((x) => x.id === c - 1);
+          return n ? { cardId: c, note: n.id, deckName: n.deck, modelName: n.model } : {};
+        });
       default:
         throw new Error('unsupported action');
     }
@@ -153,6 +167,11 @@ export async function startFakeAnki(opts: { models?: Record<string, string[]>; a
     decks,
     models,
     calls,
+    reviews,
+    review(noteId: number, button: number, at: number, durationMs = 8000) {
+      const n = notes.find((x) => x.id === noteId);
+      reviews.push({ deck: n?.deck ?? 'Default', row: [at, noteId + 1, -1, button, 1, 0, 2500, durationMs, 1] });
+    },
     close: () =>
       new Promise<void>((resolve) => {
         for (const s of sockets) s.destroy();

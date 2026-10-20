@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { LINT_RULES, articleFor, chooseInstruction, correctIsLongest, lintBank, lintQuestion, lintQuestionsFor, newFlaws, type LintInput } from '../server/lib/lint.ts';
+import { LINT_RULES, articleFor, chooseInstruction, correctIsLongest, familyFlaws, lintBank, lintContext, lintQuestion, lintQuestionsFor, newFlaws, type LintInput } from '../server/lib/lint.ts';
 import { loadBank, type BankState } from '../server/lib/bank.ts';
 import { loadTaxonomy } from '../server/lib/taxonomy.ts';
 import { parsePack } from '../server/lib/pack-format.ts';
@@ -461,4 +461,50 @@ test('validate --lint lists the exam-scope rules: an out-of-scope answer (medium
   assert.match(out, /· bank\/packs\/manual\/oos\.md:\d+ \[v-oos-d\] oos-distractor \(B\)/);
   assert.match(out, /medium +oos-answer +1 +Đáp án là dịch vụ ngoài phạm vi đề/);
   assert.match(out, /low +oos-distractor +1/);
+});
+
+// ── [v5 γ1] qualifier families + stale facts ───────────────────────────────
+
+test('family-options (medium): members share one option set (letters may differ) and ask a different final question', () => {
+  const opts = ['Use Amazon S3 Standard-IA', 'Use Amazon S3 Glacier Deep Archive', 'Use Amazon EFS One Zone', 'Use Amazon EBS gp3 volumes'];
+  const scenario = 'A media company keeps 40 TB of video masters that are read twice a year and must be retrievable within hours.';
+  const cost = mk({ id: 'f-cost', stem: `${scenario} Which solution is the MOST cost-effective?`, options: opts, answer: ['B'] });
+  const fast = mk({ id: 'f-fast', stem: `${scenario} Which solution offers the LOWEST retrieval latency?`, options: [opts[2], opts[0], opts[1], opts[3]], answer: ['B'] });
+  const odd = mk({ id: 'f-odd', stem: `${scenario} Which solution needs the LEAST operational effort?`, options: [...opts.slice(0, 3), 'Use Amazon FSx for Lustre'], answer: ['A'] });
+  const twin = mk({ id: 'f-twin', stem: `${scenario} Which solution is the MOST cost-effective?`, options: opts, answer: ['B'] });
+  assert.deepEqual(familyFlaws(cost, [cost, fast]), [], 'same set in another order, another final question');
+  const f = familyFlaws(odd, [cost, fast, odd]);
+  assert.deepEqual(f.map((x) => [x.code, x.severity]), [['family-options', 'medium']]);
+  assert.match(f[0].message, /f-cost/);
+  assert.match(familyFlaws(twin, [cost, twin])[0].message, /giống hệt f-cost/);
+  assert.deepEqual(familyFlaws(cost, [cost]), [], 'a lone member is never flagged');
+  // lintQuestion runs it only with the family context; lintBank / lintContext find the members
+  assert.ok(!codes(odd).includes('family-options'));
+  assert.ok(lintQuestion(odd, undefined, { family: [cost, fast, odd] }).some((x) => x.code === 'family-options'));
+  const bank = { questions: [cost, fast, odd].map((x) => ({ ...x, family: 'storage-tier', status: 'active' })) } as unknown as BankState;
+  assert.equal(lintContext(bank, { id: 'f-odd', family: 'storage-tier' })?.family?.length, 3);
+  assert.equal(lintContext(bank, { id: 'f-odd' }), undefined);
+});
+
+test('stale-fact (medium): taxonomy currency facts flag the old wording, `unless` the current one is used', () => {
+  const t = { ...tax, currency: [{ id: 'firehose', pattern: 'Kinesis (Data )?Firehose', unless: 'Amazon Data Firehose', fact: 'renamed', since: '2024-02-09', url: 'https://aws.amazon.com/x' }] };
+  const old = mk({ options: ['Stream the logs to Kinesis Data Firehose', 'Use Amazon EFS', 'Use Amazon SQS', 'Use AWS Glue'] });
+  const f = lintQuestion(old, t).find((x) => x.code === 'stale-fact')!;
+  assert.equal(f.severity, 'medium');
+  assert.match(f.message, /firehose.*2024-02-09.*https:\/\/aws\.amazon\.com\/x/);
+  const current = mk({ options: ['Stream the logs to Amazon Data Firehose (formerly Kinesis Data Firehose)', 'Use Amazon EFS', 'Use Amazon SQS', 'Use AWS Glue'] });
+  assert.ok(!lintQuestion(current, t).some((x) => x.code === 'stale-fact'));
+  assert.ok(!lintQuestion(old, { ...tax, currency: [{ id: 'bad', pattern: '(', fact: '', since: '', url: '' }] }).some((x) => x.code === 'stale-fact'), 'a broken pattern is no rule');
+});
+
+test('the real taxonomy currency list: every entry compiles, is dated and cites an official AWS page', () => {
+  assert.ok((tax.currency ?? []).length >= 8);
+  for (const c of tax.currency ?? []) {
+    assert.match(c.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    assert.doesNotThrow(() => new RegExp(c.pattern, 'i'), c.id);
+    if (c.unless) assert.doesNotThrow(() => new RegExp(c.unless!, 'i'), c.id);
+    assert.match(c.since, /^\d{4}-\d{2}-\d{2}$/, c.id);
+    for (const u of c.url.split(' · ')) assert.match(u, /^https:\/\/(aws\.amazon\.com|docs\.aws\.amazon\.com)\//, `${c.id}: ${u}`);
+    assert.ok(c.fact.length > 10, c.id);
+  }
 });

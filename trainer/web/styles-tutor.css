@@ -1,0 +1,269 @@
+/* [v5 τ] 🧑‍🏫 tutor chat (AskDialog), 📒 notebook (Notes), 🎧 listen page. Imported by those components; colours come from the
+   design tokens in styles.css, so light / dark follow the theme. */
+
+/* ── tutor chat ─────────────────────────────────────────────────────────── */
+.tu-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(48vh, 460px);
+  overflow-y: auto;
+  padding: 2px;
+}
+.tu-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  max-width: 100%;
+}
+.tu-msg.learner {
+  flex-direction: row-reverse;
+}
+.tu-avatar {
+  flex: 0 0 auto;
+  font-size: 18px;
+  line-height: 28px;
+}
+.tu-bubble {
+  min-width: 0;
+  max-width: min(640px, 86%);
+  border-radius: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.tu-msg.learner .tu-bubble {
+  background: var(--accent-soft);
+  border-color: transparent;
+  white-space: pre-wrap;
+}
+.tu-bubble .md > :first-child {
+  margin-top: 0;
+}
+.tu-bubble .md > :last-child {
+  margin-bottom: 0;
+}
+.tu-msg.pending .tu-bubble {
+  border-style: dashed;
+  background: var(--surface);
+}
+.tu-answer,
+.tu-rule {
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.tu-answer {
+  background: var(--good-soft);
+}
+.tu-rule {
+  background: var(--accent-soft);
+}
+.tu-composer textarea {
+  min-height: 64px;
+}
+.tu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.tu-ctx {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tu-ctx .badge {
+  white-space: normal;
+}
+
+/* ── notebook ───────────────────────────────────────────────────────────── */
+.nb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.nb-toolbar input[type='search'] {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.nb-list {
+  display: grid;
+  gap: 12px;
+}
+.nb-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.nb-entry.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.nb-entry h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.nb-line {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.nb-line b {
+  font-weight: 650;
+}
+.nb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.nb-meta a code {
+  font-size: 12px;
+}
+.nb-merge-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  box-shadow: var(--shadow);
+}
+.nb-merge-bar select {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 180px;
+}
+
+/* ── listen ─────────────────────────────────────────────────────────────── */
+.ls-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ls-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.ls-stem {
+  font-size: 18px;
+  line-height: 1.5;
+}
+.ls-options {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ls-options li {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.ls-options li.ok {
+  background: var(--good-soft);
+  border-color: transparent;
+  font-weight: 600;
+}
+.ls-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.ls-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 34px;
+  font-weight: 700;
+  text-align: center;
+}
+.ls-grades {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.ls-grades .btn {
+  padding: 14px 6px;
+  flex-direction: column;
+  gap: 2px;
+  white-space: normal;
+  font-size: 15px;
+}
+.ls-grades .btn small {
+  font-weight: 450;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.ls-grades .btn.g1 {
+  border-color: var(--critical);
+}
+.ls-grades .btn.g3,
+.ls-grades .btn.g4 {
+  border-color: var(--good);
+}
+.ls-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.ls-controls .btn {
+  min-width: 96px;
+}
+.ls-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.ls-settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.ls-settings label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.ls-progress {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.ls-progress > div {
+  height: 100%;
+  background: var(--accent);
+}
+@media (max-width: 640px) {
+  .ls-grades {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ls-stem {
+    font-size: 17px;
+  }
+  .ls-controls .btn {
+    flex: 1 1 40%;
+    min-width: 0;
+  }
+}

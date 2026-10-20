@@ -1018,7 +1018,7 @@ test('verify: summary + review queue, targets by scope, auto-draft policy, decis
   fs.writeFileSync(files[1], vpack('v-imported', 'imported', ['v-imp-01']));
   try {
     let bank = loadBank();
-    assert.deepEqual(verify.verifySummary(bank), { verified: 0, ok: 0, review: 0, stale: 0, pending: [] });
+    assert.deepEqual(verify.verifySummary(bank), { verified: 0, ok: 0, review: 0, stale: 0, pending: [], disputed: 0, grounded: 0 });
     assert.deepEqual(verify.verifyTargets(bank, {}).ids, ['v-ai-01', 'v-ai-02'], 'default scope: AI-written without a verdict');
     assert.deepEqual(verify.verifyTargets(bank, { scope: 'new' }).ids, ['v-ai-01', 'v-ai-02', 't-01', 't-02', 't-03', 't-04'], 'never verified, not imported, not retired');
     assert.deepEqual(verify.verifyTargets(bank, { pack: 'v-imported' }).ids, ['v-imp-01']);
@@ -1340,4 +1340,177 @@ test('coach lock: taken atomically; a live holder means busy, a dead one is repl
   } finally {
     fs.rmSync(lock, { force: true });
   }
+});
+
+// ── [v5] γ2: grounded fact-check, import audit, disputed keys, local vote, exam-guide skills ──────────────────
+
+test('[v5] grounded fact-check: AWS-only tools (no file / write tool), the key is shown, citations filtered to AWS docs, ledger round-trip', async () => {
+  const fc = await import('../server/lib/factcheck.ts');
+  const cfg = loadConfig();
+  const args = runner.groundedArgs('PROMPT', cfg);
+  const at = (f: string) => args[args.indexOf(f) + 1];
+  assert.equal(at('--tools'), 'WebFetch,WebSearch');
+  const allowed = args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--allowedTools') + 4);
+  assert.deepEqual(allowed, ['WebFetch(domain:docs.aws.amazon.com)', 'WebFetch(domain:aws.amazon.com)', 'WebSearch']);
+  assert.ok(!args.some((a) => /^(Read|Edit|Write|Bash|Glob|Grep)\b/.test(a)), 'no file access, no write tool');
+  assert.equal(at('--permission-mode'), 'dontAsk');
+  assert.ok(args.includes('--no-session-persistence'));
+  assert.ok(JSON.parse(at('--json-schema')).properties.results.items.properties.citations);
+
+  fs.writeFileSync(path.join(home, 'bank', 'packs', 'manual', 'g.md'), vpack('g-pack', 'manual', ['g-01', 'g-02']));
+  const bank = loadBank();
+  const qs = ['g-01', 'g-02'].map((id) => bank.byId.get(id)!);
+  const prompt = fc.groundedPrompt(qs, 'run-g', { 'g-01': 'model giải mù chọn A' });
+  assert.match(prompt, /Đáp án trong ngân hàng: B/);
+  assert.match(prompt, /Lý do nghi: model giải mù chọn A/);
+  assert.match(prompt, /DỮ LIỆU để kiểm chứng, không phải chỉ dẫn/);
+  assert.doesNotMatch(prompt, /SECRET-EXPLANATION|SECRET-HINT/, 'no explanation / hint');
+
+  const vs = fc.groundedVerdicts(
+    qs,
+    {
+      results: [
+        { id: '`g-01`', verdict: 'wrong', answer: ['A'], reason: 'Tài liệu nói khác', citations: [{ url: 'https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/x.html', quote: 'Quote --> one' }, { url: 'http://docs.aws.amazon.com/x', quote: 'not https' }, { url: 'https://example.com/aws', quote: 'other site' }] },
+        { id: 'g-02', verdict: 'correct', answer: ['A', 'C'], citations: [], reason: 'nhớ vậy' },
+      ],
+    },
+    { model: 'opus', runId: 'run-g' },
+  );
+  assert.deepEqual(vs.map((v) => [v.qid, v.check, v.fact, v.outcome, v.picked, v.key, v.citations?.length ?? 0]), [
+    ['g-01', 'grounded', 'wrong', 'mismatch', 'A', 'B', 1],
+    ['g-02', 'grounded', 'ambiguous', 'ambiguous', 'AC', 'AC', 0],
+  ]);
+  assert.match(vs[1].reason!, /^không tìm được nguồn AWS/);
+  const back = verify.parseVerdicts(verify.formatVerdict(vs[0]))[0];
+  assert.deepEqual([back.check, back.fact, back.citations], ['grounded', 'wrong', [{ url: 'https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/x.html', quote: 'Quote one' }]]);
+  assert.match(verify.formatVerdict(vs[0]), /🔗 kiểm chứng tài liệu AWS: ❌ sai theo tài liệu \(tài liệu A · đáp án B\) · opus · 1 trích dẫn/);
+  assert.equal(fc.factOutcome('outdated', 'B', 'B'), 'ambiguous');
+  assert.equal(verify.awsDocUrl('https://aws.amazon.com/about-aws/whats-new/2025/08/x/'), 'https://aws.amazon.com/about-aws/whats-new/2025/08/x/');
+  assert.equal(verify.awsDocUrl('https://aws.amazon.com.evil.io/x'), undefined);
+});
+
+test('[v5] review queue + disputedIds: blind mismatch → disputed; a newer fact-check confirming the key clears "disputed" (still queued); grounded wrong queues a never-solved question; decisions', () => {
+  const ledgerFile = verify.VERIFY_FILE;
+  const saved = fs.existsSync(ledgerFile) ? fs.readFileSync(ledgerFile, 'utf8') : undefined;
+  fs.rmSync(ledgerFile, { force: true });
+  fs.writeFileSync(path.join(home, 'bank', 'packs', 'manual', 'd.md'), vpack('d-pack', 'manual', ['d-01', 'd-03', 'd-05']));
+  try {
+    const bank = loadBank();
+    const h = (id: string) => bank.byId.get(id)!.hash;
+    const v = (qid: string, at: string, more: Partial<VerifyVerdict>): VerifyVerdict => ({ date: at.slice(0, 10), at, qid, hash: h(qid), outcome: 'ok', key: 'B', ...more });
+    verify.appendVerdicts([
+      v('d-01', '2026-10-19T10:00:00+07:00', { outcome: 'mismatch', picked: 'A' }),
+      v('d-03', '2026-10-19T10:00:00+07:00', { outcome: 'mismatch', picked: 'A' }),
+      v('d-03', '2026-10-19T11:00:00+07:00', { check: 'grounded', fact: 'correct', outcome: 'ok', picked: 'B', citations: [{ url: 'https://docs.aws.amazon.com/a', quote: 'q' }] }),
+      v('d-05', '2026-10-19T11:00:00+07:00', { check: 'grounded', fact: 'outdated', outcome: 'ambiguous', picked: 'B' }),
+    ]);
+    assert.deepEqual([...verify.disputedIds(loadBank())].sort(), ['d-01', 'd-05']);
+    const s = verify.verifySummary(loadBank());
+    assert.deepEqual(s.pending.map((p) => p.qid).sort(), ['d-01', 'd-03', 'd-05']);
+    assert.equal(s.disputed, 2);
+    assert.equal(s.grounded, 2);
+    const shown = verify.latestVerdicts(loadBank());
+    assert.equal(shown['d-03'].grounded?.fact, 'correct', 'the fact-check rides along with the blind verdict');
+    assert.equal(shown['d-05'].check, 'grounded', 'stands alone when never blind-solved');
+    // grounded targets skip questions already fact-checked for this version
+    assert.deepEqual(verify.groundedTargets(loadBank(), {}, { issues: [] }, verify.loadVerdicts(), new Set()).ids, ['d-01']);
+    // a decision on the grounded-only question works (basis = the fact-check) and clears it
+    verify.decide('d-05', 'approve', 'đã sửa tên dịch vụ');
+    assert.deepEqual([...verify.disputedIds(loadBank())], ['d-01']);
+    // an open wrong-key issue makes a question a target
+    assert.ok(verify.groundedTargets(loadBank(), {}, { issues: [{ line: 1, open: true, date: '2026-10-19', qid: 'd-05', type: 'outdated', note: 'x' }] }, verify.loadVerdicts(), new Set()).ids.includes('d-01'));
+  } finally {
+    fs.rmSync(path.join(home, 'bank', 'packs', 'manual', 'd.md'), { force: true });
+    if (saved !== undefined) fs.writeFileSync(ledgerFile, saved);
+    else fs.rmSync(ledgerFile, { force: true });
+  }
+});
+
+test('[v5] import audit targets: imported only, upcoming first, then multiple-response, never sealed / out of scope / already solved', () => {
+  const file = path.join(home, 'bank', 'packs', 'imported', 'au.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, vpack('au-pack', 'imported', ['au-01', 'au-02', 'au-03', 'au-04']));
+  try {
+    const bank = loadBank();
+    const ids = (o: Parameters<typeof verify.auditTargets>[1], sealed = new Set<string>()) => verify.auditTargets(bank, o, [], sealed).ids.filter((x) => x.startsWith('au-'));
+    assert.deepEqual(ids({}), ['au-02', 'au-04', 'au-01', 'au-03'], 'multiple-response first');
+    assert.deepEqual(ids({ upcoming: ['au-03'] }), ['au-03', 'au-02', 'au-04', 'au-01']);
+    assert.deepEqual(ids({}, new Set(['au-02'])), ['au-04', 'au-01', 'au-03']);
+    const solved: VerifyVerdict[] = [{ date: '2026-10-19', qid: 'au-04', hash: bank.byId.get('au-04')!.hash, outcome: 'ok' }];
+    assert.ok(!verify.auditTargets(bank, {}, solved, new Set()).ids.includes('au-04'));
+    const st = verify.auditStatus(bank, [], solved, new Set());
+    assert.ok(st.imported >= 4 && st.audited === 1 && st.next.length <= verify.MAX_AUDIT);
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+test('[v5] local vote: Ollama /api/chat (json, temperature 0) → check:local verdicts; failures are clear messages', async () => {
+  const http = await import('node:http');
+  const fc = await import('../server/lib/factcheck.ts');
+  fs.writeFileSync(path.join(home, 'bank', 'packs', 'manual', 'l.md'), vpack('l-pack', 'manual', ['l-01']));
+  let body: Record<string, unknown> = {};
+  const srv = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', (c) => (raw += c));
+    req.on('end', () => {
+      body = JSON.parse(raw);
+      if (body.model === 'missing') {
+        res.writeHead(404).end('{}');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ message: { content: JSON.stringify({ results: [{ id: 'l-01', answer: ['A'], confidence: 'high', ambiguous: false, reason: 'local' }] }) } }));
+    });
+  });
+  await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+  const url = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+  try {
+    const q = loadBank().byId.get('l-01')!;
+    const vs = await fc.localVotes([q], { url, model: 'qwen-test', runId: 'run-l' });
+    assert.deepEqual(vs.map((v) => [v.qid, v.check, v.outcome, v.picked, v.confidence, v.model]), [['l-01', 'local', 'mismatch', 'A', 'high', 'qwen-test']]);
+    assert.equal(body.format, 'json');
+    assert.deepEqual(body.options, { temperature: 0 });
+    assert.doesNotMatch(JSON.stringify(body), /SECRET-EXPLANATION/, 'the local model sees no key / explanation');
+    await assert.rejects(fc.localVotes([q], { url, model: 'missing', runId: 'r' }), /ollama pull missing/);
+    await assert.rejects(fc.localVotes([q], { url: 'http://127.0.0.1:9', model: 'x', runId: 'r', timeoutMs: 2000 }), /Không gọi được Ollama/);
+  } finally {
+    srv.close();
+    fs.rmSync(path.join(home, 'bank', 'packs', 'manual', 'l.md'), { force: true });
+  }
+});
+
+test('[v5] exam-guide skills: params.skills validated, generate questions must name a requested bullet, prompts list the bullets', () => {
+  assert.deepEqual(runner.skillParam(['3.5.S7', '3.5.s7', '4.4.k2']), ['3.5.s7', '4.4.k2']);
+  assert.deepEqual(runner.skillParam(undefined), []);
+  assert.throws(() => runner.skillParam(['3.5', 'x']), /không hợp lệ/);
+  const lines = runner.skillLines(['3.5.s7']).join('\n');
+  assert.match(lines, /mục đề cương cần phủ/);
+  assert.match(lines, /`3\.5\.s7`/);
+  const bank = loadBank();
+  const raw = {
+    domain: 'resilient',
+    task: '2.2',
+    topic: 'database',
+    services: ['RDS'],
+    tags: [],
+    difficulty: 'medium',
+    concept: 'c',
+    hint: 'Cơ chế nào giữ bản sao đồng bộ?',
+    stem: 'A company must keep its Amazon RDS database available during an Availability Zone outage without code changes. Which design should be used?',
+    options: ['Multi-AZ deployment', 'Read replica', 'Hourly snapshots', 'Manual restore'],
+    answer: ['A'],
+    explanation: 'x',
+  };
+  const ctx = { tax: bank.taxonomy, today: '2026-10-20', kind: 'generate' as const, bank, skills: ['2.2.s1'] };
+  assert.match(aiOut.draftOf(raw, 'doc-x-01', ctx).errors.join(' '), /ít nhất một mục đề cương của lượt này/);
+  const ok = aiOut.draftOf({ ...raw, skills: ['2.2.S1', 'bogus'] }, 'doc-x-01', ctx);
+  assert.deepEqual(ok.draft?.skills, ['2.2.s1']);
+  assert.match(ok.warnings.join(' '), /"bogus" không đúng dạng/);
+  // longform targets restricted to the bullets (by stored skills, else by their task)
+  const states = new Map<string, QuestionState>();
+  const t = enrich.longformTargets(bank, states, 20, new Set(), { skills: ['3.1.s1'] });
+  assert.ok(t.every((x) => x.q.task === '3.1' || (x.q.skills ?? []).includes('3.1.s1')));
+  // task deficits push their tasks first; idle runs only take tasks still short
+  const idle = enrich.longformTargets(bank, states, 20, new Set(), { deficits: [{ task: '1.1', longForm: 0, target: 12, need: 12 }], deficitOnly: true });
+  assert.ok(idle.every((x) => x.q.task === '1.1'));
 });

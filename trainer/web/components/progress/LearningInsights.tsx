@@ -3,12 +3,13 @@
 // with a drill per pair. Single-hue bars with the pass mark (or the learner's base rate) as a hairline, a table twin
 // on every chart (ChartCard), status colour only with an icon + text.
 import { useData } from '../../lib/store.tsx';
-import { navigate } from '../../lib/router.ts';
+import { href, navigate } from '../../lib/router.ts';
+import { exposureNote, pairHref, rateGap, ratePct, undecidedText } from '../learning/rules.ts';
 import { startTest } from '../../lib/start.ts';
 import { BarList, ChartCard } from '../charts.tsx';
 import { pctOf } from '../insights.tsx';
 import { REQUIREMENTS, REQUIREMENT_INFO } from '../../../shared/labels.ts';
-import type { Bucket, ConfusionPair, ExposureSplit } from '../../../shared/types.ts';
+import type { Bucket, ConfusionPair, ExposureSplit, TransferStats } from '../../../shared/types.ts';
 
 type Pair = { answers: number; correct: number };
 const acc = (x: Pair) => pctOf(x.correct, x.answers);
@@ -17,10 +18,7 @@ const MIN_SPLIT = 10; // answers per side before comparing first vs repeat
 // ── first vs repeat exposure ────────────────────────────────────────────────
 
 export function ExposureCard({ e, passPct }: { e: ExposureSplit; passPct: number }) {
-  const first = acc(e.first);
-  const repeat = acc(e.repeat);
-  const gap = Math.round(repeat - first);
-  const enough = e.first.answers >= MIN_SPLIT && e.repeat.answers >= MIN_SPLIT;
+  const note = exposureNote(e, MIN_SPLIT);
   const recShare = pctOf(e.recognized, e.repeat.answers);
   const rows = [
     { key: 'first', label: '🆕 Lần đầu gặp', v: e.first, title: 'Câu bạn trả lời lần đầu tiên — gần với đề thật nhất (đề thật toàn câu mới)' },
@@ -47,18 +45,7 @@ export function ExposureCard({ e, passPct }: { e: ExposureSplit; passPct: number
         }))}
       />
       <div className="stack sm" style={{ marginTop: 10 }}>
-        {!enough ? (
-          <div className="small dim">Cần ≥ {MIN_SPLIT} câu mỗi nhóm trong {e.days} ngày để so sánh.</div>
-        ) : gap >= 10 ? (
-          <div className="small warn">
-            ⚠ Câu gặp lại cao hơn câu mới <b>{gap} điểm</b> — một phần điểm đến từ việc nhớ câu. Đề thật toàn câu mới: ưu tiên câu chưa làm, câu dài và đề niêm phong để đo
-            đúng.
-          </div>
-        ) : gap <= 3 ? (
-          <div className="small good">✓ Câu mới và câu gặp lại gần như nhau — điểm phản ánh hiểu bài, không phải nhớ đáp án.</div>
-        ) : (
-          <div className="small dim">Câu gặp lại cao hơn câu mới {gap} điểm — bình thường khi đang ôn; theo dõi để khoảng cách không nới rộng.</div>
-        )}
+        <div className={`small ${note.cls}`}>{note.text}</div>
         {e.repeat.answers > 0 && (
           <div className="small dim" title="Gặp lại và trả lời đúng nhanh hơn thời gian đọc đề + phương án ở tốc độ stats.recognized_wpm">
             {e.recognized ? (
@@ -88,6 +75,8 @@ export function RequirementCard({ buckets, passPct }: { buckets: Bucket[]; passP
   // the requirement furthest below the baseline (≥ 10 answers each)
   const weakest = base && base.attempts >= 10 ? rows.filter((r) => r.k !== 'none' && (r.b?.attempts ?? 0) >= 10).sort((a, b) => a.b!.accuracy - b.b!.accuracy)[0] : undefined;
   const gap = weakest && base ? Math.round(base.accuracy - weakest.b!.accuracy) : 0;
+  // [v5] the shortfall vs the "no requirement" baseline only counts when its interval excludes 0 (statistical shield)
+  const g = weakest && base ? rateGap({ correct: base.correct, answers: base.attempts }, { correct: weakest.b!.correct, answers: weakest.b!.attempts }) : undefined;
   const example = weakest ? meta?.keywords?.[weakest.k]?.[0] : undefined;
   return (
     <ChartCard
@@ -113,6 +102,10 @@ export function RequirementCard({ buckets, passPct }: { buckets: Bucket[]; passP
       {!answered ? (
         <div className="small dim" style={{ marginTop: 10 }}>
           Chưa có câu trả lời nào trên câu có tiêu chí. Câu ngắn trong ngân hàng ít khi nêu tiêu chí — câu dài (ENRICH) và chế độ 🎯 Thi thử có nhiều hơn.
+        </div>
+      ) : weakest && gap >= 10 && g?.verdict !== 'higher' ? (
+        <div className="small dim" style={{ marginTop: 10 }}>
+          Câu hỏi về <b>{weakest.info?.label ?? weakest.k}</b> thấp hơn câu không nêu tiêu chí {gap} điểm — {undecidedText(g?.needMore)}.
         </div>
       ) : weakest && gap >= 10 ? (
         <div className="small warn" style={{ marginTop: 10 }}>
@@ -178,19 +171,93 @@ export function ConfusionCard({ pairs }: { pairs: ConfusionPair[] }) {
                 <div className="lrn-cf-val small num nowrap" title={`Cận dưới (80%) của tỉ lệ: ${pct(p.low)}%`}>
                   <b>{pct(p.rate)}%</b> <span className="muted">· gấp {fmtRatio(ratio(p))}×</span>
                 </div>
+                <div className="row nowrap lrn-cf-btn">
+                <a className="btn ghost sm" href={href(pairHref(p.correct, p.picked))} title={`So sánh ${p.correct} và ${p.picked}: trích notes, tiến bộ của bạn, luyện phân biệt`}>
+                  So sánh ⟷
+                </a>
                 <button
-                  className="btn sm lrn-cf-btn"
+                  className="btn sm"
                   disabled={!ids.length}
                   title={`Luyện ${ids.length} câu có cả ${p.picked} và ${p.correct} trong các phương án (xen kẽ câu đáp án là mỗi bên)`}
                   onClick={() => void startTest({ mode: 'ids', ids, title: `Cặp hay nhầm: ${p.picked} ⟷ ${p.correct}`, feedback: 'practice' })}
                 >
                   Luyện cặp này ({ids.length})
                 </button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
+    </ChartCard>
+  );
+}
+
+// ── [μ v5] transfer: first try on a sibling vs repeats (anti-rote, Design C3) ──────────────────────
+
+export function TransferCard({ t, passPct }: { t: TransferStats; passPct: number }) {
+  const rows = [
+    { key: 'transfer', label: '🧬 Câu anh em lần đầu', v: t.transfer, title: 'Lần đầu gặp một câu cùng cụm với câu bạn đã trả lời đúng — đo hiểu khái niệm' },
+    { key: 'repeat', label: '🔁 Gặp lại đúng câu cũ', v: t.repeat, title: 'Trả lời lại chính câu đã gặp — có thể nhờ nhớ mặt chữ' },
+  ];
+  const g = rateGap(t.repeat, t.transfer);
+  const topics = t.byTopic.filter((x) => x.transfer.answers > 0);
+  return (
+    <ChartCard
+      title="🧬 Chuyển giao: hiểu khái niệm hay thuộc mặt chữ"
+      subtitle={`${t.days} ngày gần đây · tỉ lệ đúng lần đầu gặp câu anh em so với gặp lại đúng câu cũ · vạch = ngưỡng đỗ ${passPct}%`}
+      table={{
+        head: ['Chủ đề', 'Anh em lần đầu', 'Đúng', 'Gặp lại', 'Đúng', 'Chênh (điểm)'],
+        rows: [
+          ...rows.map((r) => [r.label, r.v.answers, ratePct(r.v), '', '', '']),
+          ...t.byTopic.map((x) => [x.label, x.transfer.answers, ratePct(x.transfer), x.repeat.answers, ratePct(x.repeat), x.gap ?? '']),
+        ],
+      }}
+    >
+      <BarList
+        target={passPct}
+        items={rows.map((r) => ({
+          key: r.key,
+          label: r.label,
+          value: ratePct(r.v),
+          muted: !r.v.answers,
+          valueText: r.v.answers ? `${ratePct(r.v)}% · ${r.v.answers}` : 'chưa có',
+          title: `${r.title}: ${r.v.correct}/${r.v.answers} đúng`,
+        }))}
+      />
+      <div className="stack sm" style={{ marginTop: 10 }}>
+        {!t.transfer.answers ? (
+          <div className="small dim">
+            Chưa gặp câu anh em nào sau khi đã trả lời đúng câu gốc. Khi ôn đến hạn, app thay câu đã thuộc bằng câu anh em chưa gặp (🧬) để đo điều này.
+          </div>
+        ) : g.verdict === 'higher' ? (
+          <div className="small warn">
+            ⚠ Gặp lại câu cũ cao hơn câu anh em {Math.round(g.diff)} điểm — một phần là nhớ mặt chữ. Ôn bằng câu anh em / câu tương phản thay vì làm lại đúng câu cũ.
+          </div>
+        ) : g.verdict === 'same' || g.verdict === 'lower' ? (
+          <div className="small good">✓ Câu anh em lần đầu đúng ngang câu gặp lại — bạn đang hiểu khái niệm, không chỉ nhớ đáp án.</div>
+        ) : (
+          <div className="small dim">
+            Câu anh em {ratePct(t.transfer)}% · gặp lại {ratePct(t.repeat)}% — {undecidedText(g.needMore)}.
+          </div>
+        )}
+        {t.warnings.map((w) => (
+          <div key={w} className="small warn">
+            ⚠ {w}
+          </div>
+        ))}
+        {topics.length > 0 && (
+          <div className="tiny muted">
+            Theo chủ đề:{' '}
+            {topics.slice(0, 6).map((x, i) => (
+              <span key={x.topic}>
+                {i > 0 && ' · '}
+                {x.label} {ratePct(x.transfer)}% ({x.transfer.answers}) vs {ratePct(x.repeat)}%
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </ChartCard>
   );
 }

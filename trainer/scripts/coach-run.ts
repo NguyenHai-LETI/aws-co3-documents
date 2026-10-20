@@ -7,7 +7,12 @@
 //   node trainer/scripts/coach-run.ts --enrich [--size 20] [--tasks explain,hint,classify,balance,distractors] [--batches 3]
 //   node trainer/scripts/coach-run.ts --enrich --ids 03-v2-01,05-v1-12 [--tasks distractors] [--note "…"]
 //   node trainer/scripts/coach-run.ts --longform [--count 5]
-//   node trainer/scripts/coach-run.ts --verify [--ids a,b | --pack <pack-id> | --scope unverified-ai|new|changed]
+//   node trainer/scripts/coach-run.ts --verify [--ids a,b | --pack <pack-id> | --scope unverified-ai|new|changed|audit|grounded]
+//   node trainer/scripts/coach-run.ts --twins [--count 10] [--ids a,b --kind surface|contrast]
+//   node trainer/scripts/coach-run.ts --family [--count 2] [--topic database] [--task 2.2] [--requirement cost]
+//   node trainer/scripts/coach-run.ts --generate --skills 3.5.s7,4.4.k2 [--count 6]   |   --longform --skills 2.2.s3
+// [v5] A scheduled run without new results does the first coach.idle_tasks entry that has work (enrich | longform |
+// twins | audit | notebook); the default [enrich] is one ENRICH batch, as before. coach.enrich_on_idle: false = nothing.
 // With coach.enrich_after_analyze, a successful analyze is followed by a small ENRICH run over the questions the learner
 // is about to meet; the process waits for it (exit code = the analyze run's).
 import os from 'node:os';
@@ -18,7 +23,7 @@ import { VERIFY_SCOPES } from '../server/lib/verify.ts';
 import { loadIssues } from '../server/lib/issues.ts';
 import { newDataSince } from '../server/lib/snapshot.ts';
 import { aiSyncLine, syncForAi } from '../server/lib/sync.ts';
-import { NothingToDoError, coachGuard, coachRunner, findClaude, hostAllowed, scheduledRunsToday } from '../server/lib/coach-runner.ts';
+import { NothingToDoError, coachGuard, coachRunner, findClaude, hostAllowed, scheduledRunsToday, startIdle } from '../server/lib/coach-runner.ts';
 import type { CoachRunInfo, CoachTask } from '../shared/types.ts';
 
 const argv = process.argv.slice(2);
@@ -35,7 +40,20 @@ const int = (v: string | undefined, dflt: number, max: number) => {
 };
 
 const cfg = loadConfig();
-let task: CoachTask = flag('generate') ? 'generate' : flag('enrich') ? 'enrich' : flag('longform') ? 'longform' : flag('verify') ? 'verify' : 'analyze';
+let task: CoachTask = flag('generate')
+  ? 'generate'
+  : flag('enrich')
+    ? 'enrich'
+    : flag('longform')
+      ? 'longform'
+      : flag('verify')
+        ? 'verify'
+        : flag('twins')
+          ? 'twins'
+          : flag('family')
+            ? 'family'
+            : 'analyze';
+let idle = false; // [v5] scheduled run without new results → coach.idle_tasks
 const trigger = (opt('trigger') ?? 'cli') as CoachRunInfo['trigger'];
 const maxPerDay = cfg.coach.max_runs_per_day;
 
@@ -72,8 +90,8 @@ if (task === 'analyze' && !flag('force') && cfg.coach.skip_if_no_new_results) {
   const openIssues = loadIssues().filter((i) => i.open).length;
   if (!fresh.attempts && !openIssues) {
     if (trigger === 'schedule' && cfg.coach.enrich_on_idle) {
-      log('ℹ️  Không có bài làm mới hay issue mở — chạy 1 lượt ENRICH thay cho phân tích (coach.enrich_on_idle).');
-      task = 'enrich';
+      log(`ℹ️  Không có bài làm mới hay issue mở — chạy việc lúc rảnh (coach.idle_tasks: ${cfg.coach.idle_tasks.join(', ')}).`);
+      idle = true;
     } else {
       log('⏭  Không có bài làm mới hay issue mở kể từ kế hoạch gần nhất — bỏ qua (dùng --force để chạy).');
       process.exit(0);
@@ -100,6 +118,7 @@ const params: Record<string, unknown> =
         difficulty: opt('difficulty'),
         focus: opt('focus'),
         slug: opt('slug'),
+        ...(opt('skills') ? { skills: list(opt('skills')) } : {}),
       }
     : task === 'enrich'
       ? {
@@ -109,8 +128,12 @@ const params: Record<string, unknown> =
           ...(opt('note') ? { note: opt('note') } : {}),
         }
       : task === 'longform'
-        ? { count: int(opt('count'), 5, 20) }
-        : task === 'verify'
+        ? { count: int(opt('count'), 5, 20), ...(opt('skills') ? { skills: list(opt('skills')) } : {}) }
+        : task === 'twins'
+          ? { count: int(opt('count'), cfg.coach.twins_per_run, 20), ...(opt('ids') ? { ids: list(opt('ids')) } : {}), ...(opt('kind') ? { kind: opt('kind') } : {}) }
+          : task === 'family'
+            ? { count: int(opt('count'), 2, 5), ...(opt('topic') ? { topic: opt('topic') } : {}), ...(opt('task') ? { task: opt('task') } : {}), ...(opt('requirement') ? { requirement: opt('requirement') } : {}) }
+            : task === 'verify'
           ? { ...(opt('ids') ? { ids: list(opt('ids')) } : {}), ...(opt('pack') ? { pack: opt('pack') } : {}), ...(opt('scope') ? { scope: opt('scope') } : {}) }
           : { note: opt('note') };
 const batches = task === 'enrich' && flag('enrich') && !opt('ids') ? int(opt('batches'), 1, 20) : 1;
@@ -134,6 +157,7 @@ if (task === 'verify') {
 
 let finished = 0;
 const runOnce = () => {
+  if (idle) return void runIdle();
   if (trigger === 'schedule' && finished > 0 && maxPerDay > 0 && scheduledRunsToday() >= maxPerDay) {
     log(`⏭  Đạt giới hạn ${maxPerDay} lượt chạy theo lịch hôm nay — dừng.`);
     process.exit(0);
@@ -172,6 +196,23 @@ coachRunner.on('done', (info: CoachRunInfo) => {
     process.exit(mainStatus === 'success' || mainStatus === 'skipped' ? 0 : 1); // skipped = nothing left after the sync
   });
 });
+/** [v5] coach.idle_tasks: the first idle task with work (a coach run, or the notebook update which ends here). */
+async function runIdle() {
+  try {
+    const r = await startIdle(coachRunner, trigger, cfg, log, { syncBefore: false }); // synced above
+    if (r.kind === 'run') return; // 'done' handles the exit
+    if (r.kind === 'notebook') {
+      log(`${r.status === 'error' ? '✗' : '✓'} ${r.step.label}: ${r.summary ?? r.error ?? r.status}`);
+      process.exit(r.status === 'error' ? 1 : 0);
+    }
+    log('✓ Không có việc lúc rảnh nào cần làm.');
+    process.exit(0);
+  } catch (e) {
+    console.error(`[${stamp()}] ✗ ${(e as Error).message}`);
+    process.exit(1);
+  }
+}
+
 process.on('SIGINT', () => coachRunner.cancel() || process.exit(130));
 process.on('SIGTERM', () => coachRunner.cancel() || process.exit(143));
 

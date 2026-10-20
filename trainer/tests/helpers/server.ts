@@ -23,11 +23,12 @@ function copyData(dest: string, opts: { results?: boolean }) {
   // sandboxes never start the semantic-duplicate job (on a machine running Ollama it would embed the whole bank);
   // tests that need it set quality.embeddings themselves
   const cfgText = fs.readFileSync(path.join(TRAINER_ROOT, 'config.yaml'), 'utf8');
-  // …nor hold back sealed forms or sync on their own (tests that need these set them explicitly)
+  // …nor hold back sealed forms, sync on their own or spread due dates ([v5] load balancing) — tests that need these set them
   const sandboxCfg = cfgText
     .replace(/^(\s+embeddings:\s*)\w+/m, '$1off')
     .replace(/^(\s+sealed_forms:\s*)\d+/m, '$10')
-    .replace(/^(\s+auto:\s*)idle\b/m, '$1off');
+    .replace(/^(\s+auto:\s*)idle\b/m, '$1off')
+    .replace(/^(\s+load_balance:\s*)true\b/m, '$1false');
   fs.writeFileSync(path.join(dest, 'config.yaml'), sandboxCfg);
   const coach = path.join(TRAINER_ROOT, 'coach');
   fs.mkdirSync(path.join(dest, 'coach'), { recursive: true });
@@ -92,7 +93,8 @@ export interface ServerHandle {
 export async function startServer(opts: { home: string; repo?: string; port?: number; env?: Record<string, string>; timeoutMs?: number }): Promise<ServerHandle> {
   const port = opts.port ?? (await freePort());
   if (port === 3003) throw new Error('port 3003 belongs to the real app');
-  const env: NodeJS.ProcessEnv = { ...process.env, TRAINER_HOME: opts.home, PORT: String(port), ...opts.env };
+  // [v5] `npm start` serves the production build; sandboxes keep the Vite dev UI unless a test asks for TRAINER_UI: 'dist'
+  const env: NodeJS.ProcessEnv = { ...process.env, TRAINER_HOME: opts.home, PORT: String(port), TRAINER_UI: 'dev', ...opts.env };
   if (opts.repo) env.TRAINER_REPO = opts.repo;
   for (const k of ['OPEN', 'NODE_TEST_CONTEXT', 'NODE_OPTIONS', 'ANTHROPIC_API_KEY']) delete env[k];
   const proc = spawn(process.execPath, ['server/index.ts'], { cwd: TRAINER_ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });

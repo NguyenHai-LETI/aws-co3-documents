@@ -247,6 +247,7 @@ const MARKER_MAX_AGE_MS = 5 * 60_000;
 
 export interface RestartState {
   lan?: boolean;
+  lanAdmin?: boolean; // [v5] π: the 🧰 Công cụ "admin from the phone" toggle (only when set on that page)
 }
 
 export function writeRestartMarker(state: RestartState): void {
@@ -263,7 +264,7 @@ export function takeRestartMarker(): RestartState | undefined {
   try {
     const raw = JSON.parse(fs.readFileSync(RESTART_MARKER, 'utf8')) as RestartState & { at?: number };
     fs.rmSync(RESTART_MARKER, { force: true });
-    return typeof raw.at === 'number' && Date.now() - raw.at < MARKER_MAX_AGE_MS ? { lan: raw.lan === true } : undefined;
+    return typeof raw.at === 'number' && Date.now() - raw.at < MARKER_MAX_AGE_MS ? { lan: raw.lan === true, ...(typeof raw.lanAdmin === 'boolean' ? { lanAdmin: raw.lanAdmin } : {}) } : undefined;
   } catch {
     return undefined;
   }

@@ -438,3 +438,71 @@ features:
   right-sizing:          [right-siz*, rightsiz*, underutilized, over-provisioned]
   data-transfer-cost:    [data transfer cost*, data transfer charge*, egress cost*, egress charge*]
   serverless-cost:       [pay only for, pay-per-use, pay per request, scale to zero]
+
+# ── Kiến thức đã thay đổi (lint `stale-fact`, mức vừa) ─────────────────────────────────────────────────────────────
+# Mỗi mục đã đối chiếu trên trang chính thức của AWS (url) ngày 2026-10-20 — KHÔNG thêm mục chỉ dựa vào trí nhớ.
+# pattern = regex (không phân biệt hoa thường) trên đề + phương án + giải thích, nói kiến thức cũ; unless = câu đã dùng cách
+# viết hiện hành (vd tên mới) thì bỏ qua. Sửa câu: viết "tên mới (tên cũ)" / giới hạn mới, đừng xoá kiến thức cũ khỏi giải thích.
+# Chưa đưa vào vì không mở được trang chính thức nào của AWS để đối chiếu: Snowmobile, QLDB, OpsWorks. Cố ý không đưa vào: Snowball
+# Edge chỉ còn cho khách cũ từ 2025-11-07, ngừng hỗ trợ 2026-12-31 (aws.amazon.com/snowball) — đề cương SAA-C03 (2026-10-20) vẫn ghi
+# "AWS Snow Family" trong phạm vi nên đáp án Snowball vẫn đúng cho đề thi; CodeCommit đã mở lại cho khách mới (2025-11-24).
+currency:
+  - id: sqs-max-message-1mib
+    pattern: '(SQS|queue|message)[^.\n]{0,80}256\s?(KB|KiB)|256\s?(KB|KiB)[^.\n]{0,80}(SQS|queue|messag)'
+    fact: 'Amazon SQS cho phép message tối đa 1 MiB (trước đó 256 KiB)'
+    since: '2025-08-04'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/08/amazon-sqs-max-payload-size-1mib/'
+  - id: data-firehose-rename
+    pattern: 'Kinesis (Data )?Firehose'
+    unless: 'Amazon Data Firehose'
+    fact: 'Amazon Kinesis Data Firehose đã đổi tên thành Amazon Data Firehose'
+    since: '2024-02-09'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2024/02/amazon-data-firehose-formerly-kinesis-data-firehose'
+  - id: managed-flink-rename
+    pattern: 'Kinesis Data Analytics'
+    unless: 'Managed Service for Apache Flink'
+    fact: 'Amazon Kinesis Data Analytics đã đổi tên thành Amazon Managed Service for Apache Flink'
+    since: '2023-08-30'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2023/08/amazon-managed-service-apache-flink/'
+  - id: snowcone-discontinued
+    pattern: 'Snowcone'
+    fact: 'AWS Snowcone đã ngừng (không đặt được thiết bị mới; hỗ trợ khách cũ tới 2025-11-12)'
+    since: '2024-11-12'
+    url: 'https://aws.amazon.com/blogs/storage/aws-snow-device-updates/'
+  - id: cloud9-closed
+    pattern: 'Cloud9'
+    fact: 'AWS Cloud9 không nhận khách hàng mới (khách cũ dùng tiếp)'
+    since: '2024-07-25'
+    url: 'https://aws.amazon.com/blogs/devops/how-to-migrate-from-aws-cloud9-to-aws-ide-toolkits-or-aws-cloudshell/'
+  - id: s3-select-closed
+    pattern: 'S3 Select|Glacier Select'
+    fact: 'Amazon S3 Select và S3 Glacier Select không nhận khách hàng mới — truy vấn dữ liệu trên S3 nên dùng Athena'
+    since: '2024-07-25'
+    url: 'https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/'
+  - id: forecast-closed
+    pattern: 'Amazon Forecast'
+    fact: 'Amazon Forecast không nhận khách hàng mới (AWS gợi ý SageMaker Canvas)'
+    since: '2024-07-29'
+    url: 'https://aws.amazon.com/blogs/machine-learning/transition-your-amazon-forecast-usage-to-amazon-sagemaker-canvas/'
+  - id: data-pipeline-closed
+    pattern: 'AWS Data Pipeline|\bData Pipeline\b'
+    fact: 'AWS Data Pipeline không nhận khách hàng mới, ở chế độ bảo trì (không thêm tính năng)'
+    since: '2024-07-25'
+    url: 'https://aws.amazon.com/blogs/big-data/migrate-workloads-from-aws-data-pipeline/'
+  - id: pinpoint-end-of-support
+    pattern: 'Pinpoint'
+    fact: 'Amazon Pinpoint không nhận khách mới từ 2025-05-20 và ngừng hỗ trợ ngày 2026-10-30 (SMS / voice / push: AWS End User Messaging; email: Amazon SES)'
+    since: '2025-05-20'
+    url: 'https://docs.aws.amazon.com/pinpoint/latest/userguide/migrate.html'
+  - id: sagemaker-ai-rename
+    pattern: 'SageMaker'
+    unless: 'SageMaker AI|SageMaker (Unified Studio|Lakehouse|Catalog|Canvas)'
+    fact: 'Amazon SageMaker (dịch vụ ML) đã đổi tên thành Amazon SageMaker AI — tên dùng trong đề cương SAA-C03'
+    since: '2024-12-03'
+    url: 'https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html'
+  - id: quicksight-quick
+    pattern: 'QuickSight'
+    unless: 'Amazon Quick\b'
+    fact: 'Amazon QuickSight đã thành Amazon Quick Suite (2025-10-09); đề cương SAA-C03 hiện ghi “Amazon Quick”'
+    since: '2025-10-09'
+    url: 'https://aws.amazon.com/blogs/business-intelligence/reimagine-business-intelligence-amazon-quicksight-evolves-to-amazon-quick-suite · https://docs.aws.amazon.com/aws-certification/latest/solutions-architect-associate-03/saa-03-in-scope-services.html'

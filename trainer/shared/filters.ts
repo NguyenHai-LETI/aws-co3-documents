@@ -1,4 +1,4 @@
-import type { DomainId, Question, QuestionState, SelectionFilters } from './types.ts';
+import type { AnswerRecord, DomainId, Question, QuestionState, SelectionFilters } from './types.ts';
 
 export function applyFilters(qs: Question[], f: SelectionFilters = {}): Question[] {
   const has = (arr?: unknown[]) => Array.isArray(arr) && arr.length > 0;
@@ -64,6 +64,24 @@ export function modePool(mode: string, pool: Question[], states: Record<string, 
     default:
       return pool;
   }
+}
+
+/**
+ * [v5] The correction set of an attempt — what the result page's "🩹 Chữa N câu" stepper walks through and mode 'retest'
+ * asks again: first-attempt answers (no relearning retry, not skipped) that the learner saw (a pick or time spent) and got
+ * wrong, or got right while unsure. Confident errors (a pick, no unsure, no hint) first, then the other errors, then the
+ * unsure right answers; each question once, in answer order within a group.
+ */
+export function retestIds(answers: readonly Pick<AnswerRecord, 'q' | 'ok' | 'pick' | 't' | 'unsure' | 'hinted' | 'relearn' | 'skipped'>[]): string[] {
+  const tiers: string[][] = [[], [], []];
+  const seen = new Set<string>();
+  for (const r of answers) {
+    if (r.relearn || r.skipped || seen.has(r.q) || (!r.pick && !(r.t > 0))) continue;
+    seen.add(r.q);
+    if (!r.ok) tiers[r.pick && !r.unsure && !r.hinted ? 0 : 1].push(r.q);
+    else if (r.unsure) tiers[2].push(r.q);
+  }
+  return tiers.flat();
 }
 
 /** Any content filter set (packs, topics, domains, …, requirements, search)? Empty = the whole pool. */

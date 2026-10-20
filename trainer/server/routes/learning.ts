@@ -8,6 +8,8 @@ import { buildTest, modeCounts } from '../lib/select.ts';
 import { planSummary } from '../lib/plans.ts';
 import { newDataSince, scheduleSnapshot } from '../lib/snapshot.ts';
 import { attemptBySession } from '../lib/results.ts'; // [δ] idempotent submit
+import { NothingToSave, recordRetry, submitDiffers } from '../lib/results.ts'; // [v5 ρ] early stop + result-page retry
+import { clearActiveMirror } from '../lib/active.ts'; // [v5 ρ] resume on another device
 import { autoSync } from '../lib/sync.ts'; // [δ] quiet sync after a submit
 import { resultAnnotations } from '../lib/regrade.ts'; // [β1] GET /api/results/:id annotations
 import { loadSealed } from '../lib/sealed.ts'; // [β1] official sealed sitting (annotations.sealedOfficial)
@@ -57,8 +59,19 @@ route('POST', '/api/results', async (req) => {
   if (!body.session?.questions?.length) throw new HttpError(400, 'session is required');
   const sid = typeof body.session.sessionId === 'string' && body.session.sessionId.length <= 200 ? body.session.sessionId : undefined;
   const stored = attemptBySession(sid);
-  if (stored) return { attempt: stored, duplicate: true };
-  const attempt = gradeAndSave(body, loadBank());
+  if (stored) {
+    if (sid) clearActiveMirror(sid); // [v5 ρ] the outbox resent it: that test's mirror is done too
+    // [v5 ρ] another copy of the same test (another device) was stored first with other answers: say so
+    return submitDiffers(stored, body, loadBank()) ? { attempt: stored, duplicate: true, differs: true } : { attempt: stored, duplicate: true };
+  }
+  let attempt: Attempt;
+  try {
+    attempt = gradeAndSave(body, loadBank());
+  } catch (e) {
+    if (e instanceof NothingToSave) throw new HttpError(422, e.message); // [v5 ρ] "⏹ Dừng ở đây" before any answer
+    throw e;
+  }
+  if (sid) clearActiveMirror(sid); // [v5 ρ] another device must not offer to resume a submitted test
   scheduleSnapshot(); // coach/snapshot.md is rebuilt ~3 s later, after the response
   autoSync.noteSubmit(); // sync.auto: idle → quiet sync after auto_delay_minutes unless another test starts first
   return { attempt };
@@ -72,11 +85,24 @@ route('POST', '/api/results/:id/why', async (req, _url, [id]) => {
   if (!body.q || !attempt.answers.some((r) => r.q === body.q)) throw new HttpError(400, 'Câu hỏi không thuộc bài làm này');
   const why = cleanNote(body.why, WHY_MAX_CHARS);
   const ok = rewriteAttempt(attempt.file, (a) => {
-    for (const r of a.answers) if (r.q === body.q) r.why = why || undefined;
+    // [v5 ρ] on the graded first attempt only (an in-session relearn retry of the question keeps no note of its own)
+    const r = a.answers.find((x) => x.q === body.q && !x.relearn) ?? a.answers.find((x) => x.q === body.q);
+    if (r) r.why = why || undefined;
   });
   if (!ok) throw new HttpError(500, 'Không ghi được file kết quả');
   scheduleSnapshot();
   return { attempt: attemptById(loadAttempts(currentConfig()), attempt.id) ?? attempt };
+});
+
+/**
+ * [v5 ρ] Result page "thử lại trước khi xem giải thích": body `{q, pick: string[]}` (option keys) → `{attempt, answer, retry,
+ * retryOk, duplicate?}`. Display only: never a review, the score and `ok` stay as graded. The first retry wins.
+ */
+route('POST', '/api/results/:id/retry', async (req, _url, [id]) => {
+  const body = await readBody<{ q?: string; pick?: string[] | string }>(req);
+  const attempt = attemptById(loadAttempts(currentConfig()), decodeURIComponent(id));
+  if (!attempt) throw new HttpError(404, 'Result not found');
+  return recordRetry(attempt, body.q, body.pick, loadBank());
 });
 
 // Summaries are derived from the stored results as graded at the time (not re-graded): they match the file's score.
@@ -111,6 +137,7 @@ route('GET', '/api/results', (_req, url) => {
  * [β1] The stored attempt (as graded at the time) + `annotations` from the learning view of the history (ResultAnnotations:
  * exposure per question, recognized repeats, never-viewed answers, seen-before vs first-time split of the scored ones,
  * `sealedOfficial` = the form whose sitting sealed.md records as this attempt — the only "điểm trên câu mới").
+ * [v5 λ] + stoppedEarly / skipped / relearn / for / retest {of, title, misses} / retested / notReadiness.
  */
 route('GET', '/api/results/:id', (_req, _url, [id]) => {
   const bank = loadBank();
@@ -119,6 +146,14 @@ route('GET', '/api/results/:id', (_req, _url, [id]) => {
   const annotations = resultAnnotations(attemptById(context().attempts, attempt.id), attempt);
   const official = loadSealed().forms.find((f) => f.status === 'used' && f.attempt === attempt.id);
   if (official) annotations.sealedOfficial = official.id;
+  // [v5 λ] cross-attempt parts: the attempt a retest re-checks (title), the retests that re-checked this one (newest first)
+  const all = loadAttempts(currentConfig());
+  if (annotations.retest) {
+    const of = attemptById(all, annotations.retest.of);
+    if (of) annotations.retest.title = of.title;
+  }
+  const retested = all.filter((a) => a.mode === 'retest' && a.retestOf === attempt.id).map((a) => a.id).reverse();
+  if (retested.length) annotations.retested = retested;
   return { attempt, summary: summarize(attempt, bank), questions: attempt.answers.map((r) => bank.byId.get(r.q) ?? null), annotations };
 });
 

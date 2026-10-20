@@ -9,7 +9,9 @@
 //            unemphasized NOT, a/an cue, overlapping options) → warning;
 //   low    = maintenance work for ENRICH (short explanation, a distractor naming an out-of-scope service) → warning.
 // Codes are stable: they are stored nowhere, but patch reports, the UI and `validate --lint` refer to them.
-// Taxonomy-aware rules (oos-answer, oos-distractor: services marked `scope: out`) run only when `tax` is passed.
+// Taxonomy-aware rules (oos-answer, oos-distractor: services marked `scope: out`; [v5] stale-fact: taxonomy `currency:`)
+// run only when `tax` is passed. [v5] family-options needs the other members of the question's family (`ctx.family`, see
+// lintContext()): lintBank, validate and the drawer route pass them; a lone question is never flagged.
 import { LETTER_REF_RE } from './pack-format.ts';
 import { outOfScopeIn } from './taxonomy.ts';
 import { countWords } from '../../shared/timing.ts';
@@ -41,6 +43,18 @@ export const LINT_RULES: readonly LintRule[] = [
     severity: 'medium',
     label: 'Đáp án là dịch vụ ngoài phạm vi đề',
     fix: 'Đề thật không hỏi dịch vụ ngoài phạm vi (danh sách chính thức SAA-C03): retire câu (status: retired) hoặc viết lại để đáp án là dịch vụ trong phạm vi.',
+  },
+  {
+    code: 'family-options',
+    severity: 'medium',
+    label: 'Câu cùng họ không chung bộ phương án',
+    fix: 'Các câu cùng `family:` phải dùng y nguyên một bộ phương án và chỉ khác câu hỏi cuối (yêu cầu) — chép lại bộ phương án chung, hoặc bỏ `family:`.',
+  },
+  {
+    code: 'stale-fact',
+    severity: 'medium',
+    label: 'Kiến thức có thể đã lỗi thời',
+    fix: 'Đối chiếu tài liệu AWS (URL trong thông báo): sửa theo tên / giới hạn hiện hành, viết “tên mới (tên cũ)” — hoặc chạy kiểm chứng bằng tài liệu AWS (🧪 Giải mù).',
   },
   { code: 'short-explanation', severity: 'low', label: 'Giải thích quá ngắn', fix: 'ENRICH “explain”: vì sao đúng + từng phương án nhiễu + tóm tắt 🇻🇳.' },
   {
@@ -362,6 +376,76 @@ function scopeFlaws(q: LintInput, tax?: Taxonomy): LintFlaw[] {
   return named.map((x) => flaw('oos-distractor', `Phương án nhiễu ${x.o.key} nêu dịch vụ ngoài phạm vi (${x.services.join(', ')}) — loại được ngay vì đề thật không dùng`, x.o.key));
 }
 
+// ── [v5] qualifier families and stale facts ─────────────────────────────────
+
+/** Bank context of a lint run: the members of the question's qualifier family (bank order, the question included). */
+export interface LintContext {
+  family?: Pick<Question, 'id' | 'stem' | 'options' | 'answer'>[];
+}
+
+/** The family members of `q` (non-retired, bank order) — the context lintQuestion needs for `family-options`. */
+export function lintContext(bank: Pick<BankState, 'questions'>, q: Pick<Question, 'id' | 'family'>): LintContext | undefined {
+  if (!q.family) return undefined;
+  const family = bank.questions.filter((x) => x.family === q.family && x.status !== 'retired');
+  return family.length > 1 ? { family } : undefined;
+}
+
+const optionSet = (q: Pick<Question, 'options'>) => q.options.map((o) => sameText(o.text)).sort().join('\u0000');
+
+/**
+ * Qualifier family (C6): every member shows one identical option set (letters may differ) and asks a different final
+ * question. The family's set is the one most members share (ties: the first member in bank order).
+ */
+export function familyFlaws(q: LintInput, family: Pick<Question, 'id' | 'stem' | 'options' | 'answer'>[]): LintFlaw[] {
+  const others = family.filter((m) => m.id !== q.id);
+  if (!others.length) return [];
+  const members = family.some((m) => m.id === q.id) ? family : [q, ...family];
+  const counts = new Map<string, { n: number; first: number }>();
+  members.forEach((m, i) => {
+    const k = optionSet(m);
+    const c = counts.get(k);
+    if (c) c.n++;
+    else counts.set(k, { n: 1, first: i });
+  });
+  const common = [...counts.entries()].sort((a, b) => b[1].n - a[1].n || a[1].first - b[1].first)[0][0];
+  const out: LintFlaw[] = [];
+  if (optionSet(q) !== common) {
+    const ref = members.find((m) => optionSet(m) === common)!;
+    out.push(flaw('family-options', `Bộ phương án khác bộ chung của họ (như ${ref.id}) — câu cùng họ chỉ được khác câu hỏi cuối`));
+  }
+  const asked = norm(questionSentence(q.stem));
+  const twin = others.find((m) => norm(questionSentence(m.stem)) === asked);
+  if (twin) out.push(flaw('family-options', `Câu hỏi cuối giống hệt ${twin.id} — câu cùng họ phải hỏi một yêu cầu khác (chi phí / vận hành / bảo mật …)`));
+  return out;
+}
+
+const currencyMemo = new WeakMap<Taxonomy, { fact: NonNullable<Taxonomy['currency']>[number]; re: RegExp; unless?: RegExp }[]>();
+
+function currencyRules(tax: Taxonomy) {
+  let m = currencyMemo.get(tax);
+  if (!m) {
+    m = [];
+    for (const fact of tax.currency ?? []) {
+      try {
+        if (fact?.pattern) m.push({ fact, re: new RegExp(fact.pattern, 'i'), ...(fact.unless ? { unless: new RegExp(fact.unless, 'i') } : {}) });
+      } catch {
+        // a malformed pattern is no rule
+      }
+    }
+    currencyMemo.set(tax, m);
+  }
+  return m;
+}
+
+/** stale-fact: the text states something AWS changed since (taxonomy `currency:`, each with its official source). */
+function staleFacts(q: LintInput, tax?: Taxonomy): LintFlaw[] {
+  if (!tax?.currency?.length) return [];
+  const text = [q.stem, ...q.options.map((o) => o.text), q.explanation].join('\n');
+  return currencyRules(tax)
+    .filter(({ re, unless }) => re.test(text) && !unless?.test(text))
+    .map(({ fact }) => flaw('stale-fact', `Có thể đã lỗi thời (${fact.id}): ${fact.fact} — từ ${fact.since}, nguồn ${fact.url}`));
+}
+
 function flaw(code: string, message: string, option?: string): LintFlaw {
   const f: LintFlaw = { code, severity: RULE.get(code)!.severity, message };
   if (option) f.option = option;
@@ -381,15 +465,18 @@ const CHECKS: ((q: LintInput, tax?: Taxonomy) => LintFlaw[])[] = [
   overlappingOptions,
   shortExplanation,
   scopeFlaws,
+  staleFacts,
 ];
 
 const byRank = (a: LintFlaw, b: LintFlaw) =>
   SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || (CODE_RANK.get(a.code) ?? 99) - (CODE_RANK.get(b.code) ?? 99) || (a.option ?? '').localeCompare(b.option ?? '');
 
 /** Flaws of one question, most severe first. Pure function: no I/O. With `tax`, also the exam-scope rules (oos-*). */
-export function lintQuestion(q: Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'explanation'>, tax?: Taxonomy): LintFlaw[] {
+export function lintQuestion(q: Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'explanation'>, tax?: Taxonomy, ctx?: LintContext): LintFlaw[] {
   const input: LintInput = { id: q.id, stem: q.stem ?? '', options: q.options ?? [], answer: q.answer ?? [], explanation: q.explanation ?? '' };
-  return CHECKS.flatMap((check) => check(input, tax)).sort(byRank);
+  const flaws = CHECKS.flatMap((check) => check(input, tax));
+  if (ctx?.family?.length) flaws.push(...familyFlaws(input, ctx.family));
+  return flaws.sort(byRank);
 }
 
 /** Flaws introduced by an edit: codes present after but not before (same code on the same option counts once). */
@@ -427,7 +514,7 @@ export function lintBank(bank: BankState, opts: { cache?: boolean; exclude?: Rea
   const bySeverity: Record<LintSeverity, number> = { high: 0, medium: 0, low: 0 };
   const flagged: { id: string; flaws: LintFlaw[]; rank: number[] }[] = [];
   for (const q of active) {
-    const flaws = lintQuestion(q, bank.taxonomy);
+    const flaws = lintQuestion(q, bank.taxonomy, lintContext(bank, q));
     if (!flaws.length) continue;
     for (const code of new Set(flaws.map((f) => f.code))) {
       const rule = RULE.get(code)!;
@@ -456,7 +543,7 @@ export function lintQuestionsFor(bank: BankState, code?: string, exclude?: Reado
   const wanted = code ? new Set(summary.ids?.[code] ?? []) : undefined;
   return bank.questions
     .filter((q) => q.status === 'active' && !exclude?.has(q.id) && (!wanted || wanted.has(q.id)))
-    .map((q) => ({ id: q.id, flaws: lintQuestion(q, bank.taxonomy) }))
+    .map((q) => ({ id: q.id, flaws: lintQuestion(q, bank.taxonomy, lintContext(bank, q)) }))
     .filter((x) => x.flaws.length)
     .sort((a, b) => {
       const [x, y] = [badness(a.flaws), badness(b.flaws)];

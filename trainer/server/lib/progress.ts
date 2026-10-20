@@ -13,11 +13,12 @@ import type { BankState } from './bank.ts';
 import { asString, splitFrontMatter, stringifyFrontMatter } from './frontmatter.ts';
 import { localDateKey, localIso } from './time.ts';
 import { dayKey, dayOfKey, dayStartMs, localDay } from './fsrs.ts';
-import { computeStates, readinessAt } from './stats.ts';
+import { computeStates, learnerPace, readinessAt, reviewQueue } from './stats.ts';
 import { fsrsInfo, resolveFsrsParams } from './fsrs-optimize.ts';
 import { calibrate, forecastExam, workloadDays } from './forecast.ts';
 import { countRegraded } from './regrade.ts';
 import { loadSealed } from './sealed.ts';
+import { catchUpOf, examDayOf, examPhase, freshScores, goNoGoFrom, newQuota, practiceQuestions } from './exam-schedule.ts'; // [v5]
 import { scaledScore } from '../../shared/scoring.ts';
 import type { Attempt, ChecklistItem, ExamForecast, ExamGoal, ExternalScore, ProgressResponse, QuestionState, SealedFormProgress, SealedState } from '../../shared/types.ts';
 
@@ -540,10 +541,13 @@ export interface ProgressCtx {
 type Heavy = Omit<ProgressResponse, 'fsrs'>;
 const memo = new WeakMap<Attempt[], { key: string; value: Heavy }>();
 
-/** Goal, forecast, workload, external scores + calibration, sealed forms, checklist (memoized per data version and day), FSRS info (fresh). */
-export function computeProgress(ctx: ProgressCtx, now = Date.now()): ProgressResponse {
+/**
+ * Goal, forecast, workload, external scores + calibration, sealed forms, checklist, [v5] exam phase, new-question quota,
+ * catch-up and go / no-go (memoized per data version and day), FSRS info (fresh). `goal` defaults to results/goal.md.
+ */
+export function computeProgress(ctx: ProgressCtx, now = Date.now(), goalOverride?: ExamGoal): ProgressResponse {
   const { cfg, bank, attempts } = ctx;
-  const goal = loadGoal();
+  const goal = goalOverride ?? loadGoal();
   const external = loadExternal();
   const sealed = loadSealed();
   const today = localDay(now);
@@ -557,6 +561,9 @@ export function computeProgress(ctx: ProgressCtx, now = Date.now()): ProgressRes
     params.weights,
     cfg.srs,
     cfg.stats,
+    cfg.practice,
+    // [v5] the eve of the exam: go / no-go turns to "reschedule window closed" at the exam hour
+    goal.examDate && dayOfKey(goal.examDate) === today + 1 ? Math.floor(now / 600_000) : 0,
   ]);
   let heavy = memo.get(attempts);
   if (!heavy || heavy.key !== key) {
@@ -572,9 +579,17 @@ function computeHeavy(ctx: ProgressCtx, goal: ExamGoal, stored: ExternalScore[],
   // questions held back in sealed forms are not part of the practice bank (coverage, forecast, workload)
   const held = new Set(sealed.forms.filter((f) => f.status === 'sealed').flatMap((f) => f.ids));
   // the forecast needs FSRS memory even when the review queue runs on Leitner boxes
-  const fsrsStates = cfg.srs.algorithm === 'leitner' ? computeStates(attempts, { ...cfg, srs: { ...cfg.srs, algorithm: 'fsrs' } }, now, weights) : ctx.states;
+  const fsrsStates = cfg.srs.algorithm === 'leitner' ? computeStates(attempts, { ...cfg, srs: { ...cfg.srs, algorithm: 'fsrs' } }, now, weights, { goal }) : ctx.states;
   let forecast: ExamForecast | undefined;
-  if (goal.examDate) forecast = forecastExam(fsrsStates, bank, attempts, goal.examDate, { weights, desiredRetention: cfg.srs.desired_retention, now, exclude: held });
+  if (goal.examDate)
+    forecast = forecastExam(fsrsStates, bank, attempts, goal.examDate, {
+      weights,
+      desiredRetention: cfg.srs.desired_retention,
+      now,
+      exclude: held,
+      // [v5] exam-aware + capacity lines
+      policy: { srs: cfg.srs, minutesPerDay: goal.minutesPerDay, restDays: goal.restDays, pace: learnerPace(attempts), excludeOutOfScope: cfg.practice?.exclude_out_of_scope !== false },
+    });
   // until the exam (today … exam day), at most WORKLOAD_MAX_DAYS; no exam date or a past one → WORKLOAD_DAYS
   const days = forecast && forecast.daysLeft >= 0 ? Math.min(forecast.daysLeft + 1, WORKLOAD_MAX_DAYS) : WORKLOAD_DAYS;
   const workload = workloadDays(ctx.states, held.size ? bank.questions.filter((q) => !held.has(q.id)) : bank.questions, days, now);
@@ -596,17 +611,40 @@ function computeHeavy(ctx: ProgressCtx, goal: ExamGoal, stored: ExternalScore[],
     if (!a.rushed && Number.isFinite(t) && t < first) first = t;
   }
   if (first < Infinity) studyStart = localDateKey(new Date(first));
-  return {
+  const externalCalibration = current.answers ? calibrate(external, current.readiness) : undefined;
+  const out: Heavy = {
     today: dayKey(today),
     workload,
     goal: { ...goal, targetScaled: goal.targetScaled ?? bank.taxonomy.exam.pass_scaled },
     forecast,
     external,
-    externalCalibration: current.answers ? calibrate(external, current.readiness) : undefined,
+    externalCalibration,
     regraded: countRegraded(attempts),
     sealed: sealedProgress(sealed, attempts, goal, now),
     checklist: examChecklist(goal, now),
     checklistChecked: CHECKLIST_CHECKED,
     studyStart,
   };
+  // [v5] exam-aware plan: phase, new-question quota, catch-up, go / no-go
+  const todayKey = dayKey(today);
+  const phase = examPhase(goal, todayKey, cfg);
+  if (phase) out.phase = phase;
+  const quota = newQuota(ctx, goal, todayKey);
+  if (quota) out.newQuota = quota;
+  const exam = examDayOf(goal, cfg);
+  const backlog = reviewQueue(practiceQuestions(ctx, held), ctx.states, attempts, cfg, now).due.length;
+  const catchUp = catchUpOf(backlog, cfg.srs.daily_limit, exam !== undefined && exam >= today ? exam - today : undefined);
+  if (catchUp) out.catchUp = catchUp;
+  const go = goNoGoFrom({
+    goal: cfg.srs.exam_aware === false ? {} : goal,
+    today: todayKey,
+    fresh: freshScores(attempts, sealed),
+    readiness: { value: current.readiness, answers: current.answers, calibrated: externalCalibration?.adjustedReadiness },
+    forecast,
+    domainLabels: Object.fromEntries(bank.taxonomy.domains.map((d) => [d.id, `${d.code} ${d.label_vi}`])),
+    passScaled: bank.taxonomy.exam.pass_scaled,
+    now,
+  });
+  if (go) out.goNoGo = go;
+  return out;
 }

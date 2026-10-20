@@ -16,7 +16,7 @@ function NextSteps({ p }: { p: ProgressResponse }) {
   return <div className="lrn-next-list">{lines}</div>;
 }
 
-export function ExamCountdown() {
+export function ExamCountdown({ className = '' }: { className?: string }) {
   const { meta } = useData();
   const { data: p } = useProgress();
   if (!meta || !p) return null; // older server without /api/progress → nothing
@@ -24,7 +24,7 @@ export function ExamCountdown() {
   const target = p.goal.targetScaled ?? meta.exam.pass_scaled;
   if (!f) {
     return (
-      <div className="card stack sm lrn-countdown">
+      <div className={`card stack sm lrn-countdown ${className}`}>
         <div className="small muted">🎯 Ngày thi</div>
         <div className="small">Chưa đặt ngày thi. Đặt ngày để xem đếm ngược và dự báo điểm vào đúng ngày đó.</div>
         <a className="small" href={href('/stats?focus=exam')}>
@@ -43,7 +43,7 @@ export function ExamCountdown() {
   );
   if (!f.seen) {
     return (
-      <div className="card stack sm lrn-countdown">
+      <div className={`card stack sm lrn-countdown ${className}`}>
         {head}
         <div className="small muted">Dự báo điểm cho ngày thi sẽ có ngay sau bài test đầu tiên.</div>
         <NextSteps p={p} />
@@ -51,7 +51,7 @@ export function ExamCountdown() {
     );
   }
   return (
-    <div className="card stack sm lrn-countdown">
+    <div className={`card stack sm lrn-countdown ${className}`}>
       {head}
       <div className="row" style={{ alignItems: 'baseline', gap: 8 }}>
         <span className="ins-stat">{sched}</span>

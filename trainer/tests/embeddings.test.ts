@@ -74,7 +74,7 @@ const bankOf = (questions: Question[]): BankState => ({ version: `embed-test-${+
 
 function cfgFor(url: string, patch: Partial<AppConfig['quality']> = {}): AppConfig {
   const base = loadConfig();
-  return { ...base, quality: { embeddings: 'auto', ollama_url: url, embedding_model: 'fake-embed', semantic_threshold: 0.88, ...patch } };
+  return { ...base, quality: { ...base.quality, embeddings: 'auto', ollama_url: url, embedding_model: 'fake-embed', semantic_threshold: 0.88, ...patch } };
 }
 
 test('model names: "embeddinggemma" is "embeddinggemma:latest", other tags differ', () => {

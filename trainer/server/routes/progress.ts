@@ -8,10 +8,12 @@
 //   POST /api/external/:id/delete                                                                → ProgressResponse
 //   POST /api/fsrs/optimize             → FsrsInfo (the optimizer runs in a child process; poll GET /api/progress)
 //   POST /api/onboarding/plan {attemptId?} → OnboardingPlanResponse (coach/plans/<date>-onboarding.md, one per day)
+//   POST /api/plan/sprint {}            → {plan, created} [v5 λ] (coach/plans/<date>-sprint.md, one per day; exam ≤ 14 days)
 import { HttpError, readBody, route } from '../http.ts';
 import { context } from '../context.ts';
 import { ProgressError, addExternal, computeProgress, deleteExternal, saveGoal, type GoalInput } from '../lib/progress.ts';
 import { onboardingPlan } from '../lib/onboarding.ts';
+import { sprintPlan } from '../lib/sprint.ts'; // [v5 λ]
 import { OptimizeError, fsrsInfo, maybeAutoOptimize, startOptimize } from '../lib/fsrs-optimize.ts';
 
 /** Library input errors → HTTP errors with the same status and (Vietnamese) message. */
@@ -78,3 +80,6 @@ route('POST', '/api/onboarding/plan', async (req) => {
   const attemptId = typeof body?.attemptId === 'string' && body.attemptId.trim() ? body.attemptId.trim() : undefined;
   return guard(() => onboardingPlan(context(), { attemptId }));
 });
+
+/** [v5 λ] Deterministic sprint / final-week plan (sprint.ts): today's file is returned unchanged when it exists. */
+route('POST', '/api/plan/sprint', () => guard(() => sprintPlan(context())));

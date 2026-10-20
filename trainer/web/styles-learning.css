@@ -778,3 +778,402 @@ a.lrn-next:hover .lrn-next-label {
     gap: 8px;
   }
 }
+
+/* ═══ [μ v5] learning UI: "Học hôm nay" hero, exam phase banner, Dashboard order, correction stepper, evidence,
+   transfer / go-no-go / leeches, pair page. Same tokens; status colour always with an icon + text. ═══ */
+
+/* ── Dashboard: readiness + countdown | today; one column ≤ 960 px with the primary action first ── */
+.lrn-resume {
+  margin-bottom: 16px;
+}
+.lrn-dash {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  align-items: start;
+}
+.lrn-dash-side,
+.lrn-dash-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (max-width: 960px) {
+  .lrn-dash {
+    display: flex;
+    flex-direction: column;
+  }
+  .lrn-dash-side,
+  .lrn-dash-main {
+    display: contents;
+  }
+  .lrn-o-steps {
+    order: 0;
+  }
+  .lrn-o-hero {
+    order: 1;
+  }
+  .lrn-o-count {
+    order: 2;
+  }
+  .lrn-o-ready {
+    order: 3;
+  }
+  .lrn-o-quests {
+    order: 4;
+  }
+  .lrn-o-more {
+    order: 5;
+  }
+}
+
+/* ── "▶ Học hôm nay" hero ── */
+.lrn-today {
+  border: 1.5px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lrn-today-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.lrn-today-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.lrn-today-chips {
+  gap: 6px;
+}
+.lrn-today-chips .chip {
+  min-width: 46px;
+  justify-content: center;
+}
+.lrn-today-figure {
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.lrn-today-figure > b {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  margin-right: 4px;
+}
+.lrn-today-wait {
+  min-height: 72px;
+}
+.lrn-today-met {
+  color: var(--good-ink);
+  font-size: 15px;
+}
+.lrn-today-met .muted {
+  color: var(--text-3);
+}
+.lrn-today-coach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.lrn-today-actions {
+  gap: 10px 16px;
+  align-items: center;
+}
+.lrn-today-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 360px;
+}
+.lrn-today-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.lrn-today-catchup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.lrn-today-after {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+
+/* ── exam phase banner ── */
+.lrn-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  border-color: transparent;
+  background: var(--accent-soft);
+}
+.lrn-phase.quiet {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.lrn-phase-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.lrn-phase-title {
+  font-size: 15px;
+}
+.lrn-phase-head .btn {
+  margin-left: auto;
+}
+.lrn-phase-rules {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 26px;
+}
+.lrn-phase-rules li {
+  flex: 0 1 auto;
+}
+
+/* ── side quests, "Tự chọn khác…" ── */
+.lrn-more > summary {
+  cursor: pointer;
+  padding: 6px 2px;
+  list-style-position: inside;
+}
+.lrn-more[open] > summary {
+  margin-bottom: 10px;
+}
+.lrn-more > summary .muted {
+  margin-left: 4px;
+}
+
+/* ── result page: "🩹 Chữa N câu" stepper, "đính chính" card ── */
+.lrn-fix {
+  border: 1.5px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-margin-top: 16px;
+}
+.lrn-fix-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.lrn-fix-head h2 {
+  margin: 0;
+}
+.lrn-fix-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.lrn-fix-dot {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  cursor: pointer;
+}
+.lrn-fix-dot.seen {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.lrn-fix-dot.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.lrn-fix-nav {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.lrn-erratum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.lrn-erratum > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+/* ── confusion pairs: "So sánh ⟷" + "Luyện cặp này" share the trailing column ── */
+.lrn-cf-row {
+  grid-template-columns: minmax(0, 1.3fr) minmax(80px, 1fr) 8rem 17rem;
+}
+div.lrn-cf-btn {
+  gap: 6px;
+  justify-content: flex-end;
+}
+@media (max-width: 640px) {
+  .lrn-cf-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  div.lrn-cf-btn {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+.lrn-ci {
+  white-space: nowrap;
+}
+
+/* ── Stats: "Câu dai dẳng" ── */
+.lrn-leech-list {
+  display: flex;
+  flex-direction: column;
+}
+.lrn-leech {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.lrn-leech:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.lrn-leech.paused {
+  opacity: 0.75;
+}
+.lrn-leech-stem {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.lrn-leech-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  overflow-wrap: anywhere;
+}
+.lrn-leech-why {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.lrn-leech-actions {
+  gap: 6px;
+}
+.lrn-leech-actions input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* ── exam section: go / no-go, forecast lines ── */
+.lrn-gonogo-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lrn-gonogo-checks li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  overflow-wrap: anywhere;
+}
+.lrn-check {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 13px;
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+.lrn-check.ok {
+  background: var(--good-soft);
+  color: var(--good-ink);
+}
+.lrn-check.no {
+  background: var(--bad-soft);
+  color: var(--bad-ink);
+}
+.lrn-cap-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+/* ── pair page ── */
+.lrn-pair-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.lrn-pair-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lrn-pair-group .chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+.lrn-pair-group .chip:hover {
+  text-decoration: none;
+}
+.lrn-pair-excerpt {
+  min-width: 0;
+}
+.lrn-pair-excerpt .md table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.lrn-pair-excerpt .md th,
+.lrn-pair-excerpt .md td {
+  min-width: 7.5em;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.lrn-pair-excerpt .md pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.lrn-pair-grid > .sticky-side {
+  position: sticky;
+  top: 16px;
+}

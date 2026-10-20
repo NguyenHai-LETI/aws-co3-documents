@@ -10,7 +10,7 @@ export function Tools() {
       <div className="page-head">
         <div>
           <h1>🧰 Công cụ</h1>
-          <p>Học trên điện thoại trong cùng mạng Wi-Fi, và xuất câu hỏi sang Anki để ôn bằng flashcard.</p>
+          <p>Học trên điện thoại (Wi-Fi hoặc HTTPS), quản lý thiết bị đã ghép, và xuất câu hỏi sang Anki để ôn bằng flashcard.</p>
         </div>
       </div>
       <div className="stack tl-stack">

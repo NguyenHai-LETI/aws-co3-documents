@@ -2,15 +2,56 @@
 // queue (mismatch / ambiguous verdicts waiting for a decision: Duyệt · Sửa bằng ENRICH · Báo lỗi · Loại) and runs for
 // the AI-written questions not verified yet, the questions changed since their verdict, a pack or the current selection.
 // Works while [D]'s /api/verify endpoints are missing (404): the summary shows zeros and the buttons explain why.
+// [v5] γ2: 🔗 fact-checks against AWS documentation (verdict + quotes + links) shown on the cards, "🔗 Kiểm chứng có nguồn"
+// for the grounded queue or one card, and the import audit (progress, next questions, "🧾 Kiểm toán 10 câu nhập").
 import { useState } from 'react';
 import { useData, useShared } from '../../lib/store.tsx';
 import { fmtDate } from '../../lib/format.ts';
 import { Empty } from '../ui.tsx';
 import { OptionLine, QRef, decideVerdict, startEnrich, startVerify, useAiReady } from './common.tsx';
-import type { VerifyOutcome, VerifySummary, VerifyVerdict } from '../../../shared/types.ts';
+import type { FactVerdict, VerifyOutcome, VerifySummary, VerifyVerdict } from '../../../shared/types.ts';
 
 interface VerifyApi extends VerifySummary {
   latest: Record<string, VerifyVerdict>;
+}
+
+/** [v5] Import audit: progress + the questions the next audit run takes. */
+function AuditCard({ s, disabled, why, onRun, onOpen }: { s: VerifySummary; disabled: boolean; why?: string; onRun: () => void; onOpen: (id: string) => void }) {
+  const a = s.audit;
+  if (!a) return null;
+  const pct = a.imported ? Math.round((100 * a.audited) / a.imported) : 0;
+  return (
+    <div className="card stack sm">
+      <div className="card-head qq-head" style={{ marginBottom: 0 }}>
+        <h2>🧾 Kiểm toán câu nhập</h2>
+        <span className="small muted num">
+          {a.audited}/{a.imported} câu · {pct}%
+        </span>
+      </div>
+      <div className="small dim ins-wrap">
+        Câu nhập từ đề luyện chưa từng được giải mù. Mỗi lượt kiểm toán 10 câu — câu bạn sắp gặp trước, rồi câu nhiều đáp án, câu có kiến thức có thể đã cũ. Câu lệch
+        được kiểm chứng bằng tài liệu AWS (nếu bật) và chờ bạn quyết định; câu nhập không bao giờ tự chuyển nháp.
+      </div>
+      <div className="row">
+        <button className="btn sm" disabled={disabled || !a.next.length} title={why} onClick={onRun}>
+          🧾 Kiểm toán {Math.min(10, a.next.length)} câu nhập
+        </button>
+        <span className="tiny muted">Chạy theo lịch khi <code>coach.idle_tasks</code> có <code>audit</code>.</span>
+      </div>
+      {a.next.length > 0 && (
+        <details className="small">
+          <summary>Lượt kế tiếp ({a.next.length} câu)</summary>
+          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+            {a.next.map((id) => (
+              <button key={id} type="button" className="ins-linkish mono tiny" onClick={() => onOpen(id)}>
+                {id}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
 }
 
 /** Latest verdict per question (GET /api/verify, shared by every section); undefined while unsupported. */
@@ -25,6 +66,39 @@ const OUTCOME: Record<VerifyOutcome, { icon: string; label: string; cls: string 
   error: { icon: '💥', label: 'lỗi', cls: '' },
 };
 const CONFIDENCE: Record<string, string> = { high: 'tin cậy cao', medium: 'tin cậy vừa', low: 'tin cậy thấp' };
+const FACT: Record<FactVerdict, { icon: string; label: string; cls: string }> = {
+  correct: { icon: '✅', label: 'tài liệu xác nhận đáp án', cls: 'good' },
+  wrong: { icon: '❌', label: 'tài liệu cho thấy đáp án sai', cls: 'bad' },
+  outdated: { icon: '⏳', label: 'kiến thức lỗi thời', cls: 'warn' },
+  ambiguous: { icon: '⚠️', label: 'tài liệu chưa đủ để quyết', cls: 'warn' },
+};
+
+/** [v5] The fact-check of a question against AWS documentation: verdict, answer by the docs, quotes with links. */
+function GroundedBlock({ g, current }: { g: VerifyVerdict; current?: string }) {
+  const f = FACT[g.fact ?? 'ambiguous'];
+  const stale = !!current && g.hash !== current;
+  return (
+    <div className="stack sm qq-grounded">
+      <div className="row small" style={{ gap: 6 }}>
+        <span className={`badge ${stale ? '' : f.cls}`}>
+          🔗 {f.icon} {f.label}
+          {stale ? ' (cũ)' : ''}
+        </span>
+        {g.picked && <span className="tiny muted">theo tài liệu: {g.picked}</span>}
+        <span className="tiny muted">{[g.model, fmtDate(g.at ?? g.date)].filter(Boolean).join(' · ')}</span>
+      </div>
+      {g.reason && <div className="small ins-wrap">{g.reason}</div>}
+      {(g.citations ?? []).map((c, i) => (
+        <blockquote key={i} className="small ins-wrap" style={{ margin: 0 }}>
+          “{c.quote}”{' '}
+          <a href={c.url} target="_blank" rel="noreferrer noopener" className="tiny">
+            {c.url.replace(/^https:\/\//, '').slice(0, 70)}
+          </a>
+        </blockquote>
+      ))}
+    </div>
+  );
+}
 
 /** "🔎 ❌ lệch đáp án" — dimmed and marked (cũ) when the question changed after the verdict. */
 export function VerdictBadge({ v, current }: { v: VerifyVerdict; current?: string }) {
@@ -39,7 +113,7 @@ export function VerdictBadge({ v, current }: { v: VerifyVerdict; current?: strin
   );
 }
 
-function VerdictCard({ v, onOpen, onIssue, onDone }: { v: VerifyVerdict; onOpen: (id: string) => void; onIssue: (id: string) => void; onDone: () => void }) {
+function VerdictCard({ v, onOpen, onIssue, onDone, grounded }: { v: VerifyVerdict; onOpen: (id: string) => void; onIssue: (id: string) => void; onDone: () => void; grounded?: boolean }) {
   const { byId } = useData();
   const ai = useAiReady();
   const [busy, setBusy] = useState(false);
@@ -66,9 +140,16 @@ function VerdictCard({ v, onOpen, onIssue, onDone }: { v: VerifyVerdict; onOpen:
       ) : (
         <div className="small muted">Câu không còn trong ngân hàng.</div>
       )}
-      {v.reason && (
+      {v.reason && !v.check && (
         <div className="small ins-wrap">
           <b>Lý do của model:</b> {v.reason}
+        </div>
+      )}
+      {(v.check === 'grounded' ? v : v.grounded) && <GroundedBlock g={v.check === 'grounded' ? v : v.grounded!} current={q?.hash} />}
+      {v.local && v.local.hash === q?.hash && (
+        <div className="tiny muted">
+          🖥️ model local ({v.local.model}): {v.local.outcome === 'ok' ? 'khớp đáp án' : `chọn ${v.local.picked ?? '—'}`}
+          {v.local.confidence ? ` · ${CONFIDENCE[v.local.confidence]}` : ''}
         </div>
       )}
       <div className="tiny muted">
@@ -81,6 +162,16 @@ function VerdictCard({ v, onOpen, onIssue, onDone }: { v: VerifyVerdict; onOpen:
         <button className="btn sm" disabled={busy || !ai.ready} title={ai.why ?? 'AI viết lại giải thích + phương án nhiễu, có lý do của model kiểm tra'} onClick={() => act(() => startEnrich([v.qid], 'explain,distractors'))}>
           🧹 Sửa bằng ENRICH
         </button>
+        {grounded && !(v.check === 'grounded' || (v.grounded && v.grounded.hash === q?.hash)) && (
+          <button
+            className="btn sm"
+            disabled={busy || !ai.ready}
+            title={ai.why ?? 'Claude đọc tài liệu AWS chính thức (docs.aws.amazon.com, aws.amazon.com) và trả kết luận kèm trích dẫn'}
+            onClick={() => act(() => startVerify({ ids: [v.qid], scope: 'grounded' }, `câu ${v.qid} bằng tài liệu AWS`))}
+          >
+            🔗 Kiểm chứng
+          </button>
+        )}
         <button className="btn sm" onClick={() => onIssue(v.qid)}>
           🚩 Báo lỗi
         </button>
@@ -114,7 +205,10 @@ export function VerifySection({
   const api = useShared<VerifyApi>('/api/verify');
   const [pack, setPack] = useState('');
   const [busy, setBusy] = useState(false);
-  const s = summary ?? api.data ?? { verified: 0, ok: 0, review: 0, stale: 0, pending: [] };
+  // the live summary (GET /api/verify) carries the v5 extras (audit, grounded queue) that BankQuality.verification lacks
+  const s: VerifySummary = { ...(summary ?? {}), ...(api.data ?? summary ?? { verified: 0, ok: 0, review: 0, stale: 0, pending: [] }) };
+  const groundedOn = !!s.groundedEnabled;
+  const queue = s.groundedQueue ?? [];
   const unsupported = api.status === 404;
   const packs = (bank?.packs ?? []).filter((p) => p.activeCount > 0);
   const run = async (params: { ids?: string[]; pack?: string; scope?: string }, label: string) => {
@@ -164,6 +258,20 @@ export function VerifySection({
             <div className="value num">{s.stale}</div>
             <div className="sub">câu đã sửa sau lần giải mù</div>
           </div>
+          {s.disputed !== undefined && (
+            <div className="kpi">
+              <div className="label">Đáp án đang bị nghi</div>
+              <div className="value num">{s.disputed}</div>
+              <div className="sub">không tính vào mức sẵn sàng tới khi bạn quyết định</div>
+            </div>
+          )}
+          {s.grounded !== undefined && (
+            <div className="kpi">
+              <div className="label">🔗 Đã kiểm chứng tài liệu</div>
+              <div className="value num">{s.grounded}</div>
+              <div className="sub">{queue.length ? `${queue.length} câu chờ kiểm chứng` : 'không còn câu chờ'}</div>
+            </div>
+          )}
         </div>
         <div className="divider" style={{ margin: '4px 0' }} />
         <b className="small">Chạy giải mù (tối đa 60 câu mỗi lượt)</b>
@@ -193,6 +301,21 @@ export function VerifySection({
             📦 Giải mù bộ đề
           </button>
         </div>
+        {s.groundedEnabled !== undefined && (
+          <div className="row">
+            <button
+              className="btn sm"
+              disabled={disabled || !groundedOn || !queue.length}
+              title={groundedOn ? (ai.why ?? 'Claude chỉ được tìm / đọc tài liệu AWS chính thức, trả kết luận + trích dẫn; không đổi đáp án') : 'Đang tắt: config.yaml → coach.verify.grounded'}
+              onClick={() => run({ scope: 'grounded' }, `${Math.min(10, queue.length)} câu bằng tài liệu AWS`)}
+            >
+              🔗 Kiểm chứng có nguồn ({Math.min(10, queue.length)} câu nghi)
+            </button>
+            <span className="tiny muted">
+              {groundedOn ? 'câu lệch / mơ hồ, câu bị báo sai đáp án / lỗi thời, kiến thức có thể đã cũ — chỉ đọc docs.aws.amazon.com, aws.amazon.com' : 'tắt (coach.verify.grounded: false)'}
+            </span>
+          </div>
+        )}
         {!ai.ready && !unsupported && <div className="ins-wrap alert info small">⏸ {ai.why}</div>}
         <div className="tiny muted">Chọn câu ở tab “Câu hỏi” (ô ☑) để giải mù đúng các câu đó. Chi phí tính chung vào AI Coach.</div>
       </div>
@@ -209,11 +332,13 @@ export function VerifySection({
         ) : (
           <div className="qq-list">
             {s.pending.map((v) => (
-              <VerdictCard key={`${v.qid}-${v.line ?? v.date}`} v={v} onOpen={onOpen} onIssue={onIssue} onDone={done} />
+              <VerdictCard key={`${v.qid}-${v.line ?? v.date}`} v={v} onOpen={onOpen} onIssue={onIssue} onDone={done} grounded={groundedOn} />
             ))}
           </div>
         )}
       </div>
+
+      <AuditCard s={s} disabled={disabled} why={ai.why} onRun={() => void run({ scope: 'audit' }, '10 câu nhập')} onOpen={onOpen} />
     </div>
   );
 }

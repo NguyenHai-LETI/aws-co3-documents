@@ -41,6 +41,7 @@ export interface Meta {
   codeVersion?: string; // code the server runs (compare with the page's to offer a restart/reload)
   launcher?: boolean; // started by a launcher script that restarts the server on exit code 75
   versions?: DataVersions; // {bank, results, plans} — same values as the SSE `data` event (older servers: undefined)
+  access?: import('../../shared/types.ts').MetaAccess; // [v5] π: this machine / LAN practice / LAN admin, ui dist|dev, secure context
 }
 
 export interface BankData {

@@ -4,6 +4,7 @@ import { navigate, useRoute } from '../lib/router.ts';
 import { fmtDateTime, fmtDuration } from '../lib/format.ts';
 import { ChartCard, LineChart, Meter } from '../components/charts.tsx';
 import { AttemptBadges } from '../components/insights.tsx';
+import { attemptBadges } from '../components/learning/rules.ts';
 import { Empty, ErrorBox, Loading } from '../components/ui.tsx';
 import { MODE_INFO } from '../../shared/labels.ts';
 import { noVerdict } from '../components/onboarding/rules.ts';
@@ -147,7 +148,7 @@ export function History() {
                       </td>
                       <td>
                         {a.title}
-                        {(a.pearson || a.rushed) && (
+                        {attemptBadges(a).length > 0 && (
                           <div className="row" style={{ gap: 4, marginTop: 2 }}>
                             <AttemptBadges a={a} />
                           </div>
@@ -175,7 +176,7 @@ export function History() {
                       </td>
                       <td>
                         {noVerdict(a, studyStart) ? (
-                          <span className="badge" title="Bài chẩn đoán hoặc bài ngắn trong tuần đầu — không xét đạt/chưa đạt">—</span>
+                          <span className="badge" title="Không xét đạt/chưa đạt: bài chẩn đoán, bài ngắn trong tuần đầu, bài kiểm tra lại sau khi chữa hoặc câu tự chấm (Anki, nghe, câu hỏi nhanh)">—</span>
                         ) : (
                           <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.passed ? '✓ Đạt' : '✗'}</span>
                         )}

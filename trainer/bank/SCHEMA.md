@@ -166,6 +166,8 @@ distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuố
 | `services` | khuyến nghị | tên chuẩn trong `taxonomy.yaml → services` (vd `RDS Proxy`, `S3`, `Transit Gateway`). Service mới → thêm vào taxonomy. Service có `scope: out` (danh sách **ngoài phạm vi** chính thức của SAA-C03) không dùng cho câu mới — kể cả làm phương án nhiễu |
 | `tags` | khuyến nghị | khái niệm kebab-case, ưu tiên tag có sẵn trong `taxonomy.yaml → features` (vd `multi-az`, `s3-lifecycle`) |
 | `variant_of` | khi là biến thể | id câu gốc (có thể nhiều, phân tách dấu phẩy) |
+| `skills` | khuyến nghị (AI) | [v5] mục đề cương chính thức mà câu kiểm tra: `<task>.k<n>` (Knowledge of) / `<task>.s<n>` (Skills in) theo `bank/exam-guide/SAA-C03.yaml`, vd `3.5.s7, 3.5.k4` (ENRICH classify ghi). Không ghi → app **đoán** bằng từ khoá (`SAA-C03-cues.yaml`, chỉ trong `task` của câu) và không bao giờ ghi lại bản đoán vào file |
+| `family` | khi là họ câu | [v5] id họ câu “cùng tình huống, đổi yêu cầu” (kebab-case): các câu cùng họ dùng **y nguyên một bộ phương án** và chỉ khác câu hỏi cuối (MOST cost-effective / LEAST operational overhead …) — lint `family-options` |
 | `concept` | khuyến nghị (AI) | 1 câu ngắn mô tả khái niệm được kiểm tra — AI Coach dùng để gom nhóm điểm yếu |
 | `hint` | khuyến nghị | **một dòng** tiếng Việt (≤ 140 ký tự) hiện khi người học bấm “💡 Gợi ý” ở chế độ luyện tập: hướng tới yêu cầu/từ khoá quyết định, **không lộ đáp án** (không nêu tên đáp án đúng, không chữ cái) |
 | `refs` | tuỳ chọn | file notes liên quan, vd `03-database-services.md` hoặc `03-database-services.md#rds-proxy` |
@@ -185,6 +187,20 @@ App tự tính thêm (không ghi vào file): `words` (số từ của đề), `l
   của SAA-C03, đối chiếu 2026-10-20). `practice.exclude_out_of_scope: true` (mặc định) loại các câu này khỏi mọi chế độ luyện trừ
   “Theo bộ đề” và danh sách id; đề niêm phong không bao giờ chọn chúng. Lint: `oos-answer` (mức vừa) cho đáp án,
   `oos-distractor` (mức nhẹ) cho phương án nhiễu nêu service ngoài phạm vi.
+
+- `cluster` — [v5] nhóm **câu anh em** (`server/lib/clusters.ts`, chỉ có khi nhóm ≥ 2 câu, id nhóm = id nhỏ nhất): `variant_of` hai
+  chiều ∪ câu gần trùng chữ / theo nghĩa ∪ cùng chủ đề + cùng đáp án đúng + đề giống ≥ 0,25 ∪ đề giống ≥ 0,5 khi cùng chủ đề hoặc cùng
+  đáp án. Chống “dây chuyền”: câu giống hơn 8 câu khác là văn mẫu (không tính), nhóm theo chữ tối đa 6 câu. Một phiên chỉ ra một câu
+  mỗi nhóm; làm một câu thì các câu cùng nhóm để sang hôm sau.
+- `skills` (khi không ghi trong file) + `skillsGuessed: true` — mục đề cương đoán bằng từ khoá (xem bảng trên).
+
+**Taxonomy — kiến thức đã thay đổi (`currency:`, [v5]):** mỗi mục `{id, pattern, unless?, fact, since, url}` — `pattern` (regex,
+không phân biệt hoa thường) trên đề + phương án + giải thích nói kiến thức cũ, `unless` = câu đã dùng cách viết hiện hành thì bỏ qua.
+Lint `stale-fact` (mức vừa) báo câu cần cập nhật kèm URL. **Chỉ thêm mục đã đối chiếu trên trang chính thức của AWS** (docs / blog /
+What's New), ghi URL — không thêm từ trí nhớ. Sửa câu: viết “tên mới (tên cũ)” hoặc giới hạn mới.
+
+**Đề cương (`bank/exam-guide/`, [v5]):** `SAA-C03.yaml` = đề cương chính thức chép **nguyên văn** (189 mục, URL + ngày lấy) — không
+sửa tay, muốn cập nhật thì lấy lại trang và chép lại cả file; `SAA-C03-cues.yaml` = từ khoá đoán mục (của app, được sửa).
 
 **Taxonomy — phạm vi đề thi:** mỗi service có thể ghi `scope: out` (ngoài phạm vi) và `aliases: [...]` (tên chính thức hiện tại /
 tên mới, vd `QuickSight` → `Amazon Quick`; chỉ để hiển thị — muốn nhận diện tên đó trong câu hỏi thì thêm vào `match`). Không ghi
@@ -363,8 +379,8 @@ forms:
 
 - **Do app quản lý — đừng sửa tay** (và đừng đọc danh sách id nếu muốn điểm trung thực). Nội dung lúc tạo **tất định** (không có
   thời điểm, thứ tự theo hash): hai máy tạo độc lập từ cùng ngân hàng + lịch sử ra cùng một file, đồng bộ không xung đột.
-- Cách chọn: câu `active`, trong phạm vi đề thi, **không có câu anh em** (`variant_of` hai chiều, đề gần giống nhau — Jaccard từ
-  ≥ 0,5, hoặc ≥ 0,25 khi cùng đáp án đúng —, cặp trùng theo nghĩa nếu Ollama đã chạy), không có issue mở / 👎 nhiều / lỗi lint
+- Cách chọn: câu `active`, trong phạm vi đề thi, **không có câu anh em** ([v5] theo nhóm `cluster` ở §3 — áp dụng cho đề tạo từ nay;
+  file đề cũ không bị chọn lại), không có issue mở / 👎 nhiều / lỗi lint
   nặng, chưa từng thuộc đề trước; chia theo trọng số domain 30/26/24/20 (50 câu → 15/13/12/10) và xoay vòng các task 1.1–4.4;
   ưu tiên câu **chưa gặp**, rồi đề dài hơn; số câu nhiều đáp án chia đều giữa các đề.
 - AI (COACH, ENRICH) **không bao giờ** dùng câu niêm phong làm câu gốc cho biến thể / câu dài, không đưa vào kế hoạch.

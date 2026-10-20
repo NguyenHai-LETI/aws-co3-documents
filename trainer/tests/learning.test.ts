@@ -35,6 +35,7 @@ const { computeTimeLimit } = await import('../shared/timing.ts');
 const { regradeAttempts, resultAnnotations, recognitionSeconds, readingWords } = await import('../server/lib/regrade.ts');
 const { firstTryByDomain } = await import('../server/lib/forecast.ts');
 const sealedLib = await import('../server/lib/sealed.ts');
+const { localDateKey } = await import('../server/lib/time.ts');
 const { sealedToConfirm } = await import('../web/components/onboarding/rules.ts');
 
 const DAY = 86_400_000;
@@ -45,7 +46,7 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, statsCfg: Partial<AppConfi
   return {
     coach: {
       model: '',
-      models: { analyze: '', generate: '', enrich: '', ask: '', verify: '' },
+      models: { analyze: '', generate: '', enrich: '', ask: '', verify: '', tutor: '', notebook: '' },
       effort: '',
       max_budget_usd: 0,
       skip_if_no_new_results: true,
@@ -58,14 +59,17 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, statsCfg: Partial<AppConfi
       max_runs_per_day: 6,
       structured_output: true,
       enrich_after_analyze: false,
-      verify: { auto: false, auto_draft: false, batch_size: 10 },
+      idle_tasks: ['enrich'],
+      twins_per_run: 10,
+      tutor_daily_turns: 40,
+      verify: { auto: false, auto_draft: false, batch_size: 10, grounded: false, local_model: '' },
     },
-    srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'off', optimize_min_reviews: 400, ...srs },
-    practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false },
+    srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'off', optimize_min_reviews: 400, exam_aware: false, final_review_days: 7, new_cutoff_days: 10, load_balance: false, final_retention: 0, leech_lapses: 3, sibling_swap_days: 7, ...srs },
+    practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false, today_minutes: 25, relearn: true },
     exam: { sealed_forms: 0, sealed_size: 50 },
     stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300, ...statsCfg },
-    quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88 },
-    server: { lan: false },
+    quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88, longform_target_per_task: 12 },
+    server: { lan: false, lan_admin: false, https: 'off', https_cert: '', https_key: '' },
     export: { anki_deck: 'test', ankiconnect_url: '' },
     cache: { sqlite: false },
     sync: { data_paths: [], before_ai: false, after_ai: false, auto: 'off', auto_delay_minutes: 4 },
@@ -844,4 +848,170 @@ it('#6 a sealed exam is confirmed before it starts: mode sealed up front, any ot
   assert.equal(sealedToConfirm({ mode: 'coach' }, {}), undefined);
   assert.equal(sealedToConfirm({ mode: 'sealed', form: 'S1' }, { sealedForm: 'S1' }), undefined, 'already confirmed before building');
   assert.equal(sealedToConfirm({ mode: 'exam' }, {}), undefined);
+});
+
+// ── [v5 λ] record kinds, pace, today's answers, daily cap, evidence, annotations, optimizer input, transfer ──────
+
+const qs = bank.questions;
+
+it('v5 computeStates: skipped blanks are not reviews; relearn = one same-day FSRS step only; self-grades are the FSRS grade', () => {
+  const q = qs[0];
+  // skipped: nothing at all
+  const skipped = stats.computeStates([attempt(2, [{ ...blank(q, 30), skipped: true }])], cfg, NOW);
+  assert.equal(skipped.has(q.id), false);
+  // relearn after a wrong first attempt: counters keep the first attempt, memory takes one short-term step (grade ≤ good)
+  const first = attempt(2, [wrong(q)]);
+  const withRetry = attempt(2, [wrong(q), right(q, { relearn: true, t: 5 })]);
+  const a = stats.computeStates([first], cfg, NOW).get(q.id)!;
+  const b = stats.computeStates([withRetry], cfg, NOW).get(q.id)!;
+  assert.equal(b.attempts, 1);
+  assert.equal(b.correct, 0);
+  assert.equal(b.lastOk, false, 'still a wrong answer to retry');
+  assert.equal(b.lapses ?? 0, 0);
+  assert.notEqual(b.stability, a.stability, 'the retry is a short-term FSRS step');
+  const w = fsrs.FSRS_WEIGHTS;
+  const expected = fsrs.review(fsrs.review(undefined, 1, 0, w), 3, 0, w); // fast retry capped at "good" (not easy)
+  assert.ok(Math.abs(b.stability! - Math.round(expected.stability * 100) / 100) < 1e-9);
+  // self-graded (listen / Anki): grade 1–4 is the FSRS grade, ok = grade ≥ 3, never "unviewed" even without a pick or time
+  const g = stats.computeStates([attempt(3, [{ q: q.id, pick: '', key: keyOf(q), ok: false, t: 0, est: 60, grade: 3 }], { source: 'anki', mode: 'anki' })], cfg, NOW).get(q.id)!;
+  assert.equal(g.attempts, 1);
+  assert.equal(g.correct, 1);
+  assert.equal(g.lastGrade, 3);
+  const g1 = stats.computeStates([attempt(3, [{ q: q.id, pick: '', key: keyOf(q), ok: true, t: 9, est: 60, grade: 1 }], { source: 'listen', mode: 'listen' })], cfg, NOW).get(q.id)!;
+  assert.equal(g1.correct, 0);
+  assert.equal(g1.lastGrade, 1);
+});
+
+it('v5 computeStates: `for` credits the original (memory, due, reviewedAt) without touching its counters; sources and retests', () => {
+  const x = qs[1];
+  const y = qs[2];
+  const history = [attempt(30, [right(x)]), attempt(20, [right(x)])];
+  const before = stats.computeStates(history, cfg, NOW).get(x.id)!;
+  const swapped = [...history, attempt(1, [right(y, { for: x.id })])];
+  const st = stats.computeStates(swapped, cfg, NOW);
+  const sx = st.get(x.id)!;
+  const sy = st.get(y.id)!;
+  assert.equal(sy.attempts, 1, 'a first exposure of the served sibling');
+  assert.equal(sx.attempts, 2, 'the original keeps its own counters');
+  assert.equal(sx.lastAt, before.lastAt);
+  assert.ok(sx.reviewedAt && sx.reviewedAt > sx.lastAt!, 'reviewedAt = the sibling answer');
+  assert.ok(sx.stability! > before.stability!, 'a successful review of the original');
+  assert.ok(sx.dueAt! > before.dueAt!);
+  // chat / micro answers: no speed-based grade (fast ≠ easy) and out of avgTime
+  const fast = right(y, { t: 5, est: 60 });
+  const app = stats.computeStates([attempt(1, [fast])], cfg, NOW).get(y.id)!;
+  const chat = stats.computeStates([attempt(1, [fast], { source: 'chat' })], cfg, NOW).get(y.id)!;
+  assert.equal(app.lastGrade, 4);
+  assert.equal(chat.lastGrade, 3);
+  assert.equal(chat.avgTime, 0);
+  assert.equal(app.avgTime, 5);
+  // retest: a normal answer graded at most "good", out of timing
+  const re = stats.computeStates([attempt(1, [fast], { mode: 'retest', retestOf: 'x' })], cfg, NOW).get(y.id)!;
+  assert.equal(re.lastGrade, 3);
+  assert.equal(re.correct, 1);
+  assert.equal(re.avgTime, 0);
+});
+
+it('v5 learnerPace: median t/est of recent app answers, 1 below 30 answers, clamped; answeredOn includes skipped / relearn / for', () => {
+  assert.equal(stats.learnerPace([attempt(1, qs.slice(0, 10).map((q) => right(q, { t: 90 })))]), 1, 'fewer than 30 answers');
+  const slow = [attempt(2, qs.slice(0, 40).map((q) => right(q, { t: 90, est: 60 })))];
+  assert.equal(stats.learnerPace(slow), 1.5);
+  const noisy = [...slow, attempt(1, qs.slice(40, 80).map((q) => right(q, { t: 10, est: 60 })), { source: 'chat' }), attempt(1, qs.slice(40, 80).map((q) => right(q, { t: 10, est: 60 })), { mode: 'retest' })];
+  assert.equal(stats.learnerPace(noisy), 1.5, 'chat and retest answers are not pace');
+  assert.equal(stats.learnerPace([attempt(2, qs.slice(0, 40).map((q) => right(q, { t: 600, est: 60 })))]), 2, 'clamped');
+  const todayKey = localDateKey(new Date(NOW));
+  const seen = stats.answeredOn(
+    [attempt(0, [right(qs[0]), { ...blank(qs[1], 20), skipped: true }, blank(qs[2]), right(qs[3], { for: qs[4].id }), wrong(qs[5]), right(qs[5], { relearn: true })]), attempt(1, [right(qs[6])])],
+    todayKey,
+  );
+  assert.deepEqual([...seen].sort(), [qs[0], qs[1], qs[3], qs[4], qs[5]].map((q) => q.id).sort());
+});
+
+it('v5 daily cap: today-mode reviews (seen before or `for`) count like SRS answers; new questions and relearn retries do not', () => {
+  const old = attempt(10, qs.slice(0, 5).map((q) => right(q)));
+  const today = attempt(0, [right(qs[0]), right(qs[1]), right(qs[20]), right(qs[21], { for: qs[2].id }), right(qs[0], { relearn: true })], { mode: 'today' });
+  const learning = regradeAttempts([old, today], bank, cfg);
+  assert.equal(stats.srsAnswersToday(learning, NOW), 3);
+  const srs = attempt(0, [right(qs[3]), blank(qs[4])], { mode: 'srs' });
+  assert.equal(stats.srsAnswersToday(regradeAttempts([old, today, srs], bank, cfg), NOW), 4);
+  // R1 #5: a seen question that was NOT due (retry / weak share) is no review of the daily cap
+  const fresh = attempt(1, [right(qs[30]), wrong(qs[31])]); // reviewed yesterday: not due today
+  const share = attempt(0, [right(qs[30]), right(qs[31])], { mode: 'today' });
+  assert.equal(stats.srsAnswersToday(regradeAttempts([fresh, share], bank, cfg), NOW, cfg), 1, 'only qs[31] (wrong yesterday → due today) counts');
+  assert.equal(stats.reviewQueue(qs, stats.computeStates(regradeAttempts([fresh, share], bank, cfg), cfg, NOW), regradeAttempts([fresh, share], bank, cfg), cfg, NOW).remaining, cfg.srs.daily_limit - 1);
+});
+
+it('v5 stats: skipped / relearn / retest / self-graded answers stay out of accuracy and readiness; disputed questions out of readiness; evidence on buckets', () => {
+  const base = qs.slice(0, 40).map((q, i) => (i % 3 ? right(q) : wrong(q)));
+  const plain = [attempt(3, base)];
+  const extra = [
+    ...plain,
+    attempt(2, [{ ...blank(qs[50], 30), skipped: true }, wrong(qs[51]), right(qs[51], { relearn: true })]),
+    attempt(1, qs.slice(0, 10).map((q) => right(q)), { mode: 'retest', retestOf: 'x' }),
+    attempt(1, qs.slice(60, 70).map((q) => ({ q: q.id, pick: '', key: keyOf(q), ok: true, t: 8, est: 60, grade: 4 as const })), { source: 'anki', mode: 'anki' }),
+  ];
+  const sPlain = stats.computeStats(plain, bank, stats.computeStates(plain, cfg, NOW), cfg, NOW, { ...noSealed, disputed: new Set() });
+  const sExtra = stats.computeStats(extra, bank, stats.computeStates(extra, cfg, NOW), cfg, NOW, { ...noSealed, disputed: new Set() });
+  assert.equal(sExtra.totals.answers, sPlain.totals.answers + 1, 'only the wrong first attempt of qs[51] is new');
+  assert.equal(sExtra.totals.readiness < sPlain.totals.readiness + 5, true);
+  const disputed = stats.computeStats(plain, bank, stats.computeStates(plain, cfg, NOW), cfg, NOW, { ...noSealed, disputed: new Set(qs.slice(0, 20).map((q) => q.id)) });
+  assert.notEqual(disputed.totals.readiness, sPlain.totals.readiness, 'disputed questions are out of readiness');
+  assert.equal(disputed.totals.answers, sPlain.totals.answers, '…but still answers');
+  // evidence fields on every bucket list, 0..100
+  for (const list of [sPlain.byDomain, sPlain.byTopic, sPlain.byDifficulty, sPlain.byTask, sPlain.byService, sPlain.byTag, sPlain.byRequirement ?? []]) {
+    for (const b of list) {
+      assert.ok(b.shrunk !== undefined && b.lo! <= b.shrunk && b.shrunk <= b.hi!, `${b.key}`);
+      assert.ok(['below', 'above', 'same', 'unknown'].includes(b.verdict!));
+      assert.ok(b.verdict === 'unknown' ? b.needMore! > 0 : b.needMore === 0);
+    }
+  }
+  assert.equal(typeof sPlain.pace, 'number');
+  assert.equal(sPlain.leeches, 0);
+  assert.ok(sPlain.transfer && sPlain.transfer.days === 30);
+});
+
+it('v5 result annotations: stopped early, skipped, relearn, for, retest misses, not a readiness sample', () => {
+  const stopped = attempt(0, [right(qs[0]), { ...blank(qs[1], 12), skipped: true }, wrong(qs[2]), right(qs[2], { relearn: true }), right(qs[3], { for: qs[9].id })], { stoppedEarly: true, planned: 10 });
+  const ann = resultAnnotations(regradeAttempts([stopped], bank, cfg)[0], stopped);
+  assert.deepEqual(ann.stoppedEarly, { planned: 10, answered: 3, skipped: 1 });
+  assert.deepEqual(ann.skipped, [qs[1].id]);
+  assert.deepEqual(ann.relearn, [{ q: qs[2].id, ok: true }]);
+  assert.deepEqual(ann.for, { [qs[3].id]: qs[9].id });
+  assert.equal(ann.fresh?.total, 3, 'the fresh split covers graded first attempts only');
+  assert.equal(ann.notReadiness, undefined);
+  const retest = attempt(0, [right(qs[2]), wrong(qs[4])], { mode: 'retest', retestOf: 'a-1' });
+  const r = resultAnnotations(regradeAttempts([retest], bank, cfg)[0], retest);
+  assert.deepEqual(r.retest, { of: 'a-1', misses: [qs[4].id] });
+  assert.match(r.notReadiness!, /mức sẵn sàng/);
+});
+
+it('v5 FSRS optimizer input follows the same rules: no skipped blanks, self-grades as grades, relearn / retest capped at good', async () => {
+  const opt = await import('../server/lib/fsrs-optimize.ts');
+  const q = qs[0];
+  const set = opt.trainingSet([
+    attempt(5, [wrong(q), right(q, { relearn: true, t: 3 }), { ...blank(qs[1], 30), skipped: true }, blank(qs[2])]),
+    attempt(3, [{ q: q.id, pick: '', key: keyOf(q), ok: false, t: 0, est: 60, grade: 4 }], { source: 'anki', mode: 'anki' }),
+    attempt(1, [right(q, { t: 5 })], { mode: 'retest', retestOf: 'x' }),
+  ]);
+  assert.equal(set.excluded, 2, 'the skipped and the never-viewed blank');
+  assert.deepEqual(set.cards, [[[1, 0], [3, 0], [4, 2], [3, 2]]]);
+});
+
+it('v5 transfer: first answer on a sibling of a question answered right vs repeats; warning only with evidence', async () => {
+  const { transferStats } = await import('../server/lib/insights.ts');
+  const pairs = Array.from({ length: 20 }, (_, i) => [qs[i], qs[i + 40]] as const);
+  const cluster = new Map(pairs.flatMap(([a, b]) => [[a.id, a.id], [b.id, a.id]]));
+  const fake = { ...bank, version: 'transfer-test', byId: new Map(bank.questions.map((q) => [q.id, cluster.has(q.id) ? { ...q, cluster: cluster.get(q.id) } : q])) } as typeof bank;
+  const learnOriginals = attempt(10, pairs.map(([a]) => right(a)));
+  const repeats = attempt(5, pairs.map(([a]) => right(a)));
+  const siblings = attempt(2, pairs.map(([, b], i) => (i < 6 ? right(b) : wrong(b))));
+  const out = transferStats(regradeAttempts([learnOriginals, repeats, siblings], fake, cfg), fake, { now: NOW });
+  assert.deepEqual(out.transfer, { answers: 20, correct: 6 });
+  assert.deepEqual(out.repeat, { answers: 20, correct: 20 });
+  assert.equal(out.byTopic.length, 1);
+  assert.ok(out.byTopic[0].gap! > 50);
+  assert.ok(out.warnings.length >= 1 && /mặt chữ/.test(out.warnings[0]));
+  const few = transferStats(regradeAttempts([learnOriginals, attempt(2, pairs.slice(0, 2).map(([, b]) => wrong(b)))], fake, cfg), fake, { now: NOW });
+  assert.equal(few.transfer.answers, 2);
+  assert.deepEqual(few.warnings, [], 'no warning on 2 answers');
 });

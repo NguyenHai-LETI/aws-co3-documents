@@ -4,14 +4,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { marked } from 'marked';
-import { DATA_DIR, INBOX_DIR, REPO_DIR, TRAINER_DIR } from '../config.ts';
+import { COACH_DIR, DATA_DIR, INBOX_DIR, REPO_DIR, TRAINER_DIR } from '../config.ts';
 import { sealedIds, sealedKey } from './sealed.ts';
 
 export interface NoteInfo {
   file: string; // relative to repo root
   title: string;
   size: number;
-  group: 'notes' | 'practice' | 'inbox' | 'other';
+  group: 'notes' | 'practice' | 'inbox' | 'other' | 'notebook'; // [v5] notebook = coach/notebook/*.md (📒 Sổ lỗi)
 }
 
 const titleCache = new Map<string, { sig: string; title: string }>();
@@ -62,6 +62,13 @@ export function listNotes(): NoteInfo[] {
     if (!fs.existsSync(d)) continue;
     for (const f of fs.readdirSync(d).sort()) if (f.endsWith('.md')) add(path.join(d, f), `${dir}/${f}`, 'other');
   }
+  // [v5 γ1] the 📒 mistake notebook (τ writes coach/notebook/<domain>.md): listed, readable and searchable like a note
+  if (fs.existsSync(NOTEBOOK_NOTES_DIR)) {
+    for (const f of fs.readdirSync(NOTEBOOK_NOTES_DIR).sort()) {
+      if (!f.endsWith('.md') || f.startsWith('.') || f.toLowerCase() === 'readme.md') continue;
+      add(path.join(NOTEBOOK_NOTES_DIR, f), `${NOTEBOOK_PREFIX}${f}`, 'notebook');
+    }
+  }
   if (fs.existsSync(INBOX_DIR)) {
     for (const f of fs.readdirSync(INBOX_DIR).sort()) {
       if (f.startsWith('.') || f.toLowerCase() === 'readme.md') continue;
@@ -71,8 +78,18 @@ export function listNotes(): NoteInfo[] {
   return out;
 }
 
+const NOTEBOOK_NOTES_DIR = path.join(COACH_DIR, 'notebook');
+/** Note path of a notebook file — always this prefix, wherever the data root lives (TRAINER_HOME sandboxes too). */
+export const NOTEBOOK_PREFIX = 'trainer/coach/notebook/';
+
 /** Absolute path of a note given relative to the repo root, refusing anything outside it (undefined = not a note). */
 export function notePath(relPath: string): string | undefined {
+  if (relPath.startsWith(NOTEBOOK_PREFIX)) {
+    const name = relPath.slice(NOTEBOOK_PREFIX.length);
+    if (!/^[\w.-]+\.md$/.test(name) || name.startsWith('.')) return undefined;
+    const nb = path.join(NOTEBOOK_NOTES_DIR, name);
+    return statFile(nb) ? nb : undefined;
+  }
   const abs = path.resolve(REPO_DIR, relPath);
   if (!abs.startsWith(REPO_DIR + path.sep) || !/\.(md|txt)$/i.test(abs)) return undefined;
   if (abs.includes(`${path.sep}node_modules${path.sep}`) || abs.includes(`${path.sep}.git${path.sep}`)) return undefined;
@@ -97,7 +114,7 @@ const REFUSE_LIST = '🔒 Danh sách đề niêm phong không mở trong app —
 const REFUSE_SEALED = '🔒 File này có thể chứa câu đang niêm phong (đề, đáp án, giải thích) — mở lại sau khi bạn làm đề niêm phong hoặc mở sớm.';
 
 /** Path of `abs` inside the trainer data root (forward slashes), or undefined. Both roots: TRAINER_HOME copies + the repo's trainer/. */
-function dataRel(abs: string): string | undefined {
+export function dataRel(abs: string): string | undefined {
   for (const root of new Set([DATA_DIR, TRAINER_DIR])) {
     if (abs.startsWith(root + path.sep)) return path.relative(root, abs).split(path.sep).join('/');
   }
@@ -262,4 +279,37 @@ export function splitSections(md: string): NoteSection[] {
   }
   push();
   return out;
+}
+
+export interface RawSection {
+  heading: string; // plain text
+  anchor: string; // Notes page anchor (headingSlug)
+  level: number; // 1–4
+  md: string; // Markdown from the heading line up to the next heading of the same or a higher level (sub-headings included)
+}
+
+/** [v5] The h1–h4 sections of a note as Markdown (pair page excerpts): same headings and anchors as splitSections. */
+export function splitSectionsRaw(md: string): RawSection[] {
+  const lines = md.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
+  let i = 0;
+  if (lines[0] === '---') {
+    const end = lines.indexOf('---', 1);
+    if (end > 0) i = end + 1;
+  }
+  const heads: { line: number; level: number; heading: string }[] = [];
+  let fence = '';
+  for (; i < lines.length; i++) {
+    const f = lines[i].match(/^\s{0,3}(`{3,}|~{3,})/);
+    if (f) {
+      if (!fence) fence = f[1][0];
+      else if (f[1][0] === fence) fence = '';
+      continue;
+    }
+    const h = !fence && lines[i].match(HEADING);
+    if (h && h[1].length <= 4) heads.push({ line: i, level: h[1].length, heading: h[2].trim() });
+  }
+  return heads.map((h, k) => {
+    const next = heads.slice(k + 1).find((x) => x.level <= h.level);
+    return { heading: plainInline(h.heading), anchor: headingSlug(h.heading), level: h.level, md: lines.slice(h.line, next ? next.line : lines.length).join('\n').trimEnd() };
+  });
 }

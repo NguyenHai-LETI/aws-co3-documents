@@ -1,0 +1,6 @@
+{
+  "name": "saa-trainer-micro",
+  "version": "0.1.0",
+  "description": "SAA-C03 Trainer: one short question above the prompt while Claude works (answer with 1–5), one result file per day in the trainer. No model calls.",
+  "author": { "name": "SAA-C03 Trainer" }
+}

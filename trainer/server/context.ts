@@ -12,6 +12,8 @@ import { computeStates, computeStats } from './lib/stats.ts';
 import { loadPlans, plansVersion } from './lib/plans.ts';
 import { fileSig } from './lib/index-db.ts';
 import { localDateKey } from './lib/time.ts';
+import { loadGoal } from './lib/progress.ts'; // [v5 λ] exam date → exam-aware due dates
+import { applyLeechPauses } from './lib/leech.ts'; // [v5 λ] parked leeches (results/leeches.md)
 import type { Attempt, DataVersions, Plan, QuestionState, StatsResponse } from '../shared/types.ts';
 
 /** Personal FSRS parameters ([L] optimizer output) — a change must recompute the memory states. */
@@ -60,7 +62,9 @@ export function context(): Ctx {
   const key = JSON.stringify(versions);
   if (memo && memo.cfg === cfg && memo.bank === bank && memo.raw === raw && memo.key === key) return memo.ctx;
   const attempts = regradeAttempts(raw, bank, cfg); // regraded against fixed keys + unviewed/exposure/recognized annotations
-  const states = computeStates(attempts, cfg);
+  // [v5] goal.md and leeches.md live in results/ — a change of either is a new results version, so a new context
+  const states = computeStates(attempts, cfg, Date.now(), undefined, { goal: loadGoal() });
+  applyLeechPauses(states, localDateKey(new Date()));
   const plans = loadPlans(attempts);
   const planById = new Map<string, Plan>();
   for (const p of plans) if (!planById.has(p.id)) planById.set(p.id, p); // duplicate ids: the newest wins, as in the list

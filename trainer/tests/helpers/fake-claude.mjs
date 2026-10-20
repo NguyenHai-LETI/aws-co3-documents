@@ -7,6 +7,10 @@
 //                                      items     ENRICH: one item per question of the batch file named in the prompt
 //                                      questions generate: `count` questions · longform: one long variant per original
 //                                      results   verify: the real key of each question (read from the bank), unless FAKE_VERIFY
+//                                      [v5] twins: one sibling per original of the batch (kind from the batch) ·
+//                                      families: `count` qualifier families (2 members: cost ⟷ ops, different keys) ·
+//                                      grounded (results with citations): verdict correct + a docs.aws.amazon.com quote,
+//                                      unless FAKE_GROUNDED · generate with exam-guide bullets: `skills` = first bullet
 //   --resume <session>               repair round: corrected items for the ids listed in the prompt.
 // Knobs (environment, inherited from the test server):
 //   FAKE_CLAUDE_LOG=<file>     append {argv, cwd} per call (tests assert flags)
@@ -17,7 +21,11 @@
 //                              "until": "<text>"}} — with `until`: the override applies only while the question does not contain
 //                              that text (e.g. a distractor ENRICH rewrote), afterwards the real key is given
 //   FAKE_SLOW_RESUME_MS / FAKE_SLOW_VERIFY_MS   sleep before answering a repair (--resume) / blind-solve call
+//   FAKE_SLOW_FILE_MS          sleep before a file-mode (analyze) call writes anything
 //   FAKE_RESULT_ERROR=1        the result line reports an error
+//   FAKE_GROUNDED=<json>       {"<id or pattern with *>": {"verdict": "wrong", "answer": ["C"], "citations": [...]}} (grounded calls)
+//   FAKE_BAD=fam#n             the n-th family's 2nd member repeats the 1st member's key (rejected, fixed by the repair round)
+//   FAKE_TWIN_COPY=<id,…>      the surface twin of these originals copies the original stem (rejected, then reworded on repair)
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,6 +57,7 @@ const model = arg('--model') ?? 'fake-claude';
 // ── file mode (analyze) ─────────────────────────────────────────────────────
 
 if (!schemaText) {
+  if (Number(process.env.FAKE_SLOW_FILE_MS || 0) > 0) await new Promise((r) => setTimeout(r, Number(process.env.FAKE_SLOW_FILE_MS)));
   const dir = 'trainer/results';
   const results = fs.existsSync(dir) ? fs.readdirSync(dir, { recursive: true }).filter((f) => String(f).endsWith('.md')).length : 0;
   let snapshotAttempts = '?';
@@ -223,7 +232,88 @@ function verifyAnswer() {
   return { results };
 }
 
-const answer = props.results ? verifyAnswer() : props.items ? enrichAnswer() : packAnswer();
+// ── [v5] twins / families / grounded ────────────────────────────────────────
+
+function twinsAnswer() {
+  const batchPath = /câu gốc: `([^`]+)`/.exec(prompt)?.[1];
+  const text = (batchPath && readText(batchPath)) || readText(`trainer/coach/enrich/${runId}-batch.md`) || readText(path.join(process.env.TRAINER_HOME ?? 'trainer', 'coach', 'enrich', `${runId}-batch.md`));
+  const sections = text.split(/\n(?=## \d+\. `)/).slice(1);
+  const originals = batchQuestions(text).map((q, i) => ({ ...q, kind: /loại: \*\*(\w+)\*\*/.exec(sections[i] ?? '')?.[1] ?? 'surface', stem: /\*\*Stem\*\*[^\n]*\n\n([\s\S]*?)\n\n\*\*Options/.exec(sections[i] ?? '')?.[1] ?? '' }));
+  const copy = new Set(list(process.env.FAKE_TWIN_COPY));
+  const pick = resume ? originals.filter((o, i) => failing.some((id) => Number(/(\d+)$/.exec(id)?.[1]) === i + 1)) : originals;
+  const questions = pick.map((o) => {
+    const n = originals.indexOf(o) + 1;
+    const q = newQuestion(n, { variantOf: o.id, bad: !resume && bad.has(`#${n}`) });
+    if (!resume && copy.has(o.id) && o.stem) q.stem = o.stem;
+    return { ...(resume ? { id: failing.find((id) => Number(/(\d+)$/.exec(id)?.[1]) === n) } : {}), ...q, kind: o.kind };
+  });
+  return { pack: { slug: 'fake-twins', title: 'Twins' }, questions, summary: `fake twins: ${questions.length} câu` };
+}
+
+const FAMILY_OPTIONS = [
+  'Run the workload on Amazon EC2 Spot Instances in an Auto Scaling group',
+  'Move the workload to AWS Fargate tasks behind an Application Load Balancer',
+  'Run the workload on Amazon EC2 Reserved Instances managed by the team',
+  'Run the workload on Amazon EC2 Dedicated Hosts with custom AMIs',
+];
+
+function familyOne(n, opts = {}) {
+  const others = (k) => FAMILY_OPTIONS.filter((_, i) => i !== k);
+  return {
+    ...(opts.id ? { id: opts.id } : {}),
+    domain: 'cost',
+    task: '4.2',
+    topic: 'compute',
+    services: ['EC2', 'Fargate'],
+    tags: ['spot-instances'],
+    difficulty: 'hard',
+    concept: 'Same workload: the cheapest option vs the least operational overhead',
+    refs: ['01-compute-services.md'],
+    scenario: `A media company runs a stateless video thumbnail service (family scenario ${n}) on a fleet of Amazon EC2 instances that a small team patches by hand. The service can tolerate interruptions and must scale with an unpredictable number of uploads during the day while the company wants to control spending.`,
+    options: FAMILY_OPTIONS,
+    members: [
+      { ask: 'cost', question: 'Which solution meets these requirements MOST cost-effectively?', answer: ['A'], explanation: GOOD_EXPLANATION(others(0)), hint: HINT },
+      { ask: 'ops', question: 'Which solution meets these requirements with the LEAST operational overhead?', answer: [opts.bad ? 'A' : 'B'], explanation: GOOD_EXPLANATION(others(1)), hint: HINT },
+    ],
+  };
+}
+
+function familyAnswer() {
+  if (resume) {
+    const families = failing.map((id) => familyOne(Number(/(\d+)$/.exec(id)?.[1] ?? 1), { id, bad: stillBad }));
+    return { pack: { slug: 'fake-family', title: 'Family' }, families, summary: `fake repair: ${families.length} họ` };
+  }
+  const count = Number(/viết đúng (\d+) họ/.exec(prompt)?.[1] ?? 2);
+  const families = Array.from({ length: count }, (_, i) => familyOne(i + 1, { bad: bad.has(`fam#${i + 1}`) }));
+  return { pack: { slug: 'fake-family', title: 'Family' }, families, summary: `fake family: ${families.length} họ` };
+}
+
+function groundedAnswer() {
+  const overrides = Object.entries(JSON.parse(process.env.FAKE_GROUNDED || '{}')).map(([k, v]) => [new RegExp(`^${k.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`), v]);
+  const keys = bankKeys();
+  const ids = [...prompt.matchAll(/^## \d+\. `([^`]+)`/gm)].map((m) => m[1]);
+  const results = ids.map((id) => {
+    const o = overrides.find(([re]) => re.test(id))?.[1];
+    return {
+      id,
+      verdict: o?.verdict ?? 'correct',
+      answer: o?.answer ?? keys.get(id) ?? ['A'],
+      citations: o?.citations ?? [{ url: 'https://docs.aws.amazon.com/fake/latest/userguide/feature.html', quote: `Fake documentation quote for ${id}.` }],
+      reason: o?.reason ?? 'Tài liệu AWS xác nhận.',
+    };
+  });
+  return { results };
+}
+
+const isGrounded = !!props.results?.items?.properties?.citations;
+const isTwins = !!props.questions?.items?.properties?.kind;
+// the repair round keeps the session's context: remember the bullets of the first call per run
+const skillMemo = path.join(process.env.TRAINER_HOME ?? '.', `.fake-skills-${runId}.json`);
+let skillIds = [...prompt.matchAll(/^ {2}- `(\d\.\d\.[ks]\d+)`/gm)].map((m) => m[1]);
+if (skillIds.length && !resume) fs.writeFileSync(skillMemo, JSON.stringify(skillIds));
+else if (resume && fs.existsSync(skillMemo)) skillIds = JSON.parse(fs.readFileSync(skillMemo, 'utf8'));
+let answer = isGrounded ? groundedAnswer() : props.results ? verifyAnswer() : props.items ? enrichAnswer() : props.families ? familyAnswer() : isTwins ? twinsAnswer() : packAnswer();
+if (skillIds.length && Array.isArray(answer.questions)) answer = { ...answer, questions: answer.questions.map((q) => ({ ...q, skills: [skillIds[0]] })) };
 const failed = process.env.FAKE_RESULT_ERROR === '1';
 say({ type: 'system', subtype: 'init', model, permissionMode: arg('--permission-mode') ?? 'default', session_id: session });
 say({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'StructuredOutput', input: answer }] } });

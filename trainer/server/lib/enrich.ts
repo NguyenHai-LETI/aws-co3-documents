@@ -14,8 +14,10 @@ import { reviewQueue } from './stats.ts';
 import { sealedIds } from './sealed.ts';
 import { newOrder } from '../../shared/filters.ts';
 import { countWords } from '../../shared/timing.ts';
+import { lintQuestion } from './lint.ts';
+import { skillsOf, type TaskDeficit } from './exam-guide.ts';
 import type { OptionStats } from './quality.ts';
-import type { Attempt, CoachRunInfo, DistractorReport, EnrichStatus, Plan, Question, QuestionState, VerifyVerdict } from '../../shared/types.ts';
+import type { Attempt, CoachRunInfo, DistractorReport, EnrichStatus, FactVerdict, Plan, Question, QuestionState, VerifyVerdict } from '../../shared/types.ts';
 
 export type EnrichTodo = 'explain' | 'hint' | 'classify' | 'balance' | 'distractors';
 /** Default work of a batch (pending per question). `distractors` runs only when asked for (data-driven, see distractorReport). */
@@ -189,20 +191,39 @@ export interface LongformTarget {
  * variant yet (max 3 variants per original, SCHEMA §5). At most 2 per topic unless the pool runs dry.
  * Never a sealed question (a variant would leak it) nor an out-of-scope one (the exam does not ask it).
  */
-export function longformTargets(bank: BankState, states: Map<string, QuestionState>, count = 5, sealed: ReadonlySet<string> = sealedIds()): LongformTarget[] {
+export interface LongformOptions {
+  skills?: string[]; // [v5] exam-guide bullets to cover (params.skills): originals tagged with one of them, else of their tasks
+  deficits?: TaskDeficit[]; // [v5] exam-like questions missing per task (exam-guide.ts taskDeficits): those tasks score higher
+  deficitOnly?: boolean; // [v5] idle runs: only tasks still short of quality.longform_target_per_task
+}
+
+/** Task of an exam-guide bullet id ("3.5.s7" → "3.5"). */
+export const taskOfSkill = (s: string) => s.split('.').slice(0, 2).join('.');
+
+export function longformTargets(bank: BankState, states: Map<string, QuestionState>, count = 5, sealed: ReadonlySet<string> = sealedIds(), opts: LongformOptions = {}): LongformTarget[] {
   const n = clampInt(count, 1, MAX_LONGFORM, 5);
   const variants = new Map<string, Question[]>();
   for (const v of bank.questions) for (const o of v.variantOf) variants.set(o, [...(variants.get(o) ?? []), v]);
-  const pool: LongformTarget[] = [];
+  const need = new Map((opts.deficits ?? []).filter((d) => d.need > 0).map((d) => [d.task, d] as const));
+  let pool: LongformTarget[] = [];
   for (const q of bank.questions) {
     if (q.status !== 'active' || q.longForm || q.outOfScope || sealed.has(q.id)) continue;
+    if (opts.deficitOnly && !need.has(q.task ?? '')) continue;
     const vs = variants.get(q.id) ?? [];
     if (vs.length >= 3 || vs.some((v) => v.longForm)) continue;
     const s = states.get(q.id);
     const wrong = s ? s.attempts - s.correct : 0;
     const usage = (s?.attempts ?? 0) + wrong * 3 + (s?.lastOk === false ? 2 : 0) + (s?.lastUnsure ? 1 : 0);
     const diff = q.difficulty === 'hard' ? 1.1 : q.difficulty === 'easy' ? 0.85 : 1;
-    pool.push({ q, state: s, variants: vs.map((v) => v.id), score: Math.round((usage + 0.5) * (domainWeight(bank, q) / 30) * diff * 1000) / 1000 });
+    const d = need.get(q.task ?? '');
+    const gap = d ? 1 + (2 * d.need) / Math.max(1, d.target) : 1; // tasks short of exam-like questions first
+    pool.push({ q, state: s, variants: vs.map((v) => v.id), score: Math.round((usage + 0.5) * (domainWeight(bank, q) / 30) * diff * gap * 1000) / 1000 });
+  }
+  if (opts.skills?.length) {
+    const want = new Set(opts.skills);
+    const tagged = pool.filter((t) => skillsOf(t.q).some((s) => want.has(s)));
+    const tasks = new Set(opts.skills.map(taskOfSkill));
+    pool = tagged.length ? tagged : pool.filter((t) => tasks.has(t.q.task ?? ''));
   }
   pool.sort((a, b) => b.score - a.score || a.q.id.localeCompare(b.q.id, 'en', { numeric: true }));
   const picked: LongformTarget[] = [];
@@ -245,7 +266,8 @@ export function readRunInfos(limit = Infinity): CoachRunInfo[] {
     return [];
   }
   const live = runList?.list.some((r) => r.status === 'running');
-  if (!runList || runList.dir !== RUNS_DIR || runList.mtimeMs !== mtimeMs || live) {
+  const dirChanged = !runList || runList.dir !== RUNS_DIR || runList.mtimeMs !== mtimeMs;
+  if (dirChanged || live) {
     const names = fs
       .readdirSync(RUNS_DIR)
       .filter((x) => x.endsWith('.json'))
@@ -255,7 +277,8 @@ export function readRunInfos(limit = Infinity): CoachRunInfo[] {
     for (const name of names) {
       const file = path.join(RUNS_DIR, name);
       let entry = runFiles.get(file);
-      if (!entry || !entry.info || entry.info.status === 'running') {
+      // [v5] the directory changed: re-stat every record (an undo rewrites a finished run's record — atomic rename)
+      if (dirChanged || !entry || !entry.info || entry.info.status === 'running') {
         let m = 0;
         try {
           m = fs.statSync(file).mtimeMs;
@@ -270,7 +293,8 @@ export function readRunInfos(limit = Infinity): CoachRunInfo[] {
     for (const f of runFiles.keys()) if (!keep.has(f)) runFiles.delete(f);
     runList = { dir: RUNS_DIR, mtimeMs, list };
   }
-  return Number.isFinite(limit) ? runList.list.slice(0, limit) : runList.list;
+  const all = runList!.list;
+  return Number.isFinite(limit) ? all.slice(0, limit) : all;
 }
 
 export function enrichStatus(bank: BankState, runs: CoachRunInfo[] = readRunInfos(200), sealed: ReadonlySet<string> = sealedIds()): EnrichStatus & { longFormCandidates: number } {
@@ -319,7 +343,7 @@ function learnerLine(s: QuestionState | undefined): string {
   return `sai ${s.attempts - s.correct}/${s.attempts} lượt${picks ? ` · đã chọn sai: ${picks}` : ''}${s.lastOk === false ? ' · lần gần nhất sai' : ''}`;
 }
 
-function questionSection(bank: BankState, q: Question, opts: { n: number; title: string; lengths: boolean; state?: QuestionState; extra?: string[] }): string[] {
+export function questionSection(bank: BankState, q: Question, opts: { n: number; title: string; lengths: boolean; state?: QuestionState; extra?: string[] }): string[] {
   const o: string[] = [];
   const v = (x: string | undefined) => (x ? `\`${x}\`` : '—');
   o.push('---', '', `## ${opts.n}. \`${q.id}\` — ${opts.title}`, '');
@@ -360,7 +384,7 @@ export function fileForAi(q: Question): string {
   return repoRel(path.join(DATA_DIR, q.file));
 }
 
-function taskTable(bank: BankState): string[] {
+export function taskTable(bank: BankState): string[] {
   return bank.taxonomy.tasks.map((t) => `- \`${t.id}\` (${t.domain}) ${t.label} — ${t.label_vi}`);
 }
 
@@ -391,12 +415,44 @@ export function distractorLines(q: Question, report: DistractorReport | undefine
   return out;
 }
 
-/** 🧪 line when the blind-solve model disagreed with the key (latestVerdicts of verify.ts). */
+const FACT_TEXT: Record<FactVerdict, string> = {
+  correct: 'tài liệu XÁC NHẬN đáp án hiện tại',
+  wrong: 'tài liệu cho thấy đáp án SAI',
+  outdated: 'tài liệu cho thấy kiến thức LỖI THỜI',
+  ambiguous: 'tài liệu chưa đủ để quyết / câu mơ hồ',
+};
+
+/**
+ * 🧪 line when the blind-solve model disagreed with the key (latestVerdicts of verify.ts); [v5] 🔗 lines with the AWS
+ * documentation quotes of a grounded fact-check of the current version — the evidence an ENRICH repair must follow.
+ */
 export function verdictLines(q: Question, verdicts: Record<string, VerifyVerdict> | undefined): string[] {
   const v = verdicts?.[q.id];
-  if (!v || v.hash !== q.hash || v.decision === 'approved' || (v.outcome !== 'mismatch' && v.outcome !== 'ambiguous')) return [];
-  const what = v.outcome === 'ambiguous' ? `cho là câu MƠ HỒ (chọn ${v.picked ?? '—'})` : `chọn ${v.picked ?? '—'} thay vì ${v.key ?? q.answer.join('')}`;
-  return [`🧪 model giải mù (${v.model ?? '?'}, tin cậy ${v.confidence ?? '?'}) ${what}: “${v.reason ?? ''}” → kiểm tra đề/đáp án; sửa đề cho rõ, đổi đáp án (kèm reason) hoặc giữ nguyên nếu model sai`];
+  if (!v || v.decision === 'approved') return [];
+  const out: string[] = [];
+  if (!v.check && v.hash === q.hash && (v.outcome === 'mismatch' || v.outcome === 'ambiguous')) {
+    const what = v.outcome === 'ambiguous' ? `cho là câu MƠ HỒ (chọn ${v.picked ?? '—'})` : `chọn ${v.picked ?? '—'} thay vì ${v.key ?? q.answer.join('')}`;
+    out.push(`🧪 model giải mù (${v.model ?? '?'}, tin cậy ${v.confidence ?? '?'}) ${what}: “${v.reason ?? ''}” → kiểm tra đề/đáp án; sửa đề cho rõ, đổi đáp án (kèm reason) hoặc giữ nguyên nếu model sai`);
+  }
+  const g = v.check === 'grounded' ? v : v.grounded;
+  if (g && g.hash === q.hash) {
+    out.push(
+      `🔗 kiểm chứng tài liệu AWS (${g.date}${g.model ? `, ${g.model}` : ''}): ${FACT_TEXT[g.fact ?? 'ambiguous']}${g.picked ? ` — theo tài liệu: ${g.picked} (đáp án ${g.key ?? q.answer.join('')})` : ''}${g.reason ? `: “${g.reason}”` : ''} → đổi đáp án / sửa dữ kiện CHỈ khi trích dẫn dưới đây ủng hộ, ghi URL vào reason`,
+    );
+    for (const c of g.citations ?? []) out.push(`   📄 “${c.quote}” — ${c.url}`);
+  }
+  return out;
+}
+
+/** [v5] ⏳ lines for stale facts (lint `stale-fact`, taxonomy `currency:`): what to update in the question. */
+export function staleLines(q: Question, bank: BankState): string[] {
+  try {
+    return lintQuestion(q, bank.taxonomy)
+      .filter((f) => f.code === 'stale-fact')
+      .map((f) => `⏳ kiến thức có thể đã cũ: ${f.message} → cập nhật theo tài liệu hiện hành (ghi “tên mới (tên cũ)”, không bịa con số)`);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -455,7 +511,7 @@ export function writeBatchFile(
   ];
   items.forEach((it, i) => {
     const why = (opts.notes?.get(it.q.id) ?? []).map((w) => `🗣️ người học ${w} → giải thích phải gỡ đúng hiểu lầm này`);
-    const extra = [...why, ...(it.todo.includes('distractors') ? distractorLines(it.q, opts.report, opts.stats?.get(it.q.id)) : []), ...verdictLines(it.q, opts.verdicts)];
+    const extra = [...why, ...(it.todo.includes('distractors') ? distractorLines(it.q, opts.report, opts.stats?.get(it.q.id)) : []), ...verdictLines(it.q, opts.verdicts), ...staleLines(it.q, bank)];
     const title = `todo: ${it.todo.join(' · ')}${it.tier === 'upcoming' ? ' · ⏭ người học sắp gặp câu này' : ''}`;
     o.push(...questionSection(bank, it.q, { n: i + 1, title, lengths: it.todo.includes('balance') || it.todo.includes('distractors'), state: it.state, extra }));
   });
@@ -482,7 +538,7 @@ export interface LongformPlan {
 }
 
 /** Writes coach/enrich/<runId>-batch.md listing long-form targets; returns the absolute path. */
-export function writeLongformFile(runId: string, targets: LongformTarget[], bank: BankState, plan: LongformPlan): string {
+export function writeLongformFile(runId: string, targets: LongformTarget[], bank: BankState, plan: LongformPlan, skills: { id: string; text: string }[] = []): string {
   const file = batchPath(runId);
   const minWords = bank.taxonomy.timing.long_form_min_words ?? 55;
   const o: string[] = [
@@ -506,6 +562,13 @@ export function writeLongformFile(runId: string, targets: LongformTarget[], bank
     '**Task statements (exam guide):**',
     ...taskTable(bank),
     '',
+    ...(skills.length
+      ? [
+          '**Mục đề cương cần phủ (exam guide — ghi `skills` cho mỗi câu, ít nhất một mục dưới đây):**',
+          ...skills.map((s) => `- \`${s.id}\`${s.text ? ` ${s.text}` : ''}`),
+          '',
+        ]
+      : []),
   ];
   targets.forEach((t, i) => {
     o.push(

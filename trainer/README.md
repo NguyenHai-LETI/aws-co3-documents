@@ -12,6 +12,9 @@
 - **Học mọi nơi**: 🔎 tìm kiếm toàn văn câu hỏi + tài liệu, 📱 mở trên điện thoại qua Wi-Fi (mã truy cập), 🗂️ xuất sang Anki.
 - **Đo trung thực** (v4): 🔒 **đề niêm phong** giữ riêng câu chưa từng gặp để đo "điểm trên câu mới", 🧭 chẩn đoán đầu vào theo 14 mục
   exam guide, huy hiệu "Giống đề thật", tách điểm **lần đầu gặp / gặp lại** để lộ ra học vẹt.
+- **Học mỗi ngày & bám ngày thi** (v5): ▶ **Học hôm nay** theo quỹ phút, dừng sớm không bị phạt, lịch ôn và các giai đoạn bám ngày
+  thi, chống học vẹt bằng cụm câu anh em / câu song sinh, 🔀 phân biệt dịch vụ dễ nhầm, 🩹 chữa bài từng bước, 🗺️ đề cương chính thức,
+  🧑‍🏫 gia sư, 📒 sổ lỗi, 🎧 nghe, lá chắn thống kê; câu hỏi nhanh trong Claude Code, hỏi bài qua MCP, cài như app, điện thoại an toàn hơn.
 
 ```
  ┌──────────── bank/packs/*.md ◄─────────────────────────────────────────────┐
@@ -164,6 +167,93 @@ Pearson hoặc đề niêm phong cuối tuần; ghi `coach/plans/<ngày>-onboard
   `results/fsrs-params.json`). `srs.optimize: auto` tự tối ưu lại tối đa 1 lần/tuần khi lịch sử tăng ≥ 20 % · `manual` · `off`;
   `srs.weights` để tự đặt 21 tham số. Bài làm vội và câu bỏ trống chưa xem không được dùng để tối ưu.
 
+## ✨ v5 — học mỗi ngày, bám ngày thi, chống học vẹt
+
+### ▶ Học hôm nay & làm bài
+- **▶ Học hôm nay** (Tổng quan, hoặc Tạo bài test → ▶️): một nút ghép sẵn phiên học vừa quỹ phút (5 / 10 / 25 / 45′ hoặc số phút/ngày
+  trong Mục tiêu thi; mặc định `practice.today_minutes`): làm lại câu vừa sai (≤ 20 %), câu đến hạn ôn (≤ 50 %, trong
+  `srs.daily_limit`), rồi chia đôi phần còn lại cho task yếu nhất và câu mới theo hạn mức ngày; gần ngày thi đổi sang ôn chốt / chỉ ôn
+  lỗi. Câu xen kẽ chủ đề, xem đáp án ngay; tốc độ đọc của chính bạn được tính vào. Cùng dữ liệu + cùng ngày + cùng quỹ phút → cùng một
+  bài. Đạt mục tiêu: "✓ Đã đạt mục tiêu hôm nay" + "Thêm 10 câu". Có phiên AI Coach còn mới thì được gợi ý trước. Các thẻ cũ nằm trong
+  "Tự chọn khác…"; trên điện thoại nút chính và đếm ngược nằm trên cùng.
+- **⏹ Dừng ở đây** (mọi chế độ trừ thi thử, đề niêm phong, chẩn đoán): chỉ lưu câu đã làm, điểm tính trên phần đó; câu chưa xem quay lại
+  hàng chờ, câu đã mở mà bỏ trống ghi "bỏ qua". Lịch sử ghi "5/50 · dừng sớm". Phiên Học hôm nay có đồng hồ "⏱ 12:30 / 25′" và nhắc
+  "Hết phiên — nộp phần đã làm".
+- **🔁 Học lại trong phiên** (`practice.relearn`): câu sai hoặc phải xem gợi ý quay lại sau 3–6 câu, lựa chọn ẩn và đổi thứ tự — gõ ý chính
+  rồi mới "Hiện lựa chọn". Lần hỏi lại không tính điểm. Ô "Vì sao bạn chọn" có **lý do một chạm** (Nhầm hai dịch vụ, Đọc sót yêu cầu…).
+- **Làm tiếp trên máy khác**: bài đang làm được lưu cả trên máy chủ; mở app trên điện thoại (cùng Wi-Fi) → "⏯️ Tiếp tục bài trên …" →
+  "▶ Làm tiếp trên máy này" (mở ở trạng thái tạm dừng). Hai máy cùng sửa thì app hỏi giữ bản nào.
+- **Chế độ mới**: 🔀 **Phân biệt** (nhóm dịch vụ dễ nhầm, đáp án đúng luân phiên, nút "So sánh A ⟷ B"), 🎯 **Đọc yêu cầu** (họ câu "cùng
+  tình huống, đổi câu hỏi cuối", các câu cùng họ cách nhau ≥ 5 câu; sau câu thứ hai hiện bảng "yêu cầu → đáp án"), ☀️ **Ôn lại lỗi hôm
+  qua** (≤ 8 câu, lỗi "chắc mà sai" trước), 🩹 **Kiểm tra lại sau khi chữa**.
+
+### 🩹 Chữa bài, câu dai dẳng, gia sư, sổ lỗi
+- **Trang kết quả** mở thẳng tab Sai; **"🩹 Chữa N câu"** đi qua từng câu sai / chưa chắc (lỗi tự tin trước): thử chọn lại trước khi xem
+  giải thích, chạm lý do, hỏi AI / Gia sư, rồi **"Kiểm tra lại ngay"** (đáp án xáo, không tính vào mức sẵn sàng; câu vẫn sai được ưu tiên
+  trong Học hôm nay). Câu bị sửa đáp án sau khi bạn làm có thẻ **📣 Đính chính** kèm nút ôn lại.
+- **🔂 Câu dai dẳng** (Thống kê): câu quên ≥ `srs.leech_lapses` lần hoặc sai ≥ 3 lần trong ≥ 2 ngày — lịch sử lựa chọn, cặp hay nhầm, mẹo
+  nhớ, "✨ câu tương phản", "⏸ Tạm gác 3 ngày"; ra khỏi danh sách khi đúng ở 2 ngày khác nhau. Ghi chú lưu ở `results/leeches.md`.
+- **🧑‍🏫 Gia sư** (Kết quả → 🤖 Hỏi AI → tab Gia sư, hoặc trong bước Chữa bài): AI không nói ngay đáp án mà hỏi dẫn dắt từ lựa chọn và lý
+  do của bạn; đáp án chỉ hiện sau 3 lượt hoặc khi bấm "🏳️ Tôi chịu"; cuối buổi chốt một quy tắc vào Sổ lỗi. Mỗi lượt là một lần gọi
+  Claude Code không có công cụ (`coach.models.tutor`), tối đa `coach.tutor_daily_turns` lượt trả lời của AI mỗi ngày (0 = tắt).
+- **📒 Sổ lỗi** (Tài liệu → 📒 Sổ lỗi): gom câu sai / chưa chắc thành từng hiểu nhầm — điều bạn đã nghĩ, quy tắc đúng, dấu hiệu trong đề,
+  cặp dễ nhầm, tài liệu đọc lại, câu bằng chứng (🔥 = sai dù chắc chắn). Bấm "📒 Cập nhật sổ" (1 lượt AI) hoặc thêm `notebook` vào
+  `coach.idle_tasks`. Markdown trong `coach/notebook/`, sửa / xoá / gộp ngay trong app, tìm được bằng ô tìm kiếm, xuất thẻ Anki.
+- **🎧 Nghe** (`#/listen`, điện thoại qua LAN cũng được): đọc to câu ngắn đến hạn, dừng để tự nhớ, đọc đáp án; tự chấm Quên / Khó / Nhớ /
+  Dễ bằng nút to, phím 1–4 hoặc nút tai nghe. Dùng cho lịch ôn, không tính vào mức sẵn sàng. "📒 Bản tin" đọc lại các quy tắc trong Sổ lỗi.
+
+### 📆 Bám ngày thi & lá chắn thống kê
+- **Giai đoạn** (khi đã đặt ngày thi, `srs.exam_aware`): Xây nền → **Đo & vá** (T−14) → **Củng cố** (T−7, không thêm câu mới, ôn trước
+  hạn câu có xác suất nhớ hôm thi thấp) → **Nhẹ** (T−2, ≤ 30′). Câu mới có **hạn mức mỗi ngày** để gặp hết trước ngày thi −
+  `srs.new_cutoff_days`; câu có hạn ôn rơi sau ngày thi − 2 mà khả năng nhớ hôm thi < 90 % được kéo vào **giai đoạn ôn chốt**
+  (`srs.final_review_days`); hạn ôn được **rải đều** sang ngày ít câu (`srs.load_balance`); tồn nhiều thì gợi ý "đuổi kịp".
+- Từ T−14: thẻ **"Thi hay dời?"** (Thống kê → 🎯 Ngày thi: 3 tiêu chí, hạn chót dời lịch — chỉ là lời khuyên) và nút **"🏁 Kế hoạch nước
+  rút"** tạo lịch từng ngày tới ngày thi (không dùng AI, `coach/plans/<ngày>-sprint.md`). Dự báo thêm dòng "theo lịch bám ngày thi" và
+  "nếu mỗi ngày chỉ học 10 / 20 / 45′".
+- **Lá chắn thống kê**: mọi nhận xét tự động (chủ đề / service / task yếu, độ tự tin, câu dài, sức bền, câu mới vs gặp lại) dùng tỉ lệ đúng
+  đã "co" về mức chung của bạn kèm khoảng tin cậy 80 %; chỉ kết luận khi đủ rõ, nếu chưa thì ghi "chưa đủ dữ liệu — cần ~N câu nữa".
+
+### 🧬 Chống học vẹt, cặp dễ nhầm, đề cương
+- **Cụm câu anh em**: app gom các câu "cùng hỏi một điều" (biến thể, gần trùng, cùng chủ đề + cùng đáp án + đề giống nhau). Mỗi phiên chỉ
+  một câu mỗi cụm; làm một câu thì các câu cùng cụm để sang hôm sau. Câu đã bền (≥ `srs.sibling_swap_days` ngày) đến hạn có thể được hỏi
+  bằng **câu anh em chưa gặp** (↔). Thống kê có thẻ **chuyển giao**: đúng lần đầu gặp câu anh em so với gặp lại câu cũ. Thi thử lấy
+  ≥ 50 % câu giống đề thật mỗi domain khi đủ.
+- **🪞 Câu song sinh & họ câu** (AI Coach → 🪞): AI viết câu diễn đạt lại / tương phản cho câu bạn sắp ôn, và "họ câu" (một tình huống, một
+  bộ lựa chọn, 2–4 câu hỏi cuối khác yêu cầu). Mọi câu qua lint + giải mù; chỉ chạy khi bấm (hoặc `coach.idle_tasks` có `twins`).
+- **🔀 Cặp dịch vụ dễ nhầm** (`#/pair?a=SNS&b=SQS`): trích mục so sánh trong tài liệu, tiến độ ("đã tách được" khi ≥ 80 % trong 10 câu gần
+  nhất) và nút "Luyện phân biệt".
+- **🗺️ Đề cương chính thức** (Ngân hàng → Chất lượng → 🗺️): 189 mục Knowledge/Skills của SAA-C03 (chép nguyên văn từ trang AWS ngày
+  2026-10-20, `bank/exam-guide/`): mỗi mục có bao nhiêu câu, bao nhiêu câu dài chuẩn thi, bạn đúng lần đầu bao nhiêu; chọn ô trống →
+  "✨ Sinh cho ô trống". Câu được gắn `skills` (lưu sẵn, hoặc đoán theo từ khoá — đánh dấu "đoán").
+
+### 🔗 Nội dung chính xác
+- **Kiến thức lỗi thời** (lint `stale-fact`): câu còn dùng tên / giới hạn cũ (SQS 256 KB → 1 MiB, Kinesis Data Firehose → Amazon Data
+  Firehose, Snowcone đã ngừng…) theo danh sách `currency:` trong `taxonomy.yaml`, mỗi mục kèm link tài liệu AWS chính thức.
+- **🔗 Kiểm chứng có nguồn** (Chất lượng → 🧪): Claude chỉ được đọc docs.aws.amazon.com / aws.amazon.com để kết luận đáp án đúng / sai /
+  lỗi thời kèm trích dẫn; câu bị nghi tạm không tính vào mức sẵn sàng tới khi bạn duyệt. **🧾 Kiểm toán 10 câu nhập** giải mù dần các câu từ
+  đề luyện (câu sắp gặp trước); tuỳ chọn phiếu thứ ba từ model Ollama (`coach.verify.local_model`). ENRICH sửa câu dựa trên trích dẫn.
+- **↩️ Hoàn tác lượt AI** (AI Coach → Lượt chạy, hoặc khung chi tiết câu): khôi phục các câu một lượt AI đã sửa và loại (retired) các câu
+  nó tạo; câu đã bị sửa tiếp sau lượt đó được giữ nguyên và báo lại.
+
+### 📱 Học mọi nơi
+- **Bản build production**: `npm start` (và start.command / start.bat) phục vụ giao diện đã đóng gói; trang nặng chỉ tải khi mở. Sửa giao
+  diện thì dùng `npm run dev` (Vite HMR). Sau khi nhận code mới và bấm "Khởi động lại", app tự dựng lại giao diện. Chrome / Edge: ⋮ →
+  Cài đặt ứng dụng để mở như app, số câu đến hạn hiện trên icon.
+- **Chạy nền**: `npm run service -- install` cho trainer tự chạy khi đăng nhập (macOS launchd, Linux systemd, Windows Task Scheduler) và tự
+  khởi động lại khi cập nhật / lỗi; `status`, `uninstall`, `print` (xem trước file sẽ tạo).
+- **Điện thoại an toàn hơn**: mỗi thiết bị quét QR nhận mã riêng 30 ngày, xem / thu hồi ở 🧰 Công cụ → 📱. Điện thoại mặc định **chỉ luyện
+  tập**; AI Coach, đồng bộ, kiểm duyệt, cài đặt chỉ dùng trên máy chạy app, trừ khi bật "🔓 Cho phép quản trị từ điện thoại" (tới khi
+  khởi động lại) hoặc `server.lan_admin: true`. **HTTPS**: `server.https: tailscale` (app tự chạy `tailscale cert`, học được cả qua 4G)
+  hoặc `mkcert` (chứng chỉ ở `.local/certs/`); qua HTTPS điện thoại cài được app (PWA).
+- **Câu hỏi nhanh trong Claude Code**: dòng trạng thái `"statusLine": {"type": "command", "command": "node <đường dẫn>/trainer/integrations/claude-code/statusline.mjs"}`
+  hiện "📚 12 câu đến hạn · sẵn sàng 63 %"; mod `claude --plugin-dir trainer/integrations/claude-code/mod`: khi Claude đang làm việc, phía
+  trên ô nhập hiện một câu ngắn, gõ số 1–5 để trả lời, `/saa off` để tắt. Gom thành bài "☕ Câu hỏi nhanh" mỗi ngày, không tốn hạn mức AI.
+- **Hỏi bài qua chat (MCP)**: mở repo bằng Claude Code (cho phép server `saa-trainer` trong `.mcp.json`), gõ `/trainer-quiz` hoặc "hỏi
+  mình 10 câu phần yếu". Claude không biết đáp án trước khi bạn trả lời; kết quả lưu với nguồn 💬 chat. Claude Desktop: thêm
+  `{"command": "node", "args": ["<đường dẫn tuyệt đối>/trainer/scripts/mcp-server.ts"]}` vào cấu hình MCP. Cần app đang chạy.
+- **📥 Nhập lượt ôn từ Anki** (Công cụ → Anki, cần Anki desktop + AnkiConnect): lượt ôn trên Anki vào lịch ôn FSRS (không tính vào mức
+  sẵn sàng, mỗi khoảng chỉ nhập một lần). Lịch sử ghi nguồn 🃏 Anki / 🎧 Nghe / ☕ nhanh / 💬 chat.
+
 ## 🗂️ Ngân hàng & chất lượng
 
 **Ngân hàng → 📐 Chất lượng** có 5 mục:
@@ -293,7 +383,7 @@ App tự nạp lại khi file thay đổi. Câu lỗi định dạng bị loại
 
 | Lệnh | Việc |
 |------|------|
-| `npm start` · `npm run dev` | chạy app (`-- --lan`: mở cho điện thoại) · tự khởi động lại server khi sửa code |
+| `npm start` · `npm run dev` | chạy app với giao diện đã build (`-- --lan`: mở cho điện thoại) · chế độ phát triển: Vite HMR + tự khởi động lại server khi sửa code |
 | `npm run validate [-- <file> --warnings --fill-time --lint[=luật] --json]` | kiểm tra ngân hàng / tự điền thời gian / lint lỗi viết câu |
 | `npm run rebalance [-- --apply]` · `npm run classify-tasks [-- --apply]` | migration: cân vị trí đáp án · gắn mục exam guide |
 | `npm run apply-patch -- <patch.yaml> [--dry-run]` · `npm run enrich-batch [-- --status \| --longform \| --ids a,b --tasks distractors]` | áp patch AI · xem lô ENRICH kế tiếp / tiến độ / ứng viên câu dài |
@@ -302,6 +392,8 @@ App tự nạp lại khi file thay đổi. Câu lỗi định dạng bị loại
 | `npm run schedule -- install\|status\|run\|uninstall` | lịch chạy tự động (launchd / crontab / Task Scheduler) |
 | `npm run sync [-- --dry-run \| --status \| --force]` | đồng bộ dữ liệu học qua git (xem trước · trạng thái · chạy cả khi coach đang chạy) |
 | `npm run seal [-- --status \| --release S1 \| --forms N --size M \| --reset]` | đề niêm phong: trạng thái · mở sớm · tạo · tạo lại |
+| `npm run service -- install\|uninstall\|status\|print` | chạy trainer nền khi đăng nhập (tự khởi động lại khi cập nhật / lỗi) |
+| `npm run mcp` · `npm run coach -- --twins \| --family` | MCP server cho Claude (hỏi bài qua chat) · sinh câu song sinh / họ câu |
 | `npm run typecheck` · `npm test` · `npm run test:e2e` · `npm run test:ui` | kiểm tra kiểu · unit · e2e API · UI smoke (Playwright; thiếu trình duyệt → in lệnh `npx playwright install chromium`) |
 | `npm run check` · `npm run check:fast` · `npm run hooks:install` | validate + typecheck + unit + e2e (~40 s) · typecheck + unit (~10 s) · bật hook pre-push trên máy này |
 

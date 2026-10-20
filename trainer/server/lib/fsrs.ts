@@ -117,6 +117,22 @@ export function gradeAnswer(r: Pick<AnswerRecord, 'ok' | 'pick' | 'key' | 't' | 
   return 3;
 }
 
+/**
+ * [v5] Grade the scheduler (computeStates) uses for one review — gradeAnswer extended for the v5 records:
+ *   `grade` (self-graded: listen mode, Anki import) → that grade itself;
+ *   `timed: false` (answers from chat / micro breaks: the time is not exam reading time) → no "easy" for speed and no
+ *   "hard" for slowness; `cap` (relearning retries and retests, asked minutes after the explanation) → at most that grade.
+ * gradeAnswer itself is unchanged: it stays the FSRS optimizer's view of the raw review log (fsrs-optimize.ts).
+ */
+export function reviewGrade(
+  r: Pick<AnswerRecord, 'ok' | 'pick' | 'key' | 't' | 'est' | 'unsure' | 'hinted' | 'elim' | 'recognized' | 'grade'>,
+  opts: { timed?: boolean; cap?: Grade } = {},
+): Grade {
+  let g: Grade = r.grade !== undefined && r.grade >= 1 && r.grade <= 4 ? (Math.round(r.grade) as Grade) : gradeAnswer(opts.timed === false ? { ...r, t: 0, est: 0 } : r);
+  if (opts.cap !== undefined && g > opts.cap) g = opts.cap;
+  return g;
+}
+
 // ── day scale (local calendar days, like the app's daily stats and review cap) ──
 
 /** Local calendar day of a timestamp as a day number (days since 1970-01-01 of that local date). */

@@ -308,3 +308,29 @@
   font-size: 34px;
   line-height: 1;
 }
+
+/* ── [v5 γ1] 🗺️ Đề cương (GuideSection) + question relations (QuestionRelations) ── */
+.gd-kpis .kpi { min-width: 0; }
+.gd-legend { display: inline-block; padding: 1px 6px; border-radius: var(--radius-sm); border-left: 4px solid var(--border-strong); }
+.gd-none { border-left-color: var(--bad-ink); background: var(--bad-soft); }
+.gd-thin { border-left-color: var(--warn-ink); background: var(--warn-soft); }
+.gd-ok { border-left-color: var(--good-ink); background: var(--good-soft); }
+.gd-task summary { cursor: pointer; list-style: revert; }
+.gd-task-title { min-width: 0; overflow-wrap: anywhere; }
+.gd-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.gd-bullet { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; padding: 6px 8px; border-radius: var(--radius-sm); border-left: 4px solid var(--border-strong); }
+.gd-pick { padding-top: 2px; }
+.gd-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.gd-id { font-family: var(--mono); }
+.gd-nums { display: flex; gap: 10px; white-space: nowrap; color: var(--text-2); }
+.gd-gen select { max-width: 100%; }
+.qr-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.qr-list li { overflow-wrap: anywhere; }
+.qr-link { margin-right: 4px; }
+.qr-undo { gap: 8px; flex-wrap: wrap; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 8px; }
+@media (max-width: 640px) {
+  .gd-bullet { grid-template-columns: auto 1fr; }
+  .gd-nums { grid-column: 2; flex-wrap: wrap; white-space: normal; }
+  .gd-kpis { grid-template-columns: 1fr 1fr; }
+}
+.gd-why { overflow-wrap: anywhere; min-width: 0; }

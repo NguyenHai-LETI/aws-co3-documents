@@ -108,7 +108,8 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | **7. Hiệu năng & chất lượng câu hỏi (v3, đợt 2)** | #18–#23 §7.4 | ✅ v3 |
 | **8. Nâng cao (v3, đợt 3)** | #24–#29 §7.5 | ✅ v3 |
 | **9. Đo trung thực & quick wins (v4, đợt A + B của buổi brainstorm)** | #30–#43 §7.6 | ✅ v4 |
-| **10. Tiếp theo** | §7.7 + backlog | 💡 đề xuất |
+| **10. Học mỗi ngày, bám ngày thi, chống học vẹt (v5, đợt C + D)** | #44–#59 §7.7 | ✅ v5 |
+| **11. Tiếp theo** | §7.8 | 💡 đề xuất |
 
 ## 7. Tính năng
 
@@ -196,11 +197,34 @@ học vẹt; sau ~4 tuần hết câu chưa gặp nên mọi con số chỉ còn
 | 42 | Cổng kiểm tra | `npm run check` / `check:fast`, `.githooks/pre-push` (`npm run hooks:install`), preflight trình duyệt cho UI smoke, test golden parse |
 | 43 | ENRICH câu sắp gặp | lô ENRICH ưu tiên câu đến hạn ngày mai / câu chưa làm kế tiếp / phiên kế hoạch; `coach.enrich_after_analyze` |
 
-### 7.7 Lộ trình tiếp theo (đề xuất)
+### 7.7 Học mỗi ngày, bám ngày thi, chống học vẹt (v5 — đợt C + D của buổi brainstorm)
 
-0. **Backlog brainstorm, đợt C + D** (trang "Backlog Trainer v4"): nút "Học hôm nay" theo quỹ phút, lịch ôn & giai đoạn bám ngày thi, chống
-   học vẹt bằng cụm câu anh em / câu song sinh, luyện phân biệt cặp dễ nhầm, câu tình huống dài theo đề cương 189 mục, chữa bài có hướng dẫn,
-   lá chắn thống kê; sau đó MCP server, gia sư Socratic, kiểm chứng bằng tài liệu AWS…
+Đợt C (chính) và D (thử nghiệm, mọi tính năng tốn quota AI hoặc chạm vào hệ thống đều chỉ chạy khi bấm / bật trong config). 8 sub-agent làm
+song song trong một git worktree riêng (để app đang dùng và tự đồng bộ của người học không bị ảnh hưởng) → tích hợp → 3 agent rà soát độc lập.
+
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 44 | ▶ Học hôm nay | `server/lib/today.ts` + mode `today`, `GET /api/today`: quỹ phút × tốc độ cá nhân (median t/est), làm lại ≤ 20 %, đến hạn ≤ 50 % (trong `daily_limit`), task yếu / câu mới theo hạn mức, pha thi; tất định (ngày + quỹ + phiên bản dữ liệu); hero ở Tổng quan |
+| 45 | Dừng sớm & làm tiếp trên máy khác | `stoppedEarly` (câu chưa xem không lưu, câu mở mà trống = `skipped`, `planned`), `.local/active.json` + `GET/PUT/DELETE /api/active` (người ghi sau thắng, chống ghi đè bản mới hơn) |
+| 46 | Học lại trong phiên & lý do một chạm | câu sai / có gợi ý quay lại sau 3–6 câu với cổng nhớ trước; bản ghi `relearn` ngoài điểm, một bước FSRS cùng ngày ≤ good; `WHY_CHIPS` |
+| 47 | Lịch bám ngày thi | `exam-schedule.ts` (pha build/measure/consolidate/light, hạn mức câu mới, hàng ôn trước hạn, đuổi kịp, thi hay dời), `due-planner.ts` (rải tải ±5 %, kéo hạn vào [thi−7, thi−2], ramp retention) — tắt cả 3 = đúng lịch v4; dự báo `examAware` + `capacity` |
+| 48 | Kế hoạch nước rút | `POST /api/plan/sprint` → `coach/plans/<ngày>-sprint.md` tất định, một file/ngày, dùng đề niêm phong, Pearson, lỗi hôm qua, ôn trước hạn |
+| 49 | Cụm câu anh em & chuyển giao | `clusters.ts` (variant_of ∪ trùng ∪ cùng chủ đề + đáp án + đề giống; chống nối chuỗi: luật hub > 8, cụm text ≤ 6); 1 câu/cụm/phiên, chôn anh em của câu làm hôm nay; thay câu đã bền bằng anh em chưa gặp (`for` → FSRS ghi cho cả câu gốc); `transferStats` |
+| 50 | Câu song sinh & họ câu (AI) | tác vụ `twins` (diễn đạt lại / tương phản) và `family` (một tình huống, một bộ lựa chọn, 2–4 câu hỏi cuối); qua lint + giải mù + auto-draft; lint `family-options` |
+| 51 | Phân biệt dịch vụ dễ nhầm | `confusables.ts` (dịch vụ cạnh tranh đáp án ↔ phương án nhiễu, ≥ 8 câu; nhầm lẫn của người học ≥ 3), mode `discriminate` (đáp án luân phiên), `#/pair?a=&b=` trích mục so sánh trong notes |
+| 52 | Đọc yêu cầu, lỗi hôm qua, kiểm tra lại | mode `qualifier` (họ câu cách ≥ 5, dự phòng theo tiêu chí đề), `yesterday` (≤ 8), `retest` (`retestIds` dùng chung với bước Chữa bài) |
+| 53 | Chữa bài & câu dai dẳng | Kết quả: tab Sai mặc định, stepper "🩹 Chữa N câu" (thử lại trước khi xem → `POST /api/results/:id/retry`, chỉ hiển thị), đính chính; `leech.ts` + `results/leeches.md` (union), tạm gác ≤ 3 ngày |
+| 54 | Lá chắn thống kê | `shared/evidence.ts`: Beta co về mức chung (k = 10, phân tầng), khoảng 80 %, verdict chỉ khi khoảng loại trừ mức nền, "cần ~N câu nữa"; mọi bucket, sức bền, độ tự tin, snapshot, weakPick |
+| 55 | Đề cương chính thức & mục tiêu sinh câu | `bank/exam-guide/SAA-C03.yaml` (189 mục, chép từ trang AWS 2026-10-20), `skills` (lưu sẵn hoặc đoán theo cue), Chất lượng → 🗺️ Đề cương, generate/longform `params.skills`, `taskDeficits`; thi thử ≥ 50 % câu giống đề mỗi domain |
+| 56 | Nội dung chính xác | lint `stale-fact` (11 mục `currency:` đã đối chiếu trang AWS), kiểm chứng có nguồn (WebFetch chỉ docs.aws.amazon.com / aws.amazon.com, trích dẫn), kiểm toán câu nhập (+ phiếu Ollama tuỳ chọn), `disputedIds()` ngoài mức sẵn sàng, ↩️ hoàn tác lượt AI (bản trước trong `coach/patches/<run>.before.json`) |
+| 57 | Gia sư & sổ lỗi & nghe | `tutor.ts` (`claude -p --resume`, không công cụ, đáp án sau 3 lượt / "tôi chịu", giới hạn ngày), `notebook.ts` (`coach/notebook/<domain>.md`, gộp theo key), `#/listen` (speechSynthesis, Media Session, tự chấm → mode `listen`) |
+| 58 | Học mọi nơi | MCP server không phụ thuộc (`scripts/mcp-server.ts`, cả handshake cũ lẫn bản stateless 2026-07-28) + skill `/trainer-quiz`; micro API + status line + mod Claude Code; nhập lượt ôn Anki (`mode: anki`, idempotent theo khoảng review) |
+| 59 | Nền tảng | `npm start` phục vụ bản build (lazy routes, manifest + service worker chỉ app shell, app badge, giữ asset cũ một thế hệ); `npm run service`; LAN: phạm vi luyện tập mặc định (`lan-scope.ts`, mọi route được phân loại), token riêng từng thiết bị 30 ngày, HTTPS (tailscale / mkcert, cùng cổng) |
+
+### 7.8 Lộ trình tiếp theo (đề xuất)
+
+0. **Dùng thật v5 rồi tinh chỉnh**: trọng số "Học hôm nay", ngưỡng lá chắn thống kê, luật đoán `skills`, bản đồ cue; chạy dần câu dài /
+   câu song sinh / kiểm toán câu nhập bằng `coach.idle_tasks` khi quota cho phép.
 1. **Đợt 1 của bản rà soát (phần còn lại; mục "câu chưa xem" đã làm ở v4 #32)**: mức sẵn sàng dựa cả câu ôn lặp lại /
    gợi ý (σ chỉ có sai số mẫu → xác suất đỗ quá tự tin; v4 đã giảm trọng số câu nhận diện); `taxonomy.yaml` lỗi làm sập app; kế hoạch AI có `feedback` sai làm nộp bài lỗi 500;
    tự đặt `coach.hosts` khi cài lịch; kiểm tra đăng nhập sau khi CLI cập nhật (`--bare` có thể thành mặc định cho `-p`); thu hẹp quyền ghi
@@ -265,3 +289,16 @@ học vẹt; sau ~4 tuần hết câu chưa gặp nên mọi con số chỉ còn
 | Đề niêm phong trên ngân hàng thật | 748 câu → 420 đủ điều kiện (loại 22 câu đáp án ngoài phạm vi đề, 306 câu là cặp V1/V2 hoặc biến thể của câu khác) → 2 đề × 50 câu theo trọng số domain; `npm run seal` và lúc mở app cho cùng kết quả · validate 0 lỗi / 0 cảnh báo |
 | Rà soát độc lập | 17 lỗi được xác nhận (gần như tất cả tái hiện bằng script trên sandbox) → **17/17 đã sửa kèm test hồi quy**. Vận hành 9: tắt app giữa lúc đồng bộ để lại rebase dở và gợi ý `--continue` làm mất kết quả; tự đồng bộ đẩy commit code bỏ qua pre-push; autostash để lại conflict marker mà vẫn báo ổn; hỏi ký GPG để lại `index.lock`; hook CRLF trên Windows; code do tiến trình khác kéo về không báo cập nhật; pre-push kiểm working tree thay vì commit được đẩy; giới hạn khởi động lại không reset; outbox khi localStorage đầy. Đề niêm phong & tín hiệu học 8: file pack thô (📄) lộ câu niêm phong kèm đáp án; làm lại đề vẫn tính "điểm trên câu mới"; điểm phần câu mới bỏ qua câu chưa xem; `sealed.md` hỏng → mở hết câu; ngày gợi ý sai khi đã dùng đề trước; kế hoạch onboarding không ghim đề; snapshot nêu id câu niêm phong; Hỏi AI / giải mù có thể lộ câu niêm phong. Agent tự tìm thêm 2 lỗi cùng loại (`practice-exams/` chứa đáp án gốc; snapshot §16 lấy cả lần làm lại) |
 | Lỗi tìm thấy & sửa khi tích hợp | xuất bài bỏ mất bộ lọc `requirements`; huy hiệu đạt/chưa đạt ở Lịch sử trong tuần đầu (nay trung tính); trang không tải lại danh sách câu khi đề niêm phong đổi trạng thái; bỏ dở đề niêm phong không cảnh báo; 3 server sandbox của test chạy sót |
+
+**v5** (đợt C + D của buổi brainstorm; 8 sub-agent làm song song trong một git worktree riêng → tích hợp → 3 agent rà soát độc lập → sửa → kiểm lại):
+
+| Hạng mục | Kết quả |
+|----------|---------|
+| Typecheck · build | `tsc --noEmit` sạch · `vite build` OK (trang nặng tải lười: gói chính 675 → 492 KB) |
+| Unit (`npm test`) | 403/404 (1 bỏ qua: `systemd-analyze` không có trên macOS) — thêm today composer, luật cụm / thay câu anh em, các chế độ mới, lá chắn thống kê (phân vị Beta khớp dạng đóng ~1e-15), lịch bám ngày thi (rải tải bật, kéo hạn ôn chốt, ramp, ổn định khi có kết quả mới), câu dai dẳng, chuyển giao, kế hoạch nước rút, cụm câu anh em + chống nối chuỗi, cặp dễ nhầm, đề cương, lint `family-options` / `stale-fact`, twins / family / kiểm chứng / kiểm toán / hoàn tác (CLI giả), gia sư / sổ lỗi / nghe, phạm vi LAN (mọi route được phân loại), token thiết bị, HTTPS, file dịch vụ, MCP, mod Claude Code |
+| E2E API (`npm run test:e2e`) | 218/218 (2 lần liên tiếp) — thêm /api/today, mọi chế độ mới, dừng sớm / học lại / thử lại / `for`, mirror bài dở 2 thiết bị (đồng hồ lệch), tiến độ v5 + kế hoạch nước rút, câu dai dẳng, cặp dễ nhầm, đề cương, hoàn tác, kiểm chứng có nguồn, gia sư + nghe, micro, MCP qua stdio, LAN (phạm vi, thiết bị, HTTPS cùng cổng, POST không mở Vite), UI build + asset cũ |
+| UI smoke (`npm run test:ui`) | 34/34 (2 lần) — thêm dừng sớm, học lại, Học hôm nay, Chữa bài → thử lại, trang cặp, Đề cương, Nghe, Sổ lỗi; các agent tự soát thêm bằng Playwright (1440/390 px, sáng/tối) |
+| Dữ liệu thật (chỉ đọc) | validate 0 lỗi / 0 cảnh báo · 133 cụm câu anh em (287 câu, lớn nhất 5) · 5 nhóm dịch vụ dễ nhầm · đề cương 189 mục (chép từ trang AWS 2026-10-20), 50 mục chưa có câu · `stale-fact` gắn cờ 58 câu (11 mục `currency:` đều có nguồn AWS) · `results/sealed.md` không đổi, 0 id niêm phong trong mọi thay đổi |
+| Hiệu năng (5.000 câu) | `clusterIndex` nguội 4,6 s → 0,18 s, `/api/state` nguội 4,7 s → 0,13 s, `composeToday` 20–30 ms, `computeProgress` 0,1–0,2 s (memo theo dữ liệu) |
+| Rà soát độc lập | 3 agent (chọn câu & động cơ · làm bài / UI / gia sư / rò rỉ đề niêm phong · bảo mật / nền tảng / AI): **0 rò rỉ câu niêm phong** qua mọi route mới; ~40 lỗi được xác nhận (2 nặng: POST lạ khiến server production mở Vite và trả file thô cho điện thoại; unit systemd không chạy) → **đã sửa hết kèm test hồi quy** |
+| Lỗi tìm thấy & sửa khi tích hợp | phiên kế hoạch mất quỹ phút / cặp dịch vụ / bài gốc; "Học hôm nay" rỗng khi câu mới bị dừng; trang mở trước khi build lại hỏng ở route tải lười; lượt chấm của Anki / Nghe bị coi là "làm vội"; loại câu giữa lượt AI bị lượt hoàn tác đảo ngược |

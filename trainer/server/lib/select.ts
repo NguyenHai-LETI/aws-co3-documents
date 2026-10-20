@@ -2,39 +2,82 @@
 // Pools: practice modes never serve questions held back in a sealed form (sealed.ts), nor — practice.exclude_out_of_scope —
 // questions whose answer is an out-of-scope service (explicit pack / ids requests keep those). A sealed exam serves one
 // form (+ pilots from the practice pool). Every session carries its realism (shared/realism.ts).
+// [v5 σ] Session rules (select-rules.ts, Design C3): one question per sibling cluster and the siblings of today's answers
+// buried, in every mode except explicit lists (ids / pack / coach questions), retest and qualifier families (discriminate
+// keeps one per cluster without burying); sibling substitution in srs + today (ref.for). "Học hôm nay" = today.ts;
+// discriminate / qualifier / yesterday / retest = select-modes.ts. Mocks take ≥ 50 % exam-like questions per domain when
+// the pool allows (C5). Practice-feedback sessions get in-session relearning (session.relearn, practice.relearn).
 import crypto from 'node:crypto';
-import type { AppConfig } from '../config.ts';
 import { HttpError } from '../http.ts';
-import type { BankState } from './bank.ts';
-import { isMastered, reviewQueue } from './stats.ts';
-import { loadSealed, sealedIds } from './sealed.ts';
-import { loadGoal } from './progress.ts';
+import { isMastered, isParkedLeech, reviewQueue } from './stats.ts';
+import { ATTEMPT_SOURCES } from './results.ts';
+import { ONBOARDING_TRIGGER } from './onboarding.ts';
+import { SPRINT_TRIGGER } from './sprint.ts';
 import { DAY_MS } from './time.ts';
 import { MODE_INFO, REQUIREMENT_INFO } from '../../shared/labels.ts';
 import { EXAM_PACE_PRESETS, computeTimeLimit, defaultTimingPreset } from '../../shared/timing.ts';
-import { applyFilters, hasFilters, newOrder, stableHash, taskQuotas } from '../../shared/filters.ts';
+import { applyFilters, hasFilters, newOrder, retestIds, stableHash, taskQuotas } from '../../shared/filters.ts';
 import { isExamLike, testRealism } from '../../shared/realism.ts';
+import {
+  depsOf,
+  goalOf,
+  nowOf,
+  onePerCluster,
+  pools,
+  sealedForms,
+  sessionRules,
+  swapFor,
+  variantFamilies,
+  weakWeight,
+  type SelectCtx,
+  type SessionRules,
+} from './select-rules.ts';
+import { composeToday } from './today.ts';
+import {
+  DISCRIMINATE_DEFAULT,
+  YESTERDAY_MAX,
+  discriminatePick,
+  qualifierFamilies,
+  qualifierPick,
+  requirementSingles,
+  retestPick,
+  yesterdayList,
+} from './select-modes.ts';
 import type {
-  Attempt,
+  AttemptSource,
   BuildTestRequest,
   Difficulty,
   DomainDef,
-  ExamGoal,
-  Plan,
   Question,
-  QuestionState,
   SealedForm,
-  SealedState,
   SelectionFilters,
   Taxonomy,
   TestSession,
+  TodayMix,
 } from '../../shared/types.ts';
+
+export type { SelectCtx, SelectDeps } from './select-rules.ts';
+export { variantFamilies } from './select-rules.ts';
+export { previewToday, microCandidates } from './today.ts';
 
 export const PEARSON_TITLE = 'Thi thử SAA-C03 · mô phỏng Pearson VUE';
 /** Unscored pilot items in a real 65-question SAA-C03 exam. */
 export const PILOT_ITEMS = 15;
 /** First-day diagnostic: questions per exam-guide task (14 tasks → 28). */
 export const DIAGNOSTIC_PER_TASK = 2;
+/** [v5] Share of each domain's quota a mock fills with exam-like questions first, when the pool has them (Design C5). */
+export const EXAM_LIKE_SHARE = 0.5;
+
+/** [v5] Modes whose feedback defaults to "xem đáp án ngay". */
+const PRACTICE_MODES: string[] = ['quick', 'today', 'discriminate', 'qualifier', 'yesterday', 'retest'];
+/** [v5] Modes that set their own title (no "Theo chủ đề: …" suffix from the filters). */
+const OWN_TITLE: string[] = ['pack', 'coach', 'diagnostic', 'today', 'discriminate', 'yesterday', 'retest'];
+/** [v5] Modes that ignore the content filters. */
+const UNFILTERED: string[] = ['ids', 'coach', 'sealed', 'today', 'discriminate', 'yesterday', 'retest'];
+/** [v5] Attempt kinds created outside the runner (createAttempt): never built here. */
+const NOT_BUILT: string[] = ['anki', 'listen', 'micro'];
+
+type Ctx = SelectCtx;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -45,52 +88,13 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-/** Weighted sampling without replacement (Efraimidis–Spirakis). */
+/** Weighted sampling without replacement (Efraimidis–Spirakis); n = items.length gives a full weighted order. */
 function weightedSample<T>(items: T[], weight: (x: T) => number, n: number): T[] {
   return items
     .map((x) => ({ x, k: Math.pow(Math.random(), 1 / Math.max(1e-6, weight(x))) }))
     .sort((a, b) => b.k - a.k)
     .slice(0, n)
     .map((e) => e.x);
-}
-
-export interface SelectCtx {
-  bank: BankState;
-  states: Map<string, QuestionState>;
-  cfg: AppConfig;
-  plans: Plan[];
-  attempts?: Attempt[]; // needed for the SRS daily cap (answers already given today)
-  sealed?: SealedState; // sealed forms — default: sealed.ts (sealedIds / loadSealed); unit tests pass their own
-  goal?: ExamGoal; // learner goal — default: progress.ts loadGoal (goal.esl → the ESL clock by default)
-}
-type Ctx = SelectCtx;
-
-/** Ids held back in forms that are still sealed (hidden from every practice mode). */
-function heldBack(ctx: Ctx): Set<string> {
-  if (ctx.sealed) return new Set(ctx.sealed.forms.filter((f) => f.status === 'sealed').flatMap((f) => f.ids));
-  return sealedIds();
-}
-
-function sealedForms(ctx: Ctx): SealedForm[] {
-  return (ctx.sealed ?? loadSealed()).forms;
-}
-
-function goalOf(ctx: Ctx): ExamGoal {
-  if (ctx.goal) return ctx.goal;
-  try {
-    return loadGoal();
-  } catch {
-    return {};
-  }
-}
-
-/** Active questions → not sealed (practice) → in scope (what filter-based practice modes draw from). */
-function pools(ctx: Ctx): { active: Question[]; practice: Question[]; inScope: Question[]; held: Set<string> } {
-  const held = heldBack(ctx);
-  const active = ctx.bank.questions.filter((q) => q.status === 'active');
-  const practice = held.size ? active.filter((q) => !held.has(q.id)) : active;
-  const inScope = (ctx.cfg.practice?.exclude_out_of_scope ?? true) ? practice.filter((q) => !q.outOfScope) : practice;
-  return { active, practice, inScope, held };
 }
 
 const sealedNote = (n: number) => `${n} câu đang niêm phong đã được bỏ qua.`;
@@ -107,60 +111,28 @@ export function domainQuotas(n: number, domains: DomainDef[]): Map<string, numbe
   return new Map(quotas.map((q) => [q.id, q.want]));
 }
 
-const familyMemo = new WeakMap<readonly Question[], Map<string, string>>();
-
-/**
- * Variant families: connected components of the `variant_of` links (either direction, sibling variants included),
- * as question id → family id (questions without links are their own family and are not in the map). A mock never
- * takes two questions of one family — the second would be answered from short-term memory of the first.
- */
-export function variantFamilies(bank: Pick<BankState, 'questions'>): Map<string, string> {
-  const hit = familyMemo.get(bank.questions);
-  if (hit) return hit;
-  const parent = new Map<string, string>();
-  const find = (x: string): string => {
-    for (;;) {
-      const p = parent.get(x);
-      if (p === undefined || p === x) return x;
-      const gp = parent.get(p);
-      if (gp !== undefined && gp !== p) parent.set(x, gp); // path halving
-      x = p;
-    }
-  };
-  for (const q of bank.questions) {
-    for (const v of q.variantOf ?? []) {
-      if (!v || v === q.id) continue;
-      const a = find(q.id);
-      const b = find(v);
-      if (a !== b) parent.set(a < b ? b : a, a < b ? a : b); // the smaller id is the root: deterministic
-    }
-  }
-  const families = new Map<string, string>();
-  for (const id of parent.keys()) families.set(id, find(id));
-  familyMemo.set(bank.questions, families);
-  return families;
-}
-
 /** Day number of the last answer (-1 = never seen). */
-function seenDayOf(states: Map<string, QuestionState>, q: Question): number {
+function seenDayOf(states: Ctx['states'], q: Question): number {
   const s = states.get(q.id);
   return s?.lastAt ? Math.floor(new Date(s.lastAt).getTime() / DAY_MS) : -1;
 }
 
 interface PickOptions {
-  taken?: Question[]; // questions already in the test (their variant families are excluded)
+  taken?: Question[]; // questions already in the test (their clusters are excluded)
   deterministic?: boolean; // stable hash tie-breaks instead of random ones (previews)
+  key?: (q: Question) => string; // sibling cluster of a question (default: its variant family)
 }
 
 /**
- * Picks questions per domain proportionally to exam weights. Preference: never seen, then exam-like (long scenario stem,
- * full-sentence options — shared/realism.ts), then least recently seen (by day), then long-form stems; random among
- * equals. Never two questions of one variant family (an original and its variant, or two variants of one original).
+ * Picks questions per domain proportionally to exam weights. Inside a domain quota, at least EXAM_LIKE_SHARE of it goes to
+ * exam-like questions (long scenario stem, full-sentence options — shared/realism.ts) when the pool has them; then the
+ * general preference: never seen, then exam-like, then least recently seen (by day), then long-form stems; random among
+ * equals. Never two questions of one sibling cluster (an original and its variant, two rephrasings).
  */
 function examPick(pool: Question[], n: number, ctx: Ctx, opts: PickOptions = {}): Question[] {
   const tax = ctx.bank.taxonomy;
   const families = variantFamilies(ctx.bank);
-  const family = (q: Question) => families.get(q.id) ?? q.id;
+  const family = opts.key ?? ((q: Question) => families.get(q.id) ?? q.id);
   const ties = opts.deterministic ? (list: Question[]) => [...list].sort((a, b) => stableHash(a.id, 'exam') - stableHash(b.id, 'exam')) : shuffle;
   const preferred = (list: Question[]) =>
     ties(list)
@@ -170,7 +142,7 @@ function examPick(pool: Question[], n: number, ctx: Ctx, opts: PickOptions = {})
   const picked: Question[] = [];
   const used = new Set<string>();
   const usedFamilies = new Set((opts.taken ?? []).map(family));
-  const take = (list: Question[], want: number) => {
+  const take = (list: Question[], want: number): number => {
     let k = 0;
     for (const q of list) {
       if (k >= want) break;
@@ -180,8 +152,16 @@ function examPick(pool: Question[], n: number, ctx: Ctx, opts: PickOptions = {})
       usedFamilies.add(family(q));
       k++;
     }
+    return k;
   };
-  for (const [domain, want] of domainQuotas(n, tax.domains)) take(preferred(pool.filter((x) => x.domain === domain)), want);
+  for (const [domain, want] of domainQuotas(n, tax.domains)) {
+    const inDomain = preferred(pool.filter((x) => x.domain === domain));
+    const examLike = take(
+      inDomain.filter((q) => isExamLike(q, tax)),
+      Math.ceil(want * EXAM_LIKE_SHARE),
+    );
+    take(inDomain, want - examLike);
+  }
   if (picked.length < n) take(preferred(pool.filter((q) => !used.has(q.id))), n - picked.length);
   return opts.deterministic ? picked : shuffle(picked);
 }
@@ -248,13 +228,11 @@ const DIFFICULTY_RANK: Record<Difficulty, number> = { medium: 0, hard: 1, easy: 
  * First-day diagnostic: an even share of `n` questions for every exam-guide task (28 → 2 per task 1.1–4.4; 14 → 1 per
  * task, so two sittings of 14 cover different questions). A remainder goes to the tasks of the heaviest domains first.
  * Preference: never seen, then least recently seen, then medium difficulty (the most informative), then a stable hash —
- * the same bank and history always give the same questions. Never two questions of one variant family.
+ * the same bank and history always give the same questions. Never two questions of one sibling cluster.
  */
-function diagnosticPick(pool: Question[], n: number, ctx: Ctx): { picked: Question[]; short: string[]; perTask: Set<number> } {
+function diagnosticPick(pool: Question[], n: number, ctx: Ctx, family: (q: Question) => string): { picked: Question[]; short: string[]; perTask: Set<number> } {
   const tax = ctx.bank.taxonomy;
   const tasks = tax.tasks ?? [];
-  const families = variantFamilies(ctx.bank);
-  const family = (q: Question) => families.get(q.id) ?? q.id;
   const quotas = taskQuotas(n, tasks, tax.domains);
   const picked: Question[] = [];
   const short: string[] = [];
@@ -281,41 +259,41 @@ function diagnosticPick(pool: Question[], n: number, ctx: Ctx): { picked: Questi
   return { picked, short, perTask };
 }
 
-function weakPick(pool: Question[], n: number, ctx: Ctx): Question[] {
-  // accuracy per topic and per tag from history; unseen dimensions count as 60 % (unknown ≠ strong)
-  const agg = new Map<string, { t: number; c: number }>();
-  const add = (k: string, ok: boolean) => {
-    const g = agg.get(k) ?? { t: 0, c: 0 };
-    g.t++;
-    if (ok) g.c++;
-    agg.set(k, g);
-  };
-  for (const s of ctx.states.values()) {
-    const q = ctx.bank.byId.get(s.id);
-    if (!q) continue;
-    for (let i = 0; i < s.attempts; i++) {
-      const ok = i < s.correct;
-      add(`topic:${q.topic}`, ok);
-      for (const t of q.tags) add(`tag:${t}`, ok);
-      for (const sv of q.services) add(`svc:${sv}`, ok);
-    }
+interface ReviewPick {
+  served: Question[]; // in review order; a mature question may be replaced by an unseen sibling
+  forOf: Map<string, string>; // served id → the due question it stands in for
+  due: number; // due questions eligible today (siblings of today's answers and parked leeches left out)
+  unique: number; // …one per sibling cluster
+  remaining: number; // reviews still allowed today (srs.daily_limit)
+  backlog: number; // due questions not offered today
+}
+
+/**
+ * Mode 'srs' (and its count): due questions, lowest recall probability first, without siblings of today's answers and
+ * parked leeches, one per sibling cluster, within srs.daily_limit; a mature one (stability ≥ srs.sibling_swap_days) is
+ * served as a cluster mate never answered (ref.for, Design C3).
+ */
+function reviewPick(ctx: Ctx, pool: Question[], rules: SessionRules): ReviewPick {
+  const paused = depsOf(ctx).paused(rules.today);
+  const eligible = pool.filter((q) => !rules.buried(q.id) && !isParkedLeech(ctx.states.get(q.id), rules.today, paused));
+  const queue = reviewQueue(eligible, ctx.states, ctx.attempts ?? [], ctx.cfg, nowOf(ctx));
+  const unique = onePerCluster(queue.due, (q) => rules.key(q.id));
+  const today = unique.slice(0, queue.remaining);
+  const ids = new Set(eligible.map((q) => q.id));
+  const served: Question[] = [];
+  const forOf = new Map<string, string>();
+  for (const q of today) {
+    const sub = swapFor(ctx, rules, q, (id) => ids.has(id));
+    if (sub) {
+      served.push(sub);
+      forOf.set(sub.id, q.id);
+    } else served.push(q);
   }
-  const accOf = (k: string) => {
-    const g = agg.get(k);
-    return g && g.t >= 2 ? g.c / g.t : 0.6;
-  };
-  const weight = (q: Question) => {
-    const s = ctx.states.get(q.id);
-    const dims = [accOf(`topic:${q.topic}`), ...q.tags.map((t) => accOf(`tag:${t}`)), ...q.services.map((sv) => accOf(`svc:${sv}`))];
-    const weakness = 1 - Math.min(...dims);
-    let w = 0.2 + 3 * weakness;
-    if (s?.lastOk === false) w += 2;
-    if (s?.lastUnsure) w += 1;
-    if (isMastered(s, ctx.cfg)) w *= 0.25;
-    if (!s) w *= 0.8;
-    return w;
-  };
-  return weightedSample(pool, weight, n);
+  return { served, forOf, due: queue.due.length, unique: unique.length, remaining: queue.remaining, backlog: Math.max(0, queue.due.length - today.length) };
+}
+
+function validSource(s: unknown): AttemptSource | undefined {
+  return typeof s === 'string' && (ATTEMPT_SOURCES as readonly string[]).includes(s) ? (s as AttemptSource) : undefined;
 }
 
 export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
@@ -323,18 +301,34 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
   const tax = bank.taxonomy;
   const notes: string[] = [];
   const mode = req.mode;
+  if (NOT_BUILT.includes(mode)) throw new HttpError(400, `Chế độ “${MODE_INFO[mode]?.label ?? mode}” không tạo bài test — câu trả lời được ghi qua tính năng riêng của nó.`);
   const sealedMode = mode === 'sealed';
   const pearson = sealedMode || (!!req.pearson && mode === 'exam');
   const { active, practice, inScope, held } = pools(ctx);
+  const rules = sessionRules(ctx);
+  const key = (q: Question) => rules.key(q.id);
+  const unburied = (list: Question[]) => list.filter((q) => !rules.buried(q.id));
+  /** Design C3: siblings of today's answers buried, one question per cluster (first = preferred). */
+  const ruled = (list: Question[]) => onePerCluster(unburied(list), key);
   // explicit packs keep out-of-scope questions; the other filter-based modes draw from the in-scope pool
   const pool = applyFilters(mode === 'pack' ? practice : inScope, req.filters);
   const defaultCount =
-    mode === 'exam' ? tax.exam.questions : mode === 'quick' ? cfg.practice.quick_count : mode === 'diagnostic' ? DIAGNOSTIC_PER_TASK * (tax.tasks?.length ?? 0) : cfg.practice.default_count;
+    mode === 'exam'
+      ? tax.exam.questions
+      : mode === 'quick'
+        ? cfg.practice.quick_count
+        : mode === 'diagnostic'
+          ? DIAGNOSTIC_PER_TASK * (tax.tasks?.length ?? 0)
+          : mode === 'discriminate'
+            ? DISCRIMINATE_DEFAULT
+            : mode === 'yesterday'
+              ? YESTERDAY_MAX
+              : cfg.practice.default_count;
   const asked = Number(req.count);
   let count = pearson && !sealedMode ? tax.exam.questions : Math.max(1, Math.min(500, req.count !== undefined && Number.isFinite(asked) ? Math.round(asked) : defaultCount));
   let picked: Question[] = [];
   let title = req.title ?? (pearson && !sealedMode ? PEARSON_TITLE : (MODE_INFO[mode]?.label ?? mode));
-  let feedback = pearson ? 'exam' : (req.feedback ?? (mode === 'quick' ? 'practice' : 'exam'));
+  let feedback = pearson ? 'exam' : (req.feedback ?? (PRACTICE_MODES.includes(mode) ? 'practice' : 'exam'));
   let keepOrder = false;
   const plan = req.plan;
   // full mocks and sealed forms run on the honest reading-load clock unless the learner picked another one
@@ -342,13 +336,21 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
   let unscored: string[] | undefined;
   let sealedForm: string | undefined;
   let diagnostic = false;
-  let countNote = !['pack', 'ids', 'coach', 'sealed', 'diagnostic'].includes(mode);
+  let countNote = !['pack', 'ids', 'coach', 'sealed', 'diagnostic', 'today', 'retest', 'yesterday'].includes(mode);
+  // [v5]
+  let forOf: Map<string, string> | undefined;
+  let budgetMinutes: number | undefined;
+  let mix: TodayMix | undefined;
+  let contrast: string[] | undefined;
+  let retestOf: string | undefined;
+  let forceShuffleOptions = false;
+  let phaseId: TestSession['phase'];
 
   const lastAtDesc = (a: Question, b: Question) => (states.get(b.id)?.lastAt ?? '').localeCompare(states.get(a.id)?.lastAt ?? '');
 
   switch (mode) {
     case 'exam':
-      picked = examPick(pool, count, ctx);
+      picked = examPick(unburied(pool), count, ctx, { key });
       break;
     case 'sealed': {
       // the form's questions are the scored items; pilots come from the practice pool like the real exam's 15
@@ -357,7 +359,7 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       const lost = new Set(form.ids).size - scored.length;
       if (!scored.length) throw new HttpError(409, `Đề niêm phong ${form.id} không còn câu nào dùng được (đã bị xoá, chuyển draft hoặc retired).`);
       if (lost) notes.push(`${lost} câu của đề ${form.id} không còn dùng được (đã bị xoá, chuyển draft hoặc retired) — đề còn ${scored.length} câu tính điểm.`);
-      const pilots = examPick(inScope, sealedPilotCount(scored.length, tax), ctx, { taken: scored });
+      const pilots = examPick(unburied(inScope), sealedPilotCount(scored.length, tax), ctx, { taken: scored, key });
       picked = shuffle([...scored, ...pilots]);
       unscored = pilots.map((q) => q.id);
       sealedForm = form.id;
@@ -367,7 +369,7 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       break;
     }
     case 'diagnostic': {
-      const d = diagnosticPick(pool, count, ctx);
+      const d = diagnosticPick(unburied(pool), count, ctx, key);
       picked = d.picked;
       diagnostic = true;
       if (!picked.length) notes.push('Chưa có câu nào được gắn mục exam guide (task 1.1–4.4) — chạy `npm run classify-tasks` hoặc ENRICH để phân loại.');
@@ -389,36 +391,41 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       break;
     }
     case 'retry-wrong':
-      picked = pool.filter((q) => states.get(q.id)?.lastOk === false).sort(lastAtDesc);
+      picked = ruled(pool.filter((q) => states.get(q.id)?.lastOk === false).sort(lastAtDesc));
       break;
     case 'srs': {
-      // due questions, lowest recall probability first, capped by srs.daily_limit (minus today's SRS answers)
-      const queue = reviewQueue(pool, states, ctx.attempts ?? [], cfg);
-      picked = queue.today;
-      if (queue.due.length && !queue.today.length) {
-        notes.push(`Bạn đã ôn đủ ${cfg.srs.daily_limit} câu hôm nay (giới hạn srs.daily_limit) — ${queue.due.length} câu đến hạn được để dành cho ngày mai.`);
-      } else if (queue.backlog) {
-        notes.push(`Giới hạn ôn ${cfg.srs.daily_limit} câu/ngày: hôm nay còn ${queue.today.length} câu, ${queue.backlog} câu tồn chuyển sang ngày sau.`);
+      // due questions, lowest recall probability first, capped by srs.daily_limit (minus today's reviews)
+      const r = reviewPick(ctx, pool, rules);
+      picked = r.served;
+      forOf = r.forOf;
+      const overLimit = Math.max(0, r.unique - r.remaining);
+      if (r.due && !r.remaining) {
+        notes.push(`Bạn đã ôn đủ ${cfg.srs.daily_limit} câu hôm nay (giới hạn srs.daily_limit) — ${r.due} câu đến hạn được để dành cho ngày mai.`);
+      } else if (overLimit) {
+        notes.push(`Giới hạn ôn ${cfg.srs.daily_limit} câu/ngày: hôm nay còn ${r.served.length} câu, ${overLimit} câu tồn chuyển sang ngày sau.`);
       }
+      if (r.due > r.unique) notes.push(`${r.due - r.unique} câu đến hạn là câu anh em của câu khác trong bài — để dành cho ngày mai.`);
+      if (r.forOf.size) notes.push(`${r.forOf.size} câu đã thuộc được hỏi bằng một câu anh em chưa gặp (cùng khái niệm, cách hỏi khác).`);
       break;
     }
     case 'new':
       // deterministic, domain-balanced order: the app knows which questions come next (ENRICH prepares them first)
-      picked = newOrder(
-        pool.filter((q) => !states.has(q.id)),
-        tax.domains,
+      picked = ruled(
+        newOrder(
+          pool.filter((q) => !states.has(q.id)),
+          tax.domains,
+        ),
       ).slice(0, count);
       break;
     case 'flagged':
-      picked = pool.filter((q) => states.get(q.id)?.lastFlag || states.get(q.id)?.lastUnsure).sort(lastAtDesc);
+      picked = ruled(pool.filter((q) => states.get(q.id)?.lastFlag || states.get(q.id)?.lastUnsure).sort(lastAtDesc));
       break;
     case 'slow':
-      picked = pool
-        .filter((q) => (states.get(q.id)?.slowCount ?? 0) > 0)
-        .sort((a, b) => states.get(b.id)!.avgTime / b.time - states.get(a.id)!.avgTime / a.time);
+      picked = ruled(pool.filter((q) => (states.get(q.id)?.slowCount ?? 0) > 0).sort((a, b) => states.get(b.id)!.avgTime / b.time - states.get(a.id)!.avgTime / a.time));
       break;
     case 'weak':
-      picked = weakPick(pool, count, ctx);
+      // C8: weakness from accuracies shrunk toward the learner's own rate (select-rules.ts weakWeight)
+      picked = ruled(weightedSample(pool, weakWeight(ctx), pool.length)).slice(0, count);
       break;
     case 'coach':
     case 'ids': {
@@ -429,7 +436,9 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
         const s = p?.sessions.find((x) => x.id === sessionId);
         if (!p || !s) notes.push(`Không tìm thấy phiên ${plan} trong kế hoạch AI.`);
         if (s) {
-          if (!req.title) title = `🤖 ${s.title}`;
+          // plans the app writes itself (sprint / final week, onboarding) are no AI-coach advice: no 🤖
+          const label = p && (p.trigger === SPRINT_TRIGGER || p.trigger === ONBOARDING_TRIGGER) ? s.title : `🤖 ${s.title}`;
+          if (!req.title) title = label;
           if (s.feedback && !req.feedback) feedback = s.feedback;
           if (s.timing && !timingPreset) timingPreset = s.timing;
           if (s.questions?.length) ids = s.questions;
@@ -437,7 +446,7 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
             const sub = buildTest(
               {
                 ...s.filter,
-                title: req.title ?? `🤖 ${s.title}`,
+                title: req.title ?? label,
                 feedback: req.feedback ?? s.filter.feedback ?? s.feedback,
                 timing: req.timing ?? s.filter.timing ?? (s.timing ? { preset: s.timing } : undefined),
                 shuffleOptions: req.shuffleOptions ?? s.filter.shuffleOptions,
@@ -445,7 +454,9 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
               },
               ctx,
             );
-            return { ...sub, mode: 'coach', plan, selection: { ...req } };
+            // [v5] a filter session keeps its own mode (today, retest, sealed, exam… — the result page, readiness and the
+            // retest rules key on it); `plan` alone marks the plan session done (plans.ts indexes attempts by `plan`)
+            return { ...sub, plan, selection: { ...req } };
           }
         }
       }
@@ -468,24 +479,74 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       break;
     }
     case 'quick':
-      picked = weightedSample(pool, (q) => (isMastered(states.get(q.id), cfg) ? 0.3 : 1), count);
+      picked = ruled(weightedSample(pool, (q) => (isMastered(states.get(q.id), cfg) ? 0.3 : 1), pool.length)).slice(0, count);
       break;
+    // ── [v5] ───────────────────────────────────────────────────────────────
+    case 'today': {
+      const t = composeToday(ctx, req.budgetMinutes);
+      picked = t.items.map((x) => x.q);
+      forOf = new Map(t.items.filter((x) => x.for).map((x) => [x.q.id, x.for!]));
+      notes.push(...t.notes);
+      budgetMinutes = t.minutes;
+      mix = t.mix;
+      if (t.phase) phaseId = t.phase.id;
+      if (!req.title) title = `${MODE_INFO.today.label} · ${t.minutes}′`;
+      // the runner shows a soft budget timer (session.budgetMinutes) — never an auto-submit
+      if (!timingPreset) timingPreset = 'untimed';
+      keepOrder = true;
+      count = picked.length;
+      if (!picked.length && !t.notes.length) notes.push('Hôm nay không còn câu nào phù hợp cho “Học hôm nay” (câu đã làm hôm nay và câu anh em của chúng để dành cho ngày mai).');
+      break;
+    }
+    case 'discriminate': {
+      const d = discriminatePick(ctx, rules, new Set(inScope.map((q) => q.id)), req, count);
+      picked = d.picked;
+      notes.push(...d.notes);
+      contrast = d.services;
+      if (!req.title && d.services.length) title = `${MODE_INFO.discriminate.icon} ${MODE_INFO.discriminate.label}: ${d.services.join(' ⟷ ')}`;
+      keepOrder = true;
+      break;
+    }
+    case 'qualifier': {
+      const qp = qualifierPick(ctx, rules, pool, count);
+      picked = qp.picked;
+      notes.push(...qp.notes);
+      keepOrder = true;
+      break;
+    }
+    case 'yesterday': {
+      picked = yesterdayList(ctx, rules, new Set(inScope.map((q) => q.id))).slice(0, count);
+      if (!picked.length) notes.push('Không có câu sai / chưa chắc / phải xem gợi ý nào hôm qua cần ôn lại (hoặc đã làm lại hôm nay).');
+      if (!req.title) title = `${MODE_INFO.yesterday.icon} ${MODE_INFO.yesterday.label} (${picked.length} câu)`;
+      keepOrder = true;
+      break;
+    }
+    case 'retest': {
+      const r = retestPick(ctx, held, req.retestOf);
+      picked = r.picked;
+      notes.push(...r.notes);
+      retestOf = r.attempt.id;
+      if (!req.title) title = `${MODE_INFO.retest.icon} ${MODE_INFO.retest.label}: ${r.attempt.title}`;
+      forceShuffleOptions = true;
+      count = picked.length;
+      break;
+    }
     case 'topic':
     case 'custom':
     default:
-      picked = shuffle(pool);
+      picked = ruled(shuffle(pool));
   }
 
-  if (!req.title && !pearson && !['pack', 'coach', 'diagnostic'].includes(mode)) title = describeSelection(title, mode, req, ctx);
+  if (!req.title && !pearson && !OWN_TITLE.includes(mode)) title = describeSelection(title, mode, req, ctx);
   if (picked.length > count) picked = picked.slice(0, count);
   if (!keepOrder && mode !== 'exam' && mode !== 'weak') {
     if (req.shuffleQuestions !== false) picked = shuffle(picked);
   }
   const wanted = pearson ? count : req.count;
   if (countNote && wanted && picked.length < wanted) notes.push(`Chỉ có ${picked.length} câu phù hợp (bạn yêu cầu ${wanted}).`);
-  if (!pool.length && !['ids', 'coach', 'sealed'].includes(mode)) notes.push('Bộ lọc không khớp câu nào.');
+  if (!pool.length && !UNFILTERED.includes(mode)) notes.push('Bộ lọc không khớp câu nào.');
   // say so when a filter the learner chose lost questions to practice.exclude_out_of_scope (unfiltered modes stay quiet)
-  if (inScope !== practice && !['pack', 'ids', 'coach', 'sealed'].includes(mode) && hasFilters(req.filters)) {
+  if (inScope !== practice && !['pack', 'ids', 'coach', 'sealed'].includes(mode) && !UNFILTERED.includes(mode) && hasFilters(req.filters)) {
     const dropped = applyFilters(practice, req.filters).filter((q) => q.outOfScope).length;
     if (dropped) notes.push(`Bỏ qua ${dropped} câu có đáp án là dịch vụ ngoài phạm vi đề thi (practice.exclude_out_of_scope).`);
   }
@@ -494,13 +555,18 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
   const estimateTotal = picked.reduce((s, q) => s + q.time, 0);
   const preset = timingPreset ?? 'standard';
   // ESL +30 (× 160/130) on the exam-pace clocks: the request decides, otherwise the learner's goal (goal.esl)
-  const esl = EXAM_PACE_PRESETS.includes(preset) && (typeof req.timing?.esl === 'boolean' ? req.timing.esl : goalOf(ctx).esl === true);
+  const goal = goalOf(ctx);
+  const esl = EXAM_PACE_PRESETS.includes(preset) && (typeof req.timing?.esl === 'boolean' ? req.timing.esl : goal.esl === true);
   const timeLimit = computeTimeLimit(estimateTotal, picked.length, preset, req.timing?.minutes, tax.timing, { words: realism.words, esl });
-  const shuffleOptions = req.shuffleOptions ?? cfg.practice.shuffle_options ?? true;
+  const shuffleOptions = forceShuffleOptions || (req.shuffleOptions ?? cfg.practice.shuffle_options ?? true);
   if (pearson && !sealedMode) {
     const pilots = Math.min(PILOT_ITEMS, Math.round((picked.length * PILOT_ITEMS) / Math.max(1, tax.exam.questions)));
     unscored = pickPilots(picked, pilots, tax.domains);
   }
+  // in-session relearning (Design C7): practice feedback, never in mocks / sealed forms / the diagnostic
+  const relearn = feedback === 'practice' && !pearson && !['exam', 'sealed', 'diagnostic'].includes(mode) && (req.relearn ?? cfg.practice?.relearn ?? true) !== false;
+  if (!phaseId && cfg.srs?.exam_aware !== false) phaseId = depsOf(ctx).phase(goal, rules.today, cfg)?.id;
+  const source = validSource(req.source);
 
   return {
     sessionId: crypto.randomUUID(),
@@ -510,10 +576,14 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
     timeLimit,
     estimateTotal,
     timingPreset: preset,
-    questions: picked.map((q) => ({
-      id: q.id,
-      ...(shuffleOptions ? { order: shuffle(q.options.map((o) => o.key)) } : {}),
-    })),
+    questions: picked.map((q) => {
+      const f = forOf?.get(q.id);
+      return {
+        id: q.id,
+        ...(shuffleOptions ? { order: shuffle(q.options.map((o) => o.key)) } : {}),
+        ...(f ? { for: f } : {}),
+      };
+    }),
     selection: { ...req, ids: mode === 'ids' || mode === 'coach' ? req.ids : undefined, ...(sealedForm ? { form: sealedForm } : {}) },
     plan,
     createdAt: new Date().toISOString(),
@@ -523,6 +593,13 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
     ...(sealedForm ? { sealedForm } : {}),
     ...(diagnostic ? { diagnostic: true } : {}),
     ...(req.recallFirst ? { recallFirst: true } : {}),
+    ...(budgetMinutes !== undefined ? { budgetMinutes } : {}),
+    ...(mix ? { mix } : {}),
+    ...(relearn ? { relearn: true } : {}),
+    ...(retestOf ? { retestOf } : {}),
+    ...(contrast?.length ? { contrast } : {}),
+    ...(phaseId ? { phase: phaseId } : {}),
+    ...(source ? { source } : {}),
   };
 }
 
@@ -554,26 +631,54 @@ function addPreview(out: Record<string, number>, key: string, qs: Question[], ta
   if (pilots) out[`${key}.pilots`] = pilots;
 }
 
+const countsMemo = new WeakMap<Ctx, { key: string; counts: Record<string, number> }>();
+
 /**
  * Pool sizes for every mode, shown on the "new test" screen (sealed and — practice.exclude_out_of_scope — out-of-scope
- * questions excluded everywhere). `srs` = due questions offered today (after srs.daily_limit), `backlog` = the rest of
- * the due questions, `srsRemaining` = reviews still allowed today (pass to `modePool(…, { srsLimit })` on the web).
- * `sealed` / `outOfScope` = active questions held back / left out; `examLike` = exam-like questions in the pool.
+ * questions excluded everywhere). `srs` = due questions offered today (after srs.daily_limit and the sibling rules),
+ * `backlog` = the rest of the due questions, `srsRemaining` = reviews still allowed today (pass to
+ * `modePool(…, { srsLimit })` on the web). `sealed` / `outOfScope` = active questions held back / left out; `examLike` =
+ * exam-like questions in the pool.
  * Previews (stable tie-breaks): `exam.*` = what a full mock would serve now, `sealed.<form>.*` = each form still sealed
  * with its pilots — `.items` exam-like, `.words` to read, `.total` questions, `.estimate` Σ seconds, `.pilots`.
+ * [v5] `yesterday` = what mode 'yesterday' serves (≤ YESTERDAY_MAX; `.all` uncapped, `.estimate` Σ s) · `qualifier` =
+ * family members + requirement questions available (`.families`) · `discriminate` = confusable groups · `retest` = the
+ * correction set of the latest attempt. Unfiltered counts are memoized per data state (context.ts) and day.
  */
 export function modeCounts(ctx: Ctx, filters?: SelectionFilters): Record<string, number> {
+  const rules = sessionRules(ctx);
+  const deps = depsOf(ctx);
+  const memoKey = hasFilters(filters)
+    ? undefined
+    : [
+        rules.today,
+        sealedForms(ctx)
+          .map((f) => `${f.id}:${f.status}`)
+          .join(','),
+        [...deps.paused(rules.today)].sort().join(','),
+      ].join('|');
+  if (memoKey !== undefined) {
+    const hit = countsMemo.get(ctx);
+    if (hit?.key === memoKey) return { ...hit.counts };
+  }
   const tax = ctx.bank.taxonomy;
   const { active, practice, inScope, held } = pools(ctx);
+  const key = (q: Question) => rules.key(q.id);
+  const unburied = (list: Question[]) => list.filter((q) => !rules.buried(q.id));
   const pool = applyFilters(inScope, filters);
   const s = ctx.states;
-  const queue = reviewQueue(pool, s, ctx.attempts ?? [], ctx.cfg);
+  const review = reviewPick(ctx, pool, rules);
+  const yesterday = yesterdayList(ctx, rules, new Set(inScope.map((q) => q.id)));
+  const families = qualifierFamilies(pool);
+  const familyMembers = [...families.values()].reduce((n, m) => n + m.length, 0);
+  let latest: (typeof ctx.attempts & {})[number] | undefined;
+  for (const a of ctx.attempts ?? []) if (!a.rushed && (!latest || a.finished > latest.finished)) latest = a;
   const out: Record<string, number> = {
     all: pool.length,
     'retry-wrong': pool.filter((q) => s.get(q.id)?.lastOk === false).length,
-    srs: queue.today.length,
-    backlog: queue.backlog,
-    srsRemaining: queue.remaining,
+    srs: review.served.length,
+    backlog: review.backlog,
+    srsRemaining: review.remaining,
     new: pool.filter((q) => !s.has(q.id)).length,
     flagged: pool.filter((q) => s.get(q.id)?.lastFlag || s.get(q.id)?.lastUnsure).length,
     slow: pool.filter((q) => (s.get(q.id)?.slowCount ?? 0) > 0).length,
@@ -581,15 +686,24 @@ export function modeCounts(ctx: Ctx, filters?: SelectionFilters): Record<string,
     sealed: active.length - practice.length,
     outOfScope: practice.length - inScope.length,
     examLike: pool.filter((q) => isExamLike(q, tax)).length,
+    // [v5]
+    yesterday: Math.min(YESTERDAY_MAX, yesterday.length),
+    'yesterday.all': yesterday.length,
+    'yesterday.estimate': yesterday.slice(0, YESTERDAY_MAX).reduce((sum, q) => sum + q.time, 0),
+    qualifier: familyMembers + requirementSingles(ctx, rules, pool, `qualifier:${rules.today}`).length,
+    'qualifier.families': families.size,
+    discriminate: deps.confusableGroups(ctx.bank).length,
+    retest: latest ? retestIds(latest.answers).length : 0,
   };
-  addPreview(out, 'exam', examPick(pool, tax.exam.questions, ctx, { deterministic: true }), tax);
+  addPreview(out, 'exam', examPick(unburied(pool), tax.exam.questions, ctx, { deterministic: true, key }), tax);
   if (held.size) {
     for (const form of sealedForms(ctx)) {
       if (form.status !== 'sealed') continue;
       const scored = formQuestions(ctx, form);
-      const pilots = examPick(inScope, sealedPilotCount(scored.length, tax), ctx, { taken: scored, deterministic: true });
+      const pilots = examPick(unburied(inScope), sealedPilotCount(scored.length, tax), ctx, { taken: scored, deterministic: true, key });
       addPreview(out, `sealed.${form.id}`, [...scored, ...pilots], tax, pilots.length);
     }
   }
-  return out;
+  if (memoKey !== undefined) countsMemo.set(ctx, { key: memoKey, counts: out });
+  return { ...out };
 }

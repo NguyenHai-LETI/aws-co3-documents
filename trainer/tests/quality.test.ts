@@ -434,7 +434,8 @@ test('computeQuality carries lint, distractors, semantic status and verification
   assert.deepEqual(q.lint?.ids?.['longest-correct'], ['c-1']);
   assert.equal(q.distractors?.suspectedKeys[0]?.id, 'c-2');
   assert.ok(q.semantic && ['ollama', 'lexical', 'off'].includes(q.semantic.provider));
-  assert.deepEqual(Object.keys(q.verification ?? {}).sort(), ['ok', 'pending', 'review', 'stale', 'verified']);
+  // the v4 fields are always there; v5 (γ2) adds optional ones (grounded, disputed …)
+  for (const k of ['ok', 'pending', 'review', 'stale', 'verified']) assert.ok(k in (q.verification ?? {}), `verification.${k}`);
 
   const lines = qualitySnapshotLines(bank, attempts, { background: false }).join('\n');
   assert.match(lines, /## 14\. Chất lượng ngân hàng/);
@@ -487,7 +488,7 @@ test('scopeReport: out-of-scope answers vs distractors, per-service tallies, the
       { id: 'sc-ok', options: opts4(1), answer: ['A'] },
     ]),
   );
-  const r = scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true } });
+  const r = scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true, today_minutes: 25, relearn: true } });
   assert.deepEqual(r.answer, [{ id: 'sc-ans', services: ['CodeCommit'] }]);
   assert.deepEqual(r.distractor, [{ id: 'sc-dis', options: [{ key: 'B', services: ['Lightsail'] }, { key: 'C', services: ['CodeBuild'] }] }]);
   assert.equal(r.excluded, true);
@@ -496,7 +497,7 @@ test('scopeReport: out-of-scope answers vs distractors, per-service tallies, the
   assert.equal(r.services[0].name, 'CodeCommit', 'services the bank uses as answers first');
   assert.ok(r.services.length >= 30, 'every `scope: out` service of the taxonomy is listed');
   assert.deepEqual(r.services.find((s) => s.name === 'Location Service')?.aliases, ['Amazon Location Service']);
-  assert.equal(scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false } }).excluded, false);
+  assert.equal(scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false, today_minutes: 25, relearn: true } }).excluded, false);
   assert.deepEqual(computeQuality(bank, [], []).scope?.answer.map((x) => x.id), ['sc-ans']);
   const lines = qualitySnapshotLines(bank, [], { background: false }).join('\n');
   assert.match(lines, /### 🎯 Phạm vi đề thi/);

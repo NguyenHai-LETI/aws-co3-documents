@@ -3,10 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
-import { ANKI_TAG_ROOT, ID_TAG, ankiStatus, ankiTsv, cardBack, cardFront, cardTags, mdToHtml, noteGuid, pushToAnki, searchTerm, selectForAnki } from '../server/lib/anki.ts';
+import { ANKI_TAG_ROOT, ID_TAG, RULE_TAG, ankiStatus, ankiTsv, cardBack, cardFront, cardTags, mdToHtml, notebookCard, noteGuid, pushToAnki, readAnkiReviews, searchTerm, selectForAnki } from '../server/lib/anki.ts';
 import { loadBank } from '../server/lib/bank.ts';
 import { startFakeAnki } from './helpers/fake-anki.ts';
-import type { AnkiExportRequest, Question, QuestionState } from '../shared/types.ts';
+import type { AnkiExportRequest, NotebookEntry, Question, QuestionState } from '../shared/types.ts';
 
 function q(id: string, over: Partial<Question> = {}): Question {
   return {
@@ -316,4 +316,70 @@ test('[γ] sealed questions are never exported: every scope leaves them out, an 
   assert.deepEqual(sel.questions.map((x) => x.id), ['k-1']);
   assert.deepEqual(sel.missing, ['k-4', 'nope'], 'sealed ids are skipped silently (the Anki card explains why)');
   assert.deepEqual(selectForAnki({ scope: 'all' }, bank, states, new Set()).questions.map((x) => x.id), ['k-1', 'k-2', 'k-3'], 'nothing sealed → as before');
+});
+
+// ── [v5 γ1] notebook rule cards + review import ─────────────────────────────
+
+const entry = (key: string, over: Partial<NotebookEntry> = {}): NotebookEntry => ({
+  key,
+  domain: 'resilient',
+  misconception: 'SQS can fan out one message to many consumers <b>',
+  rule: 'Fan-out needs **SNS** in front of the SQS queues',
+  cues: ['many subscribers', 'each service'],
+  contrast: 'SNS ⟷ SQS',
+  qids: ['x-1'],
+  refs: [],
+  confident: true,
+  count: 2,
+  updated: '2026-10-19',
+  ...over,
+});
+
+test('notebook rule cards: escaped HTML, rule on the back, stable GUID + rule tag; TSV and push update them in place', async () => {
+  const c = notebookCard(entry('sqs-fanout', { title: 'SQS không fan-out' }));
+  assert.equal(c.guid, 'saa-c03:rule:sqs-fanout');
+  assert.equal(c.idTag, `${RULE_TAG}sqs-fanout`);
+  assert.ok(c.tags.includes(`${ANKI_TAG_ROOT}::notebook`));
+  assert.match(c.front, /SQS không fan-out/);
+  assert.match(c.front, /&lt;b&gt;/, 'learner text is escaped');
+  assert.match(c.front, /many subscribers · each service/);
+  assert.match(c.back, /✅ Fan-out needs <b>SNS<\/b>/);
+  assert.match(c.back, /🔥/);
+  const tsv = ankiTsv([c, q('a-1')], opts);
+  assert.match(tsv, /^saa-c03:rule:sqs-fanout\t/m);
+  assert.match(tsv, /^saa-c03:a-1\t/m);
+  const anki = await startFakeAnki();
+  try {
+    const first = await pushToAnki(anki.url, [c, q('r-1')], opts);
+    assert.deepEqual([first.ok, first.added, first.updated], [true, 2, 0]);
+    const second = await pushToAnki(anki.url, [notebookCard(entry('sqs-fanout', { rule: 'Use SNS fan-out' }))], opts);
+    assert.deepEqual([second.ok, second.added, second.updated], [true, 0, 1]);
+    assert.match(anki.notes.find((n) => n.tags.includes(`${RULE_TAG}sqs-fanout`))!.fields.Back, /Use SNS fan-out/);
+  } finally {
+    await anki.close();
+  }
+});
+
+test('review import: cardReviews after the last range, card → note → SAA-C03::id:: tag, buttons 1–4 only, sealed / unknown skipped', async () => {
+  const anki = await startFakeAnki();
+  try {
+    await pushToAnki(anki.url, [q('rv-1'), q('rv-2'), q('rv-sealed')], opts);
+    await pushToAnki(anki.url, [notebookCard(entry('rule-x'))], opts);
+    const note = (id: string) => anki.notes.find((n) => n.tags.includes(`${ID_TAG}${id}`))!.id;
+    const rule = anki.notes.find((n) => n.tags.includes(`${RULE_TAG}rule-x`))!.id;
+    anki.review(note('rv-1'), 3, 1_000, 12_500);
+    anki.review(note('rv-2'), 1, 2_000);
+    anki.review(note('rv-sealed'), 4, 3_000);
+    anki.review(rule, 3, 4_000); // a rule card: no question id → skipped
+    anki.review(note('rv-1'), 0, 5_000); // manual reschedule (button 0) → skipped
+    const bank = { byId: new Map([q('rv-1'), q('rv-2'), q('rv-sealed')].map((x) => [x.id, x])) };
+    const all = await readAnkiReviews({ url: anki.url, deck: opts.deck, bank, sealed: new Set(['rv-sealed']), after: 0 });
+    assert.deepEqual([all.reviews, all.skipped, all.from, all.to], [5, 3, 1_000, 5_000]);
+    assert.deepEqual(all.answers.map((a) => [a.q, a.grade, a.t]), [['rv-1', 3, 13], ['rv-2', 1, 8]]);
+    const later = await readAnkiReviews({ url: anki.url, deck: opts.deck, bank, sealed: new Set(), after: 5_000 });
+    assert.equal(later.reviews, 0, 'nothing after the last imported review id');
+    assert.ok(anki.calls.includes('cardReviews') && anki.calls.includes('cardsInfo'));
+  } finally {
+    await anki.close();
+  }
 });

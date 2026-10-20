@@ -3,6 +3,8 @@
 // coach/qa/<qid>.md — the coach reads these (snapshot §15) to see what still confuses the learner.
 // [γ] The run may read the study notes only: trainer/** (bank packs, results/sealed.md, ENRICH batches, ledgers…) and
 // practice-exams/** (the imported questions with their keys) are denied, so it can never quote a sealed question.
+// [v5 τ] The same log holds 🧑‍🏫 tutor dialogs (`kind: 'tutor'`, the transcript as the answer — tutor.ts), and
+// runClaudeCli() is the one-call `--output-format json` runner shared by the tutor and the 📒 notebook task.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -117,6 +119,82 @@ export function parseCliJson(stdout: string): Record<string, unknown> | undefine
   return v && typeof v === 'object' ? (v as Record<string, unknown>) : undefined;
 }
 
+/** [v5 τ] One finished `claude -p --output-format json` call. */
+export interface CliRun {
+  result: Record<string, unknown>; // the CLI's result object (`structured_output` with --json-schema)
+  text: string; // result.result, trimmed
+  costUsd?: number;
+  model?: string; // the answering model (most expensive modelUsage entry)
+  sessionId?: string; // for --resume
+}
+
+/** [v5 τ] Shape of the `modelUsage` map: the most expensive entry is the answering model. */
+function answeringModel(res: Record<string, unknown>): string | undefined {
+  const usage = res.modelUsage && typeof res.modelUsage === 'object' ? Object.entries(res.modelUsage as Record<string, { costUSD?: number }>) : [];
+  return usage.sort((a, b) => (b[1]?.costUSD ?? 0) - (a[1]?.costUSD ?? 0))[0]?.[0];
+}
+
+/**
+ * [v5 τ] Runs one `claude -p … --output-format json` call from the repo root (claude.ai login unless coach.use_api_key) and
+ * returns its result object. `input` = the prompt on stdin (no `-p <prompt>` argument: long prompts stay clear of the
+ * Windows command-line limit). Rejects with an HttpError (502 CLI error, 504 timeout, 499 cancelled) — callers show the message.
+ */
+export function runClaudeCli(
+  bin: string,
+  args: string[],
+  cfg: AppConfig,
+  opts: { timeoutMs: number; timeoutMessage: string; input?: string; signal?: AbortSignal; structured?: boolean },
+): Promise<CliRun> {
+  return new Promise((resolve, reject) => {
+    if (opts.signal?.aborted) return reject(new HttpError(499, 'Đã huỷ'));
+    const { cmd, pre } = claudeCommand(bin);
+    const stdin = opts.input !== undefined ? 'pipe' : 'ignore';
+    const child = spawn(cmd, [...pre, ...args], { cwd: REPO_DIR, env: cliEnv(cfg), stdio: [stdin, 'pipe', 'pipe'], windowsHide: true });
+    if (opts.input !== undefined) {
+      child.stdin!.on('error', () => undefined); // the CLI may exit before reading everything (bad flag): `close` reports it
+      child.stdin!.end(opts.input, 'utf8');
+    }
+    let out = '';
+    let err = '';
+    let why: 'timeout' | 'cancel' | undefined;
+    child.stdout!.on('data', (c: Buffer) => (out += c.toString('utf8')));
+    child.stderr!.on('data', (c: Buffer) => (err = (err + c.toString('utf8')).slice(-4000)));
+    const stop = (reason: 'timeout' | 'cancel') => {
+      why ??= reason;
+      child.kill('SIGTERM');
+    };
+    const timer = setTimeout(() => stop('timeout'), opts.timeoutMs);
+    const onAbort = () => stop('cancel');
+    opts.signal?.addEventListener('abort', onAbort, { once: true });
+    const done = () => {
+      clearTimeout(timer);
+      opts.signal?.removeEventListener('abort', onAbort);
+    };
+    child.on('error', (e) => {
+      done();
+      reject(new HttpError(502, `Không chạy được Claude Code: ${e.message}`));
+    });
+    child.on('close', (code) => {
+      done();
+      if (why === 'timeout') return reject(new HttpError(504, opts.timeoutMessage));
+      if (why === 'cancel') return reject(new HttpError(499, 'Đã huỷ'));
+      const res = parseCliJson(out);
+      const text = typeof res?.result === 'string' ? res.result.trim() : '';
+      if (!res || res.is_error || code !== 0 || (!text && !opts.structured)) {
+        const reason = text || err.trim().split('\n').slice(-3).join(' ') || `exit ${code}`;
+        return reject(new HttpError(502, `Claude Code báo lỗi: ${reason.slice(0, 400)}`));
+      }
+      resolve({
+        result: res,
+        text,
+        costUsd: typeof res.total_cost_usd === 'number' ? res.total_cost_usd : undefined,
+        model: answeringModel(res),
+        sessionId: typeof res.session_id === 'string' ? res.session_id : undefined,
+      });
+    });
+  });
+}
+
 function runCli(bin: string, args: string[], cfg: AppConfig): Promise<CliResult> {
   return new Promise((resolve, reject) => {
     const { cmd, pre } = claudeCommand(bin);
@@ -190,10 +268,13 @@ const header = (qid: string) =>
   [
     `# 💬 Hỏi AI — \`${qid}\``,
     '',
-    '> File tự sinh bởi trainer app (nút “🤖 Hỏi AI”): mỗi mục là một câu người học hỏi và câu trả lời của AI.',
-    '> AI Coach đọc các file này để biết người học còn mơ hồ ở đâu. Chỉ thêm mục mới, không sửa mục cũ.',
+    '> File tự sinh bởi trainer app (nút “🤖 Hỏi AI” và “🧑‍🏫 Gia sư”): mỗi mục là một câu người học hỏi và câu trả lời của AI,',
+    '> hoặc một cuộc hội thoại với gia sư. AI Coach đọc các file này để biết người học còn mơ hồ ở đâu. Chỉ thêm mục mới, không sửa mục cũ.',
     '',
   ].join('\n');
+
+/** No line of an appended block may look like an entry marker (`<!-- qa {…} -->`): HTML comments are escaped. */
+const noMarkers = (s: string) => s.replace(/<!--/g, '&lt;!--');
 
 /** Appends one entry. The machine-readable part lives in an HTML comment so union merges (two machines) stay parseable. */
 export function appendQa(qid: string, entry: QaEntry, model?: string): void {
@@ -201,29 +282,42 @@ export function appendQa(qid: string, entry: QaEntry, model?: string): void {
   if (!file) throw new Error(`Invalid question id: ${qid}`);
   fs.mkdirSync(QA_DIR, { recursive: true });
   if (!fs.existsSync(file)) fs.writeFileSync(file, header(qid));
-  const meta = JSON.stringify({ at: entry.at, q: entry.question, pick: entry.pick, costUsd: entry.costUsd, model }).replace(/--/g, '-\\u002d');
-  const block = [
-    '',
-    `<!-- qa ${meta} -->`,
-    `### ❓ ${fmtLocal(entry.at)}${entry.pick ? ` · đã chọn ${entry.pick}` : ''}`,
-    '',
-    ...entry.question.split('\n').map((l) => `> ${l}`),
-    '',
-    ANSWER_HEADING,
-    '',
-    entry.answer.trim(),
-    '',
-  ].join('\n');
+  const tutor = entry.kind === 'tutor';
+  const meta = JSON.stringify({
+    at: entry.at,
+    q: entry.question,
+    pick: entry.pick,
+    costUsd: entry.costUsd,
+    model,
+    ...(tutor ? { kind: 'tutor', turns: entry.turns, calls: entry.calls, outcome: entry.outcome, rule: entry.rule } : {}),
+  }).replace(/--/g, '-\\u002d');
+  const block = tutor
+    ? // [v5 τ] tutor dialog: the transcript is the body (tutor.ts renders it)
+      ['', `<!-- qa ${meta} -->`, `### 🧑‍🏫 ${fmtLocal(entry.at)} · ${entry.question}${entry.pick ? ` · đã chọn ${entry.pick}` : ''}`, '', noMarkers(entry.answer.trim()), '']
+    : [
+        '',
+        `<!-- qa ${meta} -->`,
+        `### ❓ ${fmtLocal(entry.at)}${entry.pick ? ` · đã chọn ${entry.pick}` : ''}`,
+        '',
+        ...entry.question.split('\n').map((l) => `> ${l}`),
+        '',
+        ANSWER_HEADING,
+        '',
+        entry.answer.trim(),
+        '',
+      ];
   const prev = fs.readFileSync(file, 'utf8');
-  fs.appendFileSync(file, (prev.endsWith('\n') ? '' : '\n') + block);
+  fs.appendFileSync(file, (prev.endsWith('\n') ? '' : '\n') + block.join('\n'));
 }
+
+const TUTOR_OUTCOMES = new Set(['found', 'revealed', 'gave-up', 'capped', 'ended']);
 
 export function parseQa(text: string): QaEntry[] {
   const src = text.replace(/\r\n?/g, '\n');
   const marks = [...src.matchAll(/^<!-- qa (\{.*\}) -->$/gm)];
   const out: QaEntry[] = [];
   marks.forEach((m, i) => {
-    let meta: { at?: unknown; q?: unknown; pick?: unknown; costUsd?: unknown };
+    let meta: { at?: unknown; q?: unknown; pick?: unknown; costUsd?: unknown; kind?: unknown; turns?: unknown; calls?: unknown; outcome?: unknown; rule?: unknown };
     try {
       meta = JSON.parse(m[1]) as typeof meta;
     } catch {
@@ -231,15 +325,29 @@ export function parseQa(text: string): QaEntry[] {
     }
     if (typeof meta.at !== 'string' || typeof meta.q !== 'string') return;
     const body = src.slice((m.index ?? 0) + m[0].length, i + 1 < marks.length ? marks[i + 1].index : src.length);
-    const k = body.indexOf(ANSWER_HEADING);
-    const answer = (k >= 0 ? body.slice(k + ANSWER_HEADING.length) : '').replace(/\n\s*(---|\*\*\*)\s*$/, '').trim();
-    out.push({
-      at: meta.at,
-      question: meta.q,
-      answer,
+    const common = {
       ...(typeof meta.pick === 'string' && meta.pick ? { pick: meta.pick } : {}),
       ...(typeof meta.costUsd === 'number' ? { costUsd: meta.costUsd } : {}),
-    });
+    };
+    if (meta.kind === 'tutor') {
+      // [v5 τ] the transcript = everything after the "### 🧑‍🏫 …" heading line
+      const transcript = body.replace(/^\s*\n?### [^\n]*\n?/, '').replace(/\n\s*(---|\*\*\*)\s*$/, '').trim();
+      out.push({
+        at: meta.at,
+        question: meta.q,
+        answer: transcript,
+        ...common,
+        kind: 'tutor',
+        ...(typeof meta.turns === 'number' ? { turns: meta.turns } : {}),
+        ...(typeof meta.calls === 'number' ? { calls: meta.calls } : {}),
+        ...(typeof meta.outcome === 'string' && TUTOR_OUTCOMES.has(meta.outcome) ? { outcome: meta.outcome as QaEntry['outcome'] } : {}),
+        ...(typeof meta.rule === 'string' && meta.rule ? { rule: meta.rule } : {}),
+      });
+      return;
+    }
+    const k = body.indexOf(ANSWER_HEADING);
+    const answer = (k >= 0 ? body.slice(k + ANSWER_HEADING.length) : '').replace(/\n\s*(---|\*\*\*)\s*$/, '').trim();
+    out.push({ at: meta.at, question: meta.q, answer, ...common });
   });
   return out.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
@@ -293,7 +401,17 @@ function allQa(): { qid: string; e: QaEntry }[] {
   return out;
 }
 
-/** Number and API-equivalent cost of asks since `sinceMs` (for CostSummary). */
+/**
+ * [v5 τ] AI replies of finished tutor dialogs started on or after `sinceMs` (the daily cap; open dialogs are counted by
+ * tutor.ts). A dialog is attributed to the day it started.
+ */
+export function tutorCallsSince(sinceMs: number): number {
+  let n = 0;
+  for (const { e } of allQa()) if (e.kind === 'tutor' && Date.parse(e.at) >= sinceMs) n += e.calls ?? 1;
+  return n;
+}
+
+/** Number and API-equivalent cost of asks since `sinceMs` (for CostSummary) — [v5 τ] a tutor dialog counts as one ask. */
 export function askCostsSince(sinceMs: number): { count: number; costUsd: number } {
   let count = 0;
   let cost = 0;
@@ -328,13 +446,18 @@ export function qaSnapshotLines(bank: BankState): string[] {
   const recent = all.filter((x) => Date.parse(x.e.at) >= Date.now() - 30 * DAY_MS).length;
   const qids = new Set(all.map((x) => x.qid));
   o.push(
-    `> Câu người học tự hỏi khi xem lại — dấu hiệu khái niệm còn mơ hồ (cân nhắc biến thể/contrast hoặc sửa giải thích). Tổng ${all.length} câu hỏi về ${qids.size} câu · 30 ngày: ${recent}. Chi tiết: \`trainer/coach/qa/<id>.md\`.`,
+    `> Câu người học tự hỏi khi xem lại — dấu hiệu khái niệm còn mơ hồ (cân nhắc biến thể/contrast hoặc sửa giải thích); 🧑‍🏫 = hội thoại với gia sư (quy tắc chốt đã vào \`coach/notebook/\`). Tổng ${all.length} câu hỏi về ${qids.size} câu · 30 ngày: ${recent}. Chi tiết: \`trainer/coach/qa/<id>.md\`.`,
     '',
   );
   for (const { qid, e } of all.slice(0, 15)) {
     const q = bank.byId.get(qid);
     const where = q ? ` (${q.topic}${q.services.length ? ` · ${q.services.slice(0, 3).join(', ')}` : ''})` : ' (⚠️ id không còn trong ngân hàng)';
     const pick = e.pick ? ` · đã chọn ${e.pick}${q ? (e.pick === [...q.answer].sort().join('') ? ' ✓' : ' ✗') : ''}` : '';
+    if (e.kind === 'tutor') {
+      // [v5 τ] a tutor dialog: how it ended + the closing rule (the transcript stays in the file)
+      o.push(`- ${fmtLocal(e.at)} · \`${qid}\`${where}${pick} — 🧑‍🏫 ${oneLine(e.question, 80)}${e.rule ? ` → 📌 ${oneLine(e.rule, 160)}` : ''}`);
+      continue;
+    }
     o.push(`- ${fmtLocal(e.at)} · \`${qid}\`${where}${pick} — ❓ ${oneLine(e.question, 160)} → 💡 ${oneLine(e.answer, 160)}`);
   }
   o.push('');

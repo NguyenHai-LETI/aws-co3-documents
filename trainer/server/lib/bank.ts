@@ -4,6 +4,8 @@ import crypto from 'node:crypto';
 import { PACKS_DIR, TAXONOMY_FILE, rel } from '../config.ts';
 import { loadTaxonomy, outOfScopeIn } from './taxonomy.ts';
 import { parsePack, type ParsedPack } from './pack-format.ts';
+import { clusterIndex } from './clusters.ts';
+import { assignSkills, guideSig } from './exam-guide.ts';
 import type { BankProblem, Pack, Question, Taxonomy } from '../../shared/types.ts';
 
 // ── computed fields: requirement categories (B4) and exam scope (B5) ────────────────────────────────────────
@@ -153,8 +155,12 @@ export function loadBank(): BankState {
     const st = fs.statSync(f);
     return `${f}:${st.mtimeMs}:${st.size}`;
   });
-  const version = crypto.createHash('sha1').update(taxSig + '|' + sigs.join('|')).digest('hex').slice(0, 12);
-  if (bankCache && bankCache.version === version) return bankCache;
+  // [v5] the exam guide + skill cue files are part of the version: they decide the computed Question.skills
+  const version = crypto.createHash('sha1').update(taxSig + '|' + guideSig() + '|' + sigs.join('|')).digest('hex').slice(0, 12);
+  if (bankCache && bankCache.version === version) {
+    clusterIndex(bankCache); // [v5] memo hit unless semantic duplicates arrived since: keeps Question.cluster current
+    return bankCache;
+  }
 
   const packs: Pack[] = [];
   const questions: Question[] = [];
@@ -196,7 +202,13 @@ export function loadBank(): BankState {
   }
   for (const [abs] of fileCache) if (!files.includes(abs)) fileCache.delete(abs);
 
+  // [v5] exam-guide bullets: stored `skills:` win, the others get the keyword guess (exam-guide.ts)
+  for (const { q, id } of assignSkills(questions).unknown) {
+    problems.push({ level: 'warning', file: q.file, line: q.line, qid: q.id, message: `skills "${id}" is not a bullet of bank/exam-guide/SAA-C03.yaml` });
+  }
+
   bankCache = { version, taxonomy: tax, packs, questions, byId, problems };
+  clusterIndex(bankCache); // [v5] fills the computed Question.cluster (sibling clusters, clusters.ts)
   return bankCache;
 }
 

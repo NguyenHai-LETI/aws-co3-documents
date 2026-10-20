@@ -76,6 +76,25 @@ function families(bank: Question[]): (id: string) => string {
 
 const ids = (s: TestSession) => s.questions.map((r) => r.id);
 
+/**
+ * [v5] What the selection rules leave of `list` (in order): siblings of questions answered today buried, one question per
+ * sibling cluster (`Question.cluster` from /api/bank, else the variant family).
+ */
+function ruled(list: Question[], bank: Question[], states: Record<string, QuestionState>): Question[] {
+  const family = families(bank);
+  const key = (q: Question) => q.cluster ?? `v:${family(q.id)}`;
+  const today = new Date().toLocaleDateString('en-CA');
+  const answered = new Set(Object.values(states).filter((s) => s.lastAt && new Date(s.lastAt).toLocaleDateString('en-CA') === today).map((s) => s.id));
+  const hot = new Set(bank.filter((q) => answered.has(q.id)).map(key));
+  const used = new Set<string>();
+  return list.filter((q) => {
+    if (!answered.has(q.id) && hot.has(key(q))) return false;
+    if (used.has(key(q))) return false;
+    used.add(key(q));
+    return true;
+  });
+}
+
 // ── a fresh learner, no sealed forms (the sandbox default) ──────────────────
 
 let env: Env;
@@ -125,9 +144,13 @@ test('Pearson mock: reading-load clock by default, realism on the session, exam-
 
 test("mode 'new': the first N questions of the deterministic, domain-balanced newOrder", T, async () => {
   const states = (await env.api.get<{ states: Record<string, QuestionState> }>('/api/state')).body.states;
-  const expected = newOrder(
-    pool.filter((q) => !states[q.id]),
-    env.meta.domains,
+  const expected = ruled(
+    newOrder(
+      pool.filter((q) => !states[q.id]),
+      env.meta.domains,
+    ),
+    env.bank,
+    states,
   )
     .slice(0, 12)
     .map((q) => q.id);
@@ -167,8 +190,9 @@ test('diagnostic: 28 = 2 per task, deterministic; 2×14 sittings cover different
 test('requirements filter (once the bank tags requirements)', T, async (t) => {
   const tagged = pool.filter((q) => q.requirements?.includes('cost'));
   if (!tagged.length) return t.skip('no question carries `requirements` yet (bank.ts computes them from taxonomy.keywords)');
+  const states = (await env.api.get<{ states: Record<string, QuestionState> }>('/api/state')).body.states;
   const { session, questions } = await buildTest(env.api, { mode: 'custom', count: 500, filters: { requirements: ['cost'] } });
-  assert.equal(session.questions.length, tagged.length);
+  assert.equal(session.questions.length, ruled(tagged, env.bank, states).length, '[v5] one per sibling cluster, today’s siblings buried');
   assert.ok(questions.every((q) => q.requirements?.includes('cost')));
   assert.match(session.title, /Chi phí/);
 });

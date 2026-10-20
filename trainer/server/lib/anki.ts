@@ -6,12 +6,13 @@
 // Questions of a sealed form ([γ] sealed.ts) are never exported, whatever the scope (an explicit id is silently skipped).
 import { applyFilters, modePool } from '../../shared/filters.ts';
 import { sealedIds } from './sealed.ts';
-import type { AnkiExportRequest, AnkiPushResult, AnkiStatus, Question, QuestionState } from '../../shared/types.ts';
+import type { AnkiExportRequest, AnkiPushResult, AnkiStatus, NotebookEntry, Question, QuestionState } from '../../shared/types.ts';
 
 export const ANKI_TAG_ROOT = 'SAA-C03';
 export const ID_TAG = `${ANKI_TAG_ROOT}::id::`;
 export const DEFAULT_MODEL = 'Basic';
-export const ANKI_SCOPES: AnkiExportRequest['scope'][] = ['all', 'filter', 'ids', 'wrong', 'due', 'flagged'];
+export const RULE_TAG = `${ANKI_TAG_ROOT}::rule::`; // [v5] rule cards of the 📒 mistake notebook (one per entry key)
+export const ANKI_SCOPES: AnkiExportRequest['scope'][] = ['all', 'filter', 'ids', 'wrong', 'due', 'flagged', 'notebook'];
 
 // ── selection ───────────────────────────────────────────────────────────────
 
@@ -173,6 +174,35 @@ export function noteGuid(id: string): string {
   return `saa-c03:${id}`;
 }
 
+// ── [v5] rule cards (📒 mistake notebook) and the card abstraction ─────────────
+
+/** One Anki note: a question or a notebook rule. `idTag` finds it again on a push (SAA-C03::id::<qid> / ::rule::<key>). */
+export interface AnkiCardItem {
+  guid: string;
+  idTag: string;
+  front: string;
+  back: string;
+  tags: string[];
+}
+
+/** A notebook entry as a rule card: front = the situation (title or misconception + cues), back = the rule (+ contrast). */
+export function notebookCard(e: NotebookEntry): AnkiCardItem {
+  const key = tagPart(e.key);
+  const cues = e.cues.length ? `<div style='margin-top:.6em;font-size:.85em;opacity:.75'>Dấu hiệu trong đề: ${e.cues.map((c) => escapeHtml(c)).join(' · ')}</div>` : '';
+  const front = `<div style='text-align:left'><div><b>📒 ${escapeHtml(e.title || e.misconception)}</b></div>${e.title ? `<div style='margin-top:.4em'>❌ ${inline(e.misconception)}</div>` : ''}${cues}</div>`;
+  const back =
+    `<div style='text-align:left'><div><b>✅ ${inline(e.rule)}</b></div>` +
+    (e.contrast ? `<div style='margin-top:.4em'>⟷ ${escapeHtml(e.contrast)}</div>` : '') +
+    `<div style='margin-top:.8em;font-size:.75em;opacity:.6'>SAA-C03 · sổ lỗi · ${escapeHtml(e.key)}${e.confident ? ' · 🔥 sai dù chắc chắn' : ''}</div></div>`;
+  const tags = [`${ANKI_TAG_ROOT}::notebook`, `${ANKI_TAG_ROOT}::domain::${tagPart(e.domain)}`, RULE_TAG + key];
+  return { guid: `saa-c03:rule:${e.key}`, idTag: RULE_TAG + key, front, back, tags };
+}
+
+function asCard(x: Question | AnkiCardItem, includeExplanation: boolean): AnkiCardItem {
+  if ('guid' in x) return x;
+  return { guid: noteGuid(x.id), idTag: ID_TAG + tagPart(x.id), front: cardFront(x), back: cardBack(x, includeExplanation), tags: cardTags(x) };
+}
+
 // ── TSV file ────────────────────────────────────────────────────────────────
 
 export interface AnkiNoteOptions {
@@ -184,9 +214,9 @@ export interface AnkiNoteOptions {
 const oneLine = (s: string) => s.replace(/[\t\r\n]+/g, ' ');
 
 /** Anki "Notes in Plain Text" with file headers: columns guid · front · back · tags. */
-export function ankiTsv(questions: Question[], opts: AnkiNoteOptions): string {
+export function ankiTsv(items: (Question | AnkiCardItem)[], opts: AnkiNoteOptions): string {
   const header = ['#separator:tab', '#html:true', `#notetype:${oneLine(opts.model)}`, `#deck:${oneLine(opts.deck)}`, '#guid column:1', '#tags column:4'];
-  const rows = questions.map((q) => [noteGuid(q.id), cardFront(q), cardBack(q, opts.includeExplanation), cardTags(q).join(' ')].map(oneLine).join('\t'));
+  const rows = items.map((x) => asCard(x, opts.includeExplanation)).map((c) => [c.guid, c.front, c.back, c.tags.join(' ')].map(oneLine).join('\t'));
   return [...header, ...rows].join('\n') + '\n';
 }
 
@@ -261,8 +291,9 @@ const CHUNK = 100;
  * canAddNotes (duplicate = same front already in the deck) → addNotes. Connection errors stop the push; per-note
  * errors are counted and listed. HTTP-level success either way (`ok:false` + `hint`).
  */
-export async function pushToAnki(url: string, questions: Question[], opts: AnkiNoteOptions): Promise<AnkiPushResult> {
-  const res: AnkiPushResult = { ok: false, deck: opts.deck, model: opts.model, total: questions.length, added: 0, updated: 0, duplicates: 0, failed: 0, errors: [] };
+export async function pushToAnki(url: string, items: (Question | AnkiCardItem)[], opts: AnkiNoteOptions): Promise<AnkiPushResult> {
+  const cards = items.map((x) => asCard(x, opts.includeExplanation));
+  const res: AnkiPushResult = { ok: false, deck: opts.deck, model: opts.model, total: cards.length, added: 0, updated: 0, duplicates: 0, failed: 0, errors: [] };
   const note = (where: string, e: unknown, count: number) => {
     if ((e as AnkiError).fatal) throw e;
     res.failed += count;
@@ -278,25 +309,29 @@ export async function pushToAnki(url: string, questions: Question[], opts: AnkiN
     const fieldNames = await ankiInvoke<string[]>(url, 'modelFieldNames', { modelName: opts.model });
     if (fieldNames.length < 2) throw new AnkiError(`Loại ghi chú “${opts.model}” chỉ có ${fieldNames.length} trường — cần ít nhất 2 (mặt trước, mặt sau).`);
     const [frontField, backField] = fieldNames;
-    const fields = (q: Question) => ({ [frontField]: cardFront(q), [backField]: cardBack(q, opts.includeExplanation) });
+    const fields = (c: AnkiCardItem) => ({ [frontField]: c.front, [backField]: c.back });
     await ankiInvoke(url, 'createDeck', { deck: opts.deck });
 
-    const existing = await ankiInvoke<number[]>(url, 'findNotes', { query: `${searchTerm('deck', opts.deck)} ${searchTerm('tag', `${ID_TAG}*`, true)}` }, 30_000);
-    const noteOf = new Map<string, number>();
-    for (let i = 0; i < existing.length; i += 500) {
-      const info = await ankiInvoke<{ noteId: number; tags: string[] }[]>(url, 'notesInfo', { notes: existing.slice(i, i + 500) }, 30_000);
-      for (const n of info) for (const t of n.tags ?? []) if (t.toLowerCase().startsWith(ID_TAG.toLowerCase())) noteOf.set(t.slice(ID_TAG.length).toLowerCase(), n.noteId);
+    const prefixes = [...new Set(cards.map((c) => (c.idTag.startsWith(RULE_TAG) ? RULE_TAG : ID_TAG)))];
+    const noteOf = new Map<string, number>(); // id tag (lower case) → note id
+    for (const prefix of prefixes) {
+      const existing = await ankiInvoke<number[]>(url, 'findNotes', { query: `${searchTerm('deck', opts.deck)} ${searchTerm('tag', `${prefix}*`, true)}` }, 30_000);
+      for (let i = 0; i < existing.length; i += 500) {
+        const info = await ankiInvoke<{ noteId: number; tags: string[] }[]>(url, 'notesInfo', { notes: existing.slice(i, i + 500) }, 30_000);
+        for (const n of info) for (const t of n.tags ?? []) if (t.toLowerCase().startsWith(prefix.toLowerCase())) noteOf.set(t.toLowerCase(), n.noteId);
+      }
     }
+    const known = (c: AnkiCardItem) => noteOf.has(c.idTag.toLowerCase());
 
-    const updates = questions.filter((q) => noteOf.has(q.id.toLowerCase()));
+    const updates = cards.filter(known);
     for (let i = 0; i < updates.length; i += CHUNK) {
       const chunk = updates.slice(i, i + CHUNK);
       try {
-        const actions = chunk.map((q) => ({ action: 'updateNoteFields', version: 6, params: { note: { id: noteOf.get(q.id.toLowerCase()), fields: fields(q) } } }));
+        const actions = chunk.map((c) => ({ action: 'updateNoteFields', version: 6, params: { note: { id: noteOf.get(c.idTag.toLowerCase()), fields: fields(c) } } }));
         const out = await ankiInvoke<unknown[]>(url, 'multi', { actions }, 60_000);
         out.forEach((r, j) => {
           const err = r && typeof r === 'object' && 'error' in r ? (r as { error: unknown }).error : null;
-          if (err) note(chunk[j].id, new AnkiError(String(err), hintFor(String(err))), 1);
+          if (err) note(chunk[j].idTag.slice(ANKI_TAG_ROOT.length + 2), new AnkiError(String(err), hintFor(String(err))), 1);
           else res.updated++;
         });
       } catch (e) {
@@ -304,10 +339,10 @@ export async function pushToAnki(url: string, questions: Question[], opts: AnkiN
       }
     }
 
-    const fresh = questions.filter((q) => !noteOf.has(q.id.toLowerCase()));
+    const fresh = cards.filter((c) => !known(c));
     const options = { allowDuplicate: false, duplicateScope: 'deck', duplicateScopeOptions: { deckName: opts.deck, checkChildren: false, checkAllModels: false } };
     for (let i = 0; i < fresh.length; i += CHUNK) {
-      const notes = fresh.slice(i, i + CHUNK).map((q) => ({ deckName: opts.deck, modelName: opts.model, fields: fields(q), tags: cardTags(q), options }));
+      const notes = fresh.slice(i, i + CHUNK).map((c) => ({ deckName: opts.deck, modelName: opts.model, fields: fields(c), tags: c.tags, options }));
       try {
         const can = await ankiInvoke<boolean[]>(url, 'canAddNotes', { notes }, 60_000);
         const addable = notes.filter((_, j) => can[j]);
@@ -328,4 +363,70 @@ export async function pushToAnki(url: string, questions: Question[], opts: AnkiN
     res.hint = (e as AnkiError).hint ?? res.hint;
   }
   return res;
+}
+
+// ── [v5] review import (8-09): reviews done in Anki (AnkiDroid / AnkiMobile synced via AnkiWeb) → an 'anki' attempt ──
+
+/** AnkiConnect cardReviews row: [reviewTime (= review id, ms), cardID, usn, buttonPressed, newInterval, previousInterval, newFactor, reviewDuration (ms), reviewType]. */
+export type AnkiReviewRow = [number, number, number, number, number, number, number, number, number];
+
+export interface ReviewImportInput {
+  url: string;
+  deck: string;
+  bank: { byId: Map<string, Question> };
+  sealed: ReadonlySet<string>;
+  after: number; // last review id imported before (0 = none)
+}
+
+export interface ReviewBatch {
+  reviews: number; // rows read
+  answers: { q: string; grade: 1 | 2 | 3 | 4; t: number; at: number }[]; // mapped to bank questions, chronological
+  skipped: number;
+  from?: number;
+  to?: number;
+}
+
+const MAX_IMPORT = 5000;
+
+/**
+ * Reads the deck's reviews after `after` (AnkiConnect cardReviews), maps each card to its question by the
+ * SAA-C03::id::<qid> tag (cardsInfo → notesInfo) and keeps the graded ones (button 1–4; manual reschedules skipped).
+ * Sealed questions, unknown ids and cards without the tag count as skipped. At most 5,000 reviews per call (oldest first).
+ */
+export async function readAnkiReviews(input: ReviewImportInput): Promise<ReviewBatch> {
+  const rows = (await ankiInvoke<AnkiReviewRow[]>(input.url, 'cardReviews', { deck: input.deck, startID: input.after }, 60_000))
+    .filter((r) => Array.isArray(r) && r[0] > input.after)
+    .sort((a, b) => a[0] - b[0])
+    .slice(0, MAX_IMPORT);
+  const out: ReviewBatch = { reviews: rows.length, answers: [], skipped: 0 };
+  if (!rows.length) return out;
+  out.from = rows[0][0];
+  out.to = rows[rows.length - 1][0];
+  const cardIds = [...new Set(rows.map((r) => r[1]))];
+  const noteOfCard = new Map<number, number>();
+  for (let i = 0; i < cardIds.length; i += 500) {
+    const info = await ankiInvoke<{ cardId: number; note: number }[]>(input.url, 'cardsInfo', { cards: cardIds.slice(i, i + 500) }, 60_000);
+    for (const c of info) if (c && typeof c.cardId === 'number') noteOfCard.set(c.cardId, c.note);
+  }
+  const noteIds = [...new Set(noteOfCard.values())];
+  const qidOfNote = new Map<number, string>();
+  for (let i = 0; i < noteIds.length; i += 500) {
+    const info = await ankiInvoke<{ noteId: number; tags: string[] }[]>(input.url, 'notesInfo', { notes: noteIds.slice(i, i + 500) }, 60_000);
+    for (const n of info) {
+      const tag = (n?.tags ?? []).find((t) => t.toLowerCase().startsWith(ID_TAG.toLowerCase()));
+      if (tag) qidOfNote.set(n.noteId, tag.slice(ID_TAG.length));
+    }
+  }
+  const byLower = new Map([...input.bank.byId.keys()].map((id) => [id.toLowerCase(), id]));
+  for (const r of rows) {
+    const button = r[3];
+    const raw = qidOfNote.get(noteOfCard.get(r[1]) ?? -1);
+    const qid = raw ? byLower.get(raw.toLowerCase()) : undefined;
+    if (!qid || input.sealed.has(qid) || !(button >= 1 && button <= 4)) {
+      out.skipped++;
+      continue;
+    }
+    out.answers.push({ q: qid, grade: button as 1 | 2 | 3 | 4, t: Math.max(1, Math.round((r[7] || 0) / 1000)), at: r[0] });
+  }
+  return out;
 }

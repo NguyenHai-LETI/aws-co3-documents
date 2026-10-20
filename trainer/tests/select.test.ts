@@ -40,7 +40,7 @@ function makeCfg(practice: Partial<AppConfig['practice']> = {}): AppConfig {
   return {
     coach: {
       model: '',
-      models: { analyze: '', generate: '', enrich: '', ask: '', verify: '' },
+      models: { analyze: '', generate: '', enrich: '', ask: '', verify: '', tutor: '', notebook: '' },
       effort: '',
       max_budget_usd: 0,
       skip_if_no_new_results: true,
@@ -53,14 +53,17 @@ function makeCfg(practice: Partial<AppConfig['practice']> = {}): AppConfig {
       max_runs_per_day: 6,
       structured_output: true,
       enrich_after_analyze: false,
-      verify: { auto: false, auto_draft: false, batch_size: 10 },
+      idle_tasks: ['enrich'],
+      twins_per_run: 10,
+      tutor_daily_turns: 40,
+      verify: { auto: false, auto_draft: false, batch_size: 10, grounded: false, local_model: '' },
     },
-    srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 500, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'off', optimize_min_reviews: 400 },
-    practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true, ...practice },
+    srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 500, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'off', optimize_min_reviews: 400, exam_aware: false, final_review_days: 7, new_cutoff_days: 10, load_balance: false, final_retention: 0, leech_lapses: 3, sibling_swap_days: 7 },
+    practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true, today_minutes: 25, relearn: true, ...practice },
     exam: { sealed_forms: 0, sealed_size: 50 },
     stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300 },
-    quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88 },
-    server: { lan: false },
+    quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88, longform_target_per_task: 12 },
+    server: { lan: false, lan_admin: false, https: 'off', https_cert: '', https_key: '' },
     export: { anki_deck: 'test', ankiconnect_url: '' },
     cache: { sqlite: false },
     sync: { data_paths: [], before_ai: false, after_ai: false, auto: 'off', auto_delay_minutes: 4 },
@@ -398,12 +401,25 @@ it('examPick prefers never-seen, then exam-like questions inside each domain quo
     for (const q of qs) if (q.id.includes('-e')) assert.ok(picked.has(q.id), `exam-like ${q.id} preferred`);
     assert.equal(s.realism?.items, 24);
   }
-  // a never-seen short question beats an exam-like one seen before
+  // [v5 C5] ≥ 50 % of a domain quota is exam-like when the pool has them, even when they were seen before: the cost
+  // quota (13 → 7 exam-like wanted) takes all 6 seen exam-like questions, then never-seen short ones
   const states = seen(qs.filter((q) => q.domain === 'cost' && q.id.includes('-e')).map((q) => q.id), {}, 30);
   const s = select.buildTest({ mode: 'exam', count: 65 }, ctxOf({ bank: b, states, sealed: { forms: [], size: 0 } }));
   const cost = ids(s).filter((id) => id.startsWith('cos-'));
   assert.equal(cost.length, 13);
-  assert.ok(cost.every((id) => id.includes('-s')), 'cost quota filled with never-seen questions first');
+  assert.equal(cost.filter((id) => id.includes('-e')).length, 6, 'the exam-like share comes first');
+  assert.ok(cost.filter((id) => id.includes('-s')).every((id) => !states.has(id)), 'the rest: never-seen questions');
+  // a domain with more exam-like questions than half its quota: at least half of the quota is exam-like
+  const many = DOMAINS.flatMap((d) => Array.from({ length: 40 }, (_, i) => (i < 20 ? mkExam(`${SHORT[d]}-e${i}`, d, undefined) : mk(`${SHORT[d]}-s${i}`, d, undefined))));
+  const bm = makeBank(many);
+  const allSeenExam = seen(many.filter((q) => q.id.includes('-e')).map((q) => q.id), {}, 30);
+  const m = select.buildTest({ mode: 'exam', count: 65 }, ctxOf({ bank: bm, states: allSeenExam, sealed: { forms: [], size: 0 } }));
+  const quota: Record<string, number> = { secure: 19, resilient: 17, performance: 16, cost: 13 };
+  for (const d of DOMAINS) {
+    const inD = ids(m).filter((id) => bm.byId.get(id)!.domain === d);
+    assert.equal(inD.length, quota[d]);
+    assert.equal(inD.filter((id) => id.includes('-e')).length, Math.ceil(quota[d] / 2), `${d}: exactly ⌈50 %⌉ seen exam-like, the rest never seen`);
+  }
 });
 
 // ── variant families ────────────────────────────────────────────────────────
@@ -418,7 +434,7 @@ it('a mock never holds a question together with its variant_of relative (either 
   for (let run = 0; run < 30; run++) {
     const s = build(run % 2 ? { mode: 'exam', pearson: true } : { mode: 'exam', count: 120 });
     const f = ids(s).map(family);
-    assert.equal(new Set(f).size, f.length, `run ${run}: two questions of one family`);
+    assert.equal(new Set(f).size, f.length, `run ${run}: two questions of one family: ${ids(s).filter((id, i) => f.indexOf(family(id)) !== i).map((id) => `${id}~${family(id)}`)}`);
   }
   // exam-like variants are preferred → their originals are the ones left out
   const s = build({ mode: 'exam', pearson: true });

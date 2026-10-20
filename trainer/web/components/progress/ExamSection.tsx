@@ -11,6 +11,8 @@ import { WorkloadChart } from './Workload.tsx';
 import { ExternalScores } from './ExternalScores.tsx';
 import { ExamChecklist } from './ExamChecklist.tsx';
 import { SealedPanel } from './SealedPanel.tsx';
+import { GoNoGoCard } from './GoNoGo.tsx';
+import { capacityRows } from '../learning/rules.ts';
 import { StudyBudgetFields, budgetFromGoal, budgetPayload, budgetText, restDaysText, type StudyBudget } from '../onboarding/Onboarding.tsx';
 import { daysLeftText, fmtDay, postProgress, todayKey } from './useProgress.ts';
 import type { ExamForecast, ExamGoal, ProgressResponse } from '../../../shared/types.ts';
@@ -108,7 +110,8 @@ function GoalForm({ goal, passScaled }: { goal: ExamGoal; passScaled: number }) 
   );
 }
 
-function ForecastSummary({ f, targetScaled, passScaled }: { f: ExamForecast; targetScaled: number; passScaled: number }) {
+function ForecastSummary({ f, targetScaled, passScaled, goalMinutes }: { f: ExamForecast; targetScaled: number; passScaled: number; goalMinutes?: number }) {
+  const caps = capacityRows(f, goalMinutes); // [μ v5] capacity-constrained forecast
   const sched = scaledScore(f.onSchedule);
   const stop = scaledScore(f.ifStopNow);
   const gap = targetScaled - sched;
@@ -145,6 +148,28 @@ function ForecastSummary({ f, targetScaled, passScaled }: { f: ExamForecast; tar
           </KvRow>
         )}
       </div>
+      {(f.examAware !== undefined || caps.length > 0) && (
+        <div className="stack sm small lrn-forecast-more">
+          {f.examAware !== undefined && (
+            <KvRow k="Theo lịch bám ngày thi" title="Có ôn chốt trước ngày thi và hạn mức câu mới mỗi ngày (srs.exam_aware)">
+              {scaledScore(f.examAware)}/1000 ({f.examAware}%)
+            </KvRow>
+          )}
+          {caps.length > 0 && (
+            <div>
+              <div className="muted">Nếu mỗi ngày chỉ học:</div>
+              <div className="lrn-cap-rows">
+                {caps.map((c) => (
+                  <span key={c.minutes} className={c.goal ? 'good' : ''} title={`~${c.reviewsPerDay} lượt ôn/ngày`}>
+                    {c.minutes}′ → <b className="num">{c.scaled}</b>
+                    {c.goal ? ' 🎯' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {f.note && <div className="tiny muted">ℹ️ {f.note}</div>}
     </div>
   );
@@ -170,7 +195,7 @@ export function ExamSection({ progress, readiness }: { progress: ProgressRespons
           {forecast && !forecast.seen ? (
             <div className="small muted">Chưa làm câu nào — dự báo điểm cho ngày {fmtDay(forecast.examDate)} sẽ có ngay sau bài test đầu tiên.</div>
           ) : forecast ? (
-            <ForecastSummary f={forecast} targetScaled={targetScaled} passScaled={passScaled} />
+            <ForecastSummary f={forecast} targetScaled={targetScaled} passScaled={passScaled} goalMinutes={goal.minutesPerDay} />
           ) : (
             <div className="small muted">
               Đặt ngày thi để xem đếm ngược, dự báo điểm vào đúng ngày đó (nếu dừng học hôm nay / nếu ôn đúng lịch) và số lượt ôn cần làm tới ngày thi.
@@ -182,6 +207,11 @@ export function ExamSection({ progress, readiness }: { progress: ProgressRespons
           <WorkloadChart days={progress.workload} dailyLimit={meta.srs.daily_limit} examDate={goal.examDate} />
         </div>
       </div>
+      {progress.goNoGo && (
+        <div className="lrn-gap">
+          <GoNoGoCard g={progress.goNoGo} />
+        </div>
+      )}
       <div className="grid c2 lrn-gap lrn-align-start">
         <ExamChecklist progress={progress} />
         <SealedPanel progress={progress} />

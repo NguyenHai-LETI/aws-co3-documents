@@ -15,7 +15,8 @@ import type { BankState } from './bank.ts';
 import { detectFeatures, detectServices } from './classify.ts';
 import { isUnviewed } from './regrade.ts';
 import { sealedIds } from './sealed.ts';
-import type { Attempt, ConfusionPair, Question, Taxonomy } from '../../shared/types.ts';
+import { compareRates } from '../../shared/evidence.ts'; // [v5] transfer warnings only with evidence
+import type { Attempt, ConfusionPair, Question, Taxonomy, TransferStats } from '../../shared/types.ts';
 
 export const CONFUSION_RULES = {
   minPicks: 4, // picks of X when the key was Y
@@ -106,9 +107,9 @@ function tallyPairs(attempts: Attempt[], bank: BankState): { pairs: Map<string, 
   const perQ = new Map<string, { q: Question; n: number; picked: Map<string, number> }>();
   let wrongPicks = 0;
   for (const a of attempts) {
-    if (a.rushed) continue;
+    if (a.rushed || a.mode === 'retest') continue; // [v5] retests re-ask just-corrected questions
     for (const r of a.answers) {
-      if (!r.pick || isUnviewed(r)) continue;
+      if (!r.pick || isUnviewed(r) || r.relearn || r.skipped || r.grade !== undefined) continue;
       const q = bank.byId.get(r.q);
       if (!q || (r.h && r.h !== q.hash)) continue; // another version of the options was on screen
       let e = perQ.get(q.id);
@@ -228,4 +229,90 @@ export function confusionPairs(attempts: Attempt[], bank: BankState, options: Co
     if (members.length) pair.merged = members;
     return pair;
   });
+}
+
+// ── [v5 · λ] transfer metric ─────────────────────────────────────────────────
+//
+// Transfer = the first answer to a question whose sibling (same cluster, Question.cluster from γ1's clusterIndex) had
+// last been answered right — the concept carried over to a new wording. Repeat = any later answer to the same question.
+// Both counted over stats samples (no skipped / relearn / retest / self-graded answers) of the last TRANSFER_DAYS days;
+// the "answered right before" history uses every real answer since the beginning. A warning ("đang thuộc mặt chữ") is
+// only raised when the evidence shield says repeats are really above transfers (compareRates verdict 'above').
+
+/** TransferStats window (days). */
+export const TRANSFER_DAYS = 30;
+const DAY = 86_400_000;
+
+type Tally = { answers: number; correct: number };
+const tally = (t: Tally, ok: boolean) => {
+  t.answers++;
+  if (ok) t.correct++;
+};
+const pct1 = (t: Tally) => (t.answers ? Math.round((1000 * t.correct) / t.answers) / 10 : 0);
+
+const transferMemo = new WeakMap<Attempt[], { key: string; value: TransferStats }>();
+
+/** First tries on a sibling of a question already answered right vs repeats of the same question, by topic. */
+export function transferStats(attempts: Attempt[], bank: BankState, opts: { now?: number; sealed?: Set<string> } = {}): TransferStats {
+  const now = opts.now ?? Date.now();
+  const key = `${bank.version}|${Math.floor(now / DAY)}`;
+  const hit = transferMemo.get(attempts);
+  if (hit?.key === key) return hit.value;
+  const since = now - TRANSFER_DAYS * DAY;
+  const ordered = attempts
+    .filter((a) => !a.rushed)
+    .map((a, i) => ({ a, i, at: Date.parse(a.finished) || 0 }))
+    .sort((x, y) => x.at - y.at || x.i - y.i);
+  const lastOk = new Map<string, boolean>(); // per question: was its latest real answer right?
+  const rightInCluster = new Map<string, Set<string>>(); // cluster → members whose latest answer is right
+  const out: TransferStats = { days: TRANSFER_DAYS, transfer: { answers: 0, correct: 0 }, repeat: { answers: 0, correct: 0 }, byTopic: [], warnings: [] };
+  const topics = new Map<string, { transfer: Tally; repeat: Tally }>();
+  for (const { a, at } of ordered) {
+    const sample = at >= since && a.mode !== 'retest' && a.source !== 'anki' && a.source !== 'listen';
+    for (const r of a.answers) {
+      if (r.relearn || r.skipped || isUnviewed(r)) continue;
+      const q = bank.byId.get(r.q);
+      const ok = r.grade !== undefined ? r.grade >= 3 : r.ok;
+      const cluster = q?.cluster;
+      if (q && sample && r.grade === undefined && !opts.sealed?.has(r.q)) {
+        const t = topics.get(q.topic) ?? { transfer: { answers: 0, correct: 0 }, repeat: { answers: 0, correct: 0 } };
+        topics.set(q.topic, t);
+        if ((r.exposure ?? (lastOk.has(r.q) ? 2 : 1)) > 1) {
+          tally(out.repeat, ok);
+          tally(t.repeat, ok);
+        } else if (cluster && [...(rightInCluster.get(cluster) ?? [])].some((id) => id !== r.q)) {
+          tally(out.transfer, ok);
+          tally(t.transfer, ok);
+        }
+      }
+      lastOk.set(r.q, ok);
+      if (cluster) {
+        let set = rightInCluster.get(cluster);
+        if (!set) rightInCluster.set(cluster, (set = new Set()));
+        if (ok) set.add(r.q);
+        else set.delete(r.q);
+      }
+    }
+  }
+  const label = (id: string) => {
+    const t = bank.taxonomy.topics.find((x) => x.id === id);
+    return t ? `${t.icon} ${t.label}` : id;
+  };
+  out.byTopic = [...topics]
+    .filter(([, t]) => t.transfer.answers > 0)
+    .map(([topic, t]) => {
+      const row: TransferStats['byTopic'][number] = { topic, label: label(topic), transfer: t.transfer, repeat: t.repeat };
+      if (t.repeat.answers) row.gap = Math.round((pct1(t.repeat) - pct1(t.transfer)) * 10) / 10;
+      return row;
+    })
+    .sort((x, y) => (y.gap ?? -999) - (x.gap ?? -999) || x.topic.localeCompare(y.topic));
+  const memorizing = (rep: Tally, tr: Tally) => compareRates(rep.correct, rep.answers, tr.correct, tr.answers).verdict === 'above';
+  if (memorizing(out.repeat, out.transfer))
+    out.warnings.push(`Có thể bạn đang thuộc mặt chữ: đúng ${pct1(out.repeat)}% khi gặp lại câu cũ nhưng chỉ ${pct1(out.transfer)}% ở lần đầu gặp câu anh em (${out.transfer.answers} câu).`);
+  for (const row of out.byTopic) {
+    if (memorizing(row.repeat, row.transfer))
+      out.warnings.push(`${row.label}: đúng ${pct1(row.repeat)}% câu lặp lại nhưng ${pct1(row.transfer)}% câu anh em lần đầu — học theo khái niệm thay vì nhớ đáp án.`);
+  }
+  transferMemo.set(attempts, { key, value: out });
+  return out;
 }

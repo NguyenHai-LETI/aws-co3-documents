@@ -6,17 +6,23 @@
 //   generate/longform → one new pack written with serializePack after per-question checks (schema, parse, option
 //                       letters, hint, lint, ids)
 // The runner sends the failures back once (`--resume <session_id>`); whatever still fails is skipped and reported.
+// [v5] γ2: `twins` (paraphrase / contrast siblings of questions due soon, `variant_of` = the original) and `family`
+// (qualifier families: one scenario + one shared option set, 2–4 final questions with different requirements and keys,
+// `family: <id>`) are packs too; generate / longform may target exam-guide bullets (`skills`). Questions a pack adds are
+// recorded for "↩️ Hoàn tác" (undo.ts) before the pack is written.
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { PACKS_DIR, REPO_DIR, rel } from '../config.ts';
-import type { BankState } from './bank.ts';
+import { stemRequirements, type BankState } from './bank.ts';
 import { stringifyFrontMatter } from './frontmatter.ts';
 import { correctIsLongest, hintReveals, lintDelta, type LintFn } from './patch.ts';
-import { CHOOSE_RE, ID_RE, LETTER_REF_RE, parsePack, serializePack, type QuestionDraft } from './pack-format.ts';
+import { familyFlaws } from './lint.ts';
+import { CHOOSE_RE, ID_RE, LETTER_REF_RE, SKILL_ID_RE, parsePack, serializePack, type QuestionDraft } from './pack-format.ts';
 import { normalizeDomain } from './taxonomy.ts';
+import { recordCreated } from './undo.ts';
 import { countWords, estimateQuestionTime } from '../../shared/timing.ts';
-import type { Difficulty, PackOrigin, Taxonomy } from '../../shared/types.ts';
+import type { Difficulty, PackOrigin, Question, Taxonomy } from '../../shared/types.ts';
 
 export const MIN_EXPLANATION_WORDS = 25; // same bar as ENRICH `explain`
 export const MAX_NEW_QUESTIONS = 60;
@@ -53,6 +59,7 @@ export const ENRICH_SCHEMA = {
               refs: strList(),
               hint: { type: 'string', description: '1 dòng tiếng Việt ≤ 140 ký tự, không lộ đáp án' },
               variant_of: strList(),
+              skills: strList('mục đề cương (exam guide) câu thật sự kiểm tra, vd "3.5.s7" — 1–3 mục'),
             },
             additionalProperties: false,
           },
@@ -91,6 +98,7 @@ const QUESTION_SCHEMA = {
     variant_of: strList('id câu gốc (câu dài: bắt buộc)'),
     concept: { type: 'string' },
     refs: strList('file notes nguồn, vd 03-database-services.md#rds-proxy'),
+    skills: strList('mục đề cương (exam guide) câu kiểm tra, vd "3.5.s7" — 1–3 mục; lượt có danh sách mục: ít nhất một mục trong đó'),
     hint: { type: 'string', description: '1 dòng tiếng Việt ≤ 140 ký tự, không lộ đáp án' },
     stem: { type: 'string', description: 'đề tiếng Anh; câu nhiều đáp án ghi "(Choose TWO)"' },
     options: { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 6, description: 'nội dung các lựa chọn theo thứ tự A, B, C…, không ghi tiền tố "A."' },
@@ -101,20 +109,22 @@ const QUESTION_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+const PACK_META_SCHEMA = {
+  type: 'object',
+  properties: {
+    slug: { type: 'string', description: '2–4 từ kebab-case mô tả chủ đề' },
+    title: { type: 'string' },
+    description: { type: 'string' },
+  },
+  required: ['slug', 'title'],
+  additionalProperties: false,
+} as const;
+
 /** generate / longform: pack meta + new questions (ids, time, created/enriched are set by the app). */
 export const PACK_SCHEMA = {
   type: 'object',
   properties: {
-    pack: {
-      type: 'object',
-      properties: {
-        slug: { type: 'string', description: '2–4 từ kebab-case mô tả chủ đề' },
-        title: { type: 'string' },
-        description: { type: 'string' },
-      },
-      required: ['slug', 'title'],
-      additionalProperties: false,
-    },
+    pack: PACK_META_SCHEMA,
     questions: { type: 'array', items: QUESTION_SCHEMA },
     summary: { type: 'string', description: '3–5 dòng tóm tắt tiếng Việt' },
   },
@@ -122,11 +132,91 @@ export const PACK_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export type StructuredTask = 'generate' | 'enrich' | 'longform';
-export const STRUCTURED_TASKS: readonly string[] = ['generate', 'enrich', 'longform'];
+export const TWIN_KINDS = ['surface', 'contrast'] as const;
+export type TwinKind = (typeof TWIN_KINDS)[number];
+
+/** [v5] twins: one sibling per original of the batch — `variant_of` = [original], `kind` = what the batch asked for. */
+export const TWINS_SCHEMA = {
+  type: 'object',
+  properties: {
+    pack: PACK_META_SCHEMA,
+    questions: {
+      type: 'array',
+      items: {
+        ...QUESTION_SCHEMA,
+        properties: {
+          ...QUESTION_SCHEMA.properties,
+          variant_of: strList('[id câu gốc] — đúng một câu gốc của lô'),
+          kind: { type: 'string', enum: [...TWIN_KINDS], description: 'surface = diễn đạt lại (cùng khái niệm, cùng yêu cầu); contrast = đổi một yêu cầu để một phương án nhiễu thành đúng' },
+        },
+        required: [...QUESTION_SCHEMA.required, 'variant_of', 'kind'],
+      },
+    },
+    summary: { type: 'string', description: '2–4 dòng tóm tắt tiếng Việt' },
+  },
+  required: ['pack', 'questions', 'summary'],
+  additionalProperties: false,
+} as const;
+
+/** Requirement categories a family member may ask for (taxonomy.keywords groups, shared/labels.ts REQUIREMENTS minus negative). */
+export const FAMILY_ASKS = ['cost', 'ops', 'resilient', 'performance', 'secure'] as const;
+
+const FAMILY_MEMBER_SCHEMA = {
+  type: 'object',
+  properties: {
+    ask: { type: 'string', enum: [...FAMILY_ASKS], description: 'yêu cầu câu hỏi cuối nhấn mạnh: cost | ops | resilient | performance | secure' },
+    question: { type: 'string', description: 'CHỈ câu hỏi cuối (tiếng Anh) có qualifier rõ, vd "Which solution meets these requirements MOST cost-effectively?"' },
+    answer: { type: 'array', items: { type: 'string', enum: LETTERS.slice(0, 5) }, minItems: 1, maxItems: 2 },
+    explanation: { type: 'string', description: 'vì sao lựa chọn này thắng VỚI YÊU CẦU NÀY + các lựa chọn khác theo nội dung + dòng "> 🇻🇳 …"' },
+    hint: { type: 'string', description: '1 dòng tiếng Việt ≤ 140 ký tự, không lộ đáp án' },
+    domain: { type: 'string', enum: DOMAINS, description: 'tuỳ chọn: domain riêng của câu này (mặc định của họ)' },
+    task: { type: 'string', description: 'tuỳ chọn: task riêng của câu này, cùng domain' },
+  },
+  required: ['ask', 'question', 'answer', 'explanation', 'hint'],
+  additionalProperties: false,
+} as const;
+
+/** [v5] family: qualifier families — the app writes one question per member (stem = scenario + final question). */
+export const FAMILY_SCHEMA = {
+  type: 'object',
+  properties: {
+    pack: PACK_META_SCHEMA,
+    families: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: 'chỉ ghi ở vòng sửa lỗi: id họ app đã gán' },
+          domain: { type: 'string', enum: DOMAINS },
+          task: { type: 'string', description: 'task statement 1.1–4.4, cùng domain' },
+          topic: { type: 'string', description: 'topic id trong taxonomy.yaml' },
+          services: strList('tên chuẩn trong taxonomy.yaml → services'),
+          tags: strList('kebab-case'),
+          difficulty: { type: 'string', enum: DIFFICULTIES },
+          concept: { type: 'string' },
+          refs: strList('file notes nguồn'),
+          skills: strList('mục đề cương (exam guide), vd "2.2.s3"'),
+          scenario: { type: 'string', description: 'tình huống chung tiếng Anh 50–110 từ (công ty, kiến trúc, ràng buộc) — KHÔNG có câu hỏi cuối' },
+          options: { type: 'array', items: { type: 'string' }, minItems: 4, maxItems: 5, description: 'bộ lựa chọn dùng chung (nội dung theo thứ tự A, B, C…, không tiền tố "A.") — mỗi lựa chọn là giải pháp chạy được' },
+          members: { type: 'array', items: FAMILY_MEMBER_SCHEMA, minItems: 2, maxItems: 4 },
+        },
+        required: ['domain', 'task', 'topic', 'services', 'tags', 'difficulty', 'concept', 'scenario', 'options', 'members'],
+        additionalProperties: false,
+      },
+    },
+    summary: { type: 'string', description: '2–4 dòng tóm tắt tiếng Việt' },
+  },
+  required: ['pack', 'families', 'summary'],
+  additionalProperties: false,
+} as const;
+
+export type StructuredTask = 'generate' | 'enrich' | 'longform' | 'twins' | 'family';
+export const STRUCTURED_TASKS: readonly string[] = ['generate', 'enrich', 'longform', 'twins', 'family'];
+/** Tasks whose answer is a new pack (questions, or families → questions). */
+export type PackTask = Exclude<StructuredTask, 'enrich'>;
 
 export function schemaFor(task: StructuredTask): Record<string, unknown> {
-  return task === 'enrich' ? ENRICH_SCHEMA : PACK_SCHEMA;
+  return task === 'enrich' ? ENRICH_SCHEMA : task === 'twins' ? TWINS_SCHEMA : task === 'family' ? FAMILY_SCHEMA : PACK_SCHEMA;
 }
 
 /** The structured answer of a CLI `result` line: `structured_output`, else the JSON text in `result` (``` fences ok). */
@@ -229,25 +319,37 @@ function writeAtomic(file: string, text: string): void {
 // ── generate / longform: questions → new pack ───────────────────────────────
 
 export interface PackTarget {
-  kind: 'generate' | 'longform';
+  kind: PackTask;
   runId: string;
   today: string; // YYYY-MM-DD
   sources?: string[]; // generate: files the questions come from
   slug?: string; // generate: slug suggested by the learner
-  packFile?: string; // longform: repo-relative path with <slug> (prepared with the batch)
-  packId?: string; // longform
-  idPrefix?: string; // longform: question ids <idPrefix><nn>
-  originals?: string[]; // longform: the short questions to write variants of
-  batch?: string; // longform: batch file (front matter `source`)
+  packFile?: string; // longform / twins / family: repo-relative path with <slug> (prepared with the batch)
+  packId?: string; // longform / twins / family
+  idPrefix?: string; // longform / twins / family: question ids <idPrefix><nn>
+  originals?: string[]; // longform / twins: the questions to write variants of
+  batch?: string; // longform / twins / family: batch file (front matter `source`)
+  skills?: string[]; // [v5] generate / longform: exam-guide bullets the run targets (params.skills)
+  twinKinds?: Record<string, TwinKind>; // [v5] twins: what the batch asked for per original
+  familyPrefix?: string; // [v5] family: family ids <familyPrefix><n>
 }
 
 export interface PackPlan {
+  kind: PackTask;
   packId: string;
   file: string; // absolute
   origin: PackOrigin;
   meta: { pack: string; title: string; origin: PackOrigin; created: string; generated_by: string; source?: string; description?: string };
   idOf: (i: number) => string;
+  familyOf: (i: number) => string; // [v5] family task: id of the i-th family
 }
+
+/** Pack naming of the tasks that write variants of prepared questions (longform, twins) or families. */
+const BATCH_PACKS: Record<Exclude<PackTask, 'generate'>, { word: string; slug: string; title: string; description: string; ids: string }> = {
+  longform: { word: 'longform', slug: 'cau-dai', title: 'Câu dài chuẩn đề thi', description: 'Biến thể dài (60–120 từ) của các câu ngắn hay gặp/hay sai', ids: 'lf' },
+  twins: { word: 'twins', slug: 'song-sinh', title: 'Câu song sinh', description: 'Câu song sinh (diễn đạt lại / tương phản) của các câu sắp ôn — chống học vẹt', ids: 'tw' },
+  family: { word: 'family', slug: 'ho-cau', title: 'Họ câu đổi yêu cầu', description: 'Cùng tình huống, cùng lựa chọn — câu hỏi cuối (yêu cầu) khác nhau thì đáp án khác nhau', ids: 'fa' },
+};
 
 /** kebab-case slug from free text (Vietnamese diacritics removed), ≤ 40 chars. */
 export function slugify(s: string): string {
@@ -275,6 +377,7 @@ export function planPack(t: PackTarget, out: Record<string, unknown> | undefined
     for (let n = 2; taken(`doc-${slug}`, path.join(PACKS_DIR, 'docs', `${t.today}-${slug}.md`)); n++) slug = `${base}-${n}`;
     const packId = `doc-${slug}`;
     return {
+      kind: 'generate',
       packId,
       file: path.join(PACKS_DIR, 'docs', `${t.today}-${slug}.md`),
       origin: 'doc',
@@ -288,30 +391,36 @@ export function planPack(t: PackTarget, out: Record<string, unknown> | undefined
         ...(str(meta.description) ? { description: str(meta.description) } : {}),
       },
       idOf: (i) => `${packId}-${nn(i)}`,
+      familyOf: (i) => `${packId}-f${i + 1}`,
     };
   }
-  const slug = slugify(str(meta.slug)) || 'cau-dai';
-  const template = t.packFile ?? `${path.join(PACKS_DIR, 'ai')}/${t.today}-longform-<slug>.md`;
+  const info = BATCH_PACKS[t.kind];
+  const slug = slugify(str(meta.slug)) || info.slug;
+  const template = t.packFile ?? `${path.join(PACKS_DIR, 'ai')}/${t.today}-${info.word}-<slug>.md`;
   let file = path.resolve(REPO_DIR, template.replace('<slug>', slug));
   for (let n = 2; fs.existsSync(file); n++) file = path.resolve(REPO_DIR, template.replace('<slug>', `${slug}-${n}`));
-  const basePack = t.packId ?? `ai-${t.today}-longform`;
+  const basePack = t.packId ?? `ai-${t.today}-${info.word}`;
   let packId = basePack;
   for (let n = 2; bank.packs.some((p) => p.id === packId); n++) packId = `${basePack}-${n}`;
   const title = str(meta.title);
+  const idPrefix = t.idPrefix ?? `${packId}-${info.ids}`;
+  const familyPrefix = t.familyPrefix ?? `${idPrefix.replace(new RegExp(`-?${info.ids}$`), '')}-f`;
   return {
+    kind: t.kind,
     packId,
     file,
     origin: 'ai',
     meta: {
       pack: packId,
-      title: /^AI ·/.test(title) ? title : `AI · Câu dài chuẩn đề thi · ${title || slug}`,
+      title: /^AI ·/.test(title) ? title : `AI · ${info.title} · ${title || slug}`,
       origin: 'ai',
       created: t.today,
       generated_by: t.runId,
       ...(t.batch ? { source: t.batch } : {}),
-      description: 'Biến thể dài (60–120 từ) của các câu ngắn hay gặp/hay sai',
+      description: info.description,
     },
-    idOf: (i) => `${t.idPrefix ?? `${packId}-lf`}${nn(i)}`,
+    idOf: (i) => `${idPrefix}${nn(i)}`,
+    familyOf: (i) => `${familyPrefix}${i + 1}`,
   };
 }
 
@@ -324,8 +433,30 @@ function list(v: unknown): string[] {
   return [...new Set(a.map((x) => oneLine(String(x))).filter(Boolean))];
 }
 
+export interface DraftContext {
+  tax: Taxonomy;
+  today: string;
+  kind: PackTask;
+  originals?: string[]; // longform / twins: allowed variant_of ids
+  bank?: BankState;
+  skills?: string[]; // [v5] bullets the run targets (generate: each question must name one of them)
+  knownSkills?: ReadonlySet<string>; // [v5] bullets of the exam guide (empty = guide not loaded: only the id format is checked)
+  family?: string; // [v5] family task: the family id of this member
+}
+
+/** [v5] Exam-guide bullets a question names: valid ids only (lower-case, unique); unknown / malformed ones are warned and dropped. */
+export function skillList(v: unknown, known: ReadonlySet<string> | undefined, warnings: string[]): string[] {
+  const out: string[] = [];
+  for (const s of list(v).map((x) => x.toLowerCase())) {
+    if (!SKILL_ID_RE.test(s)) warnings.push(`skills "${s}" không đúng dạng mục đề cương (<task>.k<n> / <task>.s<n>) — bỏ qua`);
+    else if (known?.size && !known.has(s)) warnings.push(`skills "${s}" không có trong đề cương (bank/exam-guide) — bỏ qua`);
+    else if (!out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
 /** One new question from the structured answer → serializable draft + schema errors (no I/O). */
-export function draftOf(raw: unknown, id: string, ctx: { tax: Taxonomy; today: string; kind: 'generate' | 'longform'; originals?: string[]; bank?: BankState }): { draft?: QuestionDraft; errors: string[]; warnings: string[] } {
+export function draftOf(raw: unknown, id: string, ctx: DraftContext): { draft?: QuestionDraft; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { errors: ['câu hỏi phải là một object'], warnings };
@@ -378,13 +509,23 @@ export function draftOf(raw: unknown, id: string, ctx: { tax: Taxonomy; today: s
   else if (hint.length > 200) warnings.push(`hint dài ${hint.length} ký tự — nên ≤ 140`);
 
   const variantOf = list(r.variant_of);
-  if (ctx.kind === 'longform') {
-    if (!variantOf.length) errors.push('câu dài phải có variant_of = id câu gốc');
+  if (ctx.kind === 'longform' || ctx.kind === 'twins') {
+    const what = ctx.kind === 'longform' ? 'câu dài' : 'câu song sinh';
+    if (!variantOf.length) errors.push(`${what} phải có variant_of = id câu gốc`);
+    else if (ctx.kind === 'twins' && variantOf.length > 1) errors.push(`câu song sinh chỉ có một câu gốc (variant_of: ${variantOf.join(', ')})`);
     else if (ctx.originals && variantOf.some((v) => !ctx.originals!.includes(v))) errors.push(`variant_of ${variantOf.join(', ')} không phải câu gốc của lô (${ctx.originals.join(', ')})`);
     const min = tax.timing.long_form_min_words ?? 55;
-    if (stem && countWords(stem) < min) errors.push(`đề chỉ ${countWords(stem)} từ — câu dài cần ≥ ${min} từ (nên 60–120)`);
+    if (ctx.kind === 'longform' && stem && countWords(stem) < min) errors.push(`đề chỉ ${countWords(stem)} từ — câu dài cần ≥ ${min} từ (nên 60–120)`);
+  } else if (ctx.kind === 'family') {
+    if (variantOf.length) warnings.push('câu trong họ không ghi variant_of — bỏ qua');
   } else if (ctx.bank) {
     for (const v of variantOf) if (!ctx.bank.byId.has(v)) warnings.push(`variant_of "${v}" không có trong ngân hàng`);
+  }
+  // [v5] exam-guide bullets: a run that targets bullets wants each new question on one of them
+  const skills = skillList(r.skills, ctx.knownSkills, warnings);
+  if (ctx.skills?.length && !skills.some((s) => ctx.skills!.includes(s))) {
+    if (ctx.kind === 'generate') errors.push(`câu phải nhắm ít nhất một mục đề cương của lượt này (skills: ${ctx.skills.join(', ')})`);
+    else warnings.push(`câu không ghi mục đề cương nào của lượt này (${ctx.skills.join(', ')})`);
   }
   if (!ID_RE.test(id) || id.length > 60) errors.push(`id "${id}" không hợp lệ`);
   if (errors.length || !domain) return { errors, warnings };
@@ -401,7 +542,7 @@ export function draftOf(raw: unknown, id: string, ctx: { tax: Taxonomy; today: s
     tags: list(r.tags),
     difficulty,
     time: estimateQuestionTime({ stem, options, answer, difficulty }, tax.timing),
-    variantOf,
+    variantOf: ctx.kind === 'family' ? [] : variantOf,
     concept: str(r.concept) || undefined,
     refs: list(r.refs),
     task,
@@ -409,9 +550,170 @@ export function draftOf(raw: unknown, id: string, ctx: { tax: Taxonomy; today: s
     created: ctx.today,
     // fully written (explanation + hint + task) → ENRICH need not pick it up again
     enriched: hint && countWords(explanation) >= MIN_EXPLANATION_WORDS ? ctx.today : undefined,
+    ...(skills.length ? { skills } : {}),
+    ...(ctx.family ? { family: ctx.family } : {}),
   };
   return { draft, errors, warnings };
 }
+
+// ── [v5] twins: sibling checks ──────────────────────────────────────────────
+
+const words = (s: string) => new Set((s.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []).filter((w) => !/^\d+$/.test(w)));
+
+/** Word overlap of two texts (Jaccard over words of ≥ 3 letters). */
+export function wordOverlap(a: string, b: string): number {
+  const x = words(a);
+  const y = words(b);
+  if (!x.size || !y.size) return 0;
+  let common = 0;
+  for (const w of x) if (y.has(w)) common++;
+  return common / (x.size + y.size - common);
+}
+
+const keyText = (q: Pick<QuestionDraft, 'options' | 'answer'>) =>
+  q.answer
+    .map((k) => q.options.find((o) => o.key === k)?.text ?? '')
+    .map((t) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim())
+    .sort()
+    .join(' | ');
+
+export const SURFACE_MAX_OVERLAP = 0.6; // a paraphrase sharing more of the original's stem words is a copy
+
+/**
+ * A twin against its original: a `surface` twin must really be reworded (stem word overlap < SURFACE_MAX_OVERLAP); a
+ * `contrast` twin must move the key (its correct option text differs from the original's — one changed requirement
+ * makes a former distractor right).
+ */
+export function twinChecks(d: QuestionDraft, original: Question | undefined, kind: TwinKind, said?: unknown): { errors: string[]; warnings: string[] } {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  if (said !== undefined && said !== kind) warnings.push(`kind "${String(said)}" khác loại lô yêu cầu (${kind}) — kiểm tra theo ${kind}`);
+  if (!original) return { errors, warnings };
+  const overlap = wordOverlap(d.stem, original.stem);
+  if (kind === 'surface' && overlap >= SURFACE_MAX_OVERLAP) {
+    errors.push(`đề trùng ${Math.round(overlap * 100)}% từ với câu gốc — câu song sinh "diễn đạt lại" phải đổi bối cảnh / ngành / số liệu / câu chữ (giữ khái niệm và yêu cầu)`);
+  }
+  if (kind === 'contrast' && keyText(d) === keyText(original)) {
+    errors.push('câu tương phản phải đổi đáp án đúng: đổi MỘT yêu cầu của tình huống để một phương án nhiễu (của câu gốc) trở thành đúng');
+  }
+  if (d.options.length !== original.options.length || d.answer.length !== original.answer.length) {
+    warnings.push(`câu gốc có ${original.options.length} lựa chọn / ${original.answer.length} đáp án — câu song sinh nên giữ đúng dạng đó (có ${d.options.length} / ${d.answer.length})`);
+  }
+  if (kind === 'surface' && keyText(d) !== keyText(original) && wordOverlap(keyText(d), keyText(original)) < 0.2) {
+    warnings.push('câu "diễn đạt lại" có đáp án khác hẳn câu gốc — kiểm tra vẫn cùng khái niệm');
+  }
+  return { errors, warnings };
+}
+
+// ── [v5] family: one scenario, one option set, 2–4 final questions ──────────
+
+export interface FamilyMemberDraft {
+  id: string;
+  draft?: QuestionDraft;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface FamilyBuild {
+  id: string; // family id
+  label?: string; // start of the scenario (log)
+  members: FamilyMemberDraft[];
+  errors: string[]; // family-level (options, members, answers)
+  warnings: string[];
+}
+
+const QUALIFIER_WORD = /\b(MOST|LEAST|BEST|FASTEST|CHEAPEST|LOWEST|HIGHEST|FEWEST)\b/;
+
+/**
+ * A family from the structured answer → one draft per member: stem = scenario + final question, options shared, its
+ * own key / explanation / hint, `family: <id>`. Family rules: 2–4 members, distinct shared options, every final question
+ * names a requirement (qualifier), no two members ask the same requirement and no two share a key (only the final
+ * question may change the answer). Member ids come from `idOf(n)` — consecutive over the whole pack.
+ */
+export function familyDrafts(raw: unknown, familyId: string, firstIndex: number, idOf: (i: number) => string, ctx: Omit<DraftContext, 'kind' | 'family'>): FamilyBuild {
+  const out: FamilyBuild = { id: familyId, members: [], errors: [], warnings: [] };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    out.errors.push('họ câu phải là một object');
+    return out;
+  }
+  const r = raw as Record<string, unknown>;
+  const scenario = typeof r.scenario === 'string' ? r.scenario.replace(/\r\n?/g, '\n').trim() : '';
+  out.label = stemLabelOf(scenario);
+  if (!scenario) out.errors.push('scenario rỗng');
+  else if (/\?\s*$/.test(scenario)) out.warnings.push('scenario kết thúc bằng câu hỏi — câu hỏi cuối thuộc về từng câu (members[].question)');
+  const options = (Array.isArray(r.options) ? r.options : []).map((o) => oneLine(String(o ?? '')).replace(/^\(?[A-H][.):]\s+/, ''));
+  if (options.length < 4 || options.length > 5) out.errors.push(`họ câu cần 4–5 lựa chọn dùng chung (có ${options.length})`);
+  const norm = options.map((o) => o.toLowerCase());
+  if (new Set(norm).size !== norm.length) out.errors.push('hai lựa chọn trùng nhau');
+  const members = Array.isArray(r.members) ? (r.members as unknown[]) : [];
+  if (members.length < 2 || members.length > 4) out.errors.push(`họ câu cần 2–4 câu (có ${members.length})`);
+  const keys = new Map<string, number>();
+  const asks = new Map<string, number>();
+  members.slice(0, 4).forEach((m, i) => {
+    const id = idOf(firstIndex + i);
+    const mm = m && typeof m === 'object' && !Array.isArray(m) ? (m as Record<string, unknown>) : {};
+    const question = typeof mm.question === 'string' ? oneLine(mm.question) : '';
+    const member: FamilyMemberDraft = { id, errors: [], warnings: [] };
+    if (!question) member.errors.push('thiếu câu hỏi cuối (question)');
+    const ask = str(mm.ask);
+    const found = question ? stemRequirements(question, ctx.tax).filter((c) => (FAMILY_ASKS as readonly string[]).includes(c)) : [];
+    if (question && !found.length && !QUALIFIER_WORD.test(question)) member.errors.push(`câu hỏi cuối không nêu yêu cầu (vd MOST cost-effectively / LEAST operational overhead / MOST secure): “${question.slice(0, 80)}”`);
+    else if (ask && found.length && !found.includes(ask)) member.warnings.push(`ask "${ask}" nhưng câu hỏi cuối nghiêng về ${found.join(', ')}`);
+    if (ask) {
+      if (asks.has(ask)) member.errors.push(`trùng yêu cầu "${ask}" với câu thứ ${(asks.get(ask) ?? 0) + 1} của họ — mỗi câu một yêu cầu khác`);
+      else asks.set(ask, i);
+    }
+    const d = draftOf(
+      {
+        domain: mm.domain ?? r.domain,
+        task: mm.task ?? r.task,
+        topic: r.topic,
+        services: r.services,
+        tags: r.tags,
+        difficulty: r.difficulty,
+        concept: r.concept,
+        refs: r.refs,
+        skills: r.skills,
+        hint: mm.hint,
+        stem: `${scenario} ${question}`.trim(),
+        options,
+        answer: mm.answer,
+        explanation: mm.explanation,
+      },
+      id,
+      { ...ctx, kind: 'family', family: familyId },
+    );
+    member.errors.push(...d.errors);
+    member.warnings.push(...d.warnings);
+    member.draft = d.draft;
+    if (d.draft) {
+      const k = d.draft.answer.join('');
+      if (keys.has(k)) member.errors.push(`cùng đáp án ${k} với câu thứ ${(keys.get(k) ?? 0) + 1} của họ — câu hỏi cuối khác phải dẫn tới đáp án khác`);
+      else keys.set(k, i);
+    }
+    out.members.push(member);
+  });
+  // lint family-options (γ1): members of a family must share the option set — high-severity flaws reject the member
+  const drafted = out.members.filter((m) => m.draft);
+  if (drafted.length > 1) {
+    const family = drafted.map((m) => ({ id: m.id, stem: m.draft!.stem, options: m.draft!.options, answer: m.draft!.answer }));
+    for (const m of drafted) {
+      try {
+        for (const f of familyFlaws({ ...family.find((x) => x.id === m.id)!, explanation: m.draft!.explanation }, family)) {
+          (f.severity === 'high' ? m.errors : m.warnings).push(`lint: ${f.message} [${f.code}]`);
+        }
+      } catch {
+        // a crashing linter never blocks a family
+      }
+    }
+  }
+  return out;
+}
+
+const stemLabelOf = (s: string) => {
+  const t = s.replace(/\s+/g, ' ').trim();
+  return t ? `“${t.length > 70 ? t.slice(0, 69) + '…' : t}”` : undefined;
+};
 
 /**
  * Checks one draft the way the bank will read it: serialized alone into a pack and re-parsed (parser errors and option
@@ -446,8 +748,16 @@ function packText(plan: PackPlan, drafts: QuestionDraft[]): string {
   return serializePack(plan.meta, '', drafts, (data) => stringifyFrontMatter(data));
 }
 
-/** Writes the new pack (atomic) and returns its path relative to the data root. */
+/**
+ * Writes the new pack (atomic) and returns its path relative to the data root. [v5] The run's created ids are recorded
+ * first (coach/patches/<run>.before.json) so "↩️ Hoàn tác" can retire them.
+ */
 export function writePack(plan: PackPlan, drafts: QuestionDraft[]): string {
+  try {
+    recordCreated(plan.meta.generated_by, drafts.map((d) => d.id), rel(plan.file), { task: plan.kind });
+  } catch {
+    // the undo record never blocks the pack — the run log still lists the new questions
+  }
   writeAtomic(plan.file, packText(plan, drafts));
   return rel(plan.file);
 }
@@ -456,19 +766,23 @@ export function writePack(plan: PackPlan, drafts: QuestionDraft[]): string {
 
 /** Follow-up prompt for `--resume <session_id>`: the failures per id, corrected items only, same schema. */
 export function repairPrompt(task: StructuredTask, runId: string, failures: ItemFailure[]): string {
-  const what = task === 'enrich' ? 'item' : 'câu';
+  const what = task === 'enrich' ? 'item' : task === 'family' ? 'họ câu' : 'câu';
   const lines = [
     `Ứng dụng đã kiểm tra kết quả JSON của bạn: ${failures.length} ${what} bị từ chối và CHƯA được ghi vào ngân hàng.`,
     `Sửa CHỈ các ${what} dưới đây rồi trả lại bằng JSON cùng schema — chỉ gồm các ${what} đã sửa, mỗi ${what} ghi đúng \`id\` ở đầu dòng.`,
     `Các ${what} khác đã được chấp nhận: không gửi lại.`,
     task === 'enrich'
       ? 'Câu "thiếu item": trả { id } nếu câu không cần đổi, hoặc các thay đổi. `base` do app tự điền.'
-      : 'Mỗi câu sửa lại phải đủ các trường như lần đầu và có `id` = id ở đầu dòng; `pack` giữ như cũ.',
+      : task === 'family'
+        ? 'Mỗi họ sửa lại phải đủ các trường như lần đầu (scenario, options dùng chung, 2–4 members) và có `id` = id họ ở đầu dòng; `pack` giữ như cũ.'
+        : 'Mỗi câu sửa lại phải đủ các trường như lần đầu và có `id` = id ở đầu dòng; `pack` giữ như cũ.',
     '',
     ...failures.map((f) => `- \`${f.id}\`${f.label ? ` (${f.label})` : ''}: ${f.errors.join(' | ')}`),
     '',
     'Nhắc lại: gọi lựa chọn bằng NỘI DUNG (không "option B", "(C)", "= D", dòng bắt đầu "A:"/"A."), task cùng domain, hint không lộ đáp án,',
     'đáp án đúng không dài hơn hẳn các distractor, câu nhiều đáp án ghi "(Choose TWO)".',
+    ...(task === 'twins' ? ['Câu song sinh: variant_of = đúng một câu gốc của lô; "surface" đổi bối cảnh/câu chữ (giữ khái niệm), "contrast" đổi một yêu cầu để đáp án đổi.'] : []),
+    ...(task === 'family' ? ['Họ câu: các câu hỏi cuối nêu yêu cầu khác nhau (MOST cost-effectively / LEAST operational overhead / MOST secure…) và có đáp án khác nhau.'] : []),
     '',
     `- run_id: ${runId}`,
   ];

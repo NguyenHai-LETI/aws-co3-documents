@@ -16,6 +16,8 @@ import { DuplicateSection } from '../components/quality/DuplicateSection.tsx';
 import { VerifySection } from '../components/quality/VerifySection.tsx';
 import { ScopeSection } from '../components/quality/ScopeSection.tsx';
 import { QuestionQuality } from '../components/quality/QuestionQuality.tsx';
+import { QuestionRelations } from '../components/quality/QuestionRelations.tsx';
+import { GuideSection } from '../components/quality/GuideSection.tsx';
 import { startVerify, useAiReady } from '../components/quality/common.tsx';
 import { applyFilters, isDueState, isMasteredState } from '../../shared/filters.ts';
 import { countWords } from '../../shared/timing.ts';
@@ -24,8 +26,8 @@ import type { Meta } from '../lib/store.tsx';
 
 type Tab = 'questions' | 'packs' | 'quality' | 'health' | 'issues';
 const TABS: Tab[] = ['questions', 'packs', 'quality', 'health', 'issues'];
-type QSec = 'overview' | 'lint' | 'distractors' | 'dups' | 'verify' | 'scope'; // sections of the 📐 Chất lượng tab (?sec=)
-const QSECS: QSec[] = ['overview', 'lint', 'distractors', 'dups', 'verify', 'scope'];
+type QSec = 'overview' | 'lint' | 'distractors' | 'dups' | 'verify' | 'scope' | 'guide'; // sections of the 📐 Chất lượng tab (?sec=)
+const QSECS: QSec[] = ['overview', 'lint', 'distractors', 'dups', 'verify', 'scope', 'guide'];
 type Progress = '' | 'unseen' | 'wrong' | 'due' | 'mastered' | 'flagged';
 type Feature = '' | 'long' | 'short' | 'hint' | 'nohint' | 'enriched' | 'notenriched' | 'notask' | 'shortexpl' | 'longest';
 const FEATURES: { id: Feature; label: string }[] = [
@@ -185,6 +187,7 @@ function QuestionDrawer({ q, onClose, onIssue, onAsk }: { q: Question | undefine
           )}
         </div>
         <QuestionQuality q={q} />
+        <QuestionRelations q={q} />
         <div className="card flat stack sm small">
           <b>🤖 Hỏi đáp với AI</b>
           <QaHistory qid={q.id} empty="Chưa hỏi AI về câu này — bấm “🤖 Hỏi AI” ở trên." />
@@ -330,6 +333,7 @@ function QualityTab({
     { id: 'dups', label: '👯 Câu trùng', count: qd.duplicates.length },
     { id: 'verify', label: '🧪 Giải mù', count: qd.verification?.review },
     { id: 'scope', label: '🎯 Phạm vi đề thi', count: qd.scope ? qd.scope.answer.length + qd.scope.distractor.length : undefined },
+    { id: 'guide', label: '🗺️ Đề cương' }, // [v5 γ1]
   ];
   return (
     <div className="stack">
@@ -346,6 +350,7 @@ function QualityTab({
       {sec === 'dups' && <DuplicateSection pairs={qd.duplicates} semantic={qd.semantic} onOpenPair={onOpenPair} onChanged={reload} />}
       {sec === 'verify' && <VerifySection summary={qd.verification} selected={selected} onOpen={onOpen} onIssue={onIssue} onChanged={reload} />}
       {sec === 'scope' && <ScopeSection report={qd.scope} onOpen={onOpen} onChanged={reload} />}
+      {sec === 'guide' && <GuideSection />}
     </div>
   );
 }
@@ -655,6 +660,8 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   const [qsec, setQsec] = useState<QSec>(() => (QSECS.includes(qSec as QSec) ? (qSec as QSec) : qRule ? 'lint' : 'overview'));
   const [rule, setRule] = useState<string | undefined>(qRule ?? undefined); // lint rule open in 🩺 Lỗi viết câu
   const [lintCode, setLintCode] = useState<string | undefined>(qLint ?? undefined); // question list filtered by a lint rule
+  const qSkill = query.get('skill');
+  const [skill, setSkill] = useState<string | undefined>(qSkill ?? undefined); // [v5 γ1] questions of one exam-guide bullet
   const [filters, setFilters] = useState<SelectionFilters>(() => (qTask ? { tasks: [qTask] } : {}));
   const [status, setStatus] = useState<'active' | 'draft' | 'retired' | 'all'>('active');
   const [progress, setProgress] = useState<Progress>('');
@@ -700,6 +707,12 @@ export function BankPage({ query }: { query: URLSearchParams }) {
     }
   }, [qFeature]);
   useEffect(() => {
+    if (qSkill) {
+      setSkill(qSkill);
+      setTab('questions');
+    }
+  }, [qSkill]);
+  useEffect(() => {
     if (qTask) {
       setFilters((f) => ({ ...f, tasks: [qTask] }));
       setTab('questions');
@@ -717,14 +730,15 @@ export function BankPage({ query }: { query: URLSearchParams }) {
     if (taskSel.length) qs = qs.filter((q) => (taskSel.includes('none') ? !q.task : !!q.task && taskSel.includes(q.task)));
     if (feature) qs = qs.filter(FEATURE_TEST[feature]);
     if (lintCode && lintIds) qs = qs.filter((q) => lintIds.has(q.id));
+    if (skill) qs = qs.filter((q) => q.skills?.includes(skill));
     if (progress === 'unseen') qs = qs.filter((q) => !states[q.id]);
     if (progress === 'wrong') qs = qs.filter((q) => states[q.id]?.lastOk === false);
     if (progress === 'due') qs = qs.filter((q) => isDueState(states[q.id]));
     if (progress === 'mastered') qs = qs.filter((q) => mastered(states[q.id], meta));
     if (progress === 'flagged') qs = qs.filter((q) => states[q.id]?.lastFlag || states[q.id]?.lastUnsure);
     return qs;
-  }, [bank, sealedSet, filters, status, progress, feature, states, meta, lintCode, lintIds]);
-  useEffect(() => setPage(0), [filters, status, progress, feature, lintCode]);
+  }, [bank, sealedSet, filters, status, progress, feature, states, meta, lintCode, lintIds, skill]);
+  useEffect(() => setPage(0), [filters, status, progress, feature, lintCode, skill]);
 
   if (!meta || !bank) return null;
   const set = (patch: Partial<SelectionFilters>) => setFilters((f) => ({ ...f, ...patch }));
@@ -744,6 +758,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
     feature ||
     progress ||
     lintCode ||
+    skill ||
     status !== 'active'
   );
   // a question opened from the quality tab comes back to the same section when the drawer closes
@@ -859,10 +874,16 @@ export function BankPage({ query }: { query: URLSearchParams }) {
                 {lintList.loading && !lintIds ? ' …' : ''} ✕
               </button>
             )}
+            {skill && (
+              <button type="button" className="chip on" onClick={() => setSkill(undefined)} title="Bỏ lọc theo mục đề cương">
+                🗺️ {skill} ✕
+              </button>
+            )}
             {filtered && (
               <button
                 className="btn ghost sm"
                 onClick={() => {
+                  setSkill(undefined);
                   setFilters({});
                   setFeature('');
                   setProgress('');

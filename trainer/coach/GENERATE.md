@@ -35,6 +35,7 @@ trong ngân hàng câu hỏi để người học luyện ngay trong app.
 | `difficulty mix` | tỉ lệ easy/medium/hard (mặc định medium 50%, hard 35%, easy 15%) |
 | `focus` | trọng tâm người học muốn (vd “so sánh Multi-AZ vs Read Replica”) |
 | `pack slug` | gợi ý tên pack |
+| `skills` | (tuỳ chọn) các mục đề cương chính thức cần phủ (`<task>.k<n>` / `<task>.s<n>`, kèm nội dung mục) — từ nút “✨ Sinh cho ô trống” |
 
 ## Quy trình
 
@@ -51,7 +52,9 @@ trong ngân hàng câu hỏi để người học luyện ngay trong app.
    - front matter: `pack: doc-<slug>` (kebab-case, duy nhất), `title`, `exam: SAA-C03`, `origin: doc`,
      `created`, `generated_by: <run_id>`, `source: <danh sách file nguồn>`.
    - id câu: `doc-<slug>-<nn>` (01, 02, …).
-   - mỗi câu đủ metadata: `domain, task, topic, services, tags, difficulty, time, concept, refs, hint`
+   - mỗi câu đủ metadata: `domain, task, topic, services, tags, difficulty, time, concept, refs, hint`, `skills`
+     (1–3 mục đề cương câu kiểm tra; lượt có danh sách `skills` → **mỗi câu ít nhất một mục trong danh sách**, chia đều ≥ 1 câu/mục —
+     app từ chối câu không ghi mục nào của lượt)
      (`task` = task statement exam guide **cùng domain**; `refs` = file nguồn + anchor nếu có;
      `hint` = 1 dòng tiếng Việt ≤ 140 ký tự hướng tới yêu cầu/từ khoá quyết định, **không lộ đáp án**).
    - Câu `medium`/`hard` ưu tiên **dạng câu dài** như đề thật: đề 60–120 từ (bối cảnh + 2–3 ràng buộc + qualifier) — SCHEMA §4.
@@ -61,6 +64,10 @@ trong ngân hàng câu hỏi để người học luyện ngay trong app.
    - Giải thích theo định dạng SCHEMA §3: 1–2 câu vì sao đúng + mỗi distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>`
      + dòng cuối `> 🇻🇳 …`; **gọi lựa chọn bằng nội dung, không bao giờ bằng chữ cái** (app xáo thứ tự đáp án).
    - Ghi `enriched: <YYYY-MM-DD>` khi câu đã có đủ giải thích chuẩn + hint + task (để ENRICH không xử lý lại).
+   - Lượt theo đề cương (`skills`) không có `sources`: đọc nội dung từng mục trong thông tin lượt chạy, Grep notes của task / topic
+     liên quan; câu kiểm tra **đúng hành vi** mục mô tả (vd “Determining when storage auto scaling is required” → tình huống cần
+     quyết định bật auto scaling), ưu tiên câu dài chuẩn đề, ~25 % câu nhiều đáp án, thỉnh thoảng “(Choose THREE)” với 6 lựa chọn.
+   - **Kiến thức hiện hành:** tên / giới hạn theo `taxonomy.yaml → currency:` (viết “tên mới (tên cũ)”), không dùng dịch vụ đã ngừng làm đáp án đúng.
    - Kiến thức **chỉ** lấy từ tài liệu nguồn hoặc hiểu biết AWS chắc chắn; tài liệu và kiến thức của bạn mâu thuẫn →
      theo kiến thức AWS hiện hành *đáng tin cậy hơn* và ghi chú trong giải thích “(notes ghi …, thực tế …)”.
 6. **Kiểm tra** (chế độ tương tác): `node trainer/scripts/validate.ts packs/docs/<tên-file> --fill-time` — sửa đến khi **0 lỗi ❌**

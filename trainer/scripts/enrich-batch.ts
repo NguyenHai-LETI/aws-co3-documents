@@ -4,6 +4,8 @@
 //   node trainer/scripts/enrich-batch.ts [--size 20] [--tasks explain,hint,classify,balance,distractors] [--run-id <id>]
 //   node trainer/scripts/enrich-batch.ts --ids 03-v2-01,05-v1-12 [--tasks distractors] [--note "…"] [--run-id <id>]
 //   node trainer/scripts/enrich-batch.ts --longform [--count 5] [--run-id <id>]
+//   node trainer/scripts/enrich-batch.ts --twins [--count 10] [--ids a,b --kind surface|contrast] [--run-id <id>]   (TWINS.md)
+//   node trainer/scripts/enrich-batch.ts --family [--count 2] [--topic …] [--task 2.2] [--requirement cost] [--run-id <id>]   (FAMILY.md)
 //   node trainer/scripts/enrich-batch.ts --status [--json]
 import path from 'node:path';
 import { PACKS_DIR } from '../server/config.ts';
@@ -11,6 +13,8 @@ import { context } from '../server/context.ts';
 import { distractorReport, optionStats } from '../server/lib/quality.ts';
 import { latestVerdicts } from '../server/lib/verify.ts';
 import { stampParts } from '../server/lib/time.ts';
+import { MAX_FAMILIES, MAX_TWINS, familyFocus, familySeeds, twinsTargets, writeFamilyFile, writeTwinsFile } from '../server/lib/twins.ts';
+import { TWIN_KINDS, type TwinKind } from '../server/lib/ai-output.ts';
 import { MAX_BATCH, MAX_LONGFORM, enrichStatus, idList, learnerNotes, longformTargets, parseTasks, patchPath, repoRel, selectBatch, upcomingIds, writeBatchFile, writeLongformFile } from '../server/lib/enrich.ts';
 
 const argv = process.argv.slice(2);
@@ -39,10 +43,56 @@ if (flag('status')) {
 
 const s = stampParts();
 const longform = flag('longform');
-const runId = opt('run-id') ?? `${s.date}_${s.time}_${longform ? 'longform' : 'enrich'}`;
+const twins = flag('twins');
+const family = flag('family');
+const runId = opt('run-id') ?? `${s.date}_${s.time}_${longform ? 'longform' : twins ? 'twins' : family ? 'family' : 'enrich'}`;
 if (!/^[\w-]+$/.test(runId)) {
   console.error('✗ --run-id chỉ gồm chữ, số, "_" và "-"');
   process.exit(2);
+}
+
+const hhmm = s.time.slice(0, 4);
+const aiPlan = (word: string, ids: string) => ({
+  packFile: `${repoRel(path.join(PACKS_DIR, 'ai'))}/${s.date}-${hhmm}-${word}-<slug>.md`,
+  packId: `ai-${s.date}-${hhmm}-${word}`,
+  idPrefix: `ai-${s.compact}-${hhmm}-${ids}`,
+});
+
+if (twins) {
+  const kind = opt('kind') as TwinKind | undefined;
+  if (kind && !(TWIN_KINDS as readonly string[]).includes(kind)) {
+    console.error(`✗ --kind phải là ${TWIN_KINDS.join(' | ')}`);
+    process.exit(2);
+  }
+  const targets = twinsTargets(bank, states, { count: int(opt('count'), cfg.coach.twins_per_run, MAX_TWINS), ids: idList(opt('ids')), kind });
+  if (!targets.length) {
+    console.log('✓ Không có câu nào cần câu song sinh lúc này.');
+    process.exit(0);
+  }
+  const plan = { count: targets.length, ...aiPlan('twins', 'tw') };
+  const file = writeTwinsFile(runId, targets, bank, plan);
+  console.log(`🪞 ${targets.length} câu gốc → ${repoRel(file)}`);
+  console.log(`   run_id: ${runId}`);
+  console.log(`   pack mới: ${plan.packFile} (pack id ${plan.packId}, id câu ${plan.idPrefix}01…)`);
+  console.log('   Tiếp theo: làm theo trainer/coach/TWINS.md (chế độ tương tác).');
+  process.exit(0);
+}
+
+if (family) {
+  let focus;
+  try {
+    focus = familyFocus({ topic: opt('topic'), task: opt('task'), requirement: opt('requirement') }, bank);
+  } catch (e) {
+    console.error(`✗ ${(e as Error).message}`);
+    process.exit(2);
+  }
+  const plan = { count: int(opt('count'), 2, MAX_FAMILIES), ...aiPlan('family', 'fa'), familyPrefix: `ai-${s.compact}-${hhmm}-f` };
+  const file = writeFamilyFile(runId, bank, plan, focus, familySeeds(bank, focus));
+  console.log(`🎯 ${plan.count} họ câu → ${repoRel(file)}`);
+  console.log(`   run_id: ${runId}`);
+  console.log(`   pack mới: ${plan.packFile} (pack id ${plan.packId}, id câu ${plan.idPrefix}01…, id họ ${plan.familyPrefix}1…)`);
+  console.log('   Tiếp theo: làm theo trainer/coach/FAMILY.md (chế độ tương tác).');
+  process.exit(0);
 }
 
 if (longform) {
@@ -51,13 +101,7 @@ if (longform) {
     console.log('✓ Không còn câu ngắn nào cần biến thể dài.');
     process.exit(0);
   }
-  const hhmm = s.time.slice(0, 4);
-  const plan = {
-    count: targets.length,
-    packFile: `${repoRel(path.join(PACKS_DIR, 'ai'))}/${s.date}-${hhmm}-longform-<slug>.md`,
-    packId: `ai-${s.date}-${hhmm}-longform`,
-    idPrefix: `ai-${s.compact}-${hhmm}-lf`,
-  };
+  const plan = { count: targets.length, ...aiPlan('longform', 'lf') };
   const file = writeLongformFile(runId, targets, bank, plan);
   console.log(`📏 ${targets.length} câu gốc → ${repoRel(file)}`);
   console.log(`   run_id: ${runId}`);

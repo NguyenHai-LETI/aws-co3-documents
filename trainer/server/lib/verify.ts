@@ -4,6 +4,14 @@
 // Verdicts go to bank/verify.md, one line per verdict or decision, append-only and `merge=union` between machines:
 //   - 2026-10-19 · `doc-rds-01` · ❌ lệch đáp án (model C · đáp án B) · opus · tin cậy cao — … <!-- verify {…} -->
 // The visible part is for people; the JSON in the trailing comment is the data (reason included).
+// [v5] γ2 — two more kinds of line in the same ledger (`check` in the JSON):
+//   grounded  a fact-check of the key against AWS documentation (WebFetch / WebSearch limited to AWS domains, see
+//             factcheck.ts): `fact` correct | wrong | outdated | ambiguous + `citations` [{url, quote}]. Shown next to the
+//             blind-solve verdict; wrong / outdated / ambiguous puts the question in the review queue. Never changes a key.
+//   local     a vote of a local Ollama model (coach.verify.local_model) during the import audit — a tie-breaker that
+//             only sends a question to the grounded queue, never into review by itself.
+// disputedIds() = questions whose key is in doubt (review queue, unless a newer fact-check confirmed the key) — λ leaves
+// them out of readiness. This module stays free of context / stats imports (stats.ts imports disputedIds).
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
@@ -11,15 +19,22 @@ import { BANK_DIR, PATCHES_DIR } from '../config.ts';
 import { loadBank, type BankState } from './bank.ts';
 import { sealedIds } from './sealed.ts';
 import { applyPatch, applyPatchItems } from './patch.ts';
+import { lintBank } from './lint.ts';
+import { loadIssues } from './issues.ts';
 import { ID_RE } from './pack-format.ts';
 import { localDateKey, localIso } from './time.ts';
-import type { Question, VerifyOutcome, VerifySummary, VerifyVerdict } from '../../shared/types.ts';
+import type { AuditStatus, FactVerdict, IssueItem, Question, VerifyCitation, VerifyOutcome, VerifySummary, VerifyVerdict } from '../../shared/types.ts';
 
 export const VERIFY_FILE = path.join(BANK_DIR, 'verify.md');
 export const MAX_VERIFY = 60; // questions per verify run
+export const MAX_AUDIT = 10; // [v5] imported questions per audit run
+export const MAX_GROUNDED = 10; // [v5] questions per grounded fact-check run
 export const MAX_PROMPT_CHARS = 24_000; // one verifier call (Windows command lines stop at 32k characters)
-export type VerifyScope = 'new' | 'unverified-ai' | 'changed';
-export const VERIFY_SCOPES: readonly VerifyScope[] = ['new', 'unverified-ai', 'changed'];
+export type VerifyScope = 'new' | 'unverified-ai' | 'changed' | 'audit' | 'grounded';
+export const VERIFY_SCOPES: readonly VerifyScope[] = ['new', 'unverified-ai', 'changed', 'audit', 'grounded'];
+/** Issue types that make a question a grounded fact-check target. */
+export const GROUNDED_ISSUE_TYPES = ['wrong-key', 'outdated'];
+export const FACTS: readonly FactVerdict[] = ['correct', 'wrong', 'outdated', 'ambiguous'];
 
 /** `--json-schema` of a verifier call. */
 export const VERIFY_SCHEMA = {
@@ -75,6 +90,9 @@ const CONFIDENCES = ['high', 'medium', 'low'] as const;
 const OUTCOME_LABEL: Record<VerifyOutcome, string> = { ok: '✅ khớp', mismatch: '❌ lệch đáp án', ambiguous: '⚠️ mơ hồ', error: '💥 lỗi' };
 const DECISION_LABEL: Record<NonNullable<VerifyVerdict['decision']>, string> = { approved: '👍 đã duyệt', retired: '🗑️ đã loại (retired)', drafted: '📝 tự chuyển draft' };
 const CONFIDENCE_LABEL = { high: 'tin cậy cao', medium: 'tin cậy vừa', low: 'tin cậy thấp' } as const;
+export const FACT_LABEL: Record<FactVerdict, string> = { correct: '✅ đúng theo tài liệu', wrong: '❌ sai theo tài liệu', outdated: '⏳ kiến thức lỗi thời', ambiguous: '⚠️ tài liệu chưa đủ để quyết' };
+export const MAX_CITATIONS = 3;
+export const MAX_QUOTE = 300;
 
 const clean = (s: unknown, max: number) => {
   const t = String(s ?? '')
@@ -84,13 +102,43 @@ const clean = (s: unknown, max: number) => {
   return t.length > max ? t.slice(0, max - 1) + '…' : t;
 };
 
+/** [v5] A page the grounded check may cite: https on docs.aws.amazon.com / aws.amazon.com (and their subdomains). */
+export function awsDocUrl(url: unknown): string | undefined {
+  try {
+    const u = new URL(String(url ?? '').trim());
+    if (u.protocol !== 'https:') return undefined;
+    const h = u.hostname.toLowerCase();
+    return h === 'aws.amazon.com' || h.endsWith('.aws.amazon.com') ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** [v5] Citations as stored: AWS documentation URLs only, short single-line quotes, at most MAX_CITATIONS. */
+export function cleanCitations(v: unknown): VerifyCitation[] {
+  const out: VerifyCitation[] = [];
+  for (const c of Array.isArray(v) ? v : []) {
+    if (!c || typeof c !== 'object') continue;
+    const url = awsDocUrl((c as Record<string, unknown>).url);
+    const quote = clean((c as Record<string, unknown>).quote, MAX_QUOTE);
+    if (url && quote && !out.some((x) => x.url === url && x.quote === quote)) out.push({ url, quote });
+    if (out.length >= MAX_CITATIONS) break;
+  }
+  return out;
+}
+
 /** One ledger line (verdict or decision). */
 export function formatVerdict(v: VerifyVerdict): string {
+  const conf = v.confidence ? ` · ${CONFIDENCE_LABEL[v.confidence]}` : '';
   const head = v.decision
     ? v.decision === 'approved' && v.runId
       ? '✅ tự dùng lại (giải mù khớp)'
       : DECISION_LABEL[v.decision]
-    : `${OUTCOME_LABEL[v.outcome]}${v.picked || v.key ? ` (model ${v.picked || '—'} · đáp án ${v.key || '—'})` : ''}${v.model ? ` · ${v.model}` : ''}${v.confidence ? ` · ${CONFIDENCE_LABEL[v.confidence]}` : ''}`;
+    : v.check === 'grounded'
+      ? `🔗 kiểm chứng tài liệu AWS: ${FACT_LABEL[v.fact ?? 'ambiguous']}${v.picked || v.key ? ` (tài liệu ${v.picked || '—'} · đáp án ${v.key || '—'})` : ''}${v.model ? ` · ${v.model}` : ''}${v.citations?.length ? ` · ${v.citations.length} trích dẫn` : ''}`
+      : v.check === 'local'
+        ? `🖥️ phiếu model local: ${OUTCOME_LABEL[v.outcome]}${v.picked || v.key ? ` (model ${v.picked || '—'} · đáp án ${v.key || '—'})` : ''}${v.model ? ` · ${v.model}` : ''}${conf}`
+        : `${OUTCOME_LABEL[v.outcome]}${v.picked || v.key ? ` (model ${v.picked || '—'} · đáp án ${v.key || '—'})` : ''}${v.model ? ` · ${v.model}` : ''}${conf}`;
   const why = clean(v.reason, 160);
   const data = {
     at: v.at,
@@ -103,6 +151,9 @@ export function formatVerdict(v: VerifyVerdict): string {
     run: v.runId,
     decision: v.decision,
     reason: v.reason ? clean(v.reason, 600) : undefined,
+    check: v.check,
+    fact: v.check === 'grounded' ? v.fact : undefined,
+    citations: v.check === 'grounded' && v.citations?.length ? cleanCitations(v.citations) : undefined,
   };
   const json = JSON.stringify(data).replace(/--/g, '-\\u002d'); // keeps "-->" out of the comment
   return `- ${v.date} · \`${v.qid}\` · ${head}${why ? ` — ${why}` : ''} <!-- verify ${json} -->`;
@@ -133,6 +184,12 @@ export function parseVerdicts(text: string): VerifyVerdict[] {
       if (s('reason')) v.reason = s('reason');
       if ((DECISIONS as readonly string[]).includes(String(d.decision))) v.decision = d.decision as VerifyVerdict['decision'];
       if (s('run')) v.runId = s('run');
+      if (d.check === 'grounded' || d.check === 'local') v.check = d.check;
+      if (v.check === 'grounded') {
+        v.fact = (FACTS as readonly string[]).includes(String(d.fact)) ? (d.fact as FactVerdict) : 'ambiguous';
+        const cites = cleanCitations(d.citations);
+        if (cites.length) v.citations = cites;
+      }
       out.push(v);
     });
   // newest last: union merges may interleave the two machines' lines, so order by time, then by line
@@ -173,10 +230,14 @@ export function appendVerdicts(vs: VerifyVerdict[]): void {
 // ── summary ─────────────────────────────────────────────────────────────────
 
 interface QuestionVerdicts {
-  solve?: VerifyVerdict; // latest solve of the current version — 'error' answers never count as a verdict
+  solve?: VerifyVerdict; // latest blind solve of the current version — 'error' answers never count as a verdict
   decision?: VerifyVerdict; // latest decision on the current version
-  lastSolve?: VerifyVerdict; // latest non-error solve of any version (shown while the current one is unsolved)
+  lastSolve?: VerifyVerdict; // latest non-error blind solve of any version (shown while the current one is unsolved)
   lastDecision?: VerifyVerdict; // latest decision on any version
+  grounded?: VerifyVerdict; // [v5] latest fact-check against AWS documentation of the current version
+  lastGrounded?: VerifyVerdict; // [v5] …of any version
+  local?: VerifyVerdict; // [v5] latest local-model vote of the current version (non-error)
+  lastLocal?: VerifyVerdict;
 }
 
 function byQuestion(bank: BankState, verdicts: VerifyVerdict[]): Map<string, QuestionVerdicts> {
@@ -192,6 +253,16 @@ function byQuestion(bank: BankState, verdicts: VerifyVerdict[]): Map<string, Que
       continue;
     }
     if (v.outcome === 'error') continue; // no answer is not a verdict: the question stays to be verified
+    if (v.check === 'grounded') {
+      e.lastGrounded = v;
+      if (v.hash === q.hash) e.grounded = v;
+      continue;
+    }
+    if (v.check === 'local') {
+      e.lastLocal = v;
+      if (v.hash === q.hash) e.local = v;
+      continue;
+    }
     e.lastSolve = v;
     if (v.hash === q.hash) e.solve = v;
   }
@@ -203,18 +274,37 @@ function verifierDrafted(q: Question, e: QuestionVerdicts | undefined): boolean 
   return q.status === 'draft' && e?.lastDecision?.decision === 'drafted';
 }
 
-function needsReview(q: Question, e: QuestionVerdicts): boolean {
-  if (verifierDrafted(q, e)) return true;
-  return !!e.solve && (e.solve.outcome === 'mismatch' || e.solve.outcome === 'ambiguous') && e.decision?.decision !== 'approved' && e.decision?.decision !== 'retired';
+const timeOf = (v: VerifyVerdict | undefined) => (v ? Date.parse(v.at ?? `${v.date}T00:00:00`) || 0 : 0);
+const decided = (e: QuestionVerdicts) => e.decision?.decision === 'approved' || e.decision?.decision === 'retired';
+
+/** [v5] The current version's fact-check found a problem (wrong / outdated / ambiguous) after the last decision on it. */
+function groundedFlag(e: QuestionVerdicts): boolean {
+  const g = e.grounded;
+  return !!g && g.fact !== 'correct' && !(decided(e) && timeOf(e.decision) >= timeOf(g));
 }
 
-/** The verdict shown for a question: the current version's, else the newest older one (compare `hash`), decision merged. */
+function needsReview(q: Question, e: QuestionVerdicts): boolean {
+  if (verifierDrafted(q, e)) return true;
+  if (groundedFlag(e)) return true;
+  return !!e.solve && (e.solve.outcome === 'mismatch' || e.solve.outcome === 'ambiguous') && !decided(e);
+}
+
+const bare = ({ decision: _d, grounded: _g, local: _l, ...rest }: VerifyVerdict): VerifyVerdict => rest;
+
+/**
+ * The verdict shown for a question: the current version's blind solve, else the newest older one (compare `hash`),
+ * decision merged; [v5] the newest fact-check / local vote ride along as `grounded` / `local` (or stand alone when the
+ * question was never blind-solved).
+ */
 function shown(q: Question, e: QuestionVerdicts): VerifyVerdict | undefined {
-  const v = e.solve ?? e.lastSolve ?? (verifierDrafted(q, e) ? e.lastDecision : undefined);
+  const blind = e.solve ?? e.lastSolve ?? (verifierDrafted(q, e) ? e.lastDecision : undefined);
+  const g = e.grounded ?? e.lastGrounded;
+  const l = e.local ?? e.lastLocal;
+  const v = blind ?? g ?? l;
   if (!v) return undefined;
-  const decision = verifierDrafted(q, e) ? 'drafted' : e.solve ? e.decision?.decision : undefined;
-  const { decision: _d, ...rest } = v;
-  return decision ? { ...rest, decision } : rest;
+  const current = v === e.solve || v === e.grounded || v === e.local;
+  const decision = verifierDrafted(q, e) ? 'drafted' : current ? e.decision?.decision : undefined;
+  return { ...bare(v), ...(decision ? { decision } : {}), ...(g && g !== v ? { grounded: bare(g) } : {}), ...(l && l !== v ? { local: bare(l) } : {}) };
 }
 
 /** Latest verdict per question (current version first, else the newest one — compare `hash` to spot a stale one), decision merged. */
@@ -237,7 +327,7 @@ let summaryCache: { key: string; value: VerifySummary } | undefined;
 export function verifySummary(bank: BankState): VerifySummary {
   const key = `${bank.version}|${ledgerSig()}`;
   if (summaryCache?.key === key) return summaryCache.value;
-  const value: VerifySummary = { verified: 0, ok: 0, review: 0, stale: 0, pending: [] };
+  const value: VerifySummary = { verified: 0, ok: 0, review: 0, stale: 0, pending: [], disputed: 0, grounded: 0 };
   for (const [qid, e] of byQuestion(bank, loadVerdicts())) {
     const q = bank.byId.get(qid)!;
     if (q.status === 'retired') continue;
@@ -245,6 +335,8 @@ export function verifySummary(bank: BankState): VerifySummary {
       value.verified++;
       if (e.solve.outcome === 'ok') value.ok++;
     } else if (e.lastSolve) value.stale++;
+    if (e.grounded) value.grounded!++;
+    if (disputed(q, e)) value.disputed!++;
     const v = needsReview(q, e) ? shown(q, e) : undefined;
     if (v) {
       value.review++;
@@ -255,6 +347,35 @@ export function verifySummary(bank: BankState): VerifySummary {
   value.pending.sort((a, b) => t(b) - t(a) || (b.line ?? 0) - (a.line ?? 0));
   summaryCache = { key, value };
   return value;
+}
+
+// ── [v5] disputed keys ──────────────────────────────────────────────────────
+
+/** In the review queue, unless the newest check of the current version is a fact-check that confirmed the key. */
+function disputed(q: Question, e: QuestionVerdicts): boolean {
+  if (!needsReview(q, e)) return false;
+  const g = e.grounded;
+  return !(g && g.fact === 'correct' && timeOf(g) >= timeOf(e.solve));
+}
+
+let disputedCache: { key: string; ids: Set<string> } | undefined;
+
+/**
+ * Questions whose key is in doubt right now: the latest blind-solve or fact-check of the current version says
+ * mismatch / ambiguous / wrong / outdated (or the blind-solve sent it to draft) and nobody decided since — unless a newer
+ * fact-check confirmed the key. Retired questions are left out. λ keeps them out of readiness. Cached by bank version
+ * + ledger file.
+ */
+export function disputedIds(bank: BankState = loadBank()): Set<string> {
+  const key = `${bank.version}|${ledgerSig()}`;
+  if (disputedCache?.key === key) return disputedCache.ids;
+  const ids = new Set<string>();
+  for (const [qid, e] of byQuestion(bank, loadVerdicts())) {
+    const q = bank.byId.get(qid)!;
+    if (q.status !== 'retired' && disputed(q, e)) ids.add(qid);
+  }
+  disputedCache = { key, ids };
+  return ids;
 }
 
 // ── what to verify ──────────────────────────────────────────────────────────
@@ -299,6 +420,103 @@ export function verifyTargets(
   const rank = (q: Question) => (q.origin === 'ai' || q.origin === 'doc' ? 0 : 1);
   pool.sort((a, b) => rank(a) - rank(b) || (b.created ?? '').localeCompare(a.created ?? '') || a.id.localeCompare(b.id, 'en', { numeric: true }));
   return { ids: pool.slice(0, MAX_VERIFY).map((q) => q.id), total: pool.length };
+}
+
+// ── [v5] import audit & grounded fact-check targets ─────────────────────────
+
+const byNumericId = (a: Question, b: Question) => a.id.localeCompare(b.id, 'en', { numeric: true });
+const domainWeight = (bank: BankState, q: Question) => bank.taxonomy.domains.find((d) => d.id === q.domain)?.weight ?? 0;
+
+/** Questions lint flags as stale facts (taxonomy `currency:`, rule `stale-fact`) — the cached bank lint, sealed excluded. */
+export function staleFactIds(bank: BankState, sealed: ReadonlySet<string> = sealedIds()): Set<string> {
+  try {
+    return new Set(lintBank(bank, { exclude: sealed }).ids?.['stale-fact'] ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Active imported questions of the practice pool (not sealed, not out of scope) — what the import audit covers. */
+function auditPool(bank: BankState, sealed: ReadonlySet<string>): Question[] {
+  return bank.questions.filter((q) => q.status === 'active' && q.origin === 'imported' && !q.outOfScope && !sealed.has(q.id));
+}
+
+/**
+ * Import audit (7-06): imported questions without a blind-solve verdict for their current version, MAX_AUDIT per run.
+ * Order: the questions the learner meets next (`upcoming`, enrich.ts upcomingIds — soonest first), then
+ * multiple-response, then stale-fact flagged, then exam weight of the domain, then id.
+ */
+export function auditTargets(
+  bank: BankState,
+  opts: { upcoming?: string[]; limit?: number } = {},
+  verdicts: VerifyVerdict[] = loadVerdicts(),
+  sealed: ReadonlySet<string> = sealedIds(),
+): { ids: string[]; total: number } {
+  const per = byQuestion(bank, verdicts);
+  const stale = staleFactIds(bank, sealed);
+  const soon = new Map((opts.upcoming ?? []).map((id, i) => [id, i] as const));
+  const pool = auditPool(bank, sealed).filter((q) => !per.get(q.id)?.solve);
+  const rank = (q: Question) => (soon.has(q.id) ? 0 : q.answer.length > 1 ? 1 : stale.has(q.id) ? 2 : 3);
+  pool.sort((a, b) => rank(a) - rank(b) || (soon.get(a.id) ?? 0) - (soon.get(b.id) ?? 0) || domainWeight(bank, b) - domainWeight(bank, a) || byNumericId(a, b));
+  const limit = Math.max(1, Math.min(MAX_VERIFY, Math.round(opts.limit ?? MAX_AUDIT) || MAX_AUDIT));
+  return { ids: pool.slice(0, limit).map((q) => q.id), total: pool.length };
+}
+
+/** Progress of the import audit + the questions the next audit run takes (GET /api/verify). */
+export function auditStatus(bank: BankState, upcoming: string[] = [], verdicts: VerifyVerdict[] = loadVerdicts(), sealed: ReadonlySet<string> = sealedIds()): AuditStatus {
+  const per = byQuestion(bank, verdicts);
+  const pool = auditPool(bank, sealed);
+  return { imported: pool.length, audited: pool.filter((q) => per.get(q.id)?.solve).length, next: auditTargets(bank, { upcoming }, verdicts, sealed).ids };
+}
+
+/**
+ * Questions worth a fact-check against AWS documentation (6-07 / 7-05), without one for their current version:
+ *   1. the review queue — blind-solve mismatch / ambiguous nobody decided on (newest first);
+ *   2. open issues of type wrong-key / outdated;
+ *   3. import-audit disagreements: the blind-solve agreed with the key, the local model picked another option with high confidence;
+ *   4. stale facts (lint `stale-fact`).
+ * Explicit `ids` bypass the rules (sealed allowed only then, like blind-solve runs). Retired questions never. ≤ MAX_GROUNDED.
+ */
+export function groundedTargets(
+  bank: BankState,
+  params: { ids?: unknown } = {},
+  opts: { issues?: IssueItem[]; limit?: number } = {},
+  verdicts: VerifyVerdict[] = loadVerdicts(),
+  sealed: ReadonlySet<string> = sealedIds(),
+): { ids: string[]; total: number } {
+  const limit = Math.max(1, Math.min(MAX_VERIFY, Math.round(opts.limit ?? MAX_GROUNDED) || MAX_GROUNDED));
+  const usable = (q: Question | undefined): q is Question => !!q && q.status !== 'retired';
+  if (Array.isArray(params.ids)) {
+    const ids = [...new Set(params.ids.map((x) => String(x).trim()))].filter((id) => usable(bank.byId.get(id)));
+    return { ids: ids.slice(0, limit), total: ids.length };
+  }
+  const per = byQuestion(bank, verdicts);
+  const open = (q: Question) => usable(q) && !sealed.has(q.id) && !per.get(q.id)?.grounded;
+  const out: string[] = [];
+  const add = (id: string) => {
+    const q = bank.byId.get(id);
+    if (q && open(q) && !out.includes(id)) out.push(id);
+  };
+  const review = [...per]
+    .filter(([qid, e]) => {
+      const q = bank.byId.get(qid)!;
+      return !!e.solve && (e.solve.outcome === 'mismatch' || e.solve.outcome === 'ambiguous') && !decided(e) && q.status !== 'retired';
+    })
+    .sort(([, a], [, b]) => timeOf(b.solve) - timeOf(a.solve));
+  for (const [qid] of review) add(qid);
+  for (const it of opts.issues ?? safeIssues()) if (it.open && GROUNDED_ISSUE_TYPES.includes(it.type)) add(it.qid);
+  for (const [qid, e] of per) if (e.solve?.outcome === 'ok' && e.local && e.local.outcome === 'mismatch' && e.local.confidence === 'high') add(qid);
+  const stale = staleFactIds(bank, sealed);
+  for (const q of bank.questions.filter((x) => stale.has(x.id)).sort(byNumericId)) add(q.id);
+  return { ids: out.slice(0, limit), total: out.length };
+}
+
+function safeIssues(): IssueItem[] {
+  try {
+    return loadIssues();
+  } catch {
+    return [];
+  }
 }
 
 // ── the verifier call ───────────────────────────────────────────────────────
@@ -403,7 +621,7 @@ export function reactivate(verdicts: VerifyVerdict[], runId: string): { reactiva
   if (!ok.length) return { reactivated: [], errors: [] };
   const r = applyPatchItems(
     ok.map((v) => ({ id: v.qid, base: v.hash, status: 'active' })),
-    { label: '(giải mù)' },
+    { label: '(giải mù)', preImage: runId }, // [v5] part of the run: its undo puts the question back to draft
   );
   const done = new Set(r.items.filter((i) => i.status === 'applied' || i.status === 'unchanged').map((i) => i.id));
   const now = new Date();
@@ -422,7 +640,7 @@ export function autoDraft(verdicts: VerifyVerdict[], runId: string, today?: stri
   const items = verdicts.map((v) => ({ id: v.qid, base: v.hash, status: 'draft' }));
   fs.mkdirSync(PATCHES_DIR, { recursive: true });
   fs.writeFileSync(file, `# Giải mù lệch / mơ hồ → status: draft (coach.verify.auto_draft) — lượt ${runId}\n${YAML.stringify({ run_id: `${runId}-verify`, items }, { lineWidth: 0 })}`);
-  const r = applyPatch(file, { today });
+  const r = applyPatch(file, { today, preImage: runId }); // [v5] undo of the run restores the status too
   const ok = new Set(r.items.filter((i) => i.status === 'applied' || i.status === 'unchanged').map((i) => i.id));
   const now = new Date();
   appendVerdicts(
@@ -445,7 +663,8 @@ export function decide(qid: string, decision: 'approve' | 'retire', note?: strin
   if (hash && hash !== q.hash) throw new VerifyConflictError('Câu hỏi đã thay đổi sau khi bạn xem (phiên bản khác) — tải lại hàng chờ rồi quyết định lại.');
   const e = byQuestion(bank, loadVerdicts()).get(qid);
   const drafted = verifierDrafted(q, e);
-  const basis = e?.solve ?? (drafted ? (e?.lastSolve ?? e?.lastDecision) : undefined);
+  // [v5] a fact-check of the current version is a basis too (stale-fact / issue questions that were never blind-solved)
+  const basis = e?.solve ?? e?.grounded ?? (drafted ? (e?.lastSolve ?? e?.lastDecision) : undefined);
   if (!basis) throw new VerifyInputError('Câu chưa được giải mù (hoặc đã sửa sau lần giải gần nhất) — chạy giải mù trước');
   const status = decision === 'retire' ? 'retired' : drafted ? 'active' : undefined;
   if (status) {

@@ -2,18 +2,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR, REPO_DIR, TRAINER_DIR, SNAPSHOT_FILE, rel } from '../config.ts';
-import { HttpError, readBody, route } from '../http.ts';
+import { HttpError, isLocalRequest, readBody, route } from '../http.ts';
 import { context } from '../context.ts';
 import { loadBank } from '../lib/bank.ts';
 import { addIssue, loadIssues } from '../lib/issues.ts';
-import { findClaude } from '../lib/coach-runner.ts';
+import * as coachRunnerLib from '../lib/coach-runner.ts';
+import type { ClaudeStatus } from '../../shared/types.ts';
 import { guardFile, listNotes, notePath } from '../lib/notes.ts';
 import { ensureSnapshot, scheduleSnapshot } from '../lib/snapshot.ts';
 import { loadSealed, sealedError, sealedIds } from '../lib/sealed.ts';
 import { codeVersion } from '../lib/version.ts';
 import os from 'node:os';
+import { metaAccess } from '../lib/lan.ts'; // [v5] π
 
-route('GET', '/api/meta', () => {
+/**
+ * [v5] π The Claude CLI status for /api/meta: this machine may refresh it (findClaude probes in the background when
+ * stale); a LAN device only ever gets the last detected status, never a probe.
+ */
+function claudeFor(req: import('node:http').IncomingMessage, cfg: Parameters<typeof coachRunnerLib.findClaude>[0]): ClaudeStatus {
+  if (isLocalRequest(req)) return coachRunnerLib.findClaude(cfg);
+  const cached = (coachRunnerLib as unknown as { cachedClaudeStatus?: () => ClaudeStatus | undefined }).cachedClaudeStatus?.();
+  return cached ?? { available: false, hint: 'AI Coach chỉ kiểm tra / chạy trên máy chạy app.' };
+}
+
+route('GET', '/api/meta', (req) => {
   const { cfg, bank, attempts, plans, versions } = context();
   const issues = loadIssues();
   return {
@@ -34,7 +46,7 @@ route('GET', '/api/meta', () => {
     srs: cfg.srs,
     attempts: attempts.length,
     latestPlan: plans[0] ? { id: plans[0].id, created: plans[0].created } : null,
-    claude: findClaude(cfg),
+    claude: claudeFor(req, cfg), // [v5] π: LAN clients never start the CLI probe
     paths: { trainer: TRAINER_DIR, repo: REPO_DIR, data: DATA_DIR },
     host: os.hostname(),
     coachHosts: cfg.coach.hosts,
@@ -43,6 +55,7 @@ route('GET', '/api/meta', () => {
     sealedError: sealedError(), // [γ] results/sealed.md broken: what to fix (its ids stay hidden, nothing is written meanwhile)
     codeVersion: codeVersion(), // code the server process runs (the UI offers a restart when a sync brings newer code)
     launcher: process.env.TRAINER_LAUNCHER === '1', // started by start.sh/.bat/.command (can restart itself)
+    access: metaAccess(req), // [v5] π: this machine / LAN practice / LAN admin, how the UI is served
   };
 });
 

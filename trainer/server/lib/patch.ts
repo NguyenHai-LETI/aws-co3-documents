@@ -3,6 +3,8 @@
 // against the question's content hash (`base`), re-serialized with serializeQuestion(), re-parsed and re-linted
 // (lint.ts: a new high-severity item-writing flaw rejects the item, other new flaws are warnings); an item that
 // introduces errors is reverted and reported, the others are kept.
+// [v5] γ2: a patch with a run id (or `preImage`) saves the previous version of every block it rewrites in
+// coach/patches/<run>.before.json before the pack is replaced — "↩️ Hoàn tác" of that run restores it (undo.ts).
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
@@ -10,12 +12,16 @@ import { DATA_DIR, rel } from '../config.ts';
 import { asStringList } from './frontmatter.ts';
 import { loadBank } from './bank.ts';
 import { correctIsLongest as longestRule, lintQuestion, newFlaws } from './lint.ts';
-import { LETTER_REF_RE, parsePack, questionHash, serializeQuestion, toDraft, type QuestionDraft } from './pack-format.ts';
+import { LETTER_REF_RE, SKILL_ID_RE, parsePack, questionHash, serializeQuestion, toDraft, type QuestionDraft } from './pack-format.ts';
 import { loadMigrations, type MigrationRecord } from './migrations.ts';
 import { normalizeDomain } from './taxonomy.ts';
-import { stampParts } from './time.ts';
+import { localIso, stampParts } from './time.ts';
+import { bodyStartIndex, findBlock, normalizedText, writePackText } from './blocks.ts';
+import { questionSig, recordPreImages, type PreImageInput } from './undo.ts';
 import { countWords, estimateQuestionTime } from '../../shared/timing.ts';
 import type { BankProblem, Difficulty, LintFlaw, Option, Question, QuestionStatus, Taxonomy } from '../../shared/types.ts';
+
+export { findBlock } from './blocks.ts';
 
 export interface PatchItemResult {
   id: string;
@@ -47,14 +53,15 @@ export interface ApplyOptions {
   dryRun?: boolean;
   today?: string; // YYYY-MM-DD for `enriched` (tests)
   lint?: LintFn; // default lintQuestion
+  preImage?: string | false; // [v5] run whose undo file gets the previous versions (default: the patch's run id; false = none)
 }
 
-const SET_KEYS = ['domain', 'task', 'topic', 'services', 'tags', 'difficulty', 'time', 'concept', 'refs', 'hint', 'variant_of', 'status'] as const;
+const SET_KEYS = ['domain', 'task', 'topic', 'services', 'tags', 'difficulty', 'time', 'concept', 'refs', 'hint', 'variant_of', 'status', 'skills', 'family'] as const;
 const ITEM_KEYS = ['id', 'base', 'set', 'explanation', 'options', 'stem', 'answer', 'reason', 'status'];
 const STATUSES: QuestionStatus[] = ['active', 'draft', 'retired'];
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const BLOCK_HEADING = /^#{1,2}\s/;
-const Q_HEADING = /^##\s+Q:?\s+(\S+)/;
+const FAMILY_RE = /^[a-z0-9][a-z0-9-]*$/;
 const OPTION_LIKE = /^\s*[-*]\s+(?:\[[ xX]\]\s+)?[A-H][.)]\s+/;
 const MIN_EXPLANATION_WORDS = 25;
 
@@ -103,34 +110,6 @@ export function lintDelta(before: Question | undefined, after: Question, tax: Ta
 /** Problems for one question id, keyed without line numbers (lines shift when a block grows). */
 function problemSet(problems: BankProblem[], qid: string, level: 'error' | 'warning'): Set<string> {
   return new Set(problems.filter((p) => p.qid === qid && p.level === level).map((p) => p.message));
-}
-
-/** Line range [start, end) of a question block's content (heading … last content line, without trailing blanks / `---`). */
-export function findBlock(lines: string[], id: string, bodyStart = 0): { start: number; end: number } | undefined {
-  let start = -1;
-  for (let i = bodyStart; i < lines.length; i++) {
-    if (start < 0) {
-      const m = lines[i].match(Q_HEADING);
-      if (m && m[1] === id) start = i;
-      continue;
-    }
-    if (BLOCK_HEADING.test(lines[i])) {
-      let end = i;
-      while (end > start + 1 && (!lines[end - 1].trim() || /^\s*(---|\*\*\*|___)\s*$/.test(lines[end - 1]))) end--;
-      return { start, end };
-    }
-  }
-  if (start < 0) return undefined;
-  let end = lines.length;
-  while (end > start + 1 && (!lines[end - 1].trim() || /^\s*(---|\*\*\*|___)\s*$/.test(lines[end - 1]))) end--;
-  return { start, end };
-}
-
-function bodyStartIndex(text: string): number {
-  if (!text.startsWith('---\n')) return 0;
-  const end = text.indexOf('\n---', 4);
-  if (end < 0) return 0;
-  return text.slice(0, end + 4).split('\n').length;
 }
 
 interface Built {
@@ -257,6 +236,26 @@ function buildDraft(cur: Question, item: Record<string, unknown>, tax: Taxonomy)
           statusTouched = true;
           changes.push(`status ${st}`);
           continue;
+        }
+        break;
+      }
+      case 'skills': {
+        // [v5] exam-guide bullets (ENRICH classify): a stored list replaces any guess; [] clears it
+        const list = [...new Set(asStringList(v).map((x) => x.trim().toLowerCase()))];
+        const bad = list.filter((x) => !SKILL_ID_RE.test(x));
+        if (bad.length) errors.push(`skills ${bad.join(', ')} không hợp lệ (mục đề cương dạng <task>.k<n> / <task>.s<n>, vd 3.5.s7)`);
+        else if (list.join(',') !== (d.skills ?? []).join(',')) {
+          d.skills = list.length ? list : undefined;
+          changes.push(`skills ${list.join(', ') || '(xoá)'}`);
+        }
+        break;
+      }
+      case 'family': {
+        const f = (s ?? '').trim();
+        if (f && !FAMILY_RE.test(f)) errors.push(`family "${f}" không hợp lệ (id kebab-case a-z0-9)`);
+        else if (f !== (d.family ?? '')) {
+          d.family = f || undefined;
+          changes.push(f ? `family ${f}` : 'family (xoá)');
         }
         break;
       }
@@ -470,12 +469,14 @@ export function applyPatchItems(items: Record<string, unknown>[], opts: ApplyOpt
     byFile.set(q.file, [...(byFile.get(q.file) ?? []), { item, res }]);
   });
 
+  // [v5] previous versions go to coach/patches/<run>.before.json before a pack is replaced (undo.ts)
+  const preRun = opts.preImage === false ? undefined : (opts.preImage ?? opts.runId);
   for (const [fileRel, entries] of byFile) {
     const packAbs = path.join(DATA_DIR, fileRel);
-    const original = fs.readFileSync(packAbs, 'utf8');
-    const crlf = original.includes('\r\n');
-    let text = original.replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+    const { text: normalized, crlf } = normalizedText(fs.readFileSync(packAbs, 'utf8'));
+    let text = normalized;
     let dirty = false;
+    const preImages: PreImageInput[] = [];
 
     for (const { item, res } of entries) {
       const before = parsePack(text, fileRel, tax);
@@ -567,15 +568,21 @@ export function applyPatchItems(items: Record<string, unknown>[], opts: ApplyOpt
       res.status = 'applied';
       res.hash = q2!.hash;
       ledger[res.id] = q2!.hash;
+      if (preRun) preImages.push({ id: res.id, file: fileRel, before: oldBlock.join('\n'), beforeSig: questionSig(cur), afterSig: questionSig(q2!) });
     }
 
     if (dirty) {
       result.files.push(fileRel);
       if (!opts.dryRun) {
-        const out = crlf ? text.replace(/\n/g, '\r\n') : text;
-        const tmp = path.join(path.dirname(packAbs), `.${path.basename(packAbs)}.${process.pid}.tmp`);
-        fs.writeFileSync(tmp, out);
-        fs.renameSync(tmp, packAbs);
+        if (preRun && preImages.length) {
+          try {
+            recordPreImages(preRun, preImages, { at: localIso() });
+          } catch (e) {
+            // an undo record must never block the edit itself — but say so
+            for (const p of preImages) result.items.find((r) => r.id === p.id)?.warnings.push(`không lưu được bản trước khi sửa (↩️ hoàn tác): ${(e as Error).message}`);
+          }
+        }
+        writePackText(packAbs, text, crlf);
       }
     }
   }

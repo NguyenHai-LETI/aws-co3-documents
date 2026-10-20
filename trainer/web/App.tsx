@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ComponentType } from 'react';
 import { useRoute, href, navigate } from './lib/router.ts';
 import { useData, useServerEvent } from './lib/store.tsx';
 import { api } from './lib/api.ts';
-import { flushOutbox, loadActive, useOutbox } from './lib/session.ts';
+import { DIFFERS_NOTE, flushOutbox, loadActive, useOutbox, useRemoteActive } from './lib/session.ts';
 import { ToastHost, Loading, ErrorBox, toast } from './components/ui.tsx';
 import { SyncButton } from './components/SyncButton.tsx';
 import { Dashboard } from './pages/Dashboard.tsx';
@@ -10,13 +10,52 @@ import { NewTest } from './pages/NewTest.tsx';
 import { Runner } from './pages/Runner.tsx';
 import { ResultPage } from './pages/Result.tsx';
 import { History } from './pages/History.tsx';
-import { Stats } from './pages/Stats.tsx';
-import { BankPage } from './pages/Bank.tsx';
-import { Coach } from './pages/Coach.tsx';
-import { Notes } from './pages/Notes.tsx';
-import { Tools } from './pages/Tools.tsx';
 import { LanBadge } from './components/tools/LanBadge.tsx';
 import { SearchBox } from './components/SearchBox.tsx';
+
+// [v5] π Pages outside the study loop load on demand (smaller first load in the production build). A chunk that fails to
+// load (the app was updated and rebuilt meanwhile) reloads the page once.
+const RELOAD_FLAG = 'trainer.chunkReload';
+function lazyPage<P extends object>(load: () => Promise<Record<string, unknown>>, name: string) {
+  return lazy(async () => {
+    try {
+      const m = await load();
+      try {
+        sessionStorage.removeItem(RELOAD_FLAG);
+      } catch {
+        // storage unavailable
+      }
+      return { default: m[name] as ComponentType<P> };
+    } catch (e) {
+      let reloaded = true;
+      try {
+        reloaded = sessionStorage.getItem(RELOAD_FLAG) === '1';
+        sessionStorage.setItem(RELOAD_FLAG, '1');
+      } catch {
+        // storage unavailable: never loop
+      }
+      if (!reloaded) window.location.reload();
+      throw e;
+    }
+  });
+}
+const Stats = lazyPage<object>(() => import('./pages/Stats.tsx'), 'Stats');
+const BankPage = lazyPage<{ query: URLSearchParams }>(() => import('./pages/Bank.tsx'), 'BankPage');
+const Coach = lazyPage<object>(() => import('./pages/Coach.tsx'), 'Coach');
+const Notes = lazyPage<{ query: URLSearchParams }>(() => import('./pages/Notes.tsx'), 'Notes');
+const Tools = lazyPage<object>(() => import('./pages/Tools.tsx'), 'Tools');
+const Pair = lazyPage<{ query: URLSearchParams }>(() => import('./pages/Pair.tsx'), 'Pair');
+const Listen = lazyPage<object>(() => import('./pages/Listen.tsx'), 'Listen');
+
+/** [v5] π Due reviews on the installed app's icon (Dock / taskbar; Chrome / Edge, installed PWA, secure context). */
+function useAppBadge(due: number | undefined) {
+  useEffect(() => {
+    if (due === undefined) return;
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    if (!nav.setAppBadge) return;
+    (due > 0 ? nav.setAppBadge(due) : (nav.clearAppBadge?.() ?? nav.setAppBadge(0))).catch(() => undefined);
+  }, [due]);
+}
 
 type Theme = 'system' | 'light' | 'dark';
 
@@ -145,7 +184,8 @@ function useOutboxRetry(top: string, refresh: () => Promise<void>) {
     const sent = await flushOutbox();
     if (!sent.length) return;
     void refresh();
-    toast(sent.length === 1 ? `✓ Đã nộp bài đang chờ: ${sent[0].title}` : `✓ Đã nộp ${sent.length} bài đang chờ`);
+    const note = sent.some((x) => x.differs) ? ` ${DIFFERS_NOTE}` : ''; // [v5] ρ: another device submitted it first, with other answers
+    toast((sent.length === 1 ? `✓ Đã nộp bài đang chờ: ${sent[0].title}` : `✓ Đã nộp ${sent.length} bài đang chờ`) + note);
     if (topRef.current === '/run' && !loadActive()) navigate(`/result/${encodeURIComponent(sent[sent.length - 1].attempt.id)}`, { replace: true });
   }, [refresh]);
   useEffect(() => {
@@ -176,8 +216,12 @@ const NAV = [
   { path: '/coach', icon: '🤖', label: 'AI Coach' },
   { path: '/bank', icon: '🗂️', label: 'Ngân hàng câu hỏi' },
   { path: '/notes', icon: '📖', label: 'Tài liệu' },
+  { path: '/listen', icon: '🎧', label: 'Nghe' }, // [v5] τ listen mode
   { path: '/tools', icon: '🧰', label: 'Công cụ' },
 ];
+
+/** [v5] π Pages that only drive admin routes: hidden from LAN devices in the practice scope (server.lan_admin off). */
+const ADMIN_PAGES = new Set(['/coach']);
 
 export function App() {
   const route = useRoute();
@@ -187,7 +231,10 @@ export function App() {
   const focus = top === '/run';
   const active = loadActive();
   const outbox = useOutboxRetry(top, refresh);
+  const { remote } = useRemoteActive(!active && !outbox.length); // [v5] ρ: a test left open on another device
   const { status: code, restart, restarting } = useCodeUpdate(meta, focus && !!active);
+  useAppBadge(state?.counts.srs);
+  const practiceOnly = meta?.access?.scope === 'practice';
 
   let page: React.ReactNode;
   if (!meta && !error) page = <Loading text="Đang nạp ngân hàng câu hỏi…" />;
@@ -200,7 +247,10 @@ export function App() {
   else if (top === '/coach') page = <Coach />;
   else if (top === '/notes') page = <Notes query={route.query} />;
   else if (top === '/tools') page = <Tools />;
+  else if (top === '/pair') page = <Pair query={route.query} />; // [v5] μ
+  else if (top === '/listen') page = <Listen />; // [v5] τ
   else page = <Dashboard />;
+  page = <Suspense fallback={<Loading text="Đang tải trang…" />}>{page}</Suspense>;
 
   const counts: Record<string, number | undefined> = {
     '/bank': meta?.problems.errors || undefined,
@@ -224,12 +274,17 @@ export function App() {
             <span className="ico">⏯️</span> Tiếp tục bài đang làm
           </a>
         )}
+        {remote && !active && !focus && (
+          <a className="nav-link nav-resume" href={href('/run')}>
+            <span className="ico">⏯️</span> Tiếp tục bài trên {remote.device}
+          </a>
+        )}
         {outbox.length > 0 && !active && !focus && (
           <a className="nav-link nav-resume" href={href('/run')} title="Bài đã làm xong nhưng chưa gửi được tới máy chủ — app tự nộp lại khi có kết nối">
             <span className="ico">⏳</span> {outbox.length} bài chờ nộp
           </a>
         )}
-        {NAV.map((n) => (
+        {NAV.filter((n) => !(practiceOnly && ADMIN_PAGES.has(n.path))).map((n) => (
           <a key={n.path} className={`nav-link ${top === n.path ? 'active' : ''}`} href={href(n.path)}>
             <span className="ico">{n.icon}</span>
             {n.label}
@@ -242,7 +297,7 @@ export function App() {
           </a>
         ))}
         <div className="sidebar-foot ins-foot">
-          <SyncButton />
+          {!practiceOnly && <SyncButton />}
           <div className="row nowrap ins-foot-row">
             <select value={theme} onChange={(e) => setTheme(e.target.value as Theme)} aria-label="Giao diện sáng/tối" title="Giao diện: theo hệ thống, sáng hoặc tối" style={{ padding: '3px 6px', fontSize: 12 }}>
               <option value="system">🖥 Hệ thống</option>

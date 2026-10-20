@@ -8,6 +8,10 @@
 //   POST /api/quality/semantic        → start the semantic-duplicate job now (re-probe Ollama, embed, compare)
 //   POST /api/quality/retire          {items: [{id, hash}], reason?} → { retired: string[], failed: {id, errors}[] } —
 //                                        `status: retired` for the versions the learner looked at (🎯 Phạm vi đề thi)
+//   GET  /api/exam-guide              → GuideCoverage [v5 γ1] — official SAA-C03 guide (bullets verbatim) + bank coverage
+//                                        (Quality → 🗺️ Đề cương), learner first answers per bullet; sealed questions left out
+//   GET  /api/quality/lint?id=<qid>   also returns [v5 γ1] `siblings` (cluster links: why questions are siblings) and
+//                                        `family` (other members of its qualifier family) — the Bank question drawer
 //   GET  /api/ratings[?qid=…]         → RatingItem[] (newest first)
 //   POST /api/ratings                 {qid, value: 'up'|'down', note?} → RatingItem
 import { HttpError, readBody, route } from '../http.ts';
@@ -16,12 +20,17 @@ import { loadBank } from '../lib/bank.ts';
 import { loadAttempts } from '../lib/results.ts';
 import { regradeAttempts } from '../lib/regrade.ts';
 import { computeQuality } from '../lib/quality.ts';
-import { LINT_RULES, lintQuestion, lintQuestionsFor } from '../lib/lint.ts';
+import { LINT_RULES, lintContext, lintQuestion, lintQuestionsFor } from '../lib/lint.ts';
 import { scheduleSemantic, semanticState } from '../lib/embeddings.ts';
 import { addRating, loadRatings } from '../lib/ratings.ts';
 import { scheduleSnapshot } from '../lib/snapshot.ts';
 import { sealedIds } from '../lib/sealed.ts';
 import { applyPatchItems } from '../lib/patch.ts';
+import { context } from '../context.ts';
+import { clusterIndex } from '../lib/clusters.ts';
+import { guideCoverage } from '../lib/exam-guide.ts';
+import { bankWriteBlocked } from '../lib/coach-runner.ts';
+import type { GuideCoverage } from '../../shared/types.ts';
 
 const MAX_RETIRE = 60;
 
@@ -37,7 +46,11 @@ route('GET', '/api/quality/lint', (_req, url) => {
     const bank = loadBank();
     const q = bank.byId.get(id);
     if (!q) throw new HttpError(404, 'Unknown question id');
-    return { id, flaws: lintQuestion(q, bank.taxonomy) };
+    const sealed = sealedIds();
+    // [v5] why it has siblings (cluster links) and its family — never naming a sealed question
+    const siblings = (clusterIndex(bank).links.get(id) ?? []).filter((l) => !sealed.has(l.id));
+    const family = q.family ? bank.questions.filter((x) => x.family === q.family && x.id !== id && x.status !== 'retired' && !sealed.has(x.id)).map((x) => x.id) : [];
+    return { id, flaws: lintQuestion(q, bank.taxonomy, lintContext(bank, q)), siblings, family };
   }
   const code = url.searchParams.get('code') || undefined;
   if (code && !LINT_RULES.some((r) => r.code === code)) throw new HttpError(400, `Unknown lint rule "${code}"`);
@@ -56,6 +69,8 @@ route('POST', '/api/quality/semantic', () => {
 });
 
 route('POST', '/api/quality/retire', async (req) => {
+  const busy = bankWriteBlocked(); // [v5] a file-mode AI run is writing the bank: its undo must not swallow this change
+  if (busy) throw new HttpError(409, busy);
   const body = await readBody<{ items?: unknown }>(req);
   const items = Array.isArray(body.items) ? (body.items as { id?: unknown; hash?: unknown }[]) : [];
   const list = items.filter((x) => x && typeof x.id === 'string' && x.id.trim()).map((x) => ({ id: String(x.id).trim(), hash: typeof x.hash === 'string' ? x.hash : undefined }));
@@ -91,4 +106,13 @@ route('POST', '/api/ratings', async (req) => {
   const item = addRating(body.qid, body.value, typeof body.note === 'string' ? body.note : undefined);
   scheduleSnapshot(); // ratings are a snapshot section (debounced, off the request path)
   return item;
+});
+
+let guideMemo: { key: string; value: GuideCoverage } | undefined;
+
+/** [v5 γ1] The official exam guide + coverage of the practice pool (memo per data state). */
+route('GET', '/api/exam-guide', () => {
+  const ctx = context();
+  if (guideMemo?.key !== ctx.key) guideMemo = { key: ctx.key, value: guideCoverage(ctx.bank, ctx.attempts) };
+  return guideMemo.value;
 });

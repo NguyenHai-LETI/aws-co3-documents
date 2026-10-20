@@ -11,5 +11,7 @@ description: Sinh câu hỏi trắc nghiệm phong cách AWS SAA-C03 từ tài l
 3. Kiểm tra: `node trainer/scripts/validate.ts packs/docs/<tên-file> --fill-time --lint` — sửa mọi ❌ và lỗi lint mức cao.
 4. (tuỳ chọn) Cho model thứ hai giải mù pack vừa viết: `npm --prefix trainer run coach -- --verify --pack <pack-id>`
    (câu lệch / mơ hồ chuyển draft chờ duyệt ở *Ngân hàng → Chất lượng*).
-5. Tham số từ người dùng (sources, count, topic, difficulty mix, focus, pack slug — thiếu thì tự chọn hợp lý):
+5. Nhắm mục đề cương: người dùng nêu mục (vd `3.5.s7`) hoặc “mục còn trống” → đọc `trainer/bank/exam-guide/SAA-C03.yaml`
+   (hoặc snapshot §18), ghi `skills` cho mỗi câu (ít nhất một mục được yêu cầu). Tên / giới hạn theo `taxonomy.yaml → currency:`.
+6. Tham số từ người dùng (sources, count, topic, difficulty mix, focus, pack slug, skills — thiếu thì tự chọn hợp lý):
    $ARGUMENTS

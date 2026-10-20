@@ -47,6 +47,10 @@ function toSession(raw: Record<string, unknown>, i: number): PlanSession {
           pearson: filter.pearson === true ? true : undefined,
           recallFirst: filter.recallFirst === true ? true : undefined,
           form: asString(filter.form),
+          // [v5] mode today / discriminate / retest sessions written by the sprint plan or the coach
+          budgetMinutes: Number(filter.budgetMinutes) > 0 ? Number(filter.budgetMinutes) : undefined,
+          contrast: filter.contrast ? asStringList(filter.contrast) : undefined,
+          retestOf: asString(filter.retestOf),
           feedback: (asString(filter.feedback) as FeedbackMode | undefined) ?? undefined,
           timing: raw.timing ? { preset: String(raw.timing) } : undefined,
         } as BuildTestRequest)

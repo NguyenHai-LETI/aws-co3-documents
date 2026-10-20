@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/api.ts';
 import { useData } from '../../lib/store.tsx';
 import { Chip, ErrorBox, Spinner, toast, toggle } from '../ui.tsx';
-import type { AnkiExportRequest, AnkiPreview, AnkiPushResult, AnkiStatus, Difficulty, DomainId, SelectionFilters } from '../../../shared/types.ts';
+import type { AnkiExportRequest, AnkiImportResult, AnkiPreview, AnkiPushResult, AnkiStatus, Difficulty, DomainId, SelectionFilters } from '../../../shared/types.ts';
 
 type Scope = AnkiExportRequest['scope'];
 
@@ -15,6 +15,7 @@ const SCOPES: { id: Scope; label: string; desc: string }[] = [
   { id: 'due', label: '🧠 Đến hạn ôn', desc: 'Câu đến hạn ôn theo FSRS (không giới hạn số câu mỗi ngày).' },
   { id: 'flagged', label: '🚩 Cờ / chưa chắc', desc: 'Câu cắm cờ hoặc đánh dấu “chưa chắc” ở lần làm gần nhất.' },
   { id: 'ids', label: '📌 Danh sách id', desc: 'Dán id câu hỏi, cách nhau bởi dấu phẩy, khoảng trắng hoặc xuống dòng.' },
+  { id: 'notebook', label: '📒 Sổ lỗi', desc: 'Mỗi mục trong sổ lỗi thành một thẻ quy tắc: mặt trước = hiểu nhầm + dấu hiệu trong đề, mặt sau = quy tắc đúng.' },
 ];
 
 function fromQuery(q: URLSearchParams) {
@@ -166,6 +167,8 @@ export function AnkiCard({ query }: { query: URLSearchParams }) {
   const [busy, setBusy] = useState<'download' | 'push'>();
   const [result, setResult] = useState<AnkiPushResult>();
   const [error, setError] = useState<string>();
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState<AnkiImportResult>();
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -271,6 +274,22 @@ export function AnkiCard({ query }: { query: URLSearchParams }) {
       setError((e as Error).message);
     } finally {
       setBusy(undefined);
+    }
+  };
+
+  // [v5 γ1] reviews done in Anki (phone, offline) → an 'anki' attempt: FSRS uses the button as grade, readiness leaves them out
+  const importReviews = async () => {
+    setImporting(true);
+    setImported(undefined);
+    try {
+      const r = await api.post<AnkiImportResult>('/api/export/anki/import', { deck: deckName });
+      setImported(r);
+      if (r.ok) toast(r.imported ? `🃏 Đã nhập ${r.imported} lượt ôn từ Anki` : r.duplicate ? 'Các lượt ôn này đã được nhập trước đó' : 'Không có lượt ôn mới trong Anki');
+      void check();
+    } catch (e) {
+      setImported({ ok: false, deck: deckName, reviews: 0, imported: 0, skipped: 0, error: (e as Error).message });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -383,6 +402,23 @@ export function AnkiCard({ query }: { query: URLSearchParams }) {
           <button className="btn" disabled={!count || !!busy} onClick={() => void push()} title="Cần Anki đang mở + add-on AnkiConnect">
             {busy === 'push' ? <Spinner /> : '📤'} Đẩy thẳng vào Anki
           </button>
+          <button className="btn" disabled={!!busy || importing} onClick={() => void importReviews()} title="Đọc các lượt ôn trong deck này (AnkiConnect) kể từ lần nhập trước → lịch ôn FSRS của app">
+            {importing ? <Spinner /> : '📥'} Nhập lượt ôn từ Anki
+          </button>
+          {imported && (
+            <div className={`alert small ${imported.ok ? (imported.imported ? 'good' : '') : 'bad'}`} role="status">
+              {imported.ok ? (
+                <>
+                  📥 Deck <b>{imported.deck}</b>: {imported.reviews} lượt ôn mới · nhập <b>{imported.imported}</b>
+                  {imported.skipped ? ` · bỏ qua ${imported.skipped} (thẻ không có tag SAA-C03::id::, câu không còn hoặc đang niêm phong)` : ''}
+                  {imported.duplicate ? ' · khoảng này đã nhập trước đó' : ''}
+                </>
+              ) : (
+                <>⚠️ {imported.error}</>
+              )}
+              {imported.hint && <div className="tl-hint">{imported.hint}</div>}
+            </div>
+          )}
           <div className="tiny muted tl-status">
             {checking ? (
               <>

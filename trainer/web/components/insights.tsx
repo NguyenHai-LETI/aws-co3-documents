@@ -9,7 +9,8 @@ import { fmtDateTime, fmtRelative } from '../lib/format.ts';
 import { scaledScore } from '../../shared/scoring.ts';
 import { BarList, Meter } from './charts.tsx';
 import { toast } from './ui.tsx';
-import type { AttemptSummary, CoachRunInfo, EnrichStatus, StatsResponse } from '../../shared/types.ts';
+import { attemptBadges } from './learning/rules.ts';
+import type { CoachRunInfo, EnrichStatus, StatsResponse } from '../../shared/types.ts';
 
 // ── small helpers ─────────────────────────────────────────────────────────
 
@@ -78,20 +79,15 @@ export function useEscLayer(open: boolean, onClose: () => void) {
 
 // ── badges ────────────────────────────────────────────────────────────────
 
-/** Pearson-simulation and rushed-attempt markers for result lists and headers. */
-export function AttemptBadges({ a }: { a: Partial<Pick<AttemptSummary, 'pearson' | 'rushed' | 'medianTime' | 'pilotTotal'>> }) {
+/** Attempt markers for result lists and headers: Pearson, rushed, [v5] stopped early "5/50", retest, source (learning/rules.ts). */
+export function AttemptBadges({ a }: { a: Parameters<typeof attemptBadges>[0] }) {
   return (
     <>
-      {a.pearson && (
-        <span className="badge accent" title={`Mô phỏng Pearson VUE${a.pilotTotal ? `: ${a.pilotTotal} câu thử nghiệm không tính điểm` : ''}, review cuối bài, không tạm dừng`}>
-          🎓 Pearson
+      {attemptBadges(a).map((b) => (
+        <span key={b.key} className={`badge ${b.cls}`} title={b.title}>
+          {b.text}
         </span>
-      )}
-      {a.rushed && (
-        <span className="badge warn" title={`Thời gian trung vị ${a.medianTime ?? '?'}s/câu — quá nhanh nên không tính vào thống kê, mức sẵn sàng và lịch ôn`}>
-          ⚡ làm vội
-        </span>
-      )}
+      ))}
     </>
   );
 }

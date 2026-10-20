@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TRAINER_DIR } from '../server/config.ts';
 import { loadBank } from '../server/lib/bank.ts';
-import { LINT_RULES, lintQuestion } from '../server/lib/lint.ts';
+import { LINT_RULES, lintContext, lintQuestion } from '../server/lib/lint.ts';
 import type { LintFlaw, LintSeverity } from '../shared/types.ts';
 
 const args = process.argv.slice(2);
@@ -68,7 +68,7 @@ const lintRows: LintRow[] = [];
 if (lintArg) {
   for (const q of bank.questions) {
     if (q.status !== 'active' || !match(q.file)) continue;
-    const flaws = lintQuestion(q, bank.taxonomy).filter((f) => !lintCodes.length || lintCodes.includes(f.code));
+    const flaws = lintQuestion(q, bank.taxonomy, lintContext(bank, q)).filter((f) => !lintCodes.length || lintCodes.includes(f.code));
     if (flaws.length) lintRows.push({ id: q.id, file: q.file, line: q.line, flaws });
   }
 }

@@ -94,7 +94,7 @@ const ledger = () => fs.readFileSync(path.join(home, 'bank', 'verify.md'), 'utf8
 test('GET /api/coach: structured output + blind-solve settings and the verify model', async () => {
   const c = (await api.get('/api/coach')).body;
   assert.equal(c.structured, true);
-  assert.deepEqual(c.verify, { auto: true, autoDraft: true, batchSize: 10, model: 'opus' });
+  assert.deepEqual(c.verify, { auto: true, autoDraft: true, batchSize: 10, model: 'opus', grounded: true, localModel: '' });
   assert.equal(c.models.verify, 'opus');
   assert.equal(c.claude.available, true);
   assert.equal((await api.post('/api/coach/run', { task: 'nope' })).status, 400);
@@ -475,3 +475,64 @@ function bankPackOf(id: string): string {
   }
   throw new Error(`no pack for ${id}`);
 }
+
+// ── [v5] γ2: twins, qualifier families, exam-guide skills ───────────────────────────────────────────────────
+
+test('[v5] twins (JSON): explicit ids + kind contrast → one sibling per original (variant_of), a rejected one repaired, blind-solved, undoable', async () => {
+  const [T1, T2] = packKeys('04-networking-services-v1.md', 2);
+  const { run, log, calls: cs } = await runAi('twins', { ids: [T1.id, T2.id], kind: 'contrast' });
+  assert.equal(run.status, 'success', log);
+  const out = run.outcome!;
+  assert.match(out.pack!, /^bank\/packs\/ai\/\d{4}-\d{2}-\d{2}-\d{4}-twins-fake-twins\.md$/);
+  assert.equal(out.questions, 2);
+  assert.equal(out.repaired, 1, '2nd twin rejected (letters in the explanation), then repaired');
+  assert.equal(out.verify!.checked, 2);
+  assert.deepEqual(run.params?.kinds, { [T1.id]: 'contrast', [T2.id]: 'contrast' });
+  assert.ok(schemaOf(cs[0])?.properties.questions);
+  assert.match(flag(cs[0], '-p')!, /trainer\/coach\/TWINS\.md/);
+  const qs = (await bankQuestions()).filter((q) => q.file === out.pack);
+  assert.deepEqual(qs.map((q) => q.variantOf[0]), [T1.id, T2.id]);
+  assert.ok(qs.every((q) => q.origin === 'ai' && q.id.startsWith(String(run.params!.idPrefix))));
+  const batch = fs.readFileSync(path.join(repo, String(run.params!.batch)), 'utf8');
+  assert.match(batch, /loại: \*\*contrast\*\*/);
+  const c = (await api.get<{ runs: (Run & { undoable?: { created: number } })[] }>('/api/coach')).body.runs.find((r) => r.id === run.id)!;
+  assert.equal(c.undoable?.created, 2);
+  assert.equal((await api.post('/api/coach/run', { task: 'twins', params: { kind: 'mirror' } })).status, 400);
+  const none = await api.post<{ error: string }>('/api/coach/run', { task: 'twins', params: {} });
+  assert.equal(none.status, 409, 'a fresh learner has nothing due: nothing to do');
+  assert.match(none.body.error, /Không có câu nào cần câu song sinh/);
+});
+
+test('[v5] family (JSON): qualifier families → members with shared options, distinct keys, `family` id; each blind-solved', async () => {
+  const { run, log, calls: cs } = await runAi('family', { count: 2, requirement: 'cost' });
+  assert.equal(run.status, 'success', log);
+  const out = run.outcome!;
+  assert.equal(out.families, 2);
+  assert.equal(out.questions, 4);
+  assert.equal(out.verify!.checked, 4, 'every member is blind-solved on its own');
+  assert.ok(schemaOf(cs[0])?.properties.families);
+  const qs = (await bankQuestions()).filter((q) => q.file === out.pack);
+  const fams = [...new Set(qs.map((q) => q.family))];
+  assert.equal(fams.length, 2);
+  for (const f of fams) {
+    const members = qs.filter((q) => q.family === f);
+    assert.equal(members.length, 2);
+    assert.deepEqual(members[0].options, members[1].options);
+    assert.notDeepEqual(members[0].answer, members[1].answer);
+    assert.ok(members.every((m) => (m.requirements ?? []).some((r) => r === 'cost' || r === 'ops')));
+  }
+  const batch = fs.readFileSync(path.join(repo, String(run.params!.batch)), 'utf8');
+  assert.match(batch, /^kind: family-batch$/m);
+  assert.equal((await api.post('/api/coach/run', { task: 'family', params: { requirement: 'cheap' } })).status, 409);
+});
+
+test('[v5] generate with exam-guide skills: the prompt lists the bullets, every new question names one', async () => {
+  const { run, log, calls: cs } = await runAi('generate', { skills: ['2.2.K1'], count: 2 });
+  assert.equal(run.status, 'success', log);
+  assert.deepEqual(run.params?.skills, ['2.2.k1']);
+  assert.match(flag(cs[0], '-p')!, /mục đề cương cần phủ[\s\S]*`2\.2\.k1` AWS global infrastructure/);
+  const qs = (await bankQuestions()).filter((q) => q.file === run.outcome!.pack);
+  assert.equal(qs.length, 2);
+  assert.ok(qs.every((q) => q.skills?.includes('2.2.k1') && !q.skillsGuessed));
+  assert.equal((await api.post('/api/coach/run', { task: 'generate', params: { skills: ['2.2'] } })).status, 400);
+});

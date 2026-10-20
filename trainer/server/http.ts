@@ -104,11 +104,31 @@ export async function readBody<T>(req: http.IncomingMessage): Promise<T> {
   }
 }
 
+/** A route param (or any URL piece) that decodeURIComponent accepts. */
+export function decodable(s: string): boolean {
+  try {
+    decodeURIComponent(s);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** decodeURIComponent for route params → HttpError 400 instead of a 500 on a malformed %-escape. */
+export function decodeParam(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    throw new HttpError(400, 'Bad request: malformed %-encoding in the URL');
+  }
+}
+
 export type Handler = (req: http.IncomingMessage, url: URL, params: string[]) => Promise<unknown> | unknown;
-export const routes: { method: string; re: RegExp; fn: Handler }[] = [];
+/** `pattern` as registered ([v5] LAN scope: server/lib/lan-scope.ts classifies every route by method + pattern). */
+export const routes: { method: string; pattern: string; re: RegExp; fn: Handler }[] = [];
 /** Register an API route. Pattern params like `/api/results/:id` arrive (still URI-encoded) in `params`. */
 export function route(method: string, pattern: string, fn: Handler): void {
-  routes.push({ method, re: new RegExp('^' + pattern.replace(/:\w+/g, '([^/]+)') + '$'), fn });
+  routes.push({ method, pattern, re: new RegExp('^' + pattern.replace(/:\w+/g, '([^/]+)') + '$'), fn });
 }
 
 // ── Server-Sent Events ──────────────────────────────────────────────────────

@@ -6,8 +6,8 @@
 // released_at?, ids: [...]}]` + a short Markdown note. Creation is deterministic — no timestamps, ids in a seeded-hash
 // order — so two machines creating the forms from the same bank and history write byte-identical files.
 //
-// Selection (createForms): active questions that are in the exam scope, have no near-duplicate sibling (variant_of either
-// way, a similar stem with the same key, a semantic pair when the local embedding job has run), no open issue, no low
+// Selection (createForms): active questions that are in the exam scope, have no sibling ([v5] clusters.ts: variant_of either
+// way, lexical / semantic duplicates, a similar stem with the same topic or key), no open issue, no low
 // rating, no high-severity lint flaw and were never in an earlier form. Stratified by exam domain weight and round-robin
 // over the tasks of each domain; never-seen questions first (a second pass may take seen ones), longer stems first, a
 // seeded hash for ties. The picks of each task are dealt to the forms in snake order, so the forms are equivalent.
@@ -25,7 +25,7 @@ import { asString, asStringList, splitFrontMatter } from './frontmatter.ts';
 import { lintQuestion } from './lint.ts';
 import { loadIssues } from './issues.ts';
 import { aggregateRatings, loadRatings, lowRatedIds } from './ratings.ts';
-import { semanticState } from './embeddings.ts';
+import { CLUSTER_RULES, buildClusters, clusterIndex, clusteredIds } from './clusters.ts';
 import { localIso } from './time.ts';
 import type { Attempt, Question, SealedForm, SealedFormSummary, SealedState, SealedStatus, Taxonomy } from '../../shared/types.ts';
 
@@ -301,81 +301,16 @@ const clampInt = (v: unknown, min: number, max: number, dflt: number) => {
   return Number.isFinite(n) && n > 0 ? Math.min(max, Math.max(min, n)) : dflt;
 };
 
-/** Words (≥ 3 letters) of a stem as sorted integer ids (dictionary shared by one scan). */
-function wordIds(text: string, dict: Map<string, number>): number[] {
-  const ids = new Set<number>();
-  for (const w of text.toLowerCase().match(/[a-z0-9]+/g) ?? []) {
-    if (w.length < 3) continue;
-    let n = dict.get(w);
-    if (n === undefined) dict.set(w, (n = dict.size));
-    ids.add(n);
-  }
-  return [...ids].sort((a, b) => a - b);
-}
-
-function jaccard(a: number[], b: number[]): number {
-  if (!a.length || !b.length) return 0;
-  let i = 0;
-  let j = 0;
-  let inter = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      inter++;
-      i++;
-      j++;
-    } else if (a[i] < b[j]) i++;
-    else j++;
-  }
-  return inter / (a.length + b.length - inter);
-}
-
-export const SIBLING_STEM = 0.5; // stem word overlap that makes two questions siblings on its own
-export const SIBLING_SAME_KEY = 0.25; // …or this much with the same correct option text (rephrased V1/V2 twins)
+export const SIBLING_STEM = CLUSTER_RULES.similarStem; // stem word overlap that links two questions (same topic or same key)
+export const SIBLING_SAME_KEY = CLUSTER_RULES.sameKeyStem; // …or this much with the same topic + correct option text (rephrased V1/V2 twins)
 
 /**
- * Questions with a near-duplicate sibling — practising one would leak the other's answer: `variant_of` in either
- * direction, similar stems (Jaccard of words ≥ 3 letters ≥ 0.5, or ≥ 0.25 with the same correct option text — the lens-3
- * sibling scan) and `pairs` from elsewhere (semantic duplicates). Retired questions are no siblings (nobody practises them).
+ * [v5] Questions with a sibling — practising one would leak the other's answer. The single definition lives in
+ * clusters.ts (variant_of either way, lexical / semantic duplicates (`pairs`), similar stems with the same topic or key,
+ * anti-chaining guards). Retired questions are no siblings (nobody practises them).
  */
-export function siblingIds(questions: Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'variantOf' | 'status'>[], pairs: { a: string; b: string }[] = []): Set<string> {
-  const live = questions.filter((q) => q.status !== 'retired');
-  const ids = new Set(live.map((q) => q.id));
-  const out = new Set<string>();
-  for (const q of live) {
-    for (const v of q.variantOf) {
-      if (!ids.has(v) || v === q.id) continue;
-      out.add(q.id);
-      out.add(v);
-    }
-  }
-  const dict = new Map<string, number>();
-  const sigs = live.map((q) => ({
-    id: q.id,
-    words: wordIds(q.stem, dict),
-    key: q.options
-      .filter((o) => q.answer.includes(o.key))
-      .map((o) => o.text.trim().toLowerCase().replace(/\s+/g, ' '))
-      .sort()
-      .join(' | '),
-  }));
-  for (let x = 0; x < sigs.length; x++) {
-    for (let y = x + 1; y < sigs.length; y++) {
-      const a = sigs[x];
-      const b = sigs[y];
-      const j = jaccard(a.words, b.words);
-      if (j >= SIBLING_STEM || (j >= SIBLING_SAME_KEY && a.key && a.key === b.key)) {
-        out.add(a.id);
-        out.add(b.id);
-      }
-    }
-  }
-  for (const p of pairs) {
-    if (ids.has(p.a) && ids.has(p.b)) {
-      out.add(p.a);
-      out.add(p.b);
-    }
-  }
-  return out;
+export function siblingIds(questions: (Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'variantOf' | 'status'> & { topic?: string })[], pairs: { a: string; b: string }[] = []): Set<string> {
+  return clusteredIds(buildClusters(questions, pairs));
 }
 
 /** Questions the learner has seen: an answer with a pick or time on it (a never-viewed blank is no exposure). */
@@ -391,10 +326,12 @@ export interface Eligibility {
 }
 
 /** Candidates for new forms and why the others were left out (see the header for the rules). */
-export function eligibleForSealing(bank: BankState, cfg: AppConfig, history: Set<string> = new Set()): Eligibility {
+export function eligibleForSealing(bank: BankState, _cfg: AppConfig, history: Set<string> = new Set()): Eligibility {
   const tax = bank.taxonomy;
   const active = bank.questions.filter((q) => q.status === 'active');
-  const siblings = siblingIds(bank.questions, semanticState(cfg).pairs);
+  // [v5] the cluster index (clusters.ts, semantic pairs per the current config) is the single sibling definition; only
+  // forms created from now on see it — an existing results/sealed.md is never re-picked
+  const siblings = clusteredIds(clusterIndex(bank));
   let issues = new Set<string>();
   let lowRated = new Set<string>();
   try {

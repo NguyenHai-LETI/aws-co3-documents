@@ -7,7 +7,7 @@
 // Questions of a sealed form ([γ] sealed.ts) are never indexed nor found — not even by their exact id.
 import fs from 'node:fs';
 import { loadBank, type BankState } from './bank.ts';
-import { listNotes, notePath, plainText, splitSections } from './notes.ts';
+import { dataRel, guardFile, listNotes, notePath, plainText, splitSections, splitSectionsRaw, type RawSection } from './notes.ts';
 import { ftsAvailable, getMeta, setMeta, stmt, transaction, withDb } from './index-db.ts';
 import { sealedIds, sealedKey } from './sealed.ts';
 import type { Question, SearchHit, SearchResponse } from '../../shared/types.ts';
@@ -156,12 +156,20 @@ function noteFiles(): NoteFile[] {
     if (!abs) continue;
     try {
       const st = fs.statSync(abs);
-      out.push({ file: n.file, abs, sig: `${st.mtimeMs}:${st.size}:v${INDEX_VERSION}`, title: n.title });
+      // [v5] trainer data files (the 📒 notebook) are read through the sealed guard: a newly sealed form re-indexes them
+      const guarded = dataRel(abs) !== undefined ? `:${sealedKey()}` : '';
+      out.push({ file: n.file, abs, sig: `${st.mtimeMs}:${st.size}:v${INDEX_VERSION}${guarded}`, title: n.title });
     } catch {
       // vanished
     }
   }
   return out;
+}
+
+/** What a note may show: study notes as they are, trainer data files through the sealed guard ('' when refused). */
+function noteText(abs: string): string {
+  if (dataRel(abs) === undefined) return fs.readFileSync(abs, 'utf8');
+  return guardFile(abs).content ?? '';
 }
 
 interface NoteDoc {
@@ -178,12 +186,38 @@ function noteDocs(n: NoteFile): NoteDoc[] {
   if (hit?.sig === n.sig) return hit.docs;
   let docs: NoteDoc[] = [];
   try {
-    docs = splitSections(fs.readFileSync(n.abs, 'utf8')).map((s) => ({ file: n.file, title: n.title, heading: s.heading, anchor: s.anchor, text: s.text }));
+    docs = splitSections(noteText(n.abs)).map((s) => ({ file: n.file, title: n.title, heading: s.heading, anchor: s.anchor, text: s.text }));
   } catch {
     // unreadable → no sections
   }
   noteDocsMemo.set(n.abs, { sig: n.sig, docs });
   return docs;
+}
+
+// ── [v5] heading lookup (pair page excerpts) ────────────────────────────────
+
+const rawMemo = new Map<string, { sig: string; sections: RawSection[] }>();
+
+/**
+ * Note sections whose heading satisfies `pred`, as Markdown (sub-headings included), in note-list order — GET
+ * /api/pairs/compare. Same files and sealed guard as the search; parsed once per file version.
+ */
+export function headingSections(pred: (heading: string, file: string) => boolean): { file: string; title: string; heading: string; anchor: string; md: string }[] {
+  const out: { file: string; title: string; heading: string; anchor: string; md: string }[] = [];
+  for (const n of noteFiles()) {
+    let hit = rawMemo.get(n.abs);
+    if (hit?.sig !== n.sig) {
+      let sections: RawSection[] = [];
+      try {
+        sections = splitSectionsRaw(noteText(n.abs));
+      } catch {
+        // unreadable → no sections
+      }
+      rawMemo.set(n.abs, (hit = { sig: n.sig, sections }));
+    }
+    for (const s of hit.sections) if (s.heading && pred(s.heading, n.file)) out.push({ file: n.file, title: n.title, heading: s.heading, anchor: s.anchor, md: s.md });
+  }
+  return out;
 }
 
 // ── hits ────────────────────────────────────────────────────────────────────

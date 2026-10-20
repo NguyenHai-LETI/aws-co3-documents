@@ -13,6 +13,10 @@
 //   readiness weighs it × RECOGNIZED_WEIGHT.
 // - `seenBefore` (never-viewed answers of non-rushed attempts): the question had a viewed answer earlier — the result
 //   page counts it as "đã gặp", otherwise as a first-time question answered wrong (never an exposure itself).
+// [v5] Self-graded answers (`grade`: listen mode, Anki import) are always viewed, never re-graded (their `ok` is the
+//   learner's own grade ≥ 3) and never "recognized"; in-session relearning retries (`relearn`) and the blanks of a
+//   stopped-early test (`skipped`) are not exposures; answers from chat / micro breaks (attempt `source`) are never
+//   "recognized" (their time is not reading time).
 import type { AppConfig } from '../config.ts';
 import type { BankState } from './bank.ts';
 import { isCorrect, normalizeKeys } from '../../shared/scoring.ts';
@@ -40,15 +44,39 @@ function currentKeys(bank: BankState): Map<string, string> {
 /** Option letters of a stored key, normalized ("d, b" → "BD"). */
 const letters = (k: string) => normalizeKeys([...k].filter((c) => /[a-z]/i.test(c)));
 
-/** The answer re-graded against `key` (the current answer key), or the same object when the key did not change. */
+/** The answer re-graded against `key` (the current answer key), or the same object when the key did not change (or self-graded). */
 export function regradeAnswer(r: AnswerRecord, key: string | undefined): AnswerRecord {
-  if (!key || r.key === key || letters(r.key) === key) return r;
+  if (!key || r.key === key || letters(r.key) === key || r.grade !== undefined) return r;
   return { ...r, key, ok: isCorrect(r.pick, key), regraded: true };
 }
 
-/** Never viewed: no pick and no time spent — not a review (see the header). */
-export function isUnviewed(r: Pick<AnswerRecord, 'pick' | 't'>): boolean {
-  return !r.pick && !(r.t > 0);
+/** Never viewed: no pick, no time spent and no self-grade — not a review (see the header). */
+export function isUnviewed(r: Pick<AnswerRecord, 'pick' | 't' | 'grade'>): boolean {
+  return !r.pick && !(r.t > 0) && !r.grade;
+}
+
+/**
+ * [v5] A real answer to the question: viewed, not a blank left when the learner stopped early (`skipped`), not an
+ * in-session relearning retry (`relearn`). Only these are FSRS reviews of their own question and exposures.
+ */
+export function isAnswer(r: Pick<AnswerRecord, 'pick' | 't' | 'grade' | 'skipped' | 'relearn'>): boolean {
+  return !r.skipped && !r.relearn && !isUnviewed(r);
+}
+
+/** [v5] Self-graded (listen mode, Anki import): no recorded pick — kept out of readiness, accuracy and speed statistics. */
+export function isSelfGraded(r: Pick<AnswerRecord, 'grade'>, a?: Pick<Attempt, 'source'>): boolean {
+  return r.grade !== undefined || a?.source === 'anki' || a?.source === 'listen';
+}
+
+/**
+ * [v5] Why an attempt is not a readiness sample (undefined = it is one): retests are asked minutes after the
+ * explanation, self-graded sources have no recorded pick.
+ */
+export function notReadinessReason(a: Pick<Attempt, 'mode' | 'source'>): string | undefined {
+  if (a.mode === 'retest') return 'Bài kiểm tra lại ngay sau khi chữa: không tính vào mức sẵn sàng (trả lời ngay sau khi xem giải thích).';
+  if (a.source === 'anki') return 'Lượt ôn trên Anki tự chấm: không tính vào mức sẵn sàng và xác suất đỗ.';
+  if (a.source === 'listen') return 'Chế độ nghe tự chấm: không tính vào mức sẵn sàng và xác suất đỗ.';
+  return undefined;
 }
 
 /** Words the learner has to read for a question: stem + every option. */
@@ -114,11 +142,11 @@ export function regradeAttempts(attempts: Attempt[], bank: BankState, cfg?: Pick
       let exposure: number | undefined;
       let recognized = false;
       let seenBefore = false;
-      if (!unviewed && !a.rushed) {
+      if (!unviewed && !a.rushed && !r.skipped && !r.relearn) {
         exposure = (seen.get(r.q) ?? 0) + 1;
         seen.set(r.q, exposure);
         const q = bank.byId.get(r.q);
-        recognized = exposure >= 2 && r.ok && !!r.pick && r.t > 0 && !!q && r.t < recognitionSeconds(q, wpm);
+        recognized = exposure >= 2 && r.ok && !!r.pick && r.grade === undefined && !a.source && r.t > 0 && !!q && r.t < recognitionSeconds(q, wpm);
       } else if (unviewed && !a.rushed) {
         seenBefore = (seen.get(r.q) ?? 0) > 0; // not an exposure: the count does not move
       }
@@ -139,10 +167,10 @@ export function regradeAttempts(attempts: Attempt[], bank: BankState, cfg?: Pick
   return result;
 }
 
-/** Answers marked `regraded` (optionally only in non-rushed attempts); never-viewed blanks are not answers. */
+/** Answers marked `regraded` (optionally only in non-rushed attempts); never-viewed blanks, skipped blanks and relearning retries are not answers. */
 export function countRegraded(attempts: Attempt[], opts: { includeRushed?: boolean } = {}): number {
   let n = 0;
-  for (const a of attempts) if (opts.includeRushed || !a.rushed) for (const r of a.answers) if (r.regraded && !isUnviewed(r)) n++;
+  for (const a of attempts) if (opts.includeRushed || !a.rushed) for (const r of a.answers) if (r.regraded && isAnswer(r)) n++;
   return n;
 }
 
@@ -157,13 +185,17 @@ export function resultAnnotations(annotated: Attempt | undefined, stored: Attemp
   const out: ResultAnnotations = { exposure: {}, recognized: [], unviewed: [] };
   if (!annotated) return out;
   for (const r of annotated.answers) {
+    if (r.relearn || r.skipped) continue;
     if (r.exposure !== undefined) out.exposure[r.q] = r.exposure;
     if (r.recognized) out.recognized.push(r.q);
     if (r.unviewed) out.unviewed.push(r.q);
   }
+  newCaseAnnotations(out, stored ?? annotated, annotated);
   if (annotated.rushed || stored?.rushed) return out;
-  const learning = new Map(annotated.answers.map((r) => [r.q, r]));
-  const scored = (stored ?? annotated).answers.filter((r) => r.scored !== false);
+  // the first (graded) record per question: relearning retries and skipped blanks are not part of the score
+  const learning = new Map<string, AnswerRecord>();
+  for (const r of annotated.answers) if (!r.relearn && !r.skipped && !learning.has(r.q)) learning.set(r.q, r);
+  const scored = (stored ?? annotated).answers.filter((r) => r.scored !== false && !r.relearn && !r.skipped);
   const fresh = { total: scored.length, seenBefore: 0, answers: 0, correct: 0 };
   for (const r of scored) {
     const l = learning.get(r.q);
@@ -176,4 +208,30 @@ export function resultAnnotations(annotated: Attempt | undefined, stored: Attemp
   }
   out.fresh = fresh;
   return out;
+}
+
+/**
+ * [v5] Annotations of the new record kinds, from the stored attempt (`stored`, as graded) and its learning view:
+ * stopped early (session size, graded answers, viewed blanks), skipped blanks, relearning retries, `for` substitutions,
+ * a retest's still-wrong questions, and why the attempt is not a readiness sample. GET /api/results/:id adds the
+ * cross-attempt parts (the retested attempt's title, `retested`).
+ */
+function newCaseAnnotations(out: ResultAnnotations, stored: Attempt, annotated: Attempt): void {
+  const skipped = stored.answers.filter((r) => r.skipped).map((r) => r.q);
+  if (skipped.length) out.skipped = skipped;
+  if (stored.stoppedEarly) {
+    const answered = stored.answers.filter((r) => !r.skipped && !r.relearn && r.scored !== false && (!!r.pick || r.grade !== undefined)).length;
+    out.stoppedEarly = { planned: stored.planned ?? stored.answers.filter((r) => !r.relearn).length, answered, skipped: skipped.length };
+  }
+  const relearn = annotated.answers.filter((r) => r.relearn).map((r) => ({ q: r.q, ok: r.ok }));
+  if (relearn.length) out.relearn = relearn;
+  const swaps = stored.answers.filter((r) => r.for && !r.relearn);
+  if (swaps.length) out.for = Object.fromEntries(swaps.map((r) => [r.q, r.for!]));
+  if (stored.mode === 'retest' && stored.retestOf) {
+    const graded = new Map<string, AnswerRecord>();
+    for (const r of annotated.answers) if (!r.relearn && !r.skipped && !graded.has(r.q)) graded.set(r.q, r);
+    out.retest = { of: stored.retestOf, misses: [...graded.values()].filter((r) => !r.ok && !isUnviewed(r)).map((r) => r.q) };
+  }
+  const reason = notReadinessReason(stored);
+  if (reason) out.notReadiness = reason;
 }

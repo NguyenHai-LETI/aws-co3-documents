@@ -69,6 +69,7 @@ async function launchOrExplain() {
 
 const OUT = path.resolve(process.env.SMOKE_OUT || fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-smoke-')));
 fs.mkdirSync(OUT, { recursive: true });
+const BANK_GUIDE = '/bank?tab=quality&sec=guide'; // [v5 γ1] exam-guide coverage map
 const PAGES = [
   ['/', 'dashboard'],
   ['/new', 'new-test'],
@@ -77,6 +78,8 @@ const PAGES = [
   ['/bank', 'bank'],
   ['/coach', 'coach'],
   ['/tools', 'tools'],
+  ['/pair?a=SNS&b=SQS', 'pair'], // [v5 μ]
+  ['/pair', 'pairs'],
 ];
 
 const results = []; // { name, ok, detail }
@@ -183,6 +186,32 @@ async function takeTestThroughUi(page, base, query, count) {
   return page;
 }
 
+/** [v5] Puts a test built through the API into the browser as the unfinished test (fields the runner fills itself omitted). */
+async function injectActive(page, base, session, questions, opts = {}) {
+  await open(page, base, '/');
+  await page.evaluate(
+    ([s, qs, o]) =>
+      localStorage.setItem('trainer.activeTest.v1', JSON.stringify({ session: s, questions: qs, answers: {}, current: 0, startedAt: Date.now(), pausedTotal: 0, opts: o })),
+    [session, questions, opts],
+  );
+  await open(page, base, '/run');
+  await page.locator('.runner-bar').first().waitFor({ timeout: 20_000 });
+}
+
+/** Display position (1-based key to press) of option `key` for question entry `id` of the stored unfinished test. */
+async function keyFor(page, id, key) {
+  return page.evaluate(
+    ([qid, k]) => {
+      const t = JSON.parse(localStorage.getItem('trainer.activeTest.v1') ?? 'null');
+      const q = t.questions.find((x) => x.id === qid);
+      const own = qid.endsWith('~relearn') ? t.relearn?.[qid]?.order : t.session.questions.find((r) => r.id === qid)?.order;
+      const order = own && own.length === q.options.length ? own : q.options.map((o) => o.key);
+      return String(order.indexOf(k) + 1);
+    },
+    [id, key],
+  );
+}
+
 async function submitFromRunner(page) {
   await page.getByRole('button', { name: /^Nộp bài/ }).first().click();
   await page.getByRole('button', { name: /xem kết quả|Kết thúc bài thi/ }).first().click({ timeout: 10_000 });
@@ -210,6 +239,14 @@ try {
   await open(w, srv.base, '/');
   await rendered(w);
   await w.waitForTimeout(1500);
+  // every page once: a page importing a dependency not optimized yet makes Vite reload the tab, which would drop the
+  // key presses of a recorded step that happens to run right then
+  for (const [hash] of [...PAGES, ['/run'], ['/listen'], ['/notes'], [BANK_GUIDE], ['/new?mode=today']]) {
+    await open(w, srv.base, hash);
+    await w.locator('main > *, .runner > *').first().waitFor({ timeout: 45_000 }).catch(() => undefined);
+    await w.waitForTimeout(400);
+  }
+  await w.waitForTimeout(1000);
   await warm.close();
 
   // desktop, light
@@ -232,11 +269,91 @@ try {
       throw new Error(`submitted attempt not found in /api/results (hash ${resultHash})`);
     }
   });
+  // [v5 μ] result page "🩹 Chữa N câu": retry before the explanation (POST /api/results/:id/retry)
+  await step('desktop result → 🩹 Chữa → retry → explanation', p, async () => {
+    const fix = p.getByRole('button', { name: /Chữa \d+ câu/ });
+    if (!(await fix.count())) return; // nothing to correct in this attempt (or the stepper is not in this tree)
+    await fix.first().click();
+    await p.locator('.lrn-fix').first().waitFor({ timeout: 10_000 });
+    await p.locator('.lrn-fix .opt:not(.struck)').first().click();
+    const check = p.locator('.lrn-fix').getByRole('button', { name: 'Kiểm tra' });
+    if ((await check.count()) && (await check.first().isEnabled())) await check.first().click();
+    else await p.locator('.lrn-fix').getByRole('button', { name: /Bỏ qua, xem giải thích/ }).first().click();
+    await p.locator('.lrn-fix .explain').first().waitFor({ state: 'visible', timeout: 10_000 });
+  });
   await step('desktop practice quick test (reveal)', p, async () => {
     await takeTestThroughUi(p, srv.base, 'mode=quick', 1);
     await p.keyboard.press('Enter'); // practice: check the answer
     await p.waitForTimeout(300);
   });
+  // [v5 ρ] "⏹ Dừng ở đây": 2 of 5 answered → only those are stored, the 3 never viewed stay in the queues
+  await step('desktop ⏹ stop early → result covers the answered part', p, async () => {
+    await takeTestThroughUi(p, srv.base, 'mode=topic&topics=networking&count=5', 2);
+    await p.getByRole('button', { name: 'Dừng ở đây' }).click();
+    await p.getByRole('button', { name: /Dừng & lưu phần đã làm/ }).click({ timeout: 10_000 });
+    await p.waitForURL(/#\/result\//, { timeout: 20_000 });
+    await rendered(p);
+    const a = (await api.get('/api/results?limit=1')).body.items[0];
+    if (!a.stoppedEarly || a.planned !== 5 || a.total !== 2) throw new Error(`stopped early attempt: ${JSON.stringify({ stoppedEarly: a.stoppedEarly, planned: a.planned, total: a.total })}`);
+  });
+
+  // [v5 ρ] in-session relearning: a wrong answer comes back later with its options hidden until the learner recalls
+  await step('desktop 🔁 relearn: wrong answer → asked again (recall gate) → stored as a retry', p, async () => {
+    const built = await api.post('/api/tests', { mode: 'quick', feedback: 'practice', relearn: true, count: 5 });
+    if (!built.ok) throw new Error(`POST /api/tests → ${built.status}`);
+    const { session, questions } = built.body;
+    const q0 = questions[0];
+    await injectActive(p, srv.base, session, questions, { relearn: true });
+    const wrongKey = q0.options.map((o) => o.key).find((k) => !q0.answer.includes(k));
+    await p.keyboard.press(await keyFor(p, q0.id, wrongKey));
+    await p.keyboard.press('Enter'); // Kiểm tra → wrong → queued
+    await p.getByText(/Câu này sẽ được hỏi lại/).waitFor({ timeout: 10_000 });
+    for (let i = 0; i < 8 && !(await p.locator('.relearn-badge').count()); i++) {
+      await p.keyboard.press('ArrowRight');
+      await p.waitForTimeout(80);
+    }
+    await p.locator('#recall-input').fill('ý chính của đáp án');
+    await p.keyboard.press('Enter'); // options shown
+    const slotId = `${q0.id}~relearn`;
+    for (const k of q0.answer) await p.keyboard.press(await keyFor(p, slotId, k));
+    await p.keyboard.press('Enter'); // Kiểm tra
+    await p.getByText(/Lần hỏi lại này không tính điểm/).waitFor({ timeout: 10_000 });
+    await submitFromRunner(p);
+    const id = decodeURIComponent(new URL(p.url()).hash.split('/').pop() ?? '');
+    const a = (await api.get(`/api/results/${encodeURIComponent(id)}`)).body.attempt;
+    const recs = a.answers.filter((r) => r.q === q0.id);
+    if (recs.length !== 2 || recs[0].ok || !recs[1].relearn || !recs[1].ok) throw new Error(`relearn records: ${JSON.stringify(recs.map((r) => ({ ok: r.ok, relearn: r.relearn })))}`);
+  });
+
+  // [v5 γ1] Quality → 🗺️ Đề cương
+  await step('desktop bank exam-guide map', p, async () => {
+    await open(p, srv.base, BANK_GUIDE);
+    await rendered(p);
+    await p.getByText('Sinh cho ô trống').first().waitFor({ timeout: 20_000 });
+  });
+
+  // [v5 σ] "Học hôm nay": preview → start → runner; left with ⏹ before any answer ("🗑 Bỏ bài này": nothing stored)
+  await step('desktop ▶ Học hôm nay → runner → bỏ bài', p, async () => {
+    const before = (await api.get('/api/results')).body.length;
+    await open(p, srv.base, '/new?mode=today');
+    await rendered(p);
+    const start = p.getByRole('button', { name: /^▶ (Học hôm nay|Bắt đầu)/ }).last(); // the start button, not the mode card
+    await start.waitFor({ timeout: 20_000 });
+    for (let i = 0; i < 50 && !(await start.isEnabled()); i++) await p.waitForTimeout(200); // the today preview arrives
+    await start.click();
+    await p.waitForURL(/#\/run/, { timeout: 20_000 });
+    await p.locator('.runner-bar').first().waitFor({ timeout: 20_000 });
+    const title = await p.locator('.runner-title').first().innerText();
+    if (!/Học hôm nay/.test(title)) throw new Error(`runner title: ${title}`);
+    await p.getByRole('button', { name: 'Dừng ở đây' }).click();
+    await p.getByRole('button', { name: /Bỏ bài này/ }).click({ timeout: 10_000 });
+    await p.waitForURL((u) => !/#\/run/.test(u.hash), { timeout: 20_000 });
+    const left = await p.evaluate(() => localStorage.getItem('trainer.activeTest.v1'));
+    if (left) throw new Error('the abandoned test is still stored');
+    const after = (await api.get('/api/results')).body.length;
+    if (after !== before) throw new Error(`abandon stored ${after - before} result(s)`);
+  });
+
   await step('desktop submit without connection → ⏳ chờ nộp → sent once when back', p, async () => {
     const before = (await api.get('/api/results')).body.length;
     await takeTestThroughUi(p, srv.base, 'mode=topic&topics=storage&count=3', 3);
@@ -284,6 +401,24 @@ try {
     await takeTestThroughUi(m, srv.base, 'mode=quick', 2);
     await noOverflow(m);
   });
+  await step('390px bank exam-guide map', m, async () => {
+    await open(m, srv.base, BANK_GUIDE);
+    await rendered(m);
+    await m.getByText('Sinh cho ô trống').first().waitFor({ timeout: 20_000 });
+    await noOverflow(m);
+  });
+  // [v5 τ] pages without a sidebar <h1> of their own: wait for the main content instead
+  for (const [hash, name] of [
+    ['/listen', 'listen'],
+    ['/notes?tab=notebook', 'notes notebook'],
+  ]) {
+    await step(`390px ${name}`, m, async () => {
+      await open(m, srv.base, hash);
+      await m.locator('main > *').last().waitFor({ state: 'visible', timeout: 45_000 });
+      await m.waitForTimeout(900);
+      await noOverflow(m);
+    });
+  }
 
   // dark theme
   const dark = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark' });

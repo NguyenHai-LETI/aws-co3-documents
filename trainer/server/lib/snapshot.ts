@@ -23,6 +23,11 @@ import { stringifyFrontMatter } from './frontmatter.ts';
 import { fmtDuration } from '../../shared/timing.ts';
 import { pct } from '../../shared/scoring.ts';
 import { MODE_INFO } from '../../shared/labels.ts';
+import { undecidedText, weakFirst } from '../../shared/evidence.ts';
+import { leeches as leechList } from './leech.ts';
+import { examPhase } from './exam-schedule.ts';
+import { loadGoal } from './progress.ts';
+import { guideCoverage, taskDeficits } from './exam-guide.ts';
 import type { AnswerRecord, Attempt, Bucket, ConfusionPair, Plan, Question, QuestionState, StatsResponse } from '../../shared/types.ts';
 
 function oneLine(s: string, max = 200): string {
@@ -59,7 +64,7 @@ function derived(bank: BankState, cfg: AppConfig): { all: Attempt[]; states: Map
     return { all: ctx.attempts, states: ctx.states, stats: contextStats(ctx) };
   }
   const all = regradeAttempts(loadAttempts(cfg), bank, cfg);
-  const states = computeStates(all, cfg);
+  const states = computeStates(all, cfg, Date.now(), undefined, { goal: loadGoal() }); // [v5] exam-aware due dates, as context()
   return { all, states, stats: computeStats(all, bank, states, cfg) };
 }
 
@@ -170,10 +175,19 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   }
   o.push('');
 
+  // [v5 γ1] evidence columns (shared/evidence.ts via computeStats): shrunk rate + 80 % interval, verdict vs the learner's own
+  // base rate — "yếu" only when the interval says so, otherwise how many more answers would settle it
+  const VERDICT_VI: Record<string, string> = { below: '⬇️ yếu hơn mức chung', above: '⬆️ mạnh hơn mức chung', same: '≈ như mức chung' };
+  const evidenceCell = (b: Bucket) => {
+    if (!b.attempts) return '—';
+    const band = b.shrunk !== undefined && b.lo !== undefined && b.hi !== undefined ? `${b.shrunk}% (${b.lo}–${b.hi}%)` : `${b.accuracy}%`;
+    const v = b.verdict && b.verdict !== 'unknown' ? VERDICT_VI[b.verdict] : b.needMore ? undecidedText(b.needMore) : 'chưa đủ dữ liệu';
+    return `${band} · ${v}`;
+  };
   const table = (rows: Bucket[], head: string, minAttempts = 1) => {
-    o.push(`| ${head} | Lượt | Đúng | Tỉ lệ | Đã gặp/Ngân hàng | TG TB / chuẩn |`, '|---|---|---|---|---|---|');
+    o.push(`| ${head} | Lượt | Đúng | Tỉ lệ | Đã co (khoảng 80 %) · kết luận | Đã gặp/Ngân hàng | TG TB / chuẩn |`, '|---|---|---|---|---|---|---|');
     for (const b of rows.filter((x) => x.attempts >= minAttempts)) {
-      o.push(`| ${cell(b.label)} | ${b.attempts} | ${b.correct} | ${b.accuracy}% | ${b.questions}/${b.bank} | ${b.avgTime}s / ${b.avgEst}s |`);
+      o.push(`| ${cell(b.label)} | ${b.attempts} | ${b.correct} | ${b.accuracy}% | ${cell(evidenceCell(b))} | ${b.questions}/${b.bank} | ${b.avgTime}s / ${b.avgEst}s |`);
     }
     o.push('');
   };
@@ -196,12 +210,13 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
     table(req, 'Tiêu chí', 0);
     o.push('- Tiêu chí tỉ lệ thấp → biến thể giữ khái niệm nhưng đổi tiêu chí (vd cùng kiến trúc, hỏi *LEAST operational overhead* thay vì *MOST cost-effective*).', '');
   }
-  o.push('## 3. Theo chủ đề (yếu → mạnh, có ≥ 1 lượt)', '');
-  table([...stats.byTopic].filter((b) => b.attempts).sort((a, b) => a.accuracy - b.accuracy), 'Topic');
-  o.push('## 4. Service yếu nhất (≥ 3 lượt)', '');
-  table([...stats.byService].filter((b) => b.attempts >= 3).sort((a, b) => a.accuracy - b.accuracy).slice(0, 20), 'Service', 3);
-  o.push('## 5. Khái niệm/tag yếu nhất (≥ 3 lượt)', '');
-  table([...stats.byTag].filter((b) => b.attempts >= 3).sort((a, b) => a.accuracy - b.accuracy).slice(0, 20), 'Tag', 3);
+  // weak lists: pessimistic bound first (weakFirst), n shown; a bucket is "yếu" only with verdict below
+  o.push('## 3. Theo chủ đề (yếu → mạnh theo cận dưới khoảng 80 %, có ≥ 1 lượt)', '');
+  table([...stats.byTopic].filter((b) => b.attempts).sort(weakFirst), 'Topic');
+  o.push('## 4. Service yếu nhất (xếp theo cận dưới — chỉ dòng “⬇️ yếu hơn mức chung” là kết luận chắc)', '');
+  table([...stats.byService].filter((b) => b.attempts >= 2).sort(weakFirst).slice(0, 20), 'Service', 2);
+  o.push('## 5. Khái niệm/tag yếu nhất (xếp theo cận dưới — chỉ dòng “⬇️ yếu hơn mức chung” là kết luận chắc)', '');
+  table([...stats.byTag].filter((b) => b.attempts >= 2).sort(weakFirst).slice(0, 20), 'Tag', 2);
 
   o.push('## 6. Bài làm gần đây', '', '| Kết thúc | Chế độ | Tiêu đề | Điểm | Thời gian | Kế hoạch |', '|---|---|---|---|---|---|');
   for (const a of [...attempts].reverse().slice(0, 12)) {
@@ -335,8 +350,59 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   o.push(...safeLines(() => qualitySnapshotLines(bank, attempts), 'chất lượng ngân hàng'));
   o.push(...safeLines(() => qaSnapshotLines(bank), 'câu hỏi AI'));
   o.push(...safeLines(() => sealedLines(all), 'đề niêm phong'));
+  o.push(...safeLines(() => learningSignalLines(bank, all, states, stats, cfg), 'tín hiệu học v5'));
+  o.push(...safeLines(() => guideLines(bank, attempts), 'đề cương'));
 
   return { text: stringifyFrontMatter(meta) + '\n' + o.join('\n'), meta };
+}
+
+/** [v5 γ1] §17: exam phase, transfer (memorising vs understanding), leeches — λ's engine, shown with the evidence shield. */
+function learningSignalLines(bank: BankState, all: Attempt[], states: Map<string, QuestionState>, stats: StatsResponse, cfg: AppConfig): string[] {
+  const o = ['## 17. Giai đoạn ôn, chuyển giao, câu dai dẳng', ''];
+  const goal = loadGoal();
+  const phase = examPhase(goal, localDateKey(new Date()), cfg);
+  if (phase) o.push(`- Giai đoạn: **${phase.label}** (${phase.id}, còn ${phase.daysLeft} ngày tới ngày thi)${phase.rules.length ? ` — ${phase.rules.join(' · ')}` : ''}${phase.newQuestions ? '' : ' — không thêm câu mới'}`);
+  else o.push('- Giai đoạn: chưa có ngày thi trong results/goal.md (không áp dụng lịch bám ngày thi).');
+  const t = stats.transfer;
+  if (t && (t.transfer.answers || t.repeat.answers)) {
+    const rate = (x: { answers: number; correct: number }) => (x.answers ? `${pct(x.correct, x.answers)}% (${x.correct}/${x.answers})` : '—');
+    o.push(`- Chuyển giao (${t.days} ngày): lần đầu gặp câu anh em ${rate(t.transfer)} vs làm lại câu cũ ${rate(t.repeat)}${t.warnings.length ? ` — ⚠️ ${t.warnings.join(' · ')}` : ' — chưa có cảnh báo đủ bằng chứng'}`);
+    const gaps = t.byTopic.filter((x) => x.gap !== undefined).slice(0, 5);
+    if (gaps.length) o.push(`  - Theo chủ đề: ${gaps.map((x) => `${x.label} ${rate(x.transfer)} vs ${rate(x.repeat)}`).join(' · ')} — chủ đề thuộc mặt chữ → viết câu tương phản / anh em (twins), đừng thêm câu lặp.`);
+  } else o.push('- Chuyển giao: chưa có lượt nào trên câu anh em (cụm câu: clusters.ts).');
+  const ls = leechList({ bank, attempts: all, states }).filter((l) => !sealedIds().has(l.id));
+  if (ls.length) {
+    o.push(`- Câu dai dẳng (leech): **${ls.length}** — mỗi câu cần cách trình bày khác (câu tương phản, giải thích theo góc khác), không phải lặp lại:`);
+    for (const l of ls.slice(0, 10)) o.push(`  - \`${l.id}\` · ${l.topic} · sai ${l.wrong} lần / ${l.wrongDays} ngày${l.pair?.length ? ` · nhầm ${l.pair.join(' ⟶ ')}` : ''}${l.pausedUntil ? ` · tạm gác tới ${l.pausedUntil}` : ''}${l.note ? ` · mẹo: ${oneLine(l.note, 100)}` : ''}`);
+  } else o.push('- Câu dai dẳng (leech): không có.');
+  o.push('');
+  return o;
+}
+
+/** [v5 γ1] §18: the official exam guide coverage (bank/exam-guide/SAA-C03.yaml) — what longform / generate should target. */
+function guideLines(bank: BankState, attempts: Attempt[]): string[] {
+  const g = guideCoverage(bank, attempts);
+  const o = ['## 18. Độ phủ đề cương chính thức (189 mục Knowledge / Skills — Ngân hàng → Chất lượng → 🗺️ Đề cương)', ''];
+  if (!g.bullets.length) {
+    o.push('_Chưa có bank/exam-guide/SAA-C03.yaml._', '');
+    return o;
+  }
+  const empty = g.bullets.filter((b) => !b.questions);
+  const longOk = g.bullets.filter((b) => !b.need).length;
+  o.push(
+    `- ${g.bullets.length - empty.length}/${g.bullets.length} mục có ít nhất 1 câu · ${longOk} mục đủ ≥ 2 câu chuẩn thi (câu dài) · câu nhiều đáp án ${Math.round(g.multi.share * 100)}% (mục tiêu 20–30 %) · “Choose THREE”: ${g.chooseThree} · ${g.guessed} câu gắn mục bằng đoán từ khoá (ENRICH classify ghi \`skills:\` để chắc hơn)`,
+  );
+  const deficits = taskDeficits(bank).filter((d) => d.need > 0);
+  if (deficits.length) o.push(`- Câu chuẩn thi còn thiếu theo task (mục tiêu ${deficits[0].target}/task): ${deficits.slice(0, 8).map((d) => `${d.task} cần ${d.need}`).join(' · ')}`);
+  if (empty.length) {
+    o.push(`- Mục chưa có câu nào (${empty.length}) — sinh câu dài nhắm thẳng vào mục, \`skills: [<id>]\`:`);
+    for (const b of empty.slice(0, 15)) o.push(`  - ${b.id} — ${oneLine(b.text, 140)}`);
+    if (empty.length > 15) o.push(`  - … và ${empty.length - 15} mục nữa`);
+  }
+  const weak = g.bullets.filter((b) => (b.answers ?? 0) >= 3).map((b) => ({ b, rate: (b.correct ?? 0) / (b.answers ?? 1) })).sort((x, y) => x.rate - y.rate).slice(0, 8);
+  if (weak.length) o.push(`- Đúng ngay lần đầu thấp nhất (≥ 3 câu đã gặp): ${weak.map(({ b, rate }) => `${b.id} ${Math.round(rate * 100)}% (${b.correct}/${b.answers})`).join(' · ')}`);
+  o.push('');
+  return o;
 }
 
 /** §16: the sealed forms (status, size, the internal "điểm trên câu mới" of a used form) — never a question id. */

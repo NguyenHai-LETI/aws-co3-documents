@@ -12,7 +12,11 @@ export const DIAGNOSTIC_FULL = 28;
 export const DIAGNOSTIC_PART = 14;
 export const DIAGNOSTIC_TITLE = 'Chẩn đoán đầu vào';
 
-type AttemptLike = Pick<AttemptSummary, 'mode' | 'total' | 'finished'> & { pearson?: boolean; diagnostic?: boolean; sealedForm?: string };
+type AttemptLike = Pick<AttemptSummary, 'mode' | 'total' | 'finished'> & { pearson?: boolean; diagnostic?: boolean; sealedForm?: string; source?: AttemptSummary['source']; retestOf?: string };
+
+/** [v5] Not a readiness sample: the retest of a just-corrected set, and self-graded / outside answers (Anki, listen, micro). */
+export const notSample = (a: Pick<AttemptLike, 'mode' | 'source' | 'retestOf'>) =>
+  a.mode === 'retest' || !!a.retestOf || a.mode === 'anki' || a.mode === 'listen' || a.mode === 'micro' || a.source === 'anki' || a.source === 'listen' || a.source === 'micro';
 
 export const isDiagnostic = (a: Pick<AttemptLike, 'mode' | 'diagnostic'>) => !!a.diagnostic || a.mode === 'diagnostic';
 /** One half of a diagnostic split 2 × 14. */
@@ -34,12 +38,14 @@ export function localKey(now = new Date()): string {
 }
 
 /**
- * Why a result shows no pass/fail verdict: the diagnostic is a starting point; short practice tests (not exam-like)
+ * Why a result shows no pass/fail verdict: the diagnostic is a starting point; [v5] a retest or self-graded answers are not
+ * a readiness sample; short practice tests (not exam-like)
  * during the first 7 days of study are for getting used to the app. 'pending' = the study start is still loading
  * (undefined); null = nothing counted yet, i.e. this is the first day.
  */
-export function noVerdict(a: AttemptLike, studyStart: string | undefined | null): 'diagnostic' | 'first-week' | 'pending' | undefined {
+export function noVerdict(a: AttemptLike, studyStart: string | undefined | null): 'diagnostic' | 'first-week' | 'pending' | 'not-sample' | undefined {
   if (isDiagnostic(a)) return 'diagnostic';
+  if (notSample(a)) return 'not-sample';
   if (isExamLike(a) || a.total >= SHORT_TEST) return undefined;
   if (studyStart === undefined) return 'pending';
   if (studyStart === null) return 'first-week';

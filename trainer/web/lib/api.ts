@@ -71,4 +71,8 @@ function sharedGet<T>(url: string): Promise<T> {
 export const api = {
   get: <T>(url: string) => sharedGet<T>(url),
   post: <T>(url: string, body: unknown = {}, opts?: RequestOptions) => request<T>('POST', url, body, opts),
+  /** [v5] e.g. PUT /api/active (the unfinished test mirrored for another device) */
+  put: <T>(url: string, body: unknown = {}, opts?: RequestOptions) => request<T>('PUT', url, body, opts),
+  /** [v5] e.g. DELETE /api/active?session=… */
+  del: <T>(url: string, opts?: RequestOptions) => request<T>('DELETE', url, undefined, opts),
 };
