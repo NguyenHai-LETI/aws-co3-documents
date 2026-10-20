@@ -46,6 +46,7 @@ const { withDb, stmt } = await import('../server/lib/index-db.ts');
 const plans = await import('../server/lib/plans.ts');
 const snapshot = await import('../server/lib/snapshot.ts');
 const { detectFeatures, detectServices } = await import('../server/lib/classify.ts');
+const { confusionPairs } = await import('../server/lib/insights.ts');
 
 const DOMAINS: DomainId[] = ['secure', 'resilient', 'performance', 'cost'];
 const drafts = Array.from({ length: 12 }, (_, i) => ({
@@ -288,7 +289,7 @@ it('scheduleSnapshot() writes after the debounce, off the request path; stale da
   snapshot.ensureSnapshot();
 });
 
-it('the snapshot counts answers against the current key (regradeAttempts) and keeps the confusion pairs of the naive scan', () => {
+it('the snapshot counts answers against the current key (regradeAttempts); §9 lists only confirmed confusion pairs, never the raw per-answer labels', () => {
   // an answer graded with an old key: pick = today's correct option, stored key/ok from before the fix
   const q = loadBank().byId.get('q-12')!;
   const oldKey = q.options.find((o) => !q.answer.includes(o.key))!.key;
@@ -301,9 +302,10 @@ it('the snapshot counts answers against the current key (regradeAttempts) and ke
   const wrongSection = text.slice(text.indexOf('## 7.'), text.indexOf('## 8.'));
   assert.ok(!wrongSection.includes('`q-12`'), 'q-12 was answered with the (current) correct option → not "wrong"');
 
-  // §9 rows equal the original per-answer detection (no cache)
+  // §9 (v4): the pairs insights.confusionPairs confirms against the learner's base rate, with their evidence — the old
+  // raw "picked ⟶ correct" count of every wrong answer is gone (it turned scattered slips into "repeated confusions")
   const ctx = context();
-  const pairs = new Map<string, number>();
+  const raw = new Set<string>();
   for (const a of ctx.attempts.filter((x) => !x.rushed)) {
     for (const r of a.answers as AnswerRecord[]) {
       if (r.ok || !r.pick) continue;
@@ -314,14 +316,15 @@ it('the snapshot counts answers against the current key (regradeAttempts) and ke
       const rightAll = [...detectServices(t(qq.answer.join('')), bank.taxonomy), ...detectFeatures(t(qq.answer.join('')), bank.taxonomy)];
       const picked = pickedAll.filter((x) => !rightAll.includes(x));
       const right = rightAll.filter((x) => !pickedAll.includes(x));
-      assert.ok(picked.length && right.length, 'fixture options name services');
-      const label = `${picked.slice(0, 2).join(' + ')} ⟶ ${right.slice(0, 2).join(' + ')}`;
-      pairs.set(label, (pairs.get(label) ?? 0) + 1);
+      if (picked.length > 1 || right.length > 1) raw.add(`${picked.slice(0, 2).join(' + ')} ⟶ ${right.slice(0, 2).join(' + ')}`); // a combined label = the old format
     }
   }
   const section9 = text.slice(text.indexOf('## 9.'), text.indexOf('## 10.'));
-  assert.ok(pairs.size > 0);
-  for (const [label, n] of pairs) assert.ok(section9.includes(`| ${label.replace(/\|/g, '/')} | ${n} |`), `pair ${label} × ${n}`);
+  assert.match(section9, /^## 9\. Cặp hay nhầm/);
+  const confirmed = confusionPairs(ctx.attempts.filter((x) => !x.rushed), bank, { sealed: new Set() });
+  for (const p of confirmed) assert.ok(section9.includes(`| ${p.picked} ⟶ ${p.correct}`) && section9.includes(`| ${p.picks}/${p.exposures} |`), `confirmed pair ${p.picked} ⟶ ${p.correct}`);
+  if (!confirmed.length) assert.match(section9, /Chưa có cặp nào đủ bằng chứng/);
+  for (const label of raw) assert.ok(!section9.includes(label), `no raw per-answer label: ${label}`);
 });
 
 // ── history pages ───────────────────────────────────────────────────────────

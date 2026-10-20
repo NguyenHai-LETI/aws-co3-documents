@@ -1,0 +1,2 @@
+# Golden-parse fixtures are compared byte for byte (one result file keeps a BOM + CRLF on purpose): never convert EOLs.
+* -text

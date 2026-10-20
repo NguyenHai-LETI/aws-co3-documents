@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useData } from '../lib/store.tsx';
 import { startTest } from '../lib/start.ts';
+import { api } from '../lib/api.ts';
 import { Chip, Seg, toggle } from '../components/ui.tsx';
 import { fmtDuration } from '../lib/format.ts';
-import { MODE_INFO, FEEDBACK_INFO } from '../../shared/labels.ts';
-import { TIMING_PRESETS, computeTimeLimit } from '../../shared/timing.ts';
-import { applyFilters, modePool } from '../../shared/filters.ts';
-import type { BuildTestRequest, Difficulty, DomainId, FeedbackMode, PackOrigin, SelectionFilters, TestMode } from '../../shared/types.ts';
+import { MODE_INFO, FEEDBACK_INFO, REQUIREMENTS, REQUIREMENT_INFO } from '../../shared/labels.ts';
+import { EXAM_PACE_PRESETS, TIMING_PRESETS, computeTimeLimit, defaultTimingPreset } from '../../shared/timing.ts';
+import { applyFilters, modePool, newOrder, practicePool, taskQuotas } from '../../shared/filters.ts';
+import { REALISM_LOW_HINT, REFERENCE_WORDS_PER_QUESTION, isExamLike, questionWords, realismLow, realismText, realismTitle, testRealism } from '../../shared/realism.ts';
+import type { BuildTestRequest, Difficulty, DomainId, FeedbackMode, PackOrigin, ProgressResponse, SelectionFilters, TestMode, TestRealism } from '../../shared/types.ts';
 
-const MODES: TestMode[] = ['exam', 'topic', 'pack', 'srs', 'retry-wrong', 'weak', 'new', 'flagged', 'slow', 'quick', 'custom'];
+const MODES: TestMode[] = ['exam', 'sealed', 'diagnostic', 'topic', 'pack', 'srs', 'retry-wrong', 'weak', 'new', 'flagged', 'slow', 'quick', 'custom'];
+/** Modes whose questions do not depend on the content filters. */
+const FIXED: TestMode[] = ['exam', 'sealed', 'diagnostic'];
 const ORIGINS: { id: PackOrigin; label: string }[] = [
   { id: 'imported', label: '📚 Đề gốc (V1/V2)' },
   { id: 'ai', label: '🤖 AI sinh' },
@@ -16,6 +20,7 @@ const ORIGINS: { id: PackOrigin; label: string }[] = [
   { id: 'manual', label: '✍️ Thủ công' },
 ];
 const PILOT = 15; // unscored pilot items in a Pearson-style exam (like the real SAA-C03)
+const SEALED_STATUS: Record<string, string> = { sealed: '🔒 chưa làm', used: '✓ đã làm', released: '🔓 đã mở sớm' };
 
 interface Init {
   mode?: TestMode;
@@ -24,9 +29,10 @@ interface Init {
   pearson?: boolean;
   recall?: boolean;
   feedback?: FeedbackMode;
+  form?: string;
 }
 
-/** `#/new` query: mode, count, topics, domains, packs, services, tags, tasks, pearson=1, recall=1, feedback. */
+/** `#/new` query: mode, count, topics, domains, packs, services, tags, tasks, requirements, form, pearson=1, recall=1, feedback. */
 function parseQuery(q: URLSearchParams): Init {
   const list = (k: string) => {
     const v = q.get(k)?.split(',').map((s) => s.trim()).filter(Boolean);
@@ -49,25 +55,51 @@ function parseQuery(q: URLSearchParams): Init {
       services: list('services'),
       tags: list('tags'),
       tasks: list('tasks'),
+      requirements: list('requirements'),
     },
     pearson: flag('pearson'),
     recall: flag('recall'),
     feedback: fb === 'practice' || fb === 'exam' ? fb : undefined,
+    form: q.get('form')?.trim() || undefined,
   };
 }
 
 const shortTask = (label: string) => label.split(' (')[0];
 
+/** Expected realism of `n` questions drawn at random from `pool` (the badge before a random selection exists). */
+function expectedRealism(pool: Parameters<typeof testRealism>[0], n: number, tax: Parameters<typeof testRealism>[1]): TestRealism {
+  if (!pool.length || n <= 0) return { items: 0, total: Math.max(0, n), words: 0, referenceWords: Math.max(0, n) * REFERENCE_WORDS_PER_QUESTION };
+  const exam = pool.filter((q) => isExamLike(q, tax)).length;
+  const words = pool.reduce((s, q) => s + questionWords(q), 0);
+  return { items: Math.round((exam * n) / pool.length), total: n, words: Math.round((words * n) / pool.length), referenceWords: n * REFERENCE_WORDS_PER_QUESTION };
+}
+
+/** `<key>.items|words|total|estimate|pilots` preview counters of /api/state (server modeCounts). */
+function preview(counts: Record<string, number> | undefined, key: string): { realism: TestRealism; estimate: number; pilots: number } | undefined {
+  const total = counts?.[`${key}.total`];
+  if (!counts || !total) return undefined;
+  return {
+    realism: { items: counts[`${key}.items`] ?? 0, total, words: counts[`${key}.words`] ?? 0, referenceWords: total * REFERENCE_WORDS_PER_QUESTION },
+    estimate: counts[`${key}.estimate`] ?? 0,
+    pilots: counts[`${key}.pilots`] ?? 0,
+  };
+}
+
 export function NewTest({ query }: { query: URLSearchParams }) {
   const { meta, bank, state } = useData();
   const queryKey = query.toString();
   const init = useMemo(() => parseQuery(query), [query]);
+  const diagDefault = 2 * (meta?.tasks?.length || 14);
   const [mode, setMode] = useState<TestMode>(init.mode ?? 'topic');
   const [filters, setFilters] = useState<SelectionFilters>(init.filters);
-  const [count, setCount] = useState<number>(init.count ?? meta?.practice.default_count ?? 20);
+  const [count, setCount] = useState<number>(init.mode !== 'diagnostic' ? (init.count ?? meta?.practice.default_count ?? 20) : (meta?.practice.default_count ?? 20));
+  const [diagCount, setDiagCount] = useState<number>(init.mode === 'diagnostic' && init.count ? init.count : diagDefault);
   const [feedback, setFeedback] = useState<FeedbackMode>(init.feedback ?? 'exam');
   const [timing, setTiming] = useState('standard');
   const [minutes, setMinutes] = useState(30);
+  const [eslChoice, setEslChoice] = useState<boolean>(); // undefined = follow goal.esl
+  const [goalEsl, setGoalEsl] = useState(false);
+  const [form, setForm] = useState<string | undefined>(init.form);
   const [shuffleOptions, setShuffleOptions] = useState<boolean>(() => meta?.practice?.shuffle_options ?? true);
   const [pearson, setPearson] = useState<boolean>(init.pearson ?? true);
   const [recallFirst, setRecallFirst] = useState<boolean>(init.recall ?? false);
@@ -75,6 +107,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
   const [serviceQuery, setServiceQuery] = useState('');
   const firstMode = useRef(true);
   const autoTiming = useRef(false);
+  const goalAsked = useRef(false);
   const lastQuery = useRef(queryKey);
 
   // A new #/new?… link while the page is open (e.g. Stats → "luyện task 2.2") re-applies the query.
@@ -83,16 +116,18 @@ export function NewTest({ query }: { query: URLSearchParams }) {
     lastQuery.current = queryKey;
     if (init.mode) setMode(init.mode);
     setFilters(init.filters);
-    if (init.count) setCount(init.count);
+    if (init.count) (init.mode === 'diagnostic' ? setDiagCount : setCount)(init.count);
     if (init.pearson !== undefined) setPearson(init.pearson);
     if (init.recall !== undefined) setRecallFirst(init.recall);
     if (init.feedback) setFeedback(init.feedback);
+    if (init.form) setForm(init.form);
   }, [queryKey, init]);
 
   useEffect(() => {
     const first = firstMode.current;
     firstMode.current = false;
     if (mode === 'quick' && !(first && init.feedback)) setFeedback('practice');
+    if (mode === 'diagnostic' && !(first && init.feedback)) setFeedback('exam'); // a pretest: answers after the end
     if (first && init.count) return; // an explicit ?count= wins on the first render
     if (mode === 'exam') setCount(meta?.exam.questions ?? 65);
     else if (mode === 'quick') setCount(meta?.practice.quick_count ?? 10);
@@ -100,62 +135,135 @@ export function NewTest({ query }: { query: URLSearchParams }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Pearson simulation defaults to the official clock (2 min/question); undo only what we changed ourselves.
-  const pearsonOn = mode === 'exam' && pearson;
+  // Full mocks and sealed forms default to the honest reading-load clock; undo only what we changed ourselves.
+  const examClock = mode === 'exam' || mode === 'sealed';
   useEffect(() => {
-    if (pearsonOn && timing === 'standard') {
-      setTiming('official');
+    if (examClock && timing === 'standard') {
+      setTiming(defaultTimingPreset(mode));
       autoTiming.current = true;
-    } else if (!pearsonOn && timing === 'official' && autoTiming.current) {
+    } else if (!examClock && autoTiming.current && timing === defaultTimingPreset('exam')) {
       setTiming('standard');
       autoTiming.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pearsonOn]);
+  }, [examClock]);
 
+  // ESL default = the learner's goal (Thống kê → 🎯 Ngày thi): asked once, when an exam-pace clock is first shown
+  const paceClock = EXAM_PACE_PRESETS.includes(timing);
+  useEffect(() => {
+    if (!paceClock || goalAsked.current) return;
+    goalAsked.current = true; // once per visit (StrictMode re-runs effects: no cleanup that would drop the answer)
+    api
+      .get<ProgressResponse>('/api/progress')
+      .then((p) => setGoalEsl(!!p.goal?.esl))
+      .catch(() => undefined);
+  }, [paceClock]);
+
+  const sealedIds = useMemo(() => new Set(bank?.sealed ?? []), [bank]);
+  const excludeOos = (meta?.practice as { exclude_out_of_scope?: boolean } | undefined)?.exclude_out_of_scope ?? true;
+  // practice pools: sealed questions only ever appear in their sealed exam; out-of-scope ones stay in explicit packs
   const active = useMemo(() => (bank?.questions ?? []).filter((q) => q.status === 'active'), [bank]);
+  const withOos = useMemo(() => practicePool(active, { sealed: sealedIds }), [active, sealedIds]);
+  const practice = useMemo(() => (excludeOos ? withOos.filter((q) => !q.outOfScope) : withOos), [withOos, excludeOos]);
   const states = state?.states ?? {};
-  const srsLimit = state?.counts.srsRemaining; // today's review allowance after srs.daily_limit
-  const backlog = state?.counts.backlog ?? 0;
-  const effectiveFilters: SelectionFilters = mode === 'pack' ? { packs: filters.packs?.slice(0, 1) } : mode === 'exam' ? {} : filters;
+  const counts = state?.counts;
+  const srsLimit = counts?.srsRemaining; // today's review allowance after srs.daily_limit
+  const backlog = counts?.backlog ?? 0;
+  const filterable = !FIXED.includes(mode) && mode !== 'pack';
+  const effectiveFilters: SelectionFilters = mode === 'pack' ? { packs: filters.packs?.slice(0, 1) } : FIXED.includes(mode) ? {} : filters;
   const filterKey = JSON.stringify(effectiveFilters);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const pool = useMemo(() => applyFilters(active, effectiveFilters), [active, filterKey]);
+  const pool = useMemo(() => applyFilters(mode === 'pack' ? withOos : practice, effectiveFilters), [mode, withOos, practice, filterKey]);
   const mPool = useMemo(() => modePool(mode, pool, states, { srsLimit }), [mode, pool, states, srsLimit]);
-  const examN = meta?.exam.questions ?? 65;
-  const n = pearsonOn ? Math.min(examN, mPool.length) : mode === 'pack' ? mPool.length : Math.min(count, mPool.length);
-  const avg = mPool.length ? mPool.reduce((s, q) => s + q.time, 0) / mPool.length : 0;
-  const estimate = Math.round(avg * n);
-  const limit = computeTimeLimit(estimate, n, timing, minutes, meta?.timing);
-  const countsByMode = useMemo(() => {
-    const all = active;
-    return Object.fromEntries(MODES.map((m) => [m, modePool(m, all, states, { srsLimit }).length]));
-  }, [active, states, srsLimit]);
+  const countsByMode = useMemo(
+    () => Object.fromEntries(MODES.map((m) => [m, modePool(m, m === 'pack' ? withOos : practice, states, { srsLimit }).length])),
+    [withOos, practice, states, srsLimit],
+  );
   const taskCounts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const q of active) if (q.task) m.set(q.task, (m.get(q.task) ?? 0) + 1);
+    for (const q of practice) if (q.task) m.set(q.task, (m.get(q.task) ?? 0) + 1);
     return m;
-  }, [active]);
+  }, [practice]);
+  const reqCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const q of practice) for (const r of q.requirements ?? []) m.set(r, (m.get(r) ?? 0) + 1);
+    return m;
+  }, [practice]);
+  const packCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const q of withOos) m.set(q.pack, (m.get(q.pack) ?? 0) + 1);
+    return m;
+  }, [withOos]);
+
+  // diagnostic: an even share per exam-guide task (same split as the server), limited by what each task has
+  const diag = useMemo(() => {
+    const quotas = taskQuotas(diagCount, meta?.tasks ?? [], meta?.domains ?? []);
+    let n = 0;
+    const short: string[] = [];
+    for (const [task, want] of quotas) {
+      const have = Math.min(want, taskCounts.get(task) ?? 0);
+      n += have;
+      if (have < want) short.push(`${task} (${have}/${want})`);
+    }
+    return { n, short, per: new Set(quotas.values()).size === 1 ? [...quotas.values()][0] : 0 };
+  }, [diagCount, meta, taskCounts]);
+
+  const sealedForms = meta?.sealed ?? [];
+  const openForms = sealedForms.filter((f) => f.status === 'sealed');
+  const formId = form && openForms.some((f) => f.id === form) ? form : openForms[0]?.id;
 
   if (!meta || !bank) return null;
   const set = (patch: Partial<SelectionFilters>) => setFilters((f) => ({ ...f, ...patch }));
-  const topicCount = (id: string) => active.filter((q) => q.topic === id).length;
-  const showTopicFilter = !['exam', 'pack'].includes(mode);
+  const topicCount = (id: string) => practice.filter((q) => q.topic === id).length;
   const showAdvanced = mode === 'custom';
   const tasks = meta.tasks ?? [];
-  const showTasks = tasks.length > 0 && showTopicFilter && (showAdvanced || (filters.tasks?.length ?? 0) > 0);
+  const showTasks = tasks.length > 0 && filterable && (showAdvanced || (filters.tasks?.length ?? 0) > 0);
+  const showRequirements = filterable && (showAdvanced || (filters.requirements?.length ?? 0) > 0);
   const classified = taskCounts.size > 0;
+  const examN = meta.exam.questions ?? 65;
+  const pearsonOn = mode === 'exam' && pearson;
+  const pearsonLike = pearsonOn || mode === 'sealed';
+
+  // what will be served: size, Σ estimates and realism (server previews for the full mock and the sealed forms)
+  const examPreview = mode === 'exam' ? preview(counts, 'exam') : undefined;
+  const sealedPreview = mode === 'sealed' && formId ? preview(counts, `sealed.${formId}`) : undefined;
+  const sealedMeta = sealedForms.find((f) => f.id === formId);
+  const n =
+    mode === 'sealed'
+      ? (sealedPreview?.realism.total ?? (sealedMeta ? sealedMeta.count + PILOT : 0))
+      : mode === 'diagnostic'
+        ? diag.n
+        : pearsonOn
+          ? Math.min(examN, mPool.length)
+          : mode === 'pack'
+            ? mPool.length
+            : Math.min(count, mPool.length);
+  const avg = mPool.length ? mPool.reduce((s, q) => s + q.time, 0) / mPool.length : 0;
+  const exact = mode === 'sealed' ? sealedPreview : examPreview && examPreview.realism.total === n ? examPreview : undefined;
+  // deterministic selections are known exactly: a whole pack, the next never-seen questions (newOrder)
+  const known = exact ? undefined : mode === 'pack' ? mPool : mode === 'new' ? newOrder(mPool, meta.domains).slice(0, n) : undefined;
+  const estimate = exact ? exact.estimate : known ? known.reduce((s, q) => s + q.time, 0) : Math.round(avg * n);
+  const realism: TestRealism = exact ? exact.realism : known ? testRealism(known, meta) : expectedRealism(mPool, n, meta);
+  const approx = !exact && !known;
+  const eslOn = paceClock && (eslChoice ?? goalEsl);
+  const limit = computeTimeLimit(estimate, n, timing, minutes, meta.timing, { words: realism.words, esl: eslOn });
+  const lowRealism = realismLow(realism);
+  const pilots = mode === 'sealed' ? (sealedPreview?.pilots ?? PILOT) : PILOT;
+  const scored = Math.max(0, n - pilots);
+  const heldBack = counts?.sealed ?? sealedIds.size;
+  const outOfScope = mode === 'pack' ? 0 : (counts?.outOfScope ?? 0);
 
   const start = async () => {
     setBusy(true);
     const req: BuildTestRequest = {
       mode,
-      count: mode === 'pack' ? undefined : pearsonOn ? examN : count,
+      count: mode === 'pack' || mode === 'sealed' ? undefined : mode === 'diagnostic' ? diagCount : pearsonOn ? examN : count,
       filters: effectiveFilters,
-      feedback: pearsonOn ? 'exam' : feedback,
-      timing: { preset: timing, minutes },
+      feedback: pearsonLike ? 'exam' : feedback,
+      timing: { preset: timing, minutes, ...(paceClock && eslChoice !== undefined ? { esl: eslChoice } : {}) },
       shuffleOptions,
       ...(mode === 'exam' ? { pearson } : {}),
+      ...(mode === 'sealed' && formId ? { form: formId } : {}),
       ...(recallFirst ? { recallFirst: true } : {}),
     };
     await startTest(req);
@@ -163,7 +271,13 @@ export function NewTest({ query }: { query: URLSearchParams }) {
   };
 
   const services = (meta.services ?? []).filter((s) => !serviceQuery || s.name.toLowerCase().includes(serviceQuery.toLowerCase()));
-  const scored = Math.max(0, n - PILOT);
+  const modeLine = (m: TestMode, c: number) => {
+    if (m === 'exam') return `${meta.exam.questions} câu · ${meta.exam.duration_min}′ thi thật`;
+    if (m === 'srs') return `${c} câu đến hạn hôm nay${backlog ? ` · ${backlog} câu dồn sang ngày sau` : ''}`;
+    if (m === 'sealed') return openForms.length ? `${openForms.map((f) => f.id).join(', ')} · ${openForms[0].count} câu + ${PILOT} thử nghiệm` : 'Đã dùng hết đề niêm phong';
+    if (m === 'diagnostic') return `${diag.n} câu${diag.per ? ` · ${diag.per} câu/task` : ''}`;
+    return `${c} câu khả dụng`;
+  };
 
   return (
     <div className="new-test">
@@ -177,22 +291,17 @@ export function NewTest({ query }: { query: URLSearchParams }) {
       <section>
         <div className="grid auto">
           {MODES.map((m) => {
+            if (m === 'sealed' && !sealedForms.length) return null; // no forms (exam.sealed_forms: 0) → no card
             const info = MODE_INFO[m];
             const c = countsByMode[m];
-            const disabled = ['retry-wrong', 'srs', 'flagged', 'slow'].includes(m) && !c;
+            const disabled = (['retry-wrong', 'srs', 'flagged', 'slow'].includes(m) && !c) || (m === 'sealed' && !openForms.length) || (m === 'diagnostic' && !diag.n);
             return (
               <button key={m} className={`mode-card ${mode === m ? 'on' : ''}`} onClick={() => setMode(m)} style={disabled ? { opacity: 0.55 } : undefined}>
                 <span className="t">
                   {info.icon} {info.label}
                 </span>
                 <span className="d">{info.desc}</span>
-                <span className="n">
-                  {m === 'exam'
-                    ? `${meta.exam.questions} câu · ${meta.exam.duration_min}′ thi thật`
-                    : m === 'srs'
-                      ? `${c} câu đến hạn hôm nay${backlog ? ` · ${backlog} câu dồn sang ngày sau` : ''}`
-                      : `${c} câu khả dụng`}
-                </span>
+                <span className="n">{modeLine(m, c)}</span>
               </button>
             );
           })}
@@ -209,15 +318,87 @@ export function NewTest({ query }: { query: URLSearchParams }) {
                   <b>🏛 Mô phỏng Pearson VUE (khuyến nghị)</b>
                   <span className="small dim">
                     {meta.exam.questions} câu = {Math.max(0, meta.exam.questions - PILOT)} tính điểm + {PILOT} câu thử nghiệm <b>không tính điểm và không báo trước</b> (như đề thật) ·
-                    đồng hồ {meta.exam.duration_min}′ không tạm dừng · cảnh báo khi còn 15′ và 5′ · cuối bài có <b>màn hình xem lại</b> (lọc câu cắm cờ / chưa trả lời) trước khi
-                    “Kết thúc bài thi”.
+                    đồng hồ không tạm dừng · cảnh báo khi còn 15′ và 5′ · cuối bài có <b>màn hình xem lại</b> (lọc câu cắm cờ / chưa trả lời) trước khi “Kết thúc bài thi”.
                   </span>
                 </span>
               </label>
               <div className="alert info">
-                Phân bổ theo trọng số đề thật: {meta.domains.map((d) => `${d.code} ${d.weight}%`).join(' · ')}. Ưu tiên câu bạn lâu chưa gặp
-                {pearson ? ' và câu dài chuẩn thi thật' : ''}. Kết quả quy đổi thang 1000 (đỗ ≥ {meta.exam.pass_scaled}).
+                Phân bổ theo trọng số đề thật: {meta.domains.map((d) => `${d.code} ${d.weight}%`).join(' · ')}. Ưu tiên câu bạn chưa gặp, <b>câu giống đề thật</b> (đề ≥{' '}
+                {meta.timing.long_form_min_words ?? 55} từ, phương án là câu đầy đủ) rồi câu lâu chưa gặp; không bao giờ lấy cả câu gốc lẫn câu biến thể của nó. Đồng hồ mặc
+                định <b>theo tải đọc đề thật</b>: bài ít chữ hơn đề thật thì ít thời gian hơn 130′ (chọn “Chuẩn đề thật” để luyện đủ 2′/câu). Kết quả quy đổi thang 1000
+                (đỗ ≥ {meta.exam.pass_scaled}).
               </div>
+            </>
+          )}
+
+          {mode === 'sealed' && (
+            <>
+              <div className="alert info">
+                🔒 <b>Đề niêm phong</b>: {sealedMeta?.count ?? meta.exam.questions - PILOT} câu tính điểm <b>chưa từng xuất hiện</b> khi luyện (cả tìm kiếm, Ngân hàng và Anki
+                đều không hiện) + {pilots} câu thử nghiệm không tính điểm — mô phỏng Pearson VUE: không tạm dừng, màn hình xem lại cuối bài, đồng hồ theo tải đọc đề thật. Điểm
+                của đề là <b>điểm trên câu mới</b>, thước đo trung thực nhất trước ngày thi. Nộp bài xong đề được đánh dấu đã dùng và các câu trở lại ngân hàng luyện.
+              </div>
+              {sealedForms.length > 0 && (
+                <div className="stack sm">
+                  <b className="small">Chọn đề</b>
+                  <div className="row" style={{ gap: 6 }}>
+                    {sealedForms.map((f) => {
+                      const usable = f.status === 'sealed';
+                      const on = f.id === formId;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          className={`chip ${on ? 'on' : ''}`}
+                          aria-pressed={on}
+                          disabled={!usable}
+                          style={usable ? undefined : { opacity: 0.55, cursor: 'default' }}
+                          title={f.usedAt ? `Làm ngày ${f.usedAt.slice(0, 10)}` : undefined}
+                          onClick={() => usable && setForm(f.id)}
+                        >
+                          <b>{f.id}</b> · {SEALED_STATUS[f.status] ?? f.status}
+                          {f.usedAt ? ` ${f.usedAt.slice(0, 10)}` : ''} <span className="n">{f.count} câu</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {!openForms.length && (
+                <div className="alert warn">
+                  {sealedForms.length ? (
+                    <>
+                      Không còn đề niêm phong nào chưa làm. Tạo đề mới bằng <code>npm run seal -- --forms 1</code> khi ngân hàng còn đủ câu bạn chưa gặp.
+                    </>
+                  ) : (
+                    <>
+                      Chưa có đề niêm phong. Tạo bằng <code>npm run seal -- --forms 2</code> (hoặc đặt <code>exam.sealed_forms</code> trong config.yaml rồi khởi động lại app).
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {mode === 'diagnostic' && (
+            <>
+              <div className="alert info">
+                🧭 <b>Chẩn đoán đầu vào</b>: mỗi mục exam guide 1.1–4.4 lấy câu bạn <b>chưa gặp</b> (cố định, không ngẫu nhiên), chấm cuối bài → “bản đồ xuất phát” ✓/~/✗ theo task
+                để lập kế hoạch tuần đầu. Là điểm khởi đầu, không phải “đạt/chưa đạt”. Có thể chia 2 lần × 14 câu: lần sau tự lấy 14 câu khác.
+              </div>
+              <label className="field">
+                Số câu
+                <Seg
+                  value={String(diagCount)}
+                  onChange={(v) => setDiagCount(Number(v))}
+                  items={[
+                    { id: String(diagDefault), label: `${diagDefault} câu · 2 câu/task` },
+                    { id: String(diagDefault / 2), label: `${diagDefault / 2} câu · 1 câu/task (chia 2 lần)` },
+                  ]}
+                />
+              </label>
+              {!classified && <div className="small muted">Chưa có câu nào được gắn task — chạy <code>npm run classify-tasks</code> hoặc ENRICH để phân loại.</div>}
+              {classified && diag.short.length > 0 && <div className="small warn">Chưa đủ câu cho task {diag.short.join(', ')}.</div>}
             </>
           )}
 
@@ -233,7 +414,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
                     <optgroup key={o.id} label={o.label}>
                       {packs.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.title} ({p.activeCount} câu)
+                          {p.title} ({packCounts.get(p.id) ?? 0} câu)
                         </option>
                       ))}
                     </optgroup>
@@ -243,7 +424,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
             </label>
           )}
 
-          {showTopicFilter && (
+          {filterable && (
             <div className="stack sm">
               <div className="row between">
                 <b className="small">Chủ đề {mode !== 'topic' && <span className="muted">(tùy chọn)</span>}</b>
@@ -263,7 +444,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
             </div>
           )}
 
-          {(showAdvanced || mode === 'weak' || mode === 'topic') && (
+          {filterable && (showAdvanced || mode === 'weak' || mode === 'topic') && (
             <div className="stack sm">
               <b className="small">Domain</b>
               <div className="row" style={{ gap: 6 }}>
@@ -276,7 +457,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
             </div>
           )}
 
-          {showTopicFilter && (filters.tags?.length ?? 0) > 0 && (
+          {filterable && (filters.tags?.length ?? 0) > 0 && (
             <div className="stack sm">
               <div className="row between">
                 <b className="small">Tag đang lọc</b>
@@ -286,8 +467,33 @@ export function NewTest({ query }: { query: URLSearchParams }) {
               </div>
               <div className="row" style={{ gap: 6 }}>
                 {filters.tags!.map((tg) => (
-                  <Chip key={tg} on onClick={() => set({ tags: toggle(filters.tags, tg) })} count={active.filter((q) => q.tags.includes(tg)).length}>
+                  <Chip key={tg} on onClick={() => set({ tags: toggle(filters.tags, tg) })} count={practice.filter((q) => q.tags.includes(tg)).length}>
                     {tg} ✕
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showRequirements && (
+            <div className="stack sm">
+              <div className="row between">
+                <b className="small">
+                  Tiêu chí đề hỏi {filters.requirements?.length ? <span className="badge accent">{filters.requirements.length}</span> : null}
+                </b>
+                {filters.requirements?.length ? (
+                  <button className="btn ghost sm" onClick={() => set({ requirements: [] })}>
+                    Bỏ chọn
+                  </button>
+                ) : null}
+              </div>
+              {reqCounts.size === 0 && (
+                <div className="tiny muted">Chưa có câu nào được gắn tiêu chí — ngân hàng nhận diện từ khoá của đề (MOST cost-effective, LEAST operational overhead…).</div>
+              )}
+              <div className="row" style={{ gap: 6 }}>
+                {REQUIREMENTS.map((r) => (
+                  <Chip key={r} on={filters.requirements?.includes(r)} onClick={() => set({ requirements: toggle(filters.requirements, r) })} count={reqCounts.get(r) ?? 0}>
+                    {REQUIREMENT_INFO[r].icon} {REQUIREMENT_INFO[r].label}
                   </Chip>
                 ))}
               </div>
@@ -344,7 +550,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
             </div>
           )}
 
-          {(showAdvanced || mode === 'topic') && (
+          {filterable && (showAdvanced || mode === 'topic') && (
             <div className="stack sm">
               <b className="small">Độ khó</b>
               <div className="row" style={{ gap: 6 }}>
@@ -363,7 +569,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
                 <b className="small">Nguồn câu hỏi</b>
                 <div className="row" style={{ gap: 6 }}>
                   {ORIGINS.map((o) => (
-                    <Chip key={o.id} on={filters.origins?.includes(o.id)} onClick={() => set({ origins: toggle(filters.origins, o.id) })} count={active.filter((q) => q.origin === o.id).length}>
+                    <Chip key={o.id} on={filters.origins?.includes(o.id)} onClick={() => set({ origins: toggle(filters.origins, o.id) })} count={practice.filter((q) => q.origin === o.id).length}>
                       {o.label}
                     </Chip>
                   ))}
@@ -376,7 +582,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
                 </div>
                 <div className="row" style={{ gap: 6, maxHeight: 150, overflowY: 'auto' }}>
                   {services.map((s) => {
-                    const c = active.filter((q) => q.services.includes(s.name)).length;
+                    const c = practice.filter((q) => q.services.includes(s.name)).length;
                     if (!c && !filters.services?.includes(s.name)) return null;
                     return (
                       <Chip key={s.name} on={filters.services?.includes(s.name)} onClick={() => set({ services: toggle(filters.services, s.name) })} count={c}>
@@ -399,11 +605,12 @@ export function NewTest({ query }: { query: URLSearchParams }) {
             <div className="small muted">Bài test</div>
             <div style={{ fontSize: 20, fontWeight: 700 }}>
               {MODE_INFO[mode].icon} {MODE_INFO[mode].label}
+              {mode === 'sealed' && formId ? ` ${formId}` : ''}
             </div>
-            {pearsonOn && <div className="small nt-accent">🏛 Mô phỏng Pearson VUE</div>}
+            {pearsonLike && <div className="small nt-accent">🏛 Mô phỏng Pearson VUE</div>}
           </div>
 
-          {mode !== 'pack' && !pearsonOn && (
+          {mode !== 'pack' && !pearsonLike && mode !== 'diagnostic' && (
             <label className="field">
               Số câu
               <div className="row nowrap">
@@ -420,7 +627,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
             </label>
           )}
 
-          {pearsonOn ? (
+          {pearsonLike ? (
             <div className="field-static small">
               <span className="dim">Chấm điểm</span>
               <b>
@@ -455,6 +662,14 @@ export function NewTest({ query }: { query: URLSearchParams }) {
               </div>
             )}
           </label>
+          {paceClock && (
+            <label className="check-line small" title="Thí sinh thi bằng tiếng Anh không phải tiếng mẹ đẻ được AWS cộng 30 phút (130′ → 160′) nếu đăng ký ESL +30 trước khi đặt lịch thi">
+              <input type="checkbox" checked={eslOn} onChange={(e) => setEslChoice(e.target.checked)} />
+              <span>
+                🌐 ESL +30′ <span className="muted">— ×160/130 như chế độ ESL của AWS{goalEsl && eslChoice === undefined ? ' (theo mục tiêu thi của bạn)' : ''}</span>
+              </span>
+            </label>
+          )}
 
           <div className="stack sm">
             <label className="check-line small">
@@ -475,11 +690,13 @@ export function NewTest({ query }: { query: URLSearchParams }) {
               <span className="muted">Số câu sẽ làm</span>
               <b className="num">
                 {n}
-                {pearsonOn
-                  ? n >= examN
-                    ? ` (${scored} + ${PILOT} thử nghiệm)`
+                {pearsonLike
+                  ? mode === 'sealed' || n >= examN
+                    ? n > 0
+                      ? ` (${scored} + ${pilots} thử nghiệm)`
+                      : ''
                     : ` / ${examN} (ngân hàng chỉ có ${mPool.length})`
-                  : mode !== 'pack' && mPool.length < count
+                  : mode !== 'pack' && mode !== 'diagnostic' && mPool.length < count
                     ? ` / ${count} (chỉ có ${mPool.length})`
                     : ''}
               </b>
@@ -494,14 +711,36 @@ export function NewTest({ query }: { query: URLSearchParams }) {
               <span className="muted">Đồng hồ</span>
               <b className="num">
                 {limit ? fmtDuration(limit, { long: true }) : 'không giới hạn'}
-                {pearsonOn && limit ? ' · không tạm dừng' : ''}
+                {pearsonLike && limit ? ' · không tạm dừng' : ''}
               </b>
             </div>
+            {n > 0 && (
+              <div className="stack sm" style={{ gap: 4 }}>
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }} title={`${realismTitle(realism, meta)}${lowRealism ? `\n${REALISM_LOW_HINT}` : ''}`}>
+                  <span className={`badge ${lowRealism ? 'warn' : 'good'}`}>
+                    🎯 {approx ? '≈ ' : ''}
+                    {realismText(realism)}
+                  </span>
+                </div>
+                {/* the hint matters where a score is read as a measure (mocks, sealed forms, the diagnostic) */}
+                {lowRealism && FIXED.includes(mode) && <div className="tiny warn">⚠ {REALISM_LOW_HINT}</div>}
+              </div>
+            )}
+            {(heldBack > 0 || outOfScope > 0) && (
+              <div className="tiny muted">
+                {[heldBack > 0 ? `🔒 ${heldBack} câu đang niêm phong` : '', outOfScope > 0 ? `🎯 ${outOfScope} câu ngoài phạm vi đề thi` : ''].filter(Boolean).join(' · ')}{' '}
+                không dùng khi luyện.
+              </div>
+            )}
           </div>
           <button className="btn primary lg" disabled={busy || n === 0 || (mode === 'pack' && !filters.packs?.length)} onClick={start}>
-            {busy ? 'Đang tạo…' : pearsonOn ? '▶ Bắt đầu thi thử' : '▶ Bắt đầu'}
+            {busy ? 'Đang tạo…' : mode === 'sealed' ? '▶ Bắt đầu đề niêm phong' : pearsonOn ? '▶ Bắt đầu thi thử' : '▶ Bắt đầu'}
           </button>
-          {n === 0 && <div className="small muted">Không có câu nào khớp — đổi chế độ hoặc bỏ bớt bộ lọc.</div>}
+          {n === 0 && (
+            <div className="small muted">
+              {mode === 'sealed' ? 'Chưa có đề niêm phong nào để làm.' : 'Không có câu nào khớp — đổi chế độ hoặc bỏ bớt bộ lọc.'}
+            </div>
+          )}
           <div className="tiny muted shortcut-help">
             Phím tắt khi làm bài: <span className="kbd">1</span>–<span className="kbd">5</span> chọn · <span className="kbd">Shift</span>+<span className="kbd">1</span>–<span className="kbd">5</span> gạch bỏ
             (hoặc chuột phải) · <span className="kbd">←</span>

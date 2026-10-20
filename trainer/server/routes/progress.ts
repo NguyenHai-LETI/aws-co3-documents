@@ -1,12 +1,17 @@
-// [L] Learning progress routes: exam goal & forecast, external practice-exam scores, FSRS parameters / optimizer.
-//   GET  /api/progress                  → ProgressResponse {today, fsrs, workload, goal, forecast?, external, externalCalibration?, regraded}
-//   POST /api/goal {examDate?, targetScaled?}               (missing = keep, null / '' = clear)  → ProgressResponse
-//   POST /api/external {date, source, score?, scaled?, note?}                                  → ProgressResponse
-//   POST /api/external/:id/delete                                                              → ProgressResponse
+// [L] Learning progress routes: exam goal & forecast, external practice-exam scores, FSRS parameters / optimizer,
+// first-day onboarding plan.
+//   GET  /api/progress                  → ProgressResponse {today, fsrs, workload, goal, forecast?, external, externalCalibration?,
+//                                          regraded, sealed, checklist, checklistChecked, studyStart?}
+//   POST /api/goal {examDate?, targetScaled?, minutesPerDay?, restDays?, studyTime?, examTime?, delivery?, esl?, checklist?}
+//        (missing = keep, null / '' = clear; checklist merged per item)                           → ProgressResponse
+//   POST /api/external {date, source, score?, scaled?, note?}                                    → ProgressResponse
+//   POST /api/external/:id/delete                                                                → ProgressResponse
 //   POST /api/fsrs/optimize             → FsrsInfo (the optimizer runs in a child process; poll GET /api/progress)
+//   POST /api/onboarding/plan {attemptId?} → OnboardingPlanResponse (coach/plans/<date>-onboarding.md, one per day)
 import { HttpError, readBody, route } from '../http.ts';
 import { context } from '../context.ts';
-import { ProgressError, addExternal, computeProgress, deleteExternal, saveGoal } from '../lib/progress.ts';
+import { ProgressError, addExternal, computeProgress, deleteExternal, saveGoal, type GoalInput } from '../lib/progress.ts';
+import { onboardingPlan } from '../lib/onboarding.ts';
 import { OptimizeError, fsrsInfo, maybeAutoOptimize, startOptimize } from '../lib/fsrs-optimize.ts';
 
 /** Library input errors → HTTP errors with the same status and (Vietnamese) message. */
@@ -30,9 +35,13 @@ function progress() {
 route('GET', '/api/progress', () => progress());
 
 route('POST', '/api/goal', async (req) => {
-  const body = await readBody<{ examDate?: unknown; targetScaled?: unknown }>(req);
+  const body = await readBody<GoalInput>(req);
   const { bank } = context();
-  guard(() => saveGoal({ examDate: body.examDate, targetScaled: body.targetScaled }, bank.taxonomy.exam.pass_scaled));
+  const input: GoalInput = {};
+  for (const k of ['examDate', 'targetScaled', 'minutesPerDay', 'restDays', 'studyTime', 'examTime', 'delivery', 'esl', 'checklist'] as const) {
+    if (body && k in body) input[k] = body[k];
+  }
+  guard(() => saveGoal(input, bank.taxonomy.exam.pass_scaled));
   return progress();
 });
 
@@ -62,4 +71,10 @@ route('POST', '/api/fsrs/optimize', () => {
   }
   run.catch(() => undefined); // finishes in the background; the result lands in results/fsrs-params.json
   return info;
+});
+
+route('POST', '/api/onboarding/plan', async (req) => {
+  const body = await readBody<{ attemptId?: unknown }>(req);
+  const attemptId = typeof body?.attemptId === 'string' && body.attemptId.trim() ? body.attemptId.trim() : undefined;
+  return guard(() => onboardingPlan(context(), { attemptId }));
 });

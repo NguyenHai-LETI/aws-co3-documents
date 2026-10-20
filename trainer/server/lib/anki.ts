@@ -3,7 +3,9 @@
 // derived from the question id, so a re-import updates the same notes instead of duplicating them) or a direct push
 // through the AnkiConnect add-on (2055492159): notes pushed before are found by their id tag and updated, new ones
 // are added with duplicate scope = deck. All HTML is generated here from escaped text (no raw HTML from the bank).
+// Questions of a sealed form ([γ] sealed.ts) are never exported, whatever the scope (an explicit id is silently skipped).
 import { applyFilters, modePool } from '../../shared/filters.ts';
+import { sealedIds } from './sealed.ts';
 import type { AnkiExportRequest, AnkiPushResult, AnkiStatus, Question, QuestionState } from '../../shared/types.ts';
 
 export const ANKI_TAG_ROOT = 'SAA-C03';
@@ -22,19 +24,26 @@ export interface AnkiSelection {
  * Questions for an export request. all = every active question · filter = active ∩ filters · wrong / due / flagged =
  * the practice modes' pools (last answer wrong — or ever wrong —, FSRS due without the daily cap, flagged or unsure),
  * optionally narrowed by filters · ids = exactly those (bank order irrelevant; retired ones reported as missing).
+ * `sealed` questions (default: the current sealed forms) are left out of every scope — not reported as missing.
  */
-export function selectForAnki(req: AnkiExportRequest, bank: { questions: Question[]; byId: Map<string, Question> }, states: Record<string, QuestionState>): AnkiSelection {
+export function selectForAnki(
+  req: AnkiExportRequest,
+  bank: { questions: Question[]; byId: Map<string, Question> },
+  states: Record<string, QuestionState>,
+  sealed: ReadonlySet<string> = sealedIds(),
+): AnkiSelection {
   if (req.scope === 'ids') {
     const questions: Question[] = [];
     const missing: string[] = [];
     for (const id of new Set((req.ids ?? []).map((s) => String(s).trim()).filter(Boolean))) {
       const q = bank.byId.get(id);
+      if (q && sealed.has(q.id)) continue;
       if (q && q.status !== 'retired') questions.push(q);
       else missing.push(id);
     }
     return { questions, missing };
   }
-  const active = bank.questions.filter((q) => q.status === 'active');
+  const active = bank.questions.filter((q) => q.status === 'active' && !sealed.has(q.id));
   const pool = req.scope === 'all' ? active : applyFilters(active, req.filters ?? {});
   if (req.scope === 'wrong') return { questions: req.everWrong ? pool.filter((q) => states[q.id]?.everWrong) : modePool('retry-wrong', pool, states), missing: [] };
   if (req.scope === 'due') return { questions: modePool('srs', pool, states), missing: [] };

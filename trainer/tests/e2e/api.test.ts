@@ -70,6 +70,8 @@ test('meta exposes the v2 fields and the sandbox paths', T, () => {
   assert.equal(typeof meta.practice.shuffle_options, 'boolean');
   assert.ok(['fsrs', 'leitner'].includes(meta.srs.algorithm));
   assert.equal(typeof meta.srs.daily_limit, 'number');
+  assert.match(meta.codeVersion, /^[0-9a-f]{12}$/, 'codeVersion: the code this server process runs');
+  assert.equal(meta.launcher, false, 'not started by start.sh / start.bat / start.command');
 });
 
 test('rejects requests without X-Trainer or from a foreign Host', T, async () => {
@@ -143,7 +145,8 @@ test('pearson exam: 65 questions, 15 unscored pilots, graded over the scored 50'
   assert.equal(session.pearson, true);
   assert.equal(session.questions.length, 65);
   assert.equal(session.feedback, 'exam');
-  assert.equal(session.timeLimit, 65 * 120, 'pearson defaults to official timing');
+  assert.equal(session.timingPreset, 'realistic', 'pearson defaults to the reading-load clock (B1)');
+  assert.ok(session.timeLimit >= session.estimateTotal && session.timeLimit <= 65 * 120, 'between Σ estimates and 2′/question');
   assert.match(session.title, /Pearson/);
   assert.equal(session.unscored?.length, 15);
   const ids = new Set(session.questions.map((r) => r.id));
@@ -463,6 +466,12 @@ test('sync: status → commit + push of the new results → clean', T, async () 
   assert.equal(after.dirtyData, 0);
   assert.equal(after.ahead, 0);
   assert.match(after.lastSync?.subject ?? '', /^trainer: sync từ/);
+  assert.equal(after.lastRun?.ok, true, 'last sync of this process');
+  assert.equal(after.lastRun?.source, 'manual');
+  assert.ok(after.lastOkAt);
+  assert.equal(after.unpushedSince, undefined, 'nothing left to push');
+  assert.equal(after.stale, undefined);
+  assert.equal(after.auto?.mode, 'off', 'sandboxes run with sync.auto: off');
 });
 
 test('a TRAINER_HOME sandbox outside the repo never syncs', T, async () => {

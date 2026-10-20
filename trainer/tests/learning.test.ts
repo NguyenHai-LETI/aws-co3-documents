@@ -31,6 +31,9 @@ const { loadBank } = await import('../server/lib/bank.ts');
 const { serializePack } = await import('../server/lib/pack-format.ts');
 const { splitFrontMatter, stringifyFrontMatter } = await import('../server/lib/frontmatter.ts');
 const { applyFilters, modePool } = await import('../shared/filters.ts');
+const { computeTimeLimit } = await import('../shared/timing.ts');
+const { regradeAttempts, resultAnnotations, recognitionSeconds, readingWords } = await import('../server/lib/regrade.ts');
+const { firstTryByDomain } = await import('../server/lib/forecast.ts');
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -52,16 +55,18 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, statsCfg: Partial<AppConfi
       enrich_batch_size: 20,
       max_runs_per_day: 6,
       structured_output: true,
+      enrich_after_analyze: false,
       verify: { auto: false, auto_draft: false, batch_size: 10 },
     },
     srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'off', optimize_min_reviews: 400, ...srs },
-    practice: { default_count: 20, quick_count: 10, shuffle_options: true },
-    stats: { rushed_median_seconds: 5, recency_half_life_days: 14, ...statsCfg },
+    practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false },
+    exam: { sealed_forms: 0, sealed_size: 50 },
+    stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300, ...statsCfg },
     quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88 },
     server: { lan: false },
     export: { anki_deck: 'test', ankiconnect_url: '' },
     cache: { sqlite: false },
-    sync: { data_paths: [], before_ai: false, after_ai: false },
+    sync: { data_paths: [], before_ai: false, after_ai: false, auto: 'off', auto_delay_minutes: 4 },
   };
 }
 const cfg = makeCfg();
@@ -387,15 +392,18 @@ it('rushed detection: median answered time below the threshold', () => {
   for (const f of [fast, slow]) fs.rmSync(path.join(HOME, f.file));
 });
 
-it('Pearson exam: 65 questions, 15 pilots keeping the scored domain mix, official timing', () => {
+it('Pearson exam: 65 questions, 15 pilots keeping the scored domain mix, honest timing (v4: reading-load clock by default)', () => {
   const states = new Map<string, QuestionState>();
   const s = select.buildTest({ mode: 'exam', pearson: true, count: 10, timing: undefined }, { bank, states, cfg, plans: [] });
   assert.equal(s.questions.length, 65);
   assert.equal(s.pearson, true);
   assert.equal(s.unscored?.length, 15);
   assert.equal(s.feedback, 'exam');
-  assert.equal(s.timingPreset, 'official');
-  assert.equal(s.timeLimit, 65 * 120);
+  assert.equal(s.timingPreset, 'realistic', 'design B1: full mocks default to the reading-load clock');
+  assert.equal(s.timeLimit, computeTimeLimit(s.estimateTotal, 65, 'realistic', undefined, tax.timing, { words: s.realism?.words }));
+  assert.ok(s.timeLimit <= 65 * 120, 'never more than 2′ per question');
+  const official = select.buildTest({ mode: 'exam', pearson: true, timing: { preset: 'official' } }, { bank, states, cfg, plans: [] });
+  assert.equal(official.timeLimit, 65 * 120, 'official = 2′ per question when chosen');
   assert.equal(s.title, select.PEARSON_TITLE);
   assert.ok(s.questions.every((r) => r.order?.length === 4), 'options shuffled by default');
   const scored: Record<string, number> = {};
@@ -605,4 +613,127 @@ it('tasks filter', () => {
   assert.equal(applyFilters(bank.questions, { tasks: ['1.3', '4.1'] }).length, 50);
   assert.equal(applyFilters(bank.questions, { tasks: ['9.9'] }).length, 0);
   assert.equal(applyFilters(bank.questions, { tasks: [] }).length, 100);
+});
+
+// ── v4: never-viewed answers (A3), exposure / recognition (B2), requirement buckets (B4), sealed exclusion (A1) ─────
+
+const keyOf = (q: Question) => q.answer.join('');
+const wrongOf = (q: Question) => q.options.find((o) => !q.answer.includes(o.key))!.key;
+const right = (q: Question, extra: Partial<AnswerRecord> = {}): AnswerRecord => ({ q: q.id, pick: keyOf(q), key: keyOf(q), ok: true, t: 50, est: 60, ...extra });
+const wrong = (q: Question, extra: Partial<AnswerRecord> = {}): AnswerRecord => ({ q: q.id, pick: wrongOf(q), key: keyOf(q), ok: false, t: 50, est: 60, ...extra });
+const blank = (q: Question, t = 0): AnswerRecord => ({ q: q.id, pick: '', key: keyOf(q), ok: false, t, est: 60 });
+const noSealed = { sealed: new Set<string>() };
+
+it('A3: never-viewed answers (no pick, t = 0) are not reviews — no state, no FSRS step, no pool, no daily cap, no stats', () => {
+  const [a, b, c] = bank.questions.slice(30, 33);
+  const history = regradeAttempts([attempt(5, [right(a), right(b)]), attempt(1, [blank(a), blank(c), blank(b, 35)], { mode: 'srs' })], bank, cfg);
+  assert.deepEqual(history[1].answers.map((r) => !!r.unviewed), [true, true, false], 'annotated: a viewed blank (time spent) is not "unviewed"');
+  assert.deepEqual(history[1].answers.map((r) => r.exposure), [undefined, undefined, 2]);
+  const states = stats.computeStates(history, cfg, NOW);
+  const sa = states.get(a.id)!;
+  assert.deepEqual([sa.attempts, sa.lastOk, sa.correct], [1, true, 1], 'the blank left no trace');
+  const alone = stats.computeStates([history[0]], cfg, NOW).get(a.id)!;
+  assert.deepEqual([sa.stability, sa.fsrsDifficulty, sa.dueAt], [alone.stability, alone.fsrsDifficulty, alone.dueAt], 'FSRS memory unchanged');
+  assert.equal(states.has(c.id), false, 'a question only ever left blank stays new');
+  const sb = states.get(b.id)!;
+  assert.deepEqual([sb.lastOk, sb.lastGrade, sb.attempts], [false, 1, 2], 'a viewed blank is a lapse');
+  // pools: retry-wrong gets the viewed blank only, "new" keeps the never-viewed question
+  const ctx = { bank, states, cfg, plans: [], attempts: history };
+  assert.deepEqual(select.buildTest({ mode: 'retry-wrong', count: 50 }, ctx).questions.map((r) => r.id), [b.id]);
+  assert.ok(modePool('new', bank.questions, Object.fromEntries(states)).some((q) => q.id === c.id));
+  // daily cap: only answers with a pick count
+  assert.equal(stats.srsAnswersToday([attempt(0, [right(a), blank(b), blank(c, 20)], { mode: 'srs' })], NOW), 1);
+  // stats: counted apart, left out of totals, buckets, readiness, first-try
+  const s = stats.computeStats(history, bank, states, cfg, NOW, noSealed);
+  assert.equal(s.unviewed, 2);
+  assert.equal(s.totals.answers, 3);
+  assert.equal(s.byDomain.reduce((n, d) => n + d.attempts, 0), 3);
+  const without = [history[0], { ...history[1], answers: [history[1].answers[2]] }];
+  assert.equal(s.totals.readiness, stats.computeStats(without, bank, states, cfg, NOW, noSealed).totals.readiness, 'readiness ignores never-viewed answers');
+  assert.deepEqual(stats.readinessAt(history, bank, cfg, NOW).answers, 3);
+  const first = firstTryByDomain([attempt(3, [blank(c)]), attempt(2, [right(c)])], bank);
+  assert.deepEqual(first.get(c.domain), { n: 1, ok: 1 }, 'the first viewed answer is the first try');
+});
+
+it('B2: exposure counts viewed answers of non-rushed attempts in time order; fast correct repeats are recognition', () => {
+  const q = bank.questions.find((x) => !x.longForm)!;
+  const limit = recognitionSeconds(q, 300);
+  assert.equal(limit, (readingWords(q) / 300) * 60);
+  assert.ok(limit > 6 && limit < 30, `reading time of the fixture ${limit}s`);
+  const fast = 5; // < reading time and < half the estimate (would be "easy")
+  const raw = [
+    attempt(20, [right(q, { t: 40 })]), // 1
+    attempt(18, [right(q, { t: fast })], { rushed: true }), // rushed: not an exposure
+    attempt(10, [blank(q)]), // never viewed: not an exposure
+    attempt(9, [right(q, { t: fast })]), // 2 · recognized
+    attempt(3, [wrong(q, { t: fast })]), // 3 · wrong → not recognized
+    attempt(1, [right(q, { t: 40 })]), // 4 · slower than reading → not recognized
+  ];
+  const h = regradeAttempts(raw, bank, cfg);
+  assert.deepEqual(h.map((a) => a.answers[0].exposure), [1, undefined, undefined, 2, 3, 4]);
+  assert.deepEqual(h.map((a) => !!a.answers[0].recognized), [false, false, false, true, false, false]);
+  assert.equal(regradeAttempts([attempt(2, [right(q, { t: fast })])], bank, cfg)[0].answers[0].recognized, undefined, 'a first answer is never recognition');
+  // stats.recognized_wpm: a slower reading speed raises the threshold (cache keyed by it)
+  const slow = regradeAttempts(raw, bank, makeCfg({}, { recognized_wpm: 60 }));
+  assert.notEqual(slow, h);
+  assert.equal(slow[5].answers[0].recognized, (readingWords(q) / 60) * 60 > 40, 'wpm 60: 40 s may still be faster than reading');
+  assert.deepEqual(regradeAttempts(raw, bank, cfg), h, 'back to the configured speed: same annotations');
+  // FSRS: recognition caps the grade at "good"
+  assert.equal(fsrs.gradeAnswer(raw[3].answers[0]), 4);
+  assert.equal(fsrs.gradeAnswer(h[3].answers[0]), 3);
+  const capped = stats.computeStates(h, cfg, NOW).get(q.id)!;
+  const uncapped = stats.computeStates(raw, cfg, NOW).get(q.id)!;
+  assert.ok(capped.stability! < uncapped.stability!, `recognition does not inflate stability (${capped.stability} < ${uncapped.stability})`);
+  // readiness: a recognized answer weighs 0.3
+  assert.ok(Math.abs(stats.answerWeight({ ageDays: 0, longForm: false, difficulty: 'medium', recognized: true }, 14) - stats.RECOGNIZED_WEIGHT) < 1e-12);
+  const items = DOMAINS.flatMap((d) => [...Array.from({ length: 20 }, () => ({ ...item(d, true), recognized: true })), ...Array.from({ length: 20 }, () => item(d, false))]);
+  assert.ok(stats.computeReadiness(items, tax.domains, 72, 14).readiness < 30, 'recognized right answers barely offset real misses');
+  // 14-day split (first vs repeat) in the stats
+  const s = stats.computeStats(h, bank, stats.computeStates(h, cfg, NOW), cfg, NOW, noSealed);
+  assert.deepEqual(s.exposure, { days: 14, first: { answers: 0, correct: 0 }, repeat: { answers: 3, correct: 2 }, recognized: 1 });
+  // result page annotations: the stored attempt + the learning view of it
+  assert.deepEqual(resultAnnotations(h[3], raw[3]), { exposure: { [q.id]: 2 }, recognized: [q.id], unviewed: [], fresh: { total: 1, seenBefore: 1, answers: 0, correct: 0 } });
+  assert.deepEqual(resultAnnotations(h[2], raw[2]), { exposure: {}, recognized: [], unviewed: [q.id], fresh: { total: 1, seenBefore: 0, answers: 0, correct: 0 } });
+  assert.deepEqual(resultAnnotations(h[1], raw[1]).exposure, {}, 'rushed attempts have no exposures');
+  assert.deepEqual(resultAnnotations(undefined), { exposure: {}, recognized: [], unviewed: [] });
+});
+
+it('B2: the result "fresh" split covers scored answers only (Pearson pilots left out), as graded at the time', () => {
+  const [p, n1, n2, seen] = bank.questions.slice(60, 64);
+  const prior = attempt(5, [right(seen)]);
+  const exam = attempt(1, [right(n1), wrong(n2), right(seen, { t: 40 }), right(p, { scored: false })], { mode: 'exam', pearson: true });
+  const h = regradeAttempts([prior, exam], bank, cfg);
+  assert.deepEqual(resultAnnotations(h[1], exam).fresh, { total: 3, seenBefore: 1, answers: 2, correct: 1 });
+});
+
+it('B4 + A1: requirement buckets (baseline "none" last); sealed questions out of every bank denominator, the queue and the lists', () => {
+  const qs = bank.questions;
+  // fixture: requirement categories set by hand (bank.ts derives them from taxonomy.keywords)
+  const byId = new Map(bank.questions.map((q) => [q.id, { ...q, requirements: [] as string[] }]));
+  const withReq = (q: Question, requirements: string[]) => byId.set(q.id, { ...q, requirements });
+  withReq(qs[0], ['cost']);
+  withReq(qs[1], ['cost', 'negative']);
+  withReq(qs[2], ['ops']);
+  const b2 = { ...bank, byId, questions: qs.map((q) => byId.get(q.id)!) };
+  const history = [attempt(2, [right(qs[0]), wrong(qs[1]), right(qs[3]), wrong(qs[4])])];
+  const states = stats.computeStates(history, cfg, NOW);
+  const sealed = new Set([qs[3].id, qs[4].id]);
+  const s = stats.computeStats(history, b2, states, cfg, NOW, { sealed });
+  assert.deepEqual(s.byRequirement!.map((b) => b.key), ['cost', 'ops', 'resilient', 'performance', 'secure', 'negative', 'none']);
+  assert.deepEqual(s.byRequirement!.map((b) => b.label), ['Chi phí', 'Vận hành', 'Sẵn sàng cao', 'Hiệu năng', 'Bảo mật', 'Phủ định', 'Không nêu tiêu chí']);
+  const req = (k: string) => s.byRequirement!.find((b) => b.key === k)!;
+  assert.deepEqual([req('cost').attempts, req('cost').correct, req('cost').bank], [2, 1, 2]);
+  assert.deepEqual([req('negative').attempts, req('negative').correct, req('negative').bank], [1, 0, 1]);
+  assert.deepEqual([req('ops').attempts, req('ops').bank, req('secure').bank], [0, 1, 0]);
+  assert.deepEqual([req('none').attempts, req('none').bank], [2, 100 - 3 - 2], 'baseline: stems without a requirement (sealed ones out of the bank count)');
+  // sealed: out of bankActive, boxes, bucket bank counts, distinctSeen, mostMissed, due — their answers still count
+  assert.equal(s.totals.bankActive, 98);
+  assert.equal(s.boxes.reduce((n, x) => n + x, 0), 98);
+  assert.equal(s.byDomain.reduce((n, d) => n + d.bank, 0), 98);
+  assert.equal(s.byDomain.reduce((n, d) => n + d.attempts, 0), 4);
+  assert.equal(s.totals.distinctSeen, 2);
+  assert.ok(!s.mostMissed.some((m) => sealed.has(m.id)), 'no sealed stem in the stats');
+  const open = stats.computeStats(history, b2, states, cfg, NOW, noSealed);
+  assert.equal(open.totals.due - s.totals.due, [qs[3], qs[4]].filter((q) => stats.isDue(states.get(q.id), NOW)).length, 'sealed questions are not due');
+  assert.equal(open.totals.bankActive, 100);
 });

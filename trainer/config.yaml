@@ -19,6 +19,7 @@ coach:
   claude_bin: ""            # đường dẫn Claude Code CLI nếu app không tự tìm thấy
   use_api_key: false        # false = luôn dùng đăng nhập claude.ai (bỏ ANTHROPIC_API_KEY khỏi môi trường của coach)
   structured_output: true   # sinh câu / ENRICH / câu dài trả JSON (--json-schema), app tự kiểm tra rồi ghi file — AI không cần quyền ghi
+  enrich_after_analyze: false   # sau mỗi lượt phân tích, ENRICH thêm ~10 câu bạn sắp gặp (tốn thêm quota)
   verify:
     auto: true              # sau lượt AI: model thứ hai giải mù câu mới / câu vừa sửa (không xem đáp án)
     auto_draft: true        # giải mù không khớp / mơ hồ → câu do AI viết chuyển sang draft, chờ bạn duyệt (Ngân hàng → Chất lượng)
@@ -39,10 +40,16 @@ practice:
   default_count: 20
   quick_count: 10
   shuffle_options: true     # xáo thứ tự đáp án mặc định (chống nhớ vị trí)
+  exclude_out_of_scope: true   # bỏ câu có đáp án là dịch vụ ngoài phạm vi đề (CodeCommit, IoT…) khỏi các chế độ luyện
+
+exam:
+  sealed_forms: 2           # số đề niêm phong: câu được giữ lại, không xuất hiện khi luyện, để đo điểm trên câu mới
+  sealed_size: 50           # số câu tính điểm mỗi đề niêm phong (+15 câu thử nghiệm lấy từ ngân hàng thường)
 
 stats:
   rushed_median_seconds: 5      # bài có thời gian trung vị/câu dưới ngưỡng = "làm vội", không tính vào thống kê
   recency_half_life_days: 14    # mức sẵn sàng: kết quả cũ hơn N ngày có trọng số giảm một nửa
+  recognized_wpm: 300           # gặp lại mà đúng nhanh hơn tốc độ đọc này (từ/phút) = nhận diện mặt chữ, tính nhẹ đi
 
 quality:
   embeddings: auto          # auto | ollama | off — tìm câu trùng theo nghĩa bằng model embedding chạy trên máy (Ollama)
@@ -64,3 +71,5 @@ sync:
   data_paths: [trainer/results, trainer/coach, trainer/bank]   # thư mục được "⇅ Đồng bộ" commit + push
   before_ai: true           # AI Coach (phân tích, sinh câu, ENRICH, câu dài) tự đồng bộ TRƯỚC khi chạy → thấy cả bài làm của máy kia
   after_ai: true            # ...và tự đẩy kết quả AI (kế hoạch, câu mới, patch, hồ sơ) lên ngay SAU lượt chạy thành công
+  auto: idle                # idle = tự đồng bộ vài phút sau khi nộp bài (và kéo về khi mở app, đẩy lên khi tắt) · off = chỉ khi bấm ⇅
+  auto_delay_minutes: 4

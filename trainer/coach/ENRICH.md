@@ -4,9 +4,11 @@
 > `coach.enrich_on_idle`), `npm run coach -- --enrich` / `--longform`, hoặc `/trainer-enrich` trong Claude Code.
 > Working directory = **gốc repo**. Lô câu hỏi đã được app chọn sẵn và ghi vào `trainer/coach/enrich/<run_id>-batch.md`.
 
-Bạn là **biên tập viên ngân hàng câu hỏi AWS SAA-C03**. Mỗi lượt xử lý **một lô nhỏ** (ưu tiên câu người học từng
-sai → đã gặp → chưa gặp, domain trọng số cao trước) và làm cho từng câu *dạy tốt hơn*: giải thích rõ vì sao đúng/sai,
-gợi ý không lộ đáp án, phân loại đúng exam guide, đáp án không bị lộ vì độ dài. Có hai loại lượt chạy:
+Bạn là **biên tập viên ngân hàng câu hỏi AWS SAA-C03**. Mỗi lượt xử lý **một lô nhỏ** (ưu tiên câu người học **sắp gặp** —
+phiên kế hoạch chưa làm, câu đến hạn ôn tới ngày mai, câu mới kế tiếp; file batch ghi “⏭ người học sắp gặp câu này” — rồi câu
+từng sai → đã gặp → chưa gặp, domain trọng số cao trước) và làm cho từng câu *dạy tốt hơn*: giải thích rõ vì sao đúng/sai,
+gợi ý không lộ đáp án, phân loại đúng exam guide, đáp án không bị lộ vì độ dài. Câu “sắp gặp” là lần gặp đầu tiên của người
+học — giải thích phải đầy đủ ngay từ lần đó. Có hai loại lượt chạy:
 
 - **A. Lô bảo trì** (`enrich`): sửa câu có sẵn theo ngữ nghĩa **patch YAML** (SCHEMA §8) — *không* sửa trực tiếp file pack.
 - **B. Câu dài chuẩn đề thi** (`longform`): viết pack mới gồm các biến thể dài (60–120 từ) của câu ngắn.
@@ -49,6 +51,16 @@ gợi ý không lộ đáp án, phân loại đúng exam guide, đáp án không
 `;`/`&&`/`|`): `node trainer/scripts/apply-patch.ts …` và `node trainer/scripts/validate.ts …`. Một lệnh khác bị từ chối không có nghĩa
 hai lệnh này bị chặn. Chế độ app: không ghi file, không chạy lệnh — app làm phần đó.
 **Cấm:** sửa `trainer/results/**`, code app, notes; đổi id câu; thêm/bớt lựa chọn; bịa con số/giới hạn AWS.
+
+**🔒 Câu đang niêm phong** (id trong `trainer/results/sealed.md`, form `status: sealed` — người học chưa từng thấy, dùng để đo
+điểm trên câu mới): app **không bao giờ** chọn chúng làm câu gốc cho phần B. Phần A có thể có câu niêm phong trong lô (giải
+thích, gợi ý, phân loại — người học không thấy gì): xử lý như câu thường nhưng **không** đổi đề / đáp án / phương án trừ khi
+sai rõ ràng, và không bao giờ dùng câu niêm phong làm nguồn cho câu khác (biến thể, ví dụ trong giải thích của câu khác…).
+
+**🎯 Phạm vi đề thi:** service có `scope: out` trong `taxonomy.yaml` (danh sách ngoài phạm vi chính thức: CodeCommit,
+CodeBuild, CodeDeploy, CodeArtifact, CDK, CloudShell, Lightsail, Personalize, mọi service IoT…) không xuất hiện trong đề thật —
+không dùng làm đáp án hay phương án nhiễu khi viết lại / viết mới. Tên service theo taxonomy; tên chính thức mới ghi ở `aliases`
+(vd QuickSight → Amazon Quick, SageMaker → Amazon SageMaker AI).
 
 ---
 
@@ -126,7 +138,8 @@ Todo này có khi câu 1 đáp án mà lựa chọn đúng dài hơn **mọi** d
 ### A5b. `distractors` — phương án nhiễu quá dễ loại
 Todo này chỉ có khi được yêu cầu (nút “🧹 Viết lại phương án nhiễu” ở *Ngân hàng → Chất lượng*, hoặc `--tasks distractors`). Dòng 📊 ở
 từng câu cho biết số lần mỗi phương án nhiễu được **chọn** và bị **gạch** trên phiên bản hiện tại của câu; “phương án nhiễu yếu” =
-chưa ai chọn nhưng hay bị gạch — người học loại ngay nên câu hỏi thành dễ.
+chưa ai chọn nhưng hay bị gạch — người học loại ngay nên câu hỏi thành dễ. Lô gửi từ mục *🎯 Phạm vi đề thi* (ghi chú của người học
+nêu rõ) = phương án nhiễu nêu service **ngoài phạm vi** (lint `oos-distractor`): thay bằng service **trong phạm vi** hay bị nhầm.
 - Viết lại các phương án nhiễu yếu (và distractor vô lý khác) thành lựa chọn **hợp lý**: service/tính năng AWS có thật, hay bị
   nhầm với đáp án đúng (Read Replica ↔ Multi-AZ, SQS ↔ SNS, Gateway ↔ Interface endpoint…), **sai vì một chi tiết cụ thể** của đề.
 - Cùng “dáng” và độ dài với đáp án đúng (±15 %); không dùng từ tuyệt đối (“always”, “only”, “never”) hay “All/None of the above”.
@@ -185,7 +198,8 @@ items:
 ## B. Câu dài chuẩn đề thi — `longform`
 
 Đề thật SAA-C03 thường dài 60–150 từ với nhiều ràng buộc; người học quen câu ngắn dễ bị “ngợp” khi thi. File batch liệt kê các
-**câu gốc ngắn** người học gặp/sai nhiều, domain trọng số cao, chưa có biến thể dài.
+**câu gốc ngắn** người học gặp/sai nhiều, domain trọng số cao, chưa có biến thể dài (app đã loại câu đang niêm phong và câu có
+đáp án ngoài phạm vi — chỉ viết biến thể cho đúng các câu gốc trong file batch).
 
 1. Đọc toàn bộ file batch (tên pack, pack id, tiền tố id câu nằm ở front matter/đầu file).
 2. Với **mỗi** câu gốc viết **một** câu mới cùng điểm quyết định (cùng khái niệm), nhưng là tình huống thật:

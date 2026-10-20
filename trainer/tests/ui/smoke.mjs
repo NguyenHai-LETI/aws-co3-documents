@@ -1,14 +1,71 @@
 // Playwright smoke test of the web UI against a sandbox server (temp TRAINER_HOME + seeded history, free port).
 // Checks: every page renders without page errors / console errors / failing API calls; a test can be created,
-// answered and submitted through the UI; no horizontal overflow at 390 px; dark theme renders.
-// Run: npm run test:ui   (Chromium once: npx playwright install chromium)
+// answered and submitted through the UI; a submit without connection waits as "⏳ chờ nộp" and goes through once the
+// server answers again (exactly one result); no horizontal overflow at 390 px; dark theme renders.
+// Run: npm run test:ui   (Chromium once: npx playwright install chromium — checked first, exit code 2 with the fix)
 // Env: SMOKE_OUT=<dir> screenshots (default: temp dir) · HEADED=1 show the browser · PLAYWRIGHT_BROWSERS_PATH as usual.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { apiClient, makeSandbox, startServer } from '../helpers/server.ts';
 import { seedHistory } from '../helpers/learner.ts';
+import { TRAINER_ROOT } from '../helpers/paths.ts';
+
+// ── browser preflight ───────────────────────────────────────────────────────
+// Playwright needs the browser build of its own version (start.sh installs packages with PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD,
+// so an upgrade silently leaves an older build behind). Fail in a second with the exact fix instead of a stack trace.
+
+function browsersDir() {
+  const env = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (env && env !== '0') return path.resolve(env);
+  if (env === '0') return path.join(path.dirname(createRequire(import.meta.url).resolve('playwright-core/package.json')), '.local-browsers');
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright');
+  if (process.platform === 'win32') return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'ms-playwright');
+  return path.join(process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache'), 'ms-playwright');
+}
+
+function expectedChromium() {
+  try {
+    const req = createRequire(import.meta.url);
+    const core = path.dirname(req.resolve('playwright-core/package.json')); // browsers.json itself is not "exported"
+    const { browsers } = JSON.parse(fs.readFileSync(path.join(core, 'browsers.json'), 'utf8'));
+    const version = JSON.parse(fs.readFileSync(req.resolve('playwright/package.json'), 'utf8')).version;
+    const shell = browsers.find((b) => b.name === 'chromium-headless-shell') ?? browsers.find((b) => b.name === 'chromium');
+    return { version, dir: `${shell.name.replace(/-/g, '_')}-${shell.revision}` };
+  } catch {
+    return { version: '?', dir: 'chromium_headless_shell-?' };
+  }
+}
+
+async function launchOrExplain() {
+  try {
+    return await chromium.launch({ headless: !process.env.HEADED });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/Executable doesn't exist|browser.*(not|isn't) installed|playwright install/i.test(msg)) throw e;
+    const dir = browsersDir();
+    const want = expectedChromium();
+    let found = [];
+    try {
+      found = fs.readdirSync(dir).filter((n) => /^chromium/.test(n));
+    } catch {
+      // no browser cache at all
+    }
+    const env = process.env.PLAYWRIGHT_BROWSERS_PATH ? `PLAYWRIGHT_BROWSERS_PATH="${process.env.PLAYWRIGHT_BROWSERS_PATH}" ` : '';
+    console.error(
+      [
+        `✗ UI smoke: thiếu trình duyệt cho Playwright ${want.version} — cần ${want.dir} trong ${dir}.`,
+        found.length ? `  Đang có: ${found.join(', ')} (của bản Playwright khác).` : '  Thư mục đó chưa có Chromium nào.',
+        '  Sửa (một lần, tải ~150 MB):',
+        `    cd "${TRAINER_ROOT}" && ${env}npx playwright install chromium`,
+        '  Hoặc trỏ tới bộ trình duyệt đã có đúng bản: PLAYWRIGHT_BROWSERS_PATH=<thư mục chứa ' + want.dir + '> npm run test:ui',
+      ].join('\n'),
+    );
+    process.exit(2);
+  }
+}
 
 const OUT = path.resolve(process.env.SMOKE_OUT || fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-smoke-')));
 fs.mkdirSync(OUT, { recursive: true });
@@ -25,11 +82,13 @@ const PAGES = [
 const results = []; // { name, ok, detail }
 let current = 'setup';
 const problems = []; // errors seen while `current` was running
+let offline = false; // a step simulating a dropped connection: the browser's "Failed to load resource" is expected
 
 function watch(page) {
   page.on('pageerror', (e) => problems.push(`[${current}] pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error') problems.push(`[${current}] console.error: ${m.text().slice(0, 300)}`);
+    if (m.type() !== 'error' || (offline && /ERR_INTERNET_DISCONNECTED|Failed to load resource/.test(m.text()))) return;
+    problems.push(`[${current}] console.error: ${m.text().slice(0, 300)}`);
   });
   page.on('response', (r) => {
     const u = new URL(r.url());
@@ -133,19 +192,17 @@ async function submitFromRunner(page) {
 
 // ── run ─────────────────────────────────────────────────────────────────────
 
+let browser = await launchOrExplain(); // before the sandbox and the server: a missing browser costs one second
 const sb = makeSandbox();
 const notRepo = path.join(sb.root, 'not-a-repo'); // sync status must never look at the real repo
 fs.mkdirSync(notRepo);
 let srv;
-let browser;
 let exitCode = 1;
 try {
   srv = await startServer({ home: sb.home, repo: notRepo });
   const api = apiClient(srv.base);
   await seedHistory(api);
   console.log(`server ${srv.base} · sandbox ${sb.root} · screenshots ${OUT}`);
-
-  browser = await chromium.launch({ headless: !process.env.HEADED });
 
   // warm-up (not recorded): Vite optimizes dependencies on the first page load and may reload the page once
   const warm = await browser.newContext();
@@ -179,6 +236,30 @@ try {
     await takeTestThroughUi(p, srv.base, 'mode=quick', 1);
     await p.keyboard.press('Enter'); // practice: check the answer
     await p.waitForTimeout(300);
+  });
+  await step('desktop submit without connection → ⏳ chờ nộp → sent once when back', p, async () => {
+    const before = (await api.get('/api/results')).body.length;
+    await takeTestThroughUi(p, srv.base, 'mode=topic&topics=storage&count=3', 3);
+    offline = true;
+    const drop = (route) => (route.request().method() === 'POST' ? route.abort('internetdisconnected') : route.continue());
+    await p.route('**/api/results', drop);
+    try {
+      await p.getByRole('button', { name: /^Nộp bài/ }).first().click();
+      await p.getByRole('button', { name: /xem kết quả/ }).first().click({ timeout: 10_000 });
+      await p.getByRole('heading', { name: /Bài đang chờ nộp/ }).waitFor({ timeout: 15_000 });
+      const queued = await p.evaluate(() => JSON.parse(localStorage.getItem('trainer.outbox.v1') ?? '[]').length);
+      if (queued !== 1) throw new Error(`outbox holds ${queued} entries, expected 1`);
+    } finally {
+      await p.unroute('**/api/results', drop);
+      offline = false;
+    }
+    await p.getByRole('button', { name: /Thử nộp lại ngay/ }).click();
+    await p.waitForURL(/#\/result\//, { timeout: 20_000 });
+    await rendered(p);
+    const after = (await api.get('/api/results')).body.length;
+    if (after !== before + 1) throw new Error(`expected exactly one new result, got ${after - before}`);
+    const left = await p.evaluate(() => localStorage.getItem('trainer.outbox.v1'));
+    if (left) throw new Error(`outbox not emptied: ${left.slice(0, 120)}`);
   });
 
   // mobile 390 px: no horizontal overflow

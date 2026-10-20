@@ -1,15 +1,21 @@
 // ENRICH routine helpers: which questions still need maintenance (explanation, hint, classification,
 // option-length balance, weak distractors), the batch file handed to the AI (coach/enrich/<runId>-batch.md), long-form
 // targets (short questions the learner meets/misses often) and the progress counters for the UI.
+// [γ] B9: the "upcoming" tier — questions the learner is about to meet (next plan sessions, reviews due by tomorrow, the
+// next never-seen questions in mode 'new' order) — is enriched first, so the first encounter already has a full
+// explanation. Sealed questions are never long-form originals (nothing may leak through a variant).
 import fs from 'node:fs';
 import path from 'node:path';
-import { DATA_DIR, ENRICH_DIR, PATCHES_DIR, REPO_DIR, RUNS_DIR } from '../config.ts';
+import { DATA_DIR, ENRICH_DIR, PATCHES_DIR, REPO_DIR, RUNS_DIR, type AppConfig } from '../config.ts';
 import type { BankState } from './bank.ts';
 import { correctIsLongest } from './patch.ts';
-import { localIso } from './time.ts';
+import { DAY_MS, localIso } from './time.ts';
+import { reviewQueue } from './stats.ts';
+import { sealedIds } from './sealed.ts';
+import { newOrder } from '../../shared/filters.ts';
 import { countWords } from '../../shared/timing.ts';
 import type { OptionStats } from './quality.ts';
-import type { Attempt, CoachRunInfo, DistractorReport, EnrichStatus, Question, QuestionState, VerifyVerdict } from '../../shared/types.ts';
+import type { Attempt, CoachRunInfo, DistractorReport, EnrichStatus, Plan, Question, QuestionState, VerifyVerdict } from '../../shared/types.ts';
 
 export type EnrichTodo = 'explain' | 'hint' | 'classify' | 'balance' | 'distractors';
 /** Default work of a batch (pending per question). `distractors` runs only when asked for (data-driven, see distractorReport). */
@@ -62,11 +68,11 @@ const clampInt = (v: unknown, min: number, max: number, dflt: number) => {
 export interface BatchItem {
   q: Question;
   todo: EnrichTodo[];
-  tier: 'wrong' | 'seen' | 'unseen';
+  tier: 'upcoming' | 'wrong' | 'seen' | 'unseen';
   state?: QuestionState;
 }
 
-const TIER_RANK = { wrong: 0, seen: 1, unseen: 2 } as const;
+const TIER_RANK = { upcoming: -1, wrong: 0, seen: 1, unseen: 2 } as const;
 
 function domainWeight(bank: BankState, q: Question): number {
   return bank.taxonomy.domains.find((d) => d.id === q.domain)?.weight ?? 0;
@@ -74,17 +80,59 @@ function domainWeight(bank: BankState, q: Question): number {
 
 const tierOf = (s: QuestionState | undefined): BatchItem['tier'] => (s?.everWrong ? 'wrong' : s && s.attempts > 0 ? 'seen' : 'unseen');
 
+export interface UpcomingInput {
+  bank: BankState;
+  states: Map<string, QuestionState>;
+  attempts: Attempt[];
+  plans: Plan[]; // newest first (loadPlans)
+  cfg: AppConfig;
+  now?: number;
+  sealed?: ReadonlySet<string>; // default: the current sealed forms
+  newCount?: number; // next never-seen questions to include (default practice.default_count)
+}
+
 /**
- * Picks the next ENRICH batch: non-retired questions with pending work, ordered by
- * learner relevance (answered wrong before > seen > unseen), then exam weight of the domain,
- * then how often they were missed; ties stay grouped by topic so one batch shares notes.
+ * Questions the learner is about to meet, soonest first: the questions of the newest plan's sessions not done yet, the
+ * reviews due by tomorrow (reviewQueue with now = tomorrow, daily cap applied), then the next never-seen questions in
+ * mode 'new' order (newOrder). Active only; sealed questions — and out-of-scope ones when practice.exclude_out_of_scope —
+ * are left out, as the practice modes do.
+ */
+export function upcomingIds(input: UpcomingInput): string[] {
+  const { bank, states, attempts, cfg } = input;
+  const sealed = input.sealed ?? sealedIds();
+  const dropOos = cfg.practice?.exclude_out_of_scope !== false;
+  const pool = bank.questions.filter((q) => q.status === 'active' && !sealed.has(q.id) && !(dropOos && q.outOfScope));
+  const inPool = new Set(pool.map((q) => q.id));
+  const out: string[] = [];
+  const add = (id: string) => {
+    if (inPool.has(id) && !out.includes(id)) out.push(id);
+  };
+  for (const s of input.plans[0]?.sessions ?? []) if (!s.done?.length) for (const id of s.questions ?? []) add(id);
+  const now = input.now ?? Date.now();
+  for (const q of reviewQueue(pool, states, attempts, cfg, now + DAY_MS).today) add(q.id);
+  const unseen = pool.filter((q) => !states.get(q.id)?.attempts);
+  for (const q of newOrder(unseen, bank.taxonomy.domains).slice(0, Math.max(0, input.newCount ?? cfg.practice?.default_count ?? 20))) add(q.id);
+  return out;
+}
+
+/**
+ * Picks the next ENRICH batch: non-retired questions with pending work, ordered by learner relevance (about to be met >
+ * answered wrong before > seen > unseen), then exam weight of the domain, then how often they were missed; ties stay
+ * grouped by topic so one batch shares notes. Upcoming questions keep their `upcoming` order (soonest first).
+ * - `upcoming`: upcomingIds() — their tier is 'upcoming'; `onlyUpcoming` keeps nothing else (coach.enrich_after_analyze).
  * - `ids`: explicit questions, in that order, bypassing the scoring — todo = the requested kinds (all of them),
  *   or each question's pending work (`explain` when nothing is pending: a re-check was asked for).
  * - `distractors` without ids: questions whose weak distractors `report` (distractorReport) lists, most struck first.
  */
-export function selectBatch(bank: BankState, states: Map<string, QuestionState>, opts: { size?: number; tasks?: unknown; ids?: string[]; report?: DistractorReport } = {}): BatchItem[] {
+export function selectBatch(
+  bank: BankState,
+  states: Map<string, QuestionState>,
+  opts: { size?: number; tasks?: unknown; ids?: string[]; report?: DistractorReport; upcoming?: string[]; onlyUpcoming?: boolean } = {},
+): BatchItem[] {
   const { todos, examTasks, explicit } = parseTasks(opts.tasks);
   const size = clampInt(opts.size, 1, MAX_BATCH, 20);
+  const soon = new Map((opts.upcoming ?? []).map((id, i) => [id, i] as const)); // qid → position in the upcoming list
+  const tier = (q: Question, s: QuestionState | undefined): BatchItem['tier'] => (soon.has(q.id) ? 'upcoming' : tierOf(s));
   if (opts.ids?.length) {
     return opts.ids
       .map((id) => bank.byId.get(id))
@@ -93,7 +141,7 @@ export function selectBatch(bank: BankState, states: Map<string, QuestionState>,
       .map((q) => {
         const pending = pendingTodos(q);
         const todo = explicit ? todos : pending.length ? pending : (['explain'] as EnrichTodo[]);
-        return { q, todo, tier: tierOf(states.get(q.id)), state: states.get(q.id) };
+        return { q, todo, tier: tier(q, states.get(q.id)), state: states.get(q.id) };
       });
   }
   const weak = new Map<string, number>(); // qid → strike-outs of its weak distractors
@@ -101,11 +149,12 @@ export function selectBatch(bank: BankState, states: Map<string, QuestionState>,
   const items: BatchItem[] = [];
   for (const q of bank.questions) {
     if (q.status === 'retired') continue;
+    if (opts.onlyUpcoming && !soon.has(q.id)) continue;
     if (examTasks.length && !examTasks.includes(q.task ?? '')) continue;
     const todo = [...pendingTodos(q), ...(weak.has(q.id) ? (['distractors'] as EnrichTodo[]) : [])].filter((t) => todos.includes(t));
     if (!todo.length) continue;
     const s = states.get(q.id);
-    items.push({ q, todo, tier: tierOf(s), state: s });
+    items.push({ q, todo, tier: tier(q, s), state: s });
   }
   if (weak.size) {
     // a distractor batch: the questions the learner rules out most easily first
@@ -116,6 +165,7 @@ export function selectBatch(bank: BankState, states: Map<string, QuestionState>,
   items.sort(
     (a, b) =>
       TIER_RANK[a.tier] - TIER_RANK[b.tier] ||
+      (soon.get(a.q.id) ?? 0) - (soon.get(b.q.id) ?? 0) || // upcoming: soonest first
       domainWeight(bank, b.q) - domainWeight(bank, a.q) ||
       wrong(b.state) - wrong(a.state) ||
       (b.state?.attempts ?? 0) - (a.state?.attempts ?? 0) ||
@@ -137,14 +187,15 @@ export interface LongformTarget {
 /**
  * Short questions worth an exam-length variant: met/missed often, high exam weight, and no long-form
  * variant yet (max 3 variants per original, SCHEMA §5). At most 2 per topic unless the pool runs dry.
+ * Never a sealed question (a variant would leak it) nor an out-of-scope one (the exam does not ask it).
  */
-export function longformTargets(bank: BankState, states: Map<string, QuestionState>, count = 5): LongformTarget[] {
+export function longformTargets(bank: BankState, states: Map<string, QuestionState>, count = 5, sealed: ReadonlySet<string> = sealedIds()): LongformTarget[] {
   const n = clampInt(count, 1, MAX_LONGFORM, 5);
   const variants = new Map<string, Question[]>();
   for (const v of bank.questions) for (const o of v.variantOf) variants.set(o, [...(variants.get(o) ?? []), v]);
   const pool: LongformTarget[] = [];
   for (const q of bank.questions) {
-    if (q.status !== 'active' || q.longForm) continue;
+    if (q.status !== 'active' || q.longForm || q.outOfScope || sealed.has(q.id)) continue;
     const vs = variants.get(q.id) ?? [];
     if (vs.length >= 3 || vs.some((v) => v.longForm)) continue;
     const s = states.get(q.id);
@@ -222,13 +273,13 @@ export function readRunInfos(limit = Infinity): CoachRunInfo[] {
   return Number.isFinite(limit) ? runList.list.slice(0, limit) : runList.list;
 }
 
-export function enrichStatus(bank: BankState, runs: CoachRunInfo[] = readRunInfos(200)): EnrichStatus & { longFormCandidates: number } {
+export function enrichStatus(bank: BankState, runs: CoachRunInfo[] = readRunInfos(200), sealed: ReadonlySet<string> = sealedIds()): EnrichStatus & { longFormCandidates: number } {
   const qs = bank.questions.filter((q) => q.status !== 'retired');
   const pending = { explain: 0, hint: 0, classify: 0, balance: 0 };
   for (const q of qs) for (const t of pendingTodos(q)) pending[t]++;
   const variants = new Map<string, Question[]>();
   for (const v of bank.questions) for (const o of v.variantOf) variants.set(o, [...(variants.get(o) ?? []), v]);
-  const longFormCandidates = qs.filter((q) => q.status === 'active' && !q.longForm && !(variants.get(q.id) ?? []).some((v) => v.longForm)).length;
+  const longFormCandidates = qs.filter((q) => q.status === 'active' && !q.longForm && !q.outOfScope && !sealed.has(q.id) && !(variants.get(q.id) ?? []).some((v) => v.longForm)).length;
   return {
     total: qs.length,
     enriched: qs.filter((q) => q.enriched).length,
@@ -405,7 +456,8 @@ export function writeBatchFile(
   items.forEach((it, i) => {
     const why = (opts.notes?.get(it.q.id) ?? []).map((w) => `🗣️ người học ${w} → giải thích phải gỡ đúng hiểu lầm này`);
     const extra = [...why, ...(it.todo.includes('distractors') ? distractorLines(it.q, opts.report, opts.stats?.get(it.q.id)) : []), ...verdictLines(it.q, opts.verdicts)];
-    o.push(...questionSection(bank, it.q, { n: i + 1, title: `todo: ${it.todo.join(' · ')}`, lengths: it.todo.includes('balance') || it.todo.includes('distractors'), state: it.state, extra }));
+    const title = `todo: ${it.todo.join(' · ')}${it.tier === 'upcoming' ? ' · ⏭ người học sắp gặp câu này' : ''}`;
+    o.push(...questionSection(bank, it.q, { n: i + 1, title, lengths: it.todo.includes('balance') || it.todo.includes('distractors'), state: it.state, extra }));
   });
   if (!json) {
     o.push('---', '', '## Khung patch', '', '```yaml', `run_id: ${runId}`, 'items:');

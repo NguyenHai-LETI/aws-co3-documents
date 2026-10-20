@@ -59,7 +59,7 @@ export function context(): Ctx {
   const versions: DataVersions = { bank: bank.version, results: loadedAttemptsVersion(), plans: plansVersion(), params: sig(FSRS_PARAMS_FILE), config: cfgMemo?.sig ?? sig(CONFIG_FILE), day: localDateKey(new Date()) };
   const key = JSON.stringify(versions);
   if (memo && memo.cfg === cfg && memo.bank === bank && memo.raw === raw && memo.key === key) return memo.ctx;
-  const attempts = regradeAttempts(raw, bank); // answers given before an answer-key fix count against the new key
+  const attempts = regradeAttempts(raw, bank, cfg); // regraded against fixed keys + unviewed/exposure/recognized annotations
   const states = computeStates(attempts, cfg);
   const plans = loadPlans(attempts);
   const planById = new Map<string, Plan>();

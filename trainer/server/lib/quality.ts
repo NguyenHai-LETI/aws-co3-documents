@@ -4,17 +4,21 @@
 // (distractorReport) and blind-solve verdicts (verify.ts). Numbers cover active questions.
 // Every part is cached by what it depends on: the bank version (metrics, lint, lexical duplicates), the answers
 // (variant effect, distractors), ratings.md / verify.md; semantic duplicates come from a background job (embeddings.ts).
+// [γ] Questions of a sealed form are left out of every number and list (BankQuality.sealed counts them); the exam-scope
+// report (BankQuality.scope) lists questions naming services the official guide puts out of scope.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { BANK_DIR, loadConfig } from '../config.ts';
-import type { BankState } from './bank.ts';
+import { BANK_DIR, loadConfig, type AppConfig } from '../config.ts';
+import { correctOutOfScope, type BankState } from './bank.ts';
 import { aggregateRatings, loadRatings, lowRatedIds, ratingsMtime, type RatingEntry } from './ratings.ts';
 import { LINT_RULES, SHORT_EXPLANATION_WORDS, correctIsLongest, lintBank } from './lint.ts';
 import { mergeDuplicates, scheduleSemantic, semanticState } from './embeddings.ts';
 import { verifySummary } from './verify.ts';
+import { sealedIds, sealedKey } from './sealed.ts';
+import { outOfScopeIn, outOfScopeSet } from './taxonomy.ts';
 import { countWords } from '../../shared/timing.ts';
-import type { AnswerRecord, Attempt, BankQuality, DistractorReport, DuplicatePair, LintSeverity, Question, VerifySummary } from '../../shared/types.ts';
+import type { AnswerRecord, Attempt, BankQuality, DistractorReport, DuplicatePair, LintSeverity, Question, ScopeReport, VerifySummary } from '../../shared/types.ts';
 
 export { correctIsLongest } from './lint.ts'; // one rule for metric, lint, filter (moved to lint.ts)
 
@@ -322,39 +326,89 @@ function safeVerify(bank: BankState): VerifySummary {
   }
 }
 
+// ── exam scope (B5) ─────────────────────────────────────────────────────────
+
+/**
+ * Questions naming services of the official out-of-scope list (taxonomy `scope: out`): a correct option (the question is
+ * off-exam: Question.outOfScope, lint oos-answer) or only distractors (easy give-aways: lint oos-distractor).
+ */
+export function scopeReport(bank: Pick<BankState, 'taxonomy'>, questions: Question[], cfg: Pick<AppConfig, 'practice'>): ScopeReport {
+  const tax = bank.taxonomy;
+  const tally = new Map<string, { answers: number; distractors: number }>();
+  const bump = (name: string, k: 'answers' | 'distractors') => {
+    const t = tally.get(name) ?? { answers: 0, distractors: 0 };
+    t[k]++;
+    tally.set(name, t);
+  };
+  const answer: ScopeReport['answer'] = [];
+  const distractor: ScopeReport['distractor'] = [];
+  for (const q of questions) {
+    const right = correctOutOfScope(q, tax);
+    if (right.length) {
+      answer.push({ id: q.id, services: right });
+      for (const s of right) bump(s, 'answers');
+      continue;
+    }
+    const options = q.options.filter((o) => !q.answer.includes(o.key)).map((o) => ({ key: o.key, services: outOfScopeIn(o.text, tax) })).filter((x) => x.services.length);
+    if (!options.length) continue;
+    distractor.push({ id: q.id, options });
+    for (const s of new Set(options.flatMap((x) => x.services))) bump(s, 'distractors');
+  }
+  const services = [...outOfScopeSet(tax)]
+    .map((name) => {
+      const def = tax.services[name];
+      const t = tally.get(name) ?? { answers: 0, distractors: 0 };
+      return { name, topic: def.topic, ...(def.aliases?.length ? { aliases: def.aliases } : {}), ...t };
+    })
+    .sort((a, b) => b.answers - a.answers || b.distractors - a.distractors || a.name.localeCompare(b.name));
+  return { services, answer, distractor, excluded: cfg.practice?.exclude_out_of_scope !== false };
+}
+
+const setKey = (s: ReadonlySet<string>) => (s.size ? [...s].sort().join(',') : '');
+
 /**
  * Everything the "Chất lượng" tab and the coach snapshot show. Explicit `ratings` (tests) disable every cache and the
  * background semantic job; otherwise each part is memoized and the semantic job is (re)scheduled when the bank changed.
+ * `sealed` (default: the current sealed forms; none for explicit test inputs) are left out of every number and list.
  */
-export function computeQuality(bank: BankState, attempts: Attempt[], ratings?: RatingEntry[], opts: { background?: boolean } = {}): BankQuality {
+export function computeQuality(bank: BankState, attempts: Attempt[], ratings?: RatingEntry[], opts: { background?: boolean; sealed?: ReadonlySet<string> } = {}): BankQuality {
   const pure = ratings !== undefined;
-  const v = pure ? undefined : bank.version;
+  const sealed: ReadonlySet<string> = opts.sealed ?? (pure ? new Set<string>() : sealedIds());
+  const v = pure ? undefined : `${bank.version}|${opts.sealed ? setKey(opts.sealed) : sealedKey()}`;
   const cfg = loadConfig();
   const active = bank.questions.filter((q) => q.status === 'active');
-  const metrics = cached('metrics', v, () => bankMetrics(active));
-  const lexical = pure ? findDuplicates(active) : lexicalDuplicates(bank);
+  const visible = sealed.size ? active.filter((q) => !sealed.has(q.id)) : active;
+  const shown = (id: string) => !sealed.has(id);
+  const metrics = cached('metrics', v, () => bankMetrics(visible));
+  const lexical = (pure ? findDuplicates(visible) : lexicalDuplicates(bank)).filter((p) => shown(p.a) && shown(p.b));
   const learning = cached('learning', pure ? undefined : `${bank.version}|${attemptsKey(attempts)}`, () => ({
     cycles: variantCycles(bank, attempts),
     distractors: distractorReport(bank, attempts),
   }));
   const votes = cached('ratings', pure ? undefined : String(ratingsMtime()), () => aggregateRatings(ratings ?? loadRatings()));
-  const verification = cached('verify', pure ? undefined : `${bank.version}|${mtime(VERIFY_FILE)}`, () => safeVerify(bank));
+  const verified = cached('verify', pure ? undefined : `${bank.version}|${mtime(VERIFY_FILE)}`, () => safeVerify(bank));
+  const scope = cached('scope', v, () => scopeReport(bank, visible, cfg));
   if (opts.background ?? !pure) scheduleSemantic(bank, cfg); // no-op unless the bank / model changed
   const sem = semanticState(cfg);
-  const activeIds = new Set(active.map((q) => q.id));
-  const fixed = learning.cycles.filter((c) => c.ok).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const visibleIds = new Set(visible.map((q) => q.id));
+  const cycles = learning.cycles.filter((c) => shown(c.id));
+  const fixed = cycles.filter((c) => c.ok).sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const dr = learning.distractors;
+  const pending = verified.pending.filter((p) => shown(p.qid));
 
   return {
     version: bank.version,
     ...metrics,
-    duplicates: mergeDuplicates(lexical, sem.pairs, (id) => activeIds.has(id)),
+    duplicates: mergeDuplicates(lexical, sem.pairs, (id) => visibleIds.has(id)),
     ratings: votes,
-    lowRated: lowRatedIds(votes).filter((id) => bank.byId.has(id) && bank.byId.get(id)!.status !== 'retired'),
-    variantEffect: { originals: learning.cycles.length, fixedAfterVariant: fixed.length, examples: fixed.slice(0, 10).map((c) => c.id) },
-    lint: lintBank(bank, { cache: !pure }),
-    distractors: learning.distractors,
+    lowRated: lowRatedIds(votes).filter((id) => bank.byId.has(id) && bank.byId.get(id)!.status !== 'retired' && shown(id)),
+    variantEffect: { originals: cycles.length, fixedAfterVariant: fixed.length, examples: fixed.slice(0, 10).map((c) => c.id) },
+    lint: lintBank(bank, { cache: !pure, exclude: sealed }),
+    distractors: sealed.size ? { ...dr, weakDistractors: dr.weakDistractors.filter((w) => shown(w.id)), suspectedKeys: dr.suspectedKeys.filter((s) => shown(s.id)) } : dr,
     semantic: sem.status,
-    verification,
+    verification: pending.length === verified.pending.length ? verified : { ...verified, pending, review: Math.max(0, verified.review - (verified.pending.length - pending.length)) },
+    sealed: active.length - visible.length,
+    scope: { ...scope, excluded: cfg.practice?.exclude_out_of_scope !== false },
   };
 }
 
@@ -388,6 +442,21 @@ export function qualitySnapshotLines(bank: BankState, attempts: Attempt[], opts:
     `- Đáp án đúng dài nhất (≥ 15 %): **${q.correctLongest}**/${q.total} câu (${pctOf(q.correctLongest, q.total)}%) — ENRICH \`balance\` viết lại distractor cho cân độ dài`,
     `- Giải thích ngắn (< ${SHORT_EXPLANATION_WORDS} từ): ${q.shortExplanations} · có gợi ý: ${q.withHint} · có task: ${q.withTask} · đã ENRICH: ${q.enriched} · câu dài chuẩn thi: ${q.longForm} (${pctOf(q.longForm, q.total)}%, trung vị đề ${q.medianStemWords} từ)`,
   );
+  if (q.sealed) o.push(`- 🔒 ${q.sealed} câu đang niêm phong — không tính trong số liệu / danh sách của mục này (xem §16).`);
+
+  // exam scope (taxonomy scope: out = official out-of-scope list)
+  const sc = q.scope;
+  if (sc && (sc.answer.length || sc.distractor.length)) {
+    const named = sc.services.filter((s) => s.answers || s.distractors).map((s) => s.name);
+    o.push('', `### 🎯 Phạm vi đề thi (dịch vụ ngoài phạm vi chính thức SAA-C03)`, '');
+    if (sc.answer.length) {
+      o.push(
+        `- ${sc.answer.length} câu có **đáp án đúng** là dịch vụ ngoài phạm vi${sc.excluded ? ' (đang bị loại khỏi các chế độ luyện)' : ''}: ${sc.answer.slice(0, 8).map((x) => `\`${x.id}\` (${x.services.join(', ')})`).join(', ')}${sc.answer.length > 8 ? ', …' : ''} — không viết biến thể / câu mở rộng cho các câu này; người học retire ở Ngân hàng → Chất lượng → 🎯 Phạm vi đề thi.`,
+      );
+    }
+    if (sc.distractor.length) o.push(`- ${sc.distractor.length} câu dùng dịch vụ ngoài phạm vi làm **phương án nhiễu** (dễ loại) — ENRICH \`distractors\` thay bằng dịch vụ trong phạm vi.`);
+    o.push(`- Câu mới (biến thể, contrast, câu dài): **không** dùng ${named.slice(0, 12).join(', ')}${named.length > 12 ? '…' : ''} (đáp án lẫn phương án nhiễu) — danh sách đầy đủ: \`scope: out\` trong taxonomy.yaml.`);
+  }
 
   // item-writing flaws (lint.ts)
   const lint = q.lint;

@@ -6,10 +6,14 @@
 //                         onSchedule: every review that falls due before the exam is done on its due day (overdue ones
 //                                     today) and answered "good" → R(exam − last scheduled review, S′) ≥ desired retention
 //   unseen question    → first-attempt accuracy of the learner in that domain, Laplace prior (ok + 1) / (n + 2)
+//                         (first *viewed* answer of each question: never-viewed blanks are not attempts)
 //   acc_d = Σ_q p_q / active questions of d · exam % = Σ_d f_d · acc_d (f_d = weight share)
-// Calibration: offset = mean(external score − app readiness on that date) over the last 5 external scores.
+//   Sealed questions (held back for the sealed forms) are not part of the practice bank: left out of every count.
+// Calibration: offset = mean(external score − app readiness on that date) over the last 5 external scores (sealed
+// forms of this app count as internal scores, see progress.ts).
 import type { BankState } from './bank.ts';
 import { dayKey, dayOfKey, localDay, scheduler, type Scheduler } from './fsrs.ts';
+import { isUnviewed } from './regrade.ts';
 import type { Attempt, ExamForecast, ExternalCalibration, ExternalScore, Question, QuestionState, WorkloadDay } from '../../shared/types.ts';
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
@@ -17,7 +21,7 @@ const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x
 /** Simulated reviews per question are capped (an interval never shrinks below 1 day, so this is only a safety net). */
 const MAX_SIM_REVIEWS = 120;
 
-/** First-attempt tallies per domain: the chronologically first non-rushed answer of every question. */
+/** First-attempt tallies per domain: the chronologically first viewed answer (non-rushed attempts) of every question. */
 export function firstTryByDomain(attempts: Attempt[], bank: BankState): Map<string, { n: number; ok: number }> {
   const ordered = attempts
     .filter((a) => !a.rushed)
@@ -27,7 +31,7 @@ export function firstTryByDomain(attempts: Attempt[], bank: BankState): Map<stri
   const out = new Map<string, { n: number; ok: number }>();
   for (const { a } of ordered) {
     for (const r of a.answers) {
-      if (seen.has(r.q)) continue;
+      if (seen.has(r.q) || isUnviewed(r)) continue;
       seen.add(r.q);
       const q = bank.byId.get(r.q);
       if (!q) continue;
@@ -80,6 +84,7 @@ export interface ForecastOptions {
   weights: readonly number[];
   desiredRetention: number;
   now?: number;
+  exclude?: Set<string>; // question ids outside the practice bank (sealed forms)
 }
 
 /** Expected exam score (percent) on `examDate` — see the header for the model. */
@@ -92,7 +97,7 @@ export function forecastExam(states: Map<string, QuestionState>, bank: BankState
   const first = firstTryByDomain(attempts, bank);
   const domains = bank.taxonomy.domains;
   const totalWeight = domains.reduce((s, d) => s + d.weight, 0) || 1;
-  const active = bank.questions.filter((q) => q.status === 'active');
+  const active = bank.questions.filter((q) => q.status === 'active' && !opts.exclude?.has(q.id));
   const byDomain = new Map<string, Question[]>();
   for (const q of active) {
     const list = byDomain.get(q.domain);

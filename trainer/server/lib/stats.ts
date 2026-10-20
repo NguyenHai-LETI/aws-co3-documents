@@ -3,10 +3,29 @@ import type { BankState } from './bank.ts';
 import { DAY_MS, localDateKey } from './time.ts';
 import { FSRS_LEVEL_LABELS, dayStartMs, gradeAnswer, localDay, memoryLevel, scheduler, type MemoryState } from './fsrs.ts';
 import { resolveFsrsParams } from './fsrs-optimize.ts';
-import { countRegraded } from './regrade.ts';
+import { countRegraded, isUnviewed } from './regrade.ts';
+import { sealedIds } from './sealed.ts';
+import { confusionPairs } from './insights.ts';
 import { compareDue, isMasteredState } from '../../shared/filters.ts';
+import { REQUIREMENTS, REQUIREMENT_INFO } from '../../shared/labels.ts';
 import { pct, scaledScore } from '../../shared/scoring.ts';
-import type { Attempt, Bucket, Difficulty, DomainDef, Question, QuestionState, StatsResponse } from '../../shared/types.ts';
+import type { Attempt, Bucket, Difficulty, DomainDef, ExposureSplit, Question, QuestionState, StatsResponse } from '../../shared/types.ts';
+
+/** Readiness evidence weight of a recognized answer (a repeat answered faster than the question can be read). */
+export const RECOGNIZED_WEIGHT = 0.3;
+/** StatsResponse.exposure window (days). */
+export const EXPOSURE_DAYS = 14;
+/** StatsResponse.confusions: confirmed pairs shown. */
+export const CONFUSIONS_SHOWN = 10;
+/** byRequirement bucket of stems that name no requirement (the learner's baseline for the other buckets). */
+export const NO_REQUIREMENT = 'none';
+/** byRequirement order: shared/labels.ts REQUIREMENTS, then the baseline bucket. */
+const REQUIREMENT_ORDER: string[] = [...REQUIREMENTS, NO_REQUIREMENT];
+
+/** Vietnamese label of a byRequirement bucket. */
+export function requirementLabel(key: string): string {
+  return key === NO_REQUIREMENT ? 'Không nêu tiêu chí' : (REQUIREMENT_INFO[key]?.label ?? key);
+}
 
 const round = (x: number, digits = 2) => Math.round(x * 10 ** digits) / 10 ** digits;
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
@@ -23,7 +42,9 @@ export function struckCorrect(r: { elim?: string; key: string }): boolean {
 
 /**
  * Learning state per question, recomputed from the full answer history (no database).
- * Rushed attempts (median answer time below stats.rushed_median_seconds) are ignored.
+ * Rushed attempts (median answer time below stats.rushed_median_seconds) are ignored, and so are never-viewed answers
+ * (no pick, t = 0 — not reviews: no state, no FSRS step). `attempts` = the learning view (regradeAttempts): its
+ * `recognized` flags cap the FSRS grade at "good".
  *
  * srs.algorithm = fsrs (default): FSRS-6 memory model (see fsrs.ts), day-scale: elapsed time between answers in whole
  *   local days (same day = short-term rule). `box` = memory level by stability; due = start of the local day
@@ -46,6 +67,7 @@ export function computeStates(attempts: Attempt[], cfg: AppConfig, now = Date.no
   for (const { a, at } of ordered) {
     const day = localDay(at);
     for (const r of a.answers) {
+      if (isUnviewed(r)) continue;
       let s = states.get(r.q);
       if (!s) {
         s = { id: r.q, attempts: 0, correct: 0, everWrong: false, streak: 0, box: 0, avgTime: 0, slowCount: 0, wrongPicks: {} };
@@ -121,10 +143,12 @@ export function boxLabels(cfg: AppConfig): string[] {
 
 // ── daily review cap ────────────────────────────────────────────────────────
 
-/** Answers given today (local date) in SRS-mode tests — they count against srs.daily_limit. */
+/** Answers given today (local date) in SRS-mode tests — they count against srs.daily_limit. Blanks do not count. */
 export function srsAnswersToday(attempts: Attempt[], now = Date.now()): number {
   const today = localDateKey(new Date(now));
-  return attempts.filter((a) => !a.rushed && a.mode === 'srs' && localDateKey(a.finished) === today).reduce((n, a) => n + a.answers.length, 0);
+  return attempts
+    .filter((a) => !a.rushed && a.mode === 'srs' && localDateKey(a.finished) === today)
+    .reduce((n, a) => n + a.answers.filter((r) => r.pick).length, 0);
 }
 
 export interface ReviewQueue {
@@ -150,6 +174,7 @@ export interface ReadinessItem {
   ageDays: number;
   longForm: boolean;
   difficulty: Difficulty;
+  recognized?: boolean; // weighs RECOGNIZED_WEIGHT: item memory, not exam skill
 }
 
 export interface Readiness {
@@ -163,10 +188,10 @@ export interface Readiness {
 
 const DIFFICULTY_WEIGHT: Record<Difficulty, number> = { easy: 0.8, medium: 1, hard: 1.2 };
 
-/** Evidence weight of one answer: recency half-life × long-form bonus × difficulty. */
-export function answerWeight(it: Pick<ReadinessItem, 'ageDays' | 'longForm' | 'difficulty'>, halfLifeDays: number): number {
+/** Evidence weight of one answer: recency half-life × long-form bonus × difficulty × recognition discount. */
+export function answerWeight(it: Pick<ReadinessItem, 'ageDays' | 'longForm' | 'difficulty' | 'recognized'>, halfLifeDays: number): number {
   const recency = halfLifeDays > 0 ? Math.pow(0.5, Math.max(0, it.ageDays) / halfLifeDays) : 1;
-  return recency * (it.longForm ? 1.5 : 1) * (DIFFICULTY_WEIGHT[it.difficulty] ?? 1);
+  return recency * (it.longForm ? 1.5 : 1) * (DIFFICULTY_WEIGHT[it.difficulty] ?? 1) * (it.recognized ? RECOGNIZED_WEIGHT : 1);
 }
 
 /** Standard normal CDF (erfc approximation, |error| < 1.2e-7). */
@@ -225,20 +250,30 @@ export function computeReadiness(items: ReadinessItem[], domains: DomainDef[], p
   };
 }
 
+/** Readiness evidence of one answer (undefined: never viewed, or the question is retired / gone). */
+function readinessItem(r: Attempt['answers'][number], bank: BankState, ageDays: number): ReadinessItem | undefined {
+  if (isUnviewed(r)) return undefined;
+  const q = bank.byId.get(r.q);
+  if (!q || q.status === 'retired') return undefined;
+  const it: ReadinessItem = { domain: q.domain, ok: r.ok, ageDays, longForm: q.longForm, difficulty: q.difficulty };
+  if (r.recognized) it.recognized = true;
+  return it;
+}
+
 /**
  * The readiness the stats page would have shown at time `at`: same items and weights as computeStats (non-rushed
- * attempts, retired questions left out), restricted to attempts finished by `at`, ages measured from `at`.
- * `answers` = evidence behind it (0 → no readiness yet).
+ * attempts, never-viewed answers and retired questions left out, recognized answers discounted), restricted to attempts
+ * finished by `at` (and not `opts.exclude`), ages measured from `at`. `answers` = evidence behind it (0 → no readiness yet).
  */
-export function readinessAt(attempts: Attempt[], bank: BankState, cfg: AppConfig, at: number): Readiness & { answers: number } {
+export function readinessAt(attempts: Attempt[], bank: BankState, cfg: AppConfig, at: number, opts: { exclude?: string } = {}): Readiness & { answers: number } {
   const items: ReadinessItem[] = [];
   for (const a of attempts) {
     const t = timeOf(a.finished);
-    if (a.rushed || t > at) continue;
+    if (a.rushed || t > at || (opts.exclude !== undefined && a.id === opts.exclude)) continue;
     const ageDays = Math.max(0, (at - t) / DAY_MS);
     for (const r of a.answers) {
-      const q = bank.byId.get(r.q);
-      if (q && q.status !== 'retired') items.push({ domain: q.domain, ok: r.ok, ageDays, longForm: q.longForm, difficulty: q.difficulty });
+      const it = readinessItem(r, bank, ageDays);
+      if (it) items.push(it);
     }
   }
   const tax = bank.taxonomy;
@@ -283,10 +318,21 @@ function tally(t: Tally, ok: boolean) {
   if (ok) t.correct++;
 }
 
-export function computeStats(attempts: Attempt[], bank: BankState, states: Map<string, QuestionState>, cfg: AppConfig, now = Date.now()): StatsResponse {
+export interface StatsOptions {
+  sealed?: Set<string>; // sealed question ids (default: sealedIds()) — out of the bank denominators, review queue and lists
+}
+
+/**
+ * Everything GET /api/stats shows, from the learning view of the history (regradeAttempts) and its states. Rushed
+ * attempts and never-viewed answers are left out (the latter are counted in `unviewed`); sealed questions are left out of
+ * every bank denominator (coverage, buckets' `bank`, boxes), the review queue and the question lists until released.
+ */
+export function computeStats(attempts: Attempt[], bank: BankState, states: Map<string, QuestionState>, cfg: AppConfig, now = Date.now(), opts: StatsOptions = {}): StatsResponse {
   const tax = bank.taxonomy;
   const used = attempts.filter((a) => !a.rushed);
+  const sealed = opts.sealed ?? sealedIds();
   const active = bank.questions.filter((q) => q.status === 'active');
+  const practice = sealed.size ? active.filter((q) => !sealed.has(q.id)) : active; // the bank the learner can practise
   const dims: Record<string, (q: Question) => string[]> = {
     domain: (q) => [q.domain],
     topic: (q) => [q.topic],
@@ -294,6 +340,7 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     service: (q) => q.services,
     tag: (q) => q.tags,
     task: (q) => (q.task ? [q.task] : []),
+    requirement: (q) => (q.requirements?.length ? q.requirements : [NO_REQUIREMENT]),
   };
   const acc: Record<string, Map<string, Acc>> = {};
   const bankCount: Record<string, Map<string, number>> = {};
@@ -302,10 +349,12 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     bankCount[d] = new Map();
   }
   for (const t of tax.tasks ?? []) bankCount.task.set(t.id, 0);
-  for (const q of active) for (const [d, f] of Object.entries(dims)) for (const k of f(q)) bankCount[d].set(k, (bankCount[d].get(k) ?? 0) + 1);
+  for (const k of REQUIREMENT_ORDER) bankCount.requirement.set(k, 0);
+  for (const q of practice) for (const [d, f] of Object.entries(dims)) for (const k of f(q)) bankCount[d].set(k, (bankCount[d].get(k) ?? 0) + 1);
 
   let answers = 0;
   let correct = 0;
+  let unviewed = 0;
   let studySeconds = 0;
   const daily = new Map<string, { answers: number; correct: number; seconds: number }>();
   const calibration = { sure: { answers: 0, correct: 0 }, unsure: { answers: 0, correct: 0 }, hinted: { answers: 0, correct: 0 } };
@@ -313,19 +362,31 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
   const elimQs: string[] = [];
   const recall = { answers: 0, hits: 0, hitCorrect: 0, missCorrect: 0 };
   const lengthSplit = { long: { answers: 0, correct: 0 }, short: { answers: 0, correct: 0 } };
+  const exposure: ExposureSplit = { days: EXPOSURE_DAYS, first: { answers: 0, correct: 0 }, repeat: { answers: 0, correct: 0 }, recognized: 0 };
+  const exposureSince = now - EXPOSURE_DAYS * DAY_MS;
   const readinessItems: ReadinessItem[] = [];
   for (const a of used) {
     const day = localDateKey(a.finished);
     const dd = daily.get(day) ?? { answers: 0, correct: 0, seconds: 0 };
     dd.seconds += a.timeUsed;
     studySeconds += a.timeUsed;
-    const ageDays = Math.max(0, (now - timeOf(a.finished)) / DAY_MS);
+    const finishedAt = timeOf(a.finished);
+    const ageDays = Math.max(0, (now - finishedAt) / DAY_MS);
+    const recent = finishedAt >= exposureSince;
     for (const r of a.answers) {
+      if (isUnviewed(r)) {
+        unviewed++;
+        continue;
+      }
       answers++;
       dd.answers++;
       if (r.ok) {
         correct++;
         dd.correct++;
+      }
+      if (recent && r.exposure !== undefined) {
+        tally(r.exposure > 1 ? exposure.repeat : exposure.first, r.ok);
+        if (r.recognized) exposure.recognized++;
       }
       if (r.hinted) tally(calibration.hinted, r.ok);
       else if (r.unsure) tally(calibration.unsure, r.ok);
@@ -358,11 +419,12 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
           acc[d].set(k, x);
         }
       }
-      if (q.status !== 'retired') readinessItems.push({ domain: q.domain, ok: r.ok, ageDays, longForm: q.longForm, difficulty: q.difficulty });
+      const it = readinessItem(r, bank, ageDays);
+      if (it) readinessItems.push(it);
     }
     daily.set(day, dd);
   }
-  elimination.questions = [...new Set(elimQs.reverse())].slice(0, 30);
+  elimination.questions = [...new Set(elimQs.reverse())].filter((id) => !sealed.has(id)).slice(0, 30);
 
   const domainOrder = (k: string) => tax.domains.findIndex((d) => d.id === k);
   const byDomain = bucketize(acc.domain, bankCount.domain, (k) => {
@@ -377,6 +439,13 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     const t = tax.tasks?.find((x) => x.id === k);
     return t ? `${t.id} · ${t.label_vi}` : k;
   }).sort((a, b) => taskOrder(a.key) - taskOrder(b.key) || a.key.localeCompare(b.key));
+  const requirementOrder = (k: string) => {
+    const i = REQUIREMENT_ORDER.indexOf(k);
+    return i < 0 ? 999 : i;
+  };
+  const byRequirement = bucketize(acc.requirement, bankCount.requirement, requirementLabel).sort(
+    (a, b) => requirementOrder(a.key) - requirementOrder(b.key) || a.key.localeCompare(b.key),
+  );
 
   const ready = computeReadiness(readinessItems, tax.domains, tax.exam.pass_pct, cfg.stats.recency_half_life_days);
 
@@ -388,10 +457,10 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     else if (i > 0) break;
   }
 
-  const stateList = [...states.values()].filter((s) => bank.byId.get(s.id)?.status === 'active');
+  const stateList = [...states.values()].filter((s) => bank.byId.get(s.id)?.status === 'active' && !sealed.has(s.id));
   const boxes = [0, 0, 0, 0, 0, 0];
-  for (const q of active) boxes[Math.min(5, Math.max(0, states.get(q.id)?.box ?? 0))]++;
-  const queue = reviewQueue(active, states, attempts, cfg, now);
+  for (const q of practice) boxes[Math.min(5, Math.max(0, states.get(q.id)?.box ?? 0))]++;
+  const queue = reviewQueue(practice, states, attempts, cfg, now);
 
   const topicLabel = (k: string) => {
     const t = tax.topics.find((x) => x.id === k);
@@ -420,7 +489,7 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
       correct,
       accuracy: pct(correct, answers),
       distinctSeen: stateList.length,
-      bankActive: active.length,
+      bankActive: practice.length,
       mastered: stateList.filter((s) => isMastered(s, cfg)).length,
       due: queue.due.length,
       wrongOpen: stateList.filter((s) => s.lastOk === false).length,
@@ -460,5 +529,9 @@ export function computeStats(attempts: Attempt[], bank: BankState, states: Map<s
     daily: [...daily].map(([date, v]) => ({ date, ...v })).sort((a, b) => a.date.localeCompare(b.date)),
     mostMissed,
     regraded: countRegraded(used),
+    unviewed,
+    exposure,
+    byRequirement,
+    confusions: confusionPairs(attempts, bank, { sealed, excludeOutOfScope: cfg.practice?.exclude_out_of_scope !== false }).slice(0, CONFUSIONS_SHOWN),
   };
 }

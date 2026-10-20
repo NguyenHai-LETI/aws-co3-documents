@@ -8,6 +8,8 @@
 > câu dài chuẩn đề thi (§4); patch YAML cho chỉnh sửa hàng loạt bằng AI (§8).
 > v3: AI trả kết quả bằng JSON (structured output) và app tự ghi patch / pack (§8); lint lỗi viết câu sau mỗi chỉnh sửa (§8);
 > giải mù bằng model thứ hai — `bank/verify.md` (§9).
+> v4: app tự tính `requirements` (tiêu chí đề) và `outOfScope` (§3); service có `scope: out` / `aliases` trong taxonomy;
+> lint `oos-answer` / `oos-distractor`; đề niêm phong — `results/sealed.md` (§10).
 
 ---
 
@@ -161,7 +163,7 @@ distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuố
 | `difficulty` | ✅ | `easy` (1 khái niệm, nhận diện trực tiếp) · `medium` (tình huống áp dụng, 2 đáp án gần đúng) · `hard` (kết hợp nhiều khái niệm, bẫy, multi-response) |
 | `time` | ✅ | giây, số nguyên — tính theo rubric §4 |
 | `task` | khuyến nghị | task statement của exam guide trong `taxonomy.yaml → tasks`: `1.1`–`1.3` (secure), `2.1`–`2.2` (resilient), `3.1`–`3.5` (performance), `4.1`–`4.4` (cost) — **phải cùng domain** (ghi trong ngoặc kép nếu viết trong YAML: `"2.2"`) |
-| `services` | khuyến nghị | tên chuẩn trong `taxonomy.yaml → services` (vd `RDS Proxy`, `S3`, `Transit Gateway`). Service mới → thêm vào taxonomy |
+| `services` | khuyến nghị | tên chuẩn trong `taxonomy.yaml → services` (vd `RDS Proxy`, `S3`, `Transit Gateway`). Service mới → thêm vào taxonomy. Service có `scope: out` (danh sách **ngoài phạm vi** chính thức của SAA-C03) không dùng cho câu mới — kể cả làm phương án nhiễu |
 | `tags` | khuyến nghị | khái niệm kebab-case, ưu tiên tag có sẵn trong `taxonomy.yaml → features` (vd `multi-az`, `s3-lifecycle`) |
 | `variant_of` | khi là biến thể | id câu gốc (có thể nhiều, phân tách dấu phẩy) |
 | `concept` | khuyến nghị (AI) | 1 câu ngắn mô tả khái niệm được kiểm tra — AI Coach dùng để gom nhóm điểm yếu |
@@ -172,8 +174,21 @@ distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuố
 | `enriched` | tự động | `YYYY-MM-DD` lần cuối ENRICH (patch AI) cải thiện/duyệt câu — app dùng để biết câu nào còn cần bảo trì |
 | `source` | tuỳ chọn | nguồn gốc (file + vị trí) |
 
-App tự tính thêm (không ghi vào file): `words` (số từ của đề), `longForm` (đề ≥ `timing.long_form_min_words` = 55 từ) và `hash`
-(mã 10 ký tự của đề + lựa chọn + đáp án — dùng làm `base` trong patch §8).
+App tự tính thêm (không ghi vào file): `words` (số từ của đề), `longForm` (đề ≥ `timing.long_form_min_words` = 55 từ), `hash`
+(mã 10 ký tự của đề + lựa chọn + đáp án — dùng làm `base` trong patch §8) và:
+
+- `requirements` — **tiêu chí đề** mà đề bài yêu cầu tối ưu: các nhóm `taxonomy.yaml → keywords` tìm thấy trong đề (`cost`, `ops`,
+  `resilient`, `performance`, `secure`; nguyên từ, từ VIẾT HOA phân biệt hoa/thường — cùng quy tắc với tô sáng từ khoá) + `negative`
+  cho câu hỏi phủ định (NOT/EXCEPT viết hoa trong câu hỏi, “LEAST likely/suitable…”; “LEAST operational overhead” là `ops`, không
+  phải phủ định). Không có tiêu chí nào → `[]`. Dùng cho bộ lọc “tiêu chí đề” và thống kê “Theo tiêu chí đề”.
+- `outOfScope` — `true` khi một phương án **đúng** nêu service có `scope: out` trong taxonomy (danh sách ngoài phạm vi chính thức
+  của SAA-C03, đối chiếu 2026-10-20). `practice.exclude_out_of_scope: true` (mặc định) loại các câu này khỏi mọi chế độ luyện trừ
+  “Theo bộ đề” và danh sách id; đề niêm phong không bao giờ chọn chúng. Lint: `oos-answer` (mức vừa) cho đáp án,
+  `oos-distractor` (mức nhẹ) cho phương án nhiễu nêu service ngoài phạm vi.
+
+**Taxonomy — phạm vi đề thi:** mỗi service có thể ghi `scope: out` (ngoài phạm vi) và `aliases: [...]` (tên chính thức hiện tại /
+tên mới, vd `QuickSight` → `Amazon Quick`; chỉ để hiển thị — muốn nhận diện tên đó trong câu hỏi thì thêm vào `match`). Không ghi
+`scope` = trong phạm vi hoặc chưa được liệt kê (danh sách chính thức không đầy đủ) — không bị loại.
 
 ## 4. Rubric thời gian (`time`) & câu dài chuẩn đề thi
 
@@ -320,3 +335,39 @@ cần chọn** — không thấy đáp án, giải thích, gợi ý hay metadata
 
   Phần `<!-- verify {…} -->` là dữ liệu cho app (đừng sửa tay). Kết quả gắn với **hash** của câu (§3): sửa đề / lựa chọn / đáp án → kết
   quả cũ thành “cũ” (stale) và câu được giải mù lại ở lượt sau (`--scope changed`).
+
+## 10. Đề niêm phong — `results/sealed.md`
+
+Một số câu **chưa từng gặp** được giữ riêng thành *đề niêm phong* (mặc định `config.yaml → exam.sealed_forms: 2` đề ×
+`exam.sealed_size: 50` câu), tạo một lần khi mở app (trước buổi luyện đầu tiên) hoặc bằng `npm run seal`. Câu đang niêm phong
+không xuất hiện ở bất kỳ chế độ luyện, tìm kiếm, xuất Anki, danh sách Ngân hàng / Chất lượng, snapshot hay kế hoạch AI Coach;
+“Đề niêm phong” = mô phỏng Pearson với 50 câu của đề làm câu tính điểm + 15 câu thử nghiệm từ ngân hàng thường → **điểm trên
+câu mới** (điểm hiệu chỉnh nội bộ, như điểm thi thử bên ngoài). Nộp bài → đề thành `used`, câu trở lại ngân hàng; “Mở sớm” →
+`released` (không có điểm).
+
+```markdown
+---
+kind: sealed
+size: 50
+forms:
+  - id: S1
+    status: sealed                 # sealed | used | released
+    ids: [ 06-v1-03, 16-v2-19, … ]
+  - id: S2
+    status: used
+    used_at: 2026-11-01T10:00:00+07:00
+    attempt_id: 2026-11-01_100000_sealed
+    ids: [ … ]
+---
+```
+
+- **Do app quản lý — đừng sửa tay** (và đừng đọc danh sách id nếu muốn điểm trung thực). Nội dung lúc tạo **tất định** (không có
+  thời điểm, thứ tự theo hash): hai máy tạo độc lập từ cùng ngân hàng + lịch sử ra cùng một file, đồng bộ không xung đột.
+- Cách chọn: câu `active`, trong phạm vi đề thi, **không có câu anh em** (`variant_of` hai chiều, đề gần giống nhau — Jaccard từ
+  ≥ 0,5, hoặc ≥ 0,25 khi cùng đáp án đúng —, cặp trùng theo nghĩa nếu Ollama đã chạy), không có issue mở / 👎 nhiều / lỗi lint
+  nặng, chưa từng thuộc đề trước; chia theo trọng số domain 30/26/24/20 (50 câu → 15/13/12/10) và xoay vòng các task 1.1–4.4;
+  ưu tiên câu **chưa gặp**, rồi đề dài hơn; số câu nhiều đáp án chia đều giữa các đề.
+- AI (COACH, ENRICH) **không bao giờ** dùng câu niêm phong làm câu gốc cho biến thể / câu dài, không đưa vào kế hoạch.
+- Lệnh: `npm run seal` (trạng thái, không in id) · `-- --forms 2 --size 50` (tạo khi không còn đề nào đang niêm phong) ·
+  `-- --release S1` (mở sớm) · `-- --reset [--forms N --size M]` (bỏ mọi đề rồi tạo lại; `--forms 0` = chỉ bỏ). Đề mới đánh số
+  tiếp (S3, S4…) để không trùng `sealed_form` của bài làm cũ.

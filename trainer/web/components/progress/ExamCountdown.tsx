@@ -1,9 +1,20 @@
 // [L] Dashboard: days left until the exam + the forecast for that day, or a nudge to set the exam date.
+// [β2] + the next exam-day checklist item and when to take the next sealed form.
 import { href } from '../../lib/router.ts';
 import { useData } from '../../lib/store.tsx';
 import { scaledScore } from '../../../shared/scoring.ts';
 import { ForecastLegend, ForecastTrack } from './ForecastViz.tsx';
+import { NextChecklistLine } from './ExamChecklist.tsx';
+import { NextSealedLine, useSealedForms } from './SealedPanel.tsx';
 import { daysLeftText, fmtDay, useProgress } from './useProgress.ts';
+import type { ProgressResponse } from '../../../shared/types.ts';
+
+function NextSteps({ p }: { p: ProgressResponse }) {
+  const forms = useSealedForms(p);
+  const lines = [<NextChecklistLine key="ck" items={p.checklist} />, <NextSealedLine key="sf" forms={forms} />];
+  if (!p.checklist?.some((i) => !i.done) && !forms.some((f) => f.status === 'sealed')) return null;
+  return <div className="lrn-next-list">{lines}</div>;
+}
 
 export function ExamCountdown() {
   const { meta } = useData();
@@ -19,6 +30,7 @@ export function ExamCountdown() {
         <a className="small" href={href('/stats?focus=exam')}>
           Đặt ngày thi →
         </a>
+        <NextSteps p={p} />
       </div>
     );
   }
@@ -34,6 +46,7 @@ export function ExamCountdown() {
       <div className="card stack sm lrn-countdown">
         {head}
         <div className="small muted">Dự báo điểm cho ngày thi sẽ có ngay sau bài test đầu tiên.</div>
+        <NextSteps p={p} />
       </div>
     );
   }
@@ -50,6 +63,7 @@ export function ExamCountdown() {
         Dừng học hôm nay: {scaledScore(f.ifStopNow)} · {sched >= target ? `✓ đang trên mục tiêu ${target}` : `thiếu ${target - sched} điểm so với mục tiêu`}
         {f.daysLeft > 0 && f.reviewsUntilExam ? ` · ~${Math.round((f.reviewsUntilExam / f.daysLeft) * 10) / 10} lượt ôn/ngày` : ''}
       </div>
+      <NextSteps p={p} />
       <a className="small" href={href('/stats?focus=exam')}>
         Xem dự báo chi tiết →
       </a>

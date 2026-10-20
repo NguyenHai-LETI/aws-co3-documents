@@ -105,13 +105,15 @@ export function review(prev: MemoryState | undefined, g: Grade, elapsedDays: num
 /**
  * Grade of one recorded answer:
  *   wrong / unanswered → 1 · correct but unsure, hinted, struck a correct option or slower than 1.5× the estimate → 2
- *   correct, confident and faster than half the estimate → 4 · otherwise → 3
+ *   correct, confident and faster than half the estimate → 4, unless `recognized` (a repeat answered faster than the
+ *   question can be read — recognition, not recall: capped at 3) · otherwise → 3
+ * Never-viewed answers (no pick, t = 0) are not reviews at all: callers skip them (regrade.ts isUnviewed).
  */
-export function gradeAnswer(r: Pick<AnswerRecord, 'ok' | 'pick' | 'key' | 't' | 'est' | 'unsure' | 'hinted' | 'elim'>): Grade {
+export function gradeAnswer(r: Pick<AnswerRecord, 'ok' | 'pick' | 'key' | 't' | 'est' | 'unsure' | 'hinted' | 'elim' | 'recognized'>): Grade {
   if (!r.ok || !r.pick) return 1;
   const struckCorrect = !!r.elim && [...r.elim].some((k) => r.key.includes(k));
   if (r.unsure || r.hinted || struckCorrect || (r.est > 0 && r.t > 1.5 * r.est)) return 2;
-  if (r.est > 0 && r.t > 0 && r.t < 0.5 * r.est) return 4;
+  if (!r.recognized && r.est > 0 && r.t > 0 && r.t < 0.5 * r.est) return 4;
   return 3;
 }
 

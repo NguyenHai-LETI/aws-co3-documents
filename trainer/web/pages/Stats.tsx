@@ -8,6 +8,7 @@ import { ReadinessCard, pctOf } from '../components/insights.tsx';
 import { Empty, ErrorBox, Loading, Seg } from '../components/ui.tsx';
 import { ExamSection } from '../components/progress/ExamSection.tsx';
 import { FsrsCard } from '../components/progress/FsrsCard.tsx';
+import { ConfusionCard, ExposureCard, RequirementCard } from '../components/progress/LearningInsights.tsx';
 import { useProgress } from '../components/progress/useProgress.ts';
 import type { Bucket, StatsResponse } from '../../shared/types.ts';
 
@@ -210,9 +211,10 @@ export function Stats() {
   const { data: progress } = useProgress();
   const [topicSort, setTopicSort] = useState<'weak' | 'bank'>('weak');
   const focus = route.query.get('focus');
-  // Dashboard "Đặt ngày thi →" opens #/stats?focus=exam
+  // Dashboard links: "Đặt ngày thi →" #/stats?focus=exam · next checklist item ?focus=checklist · sealed form ?focus=sealed
   useEffect(() => {
-    if (focus === 'exam' && progress) document.getElementById('exam-goal')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const target = { exam: 'exam-goal', checklist: 'exam-checklist', sealed: 'sealed-forms' }[focus ?? ''];
+    if (target && progress) document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [focus, !!progress, !!s]); // eslint-disable-line react-hooks/exhaustive-deps
   if (loading && !s) return <Loading />;
   if (error && !s) return <ErrorBox error={error} />;
@@ -225,6 +227,11 @@ export function Stats() {
     void refresh();
   };
   const regraded = s.regraded ?? progress?.regraded ?? 0;
+  const unviewedNote = !!s.unviewed && (
+    <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
+      👁️ <b>{s.unviewed} câu bỏ trống chưa xem</b> (không chọn, 0 giây) không được tính vào thống kê, mức sẵn sàng và lịch ôn — trong điểm từng bài chúng vẫn tính là sai.
+    </div>
+  );
   const rushedNote = rushed.length > 0 && (
     <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
       ⚡ <b>{rushed.length} bài làm vội</b> không được tính vào thống kê, mức sẵn sàng và lịch ôn (thời gian trung vị mỗi câu quá ngắn):{' '}
@@ -247,6 +254,7 @@ export function Stats() {
           <h1>📊 Thống kê</h1>
         </div>
         {rushedNote}
+        {unviewedNote}
         <Empty icon="📈" title="Chưa có dữ liệu">
           Làm vài bài test để thấy thống kê theo domain, task, chủ đề, service, tốc độ và lịch ôn tập.
         </Empty>
@@ -280,6 +288,7 @@ export function Stats() {
         </div>
       </div>
       {rushedNote}
+      {unviewedNote}
       {regraded > 0 && (
         <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
           ↻ <b>{regraded} câu trả lời được chấm lại</b> theo đáp án đã sửa trong ngân hàng (file kết quả giữ nguyên) — thống kê, mức sẵn sàng và lịch ôn tính theo đáp án hiện
@@ -383,6 +392,13 @@ export function Stats() {
         </section>
       )}
 
+      {(s.byRequirement || s.exposure) && (
+        <section className={s.byRequirement && s.exposure ? 'grid c2 lrn-align-start' : undefined}>
+          {s.byRequirement && <RequirementCard buckets={s.byRequirement} passPct={passPct} />}
+          {s.exposure && <ExposureCard e={s.exposure} passPct={passPct} />}
+        </section>
+      )}
+
       <section>
         <ChartCard
           title="Theo chủ đề"
@@ -465,6 +481,12 @@ export function Stats() {
             {s.elimination && <Elimination e={s.elimination} />}
             {s.recall && <Recall r={s.recall} />}
           </div>
+        </section>
+      )}
+
+      {s.confusions && (
+        <section>
+          <ConfusionCard pairs={s.confusions} />
         </section>
       )}
 

@@ -8,6 +8,8 @@
 //   node trainer/scripts/coach-run.ts --enrich --ids 03-v2-01,05-v1-12 [--tasks distractors] [--note "…"]
 //   node trainer/scripts/coach-run.ts --longform [--count 5]
 //   node trainer/scripts/coach-run.ts --verify [--ids a,b | --pack <pack-id> | --scope unverified-ai|new|changed]
+// With coach.enrich_after_analyze, a successful analyze is followed by a small ENRICH run over the questions the learner
+// is about to meet; the process waits for it (exit code = the analyze run's).
 import os from 'node:os';
 import { loadConfig } from '../server/config.ts';
 import { context } from '../server/context.ts';
@@ -153,11 +155,22 @@ coachRunner.on('event', (ev) => {
   const prefix = { start: '▶', tool: '  ·', text: '  ✎', result: '✔', error: '  ✗', stderr: '  !', end: '■' }[ev.kind as string] ?? '-';
   console.log(`${prefix} ${ev.text}`);
 });
+let mainStatus: CoachRunInfo['status'] | undefined; // exit code = the requested runs' outcome (not a follow-up's)
+coachRunner.on('followup', (f: { after: string; run?: CoachRunInfo; skipped?: string }) => {
+  log(f.run ? `▶ ENRICH câu sắp gặp sau phân tích (coach.enrich_after_analyze): ${f.run.id}` : `✓ Không chạy ENRICH sau phân tích: ${f.skipped ?? ''}`);
+});
 coachRunner.on('done', (info: CoachRunInfo) => {
   log(`${info.status}${info.costUsd ? ` · $${info.costUsd.toFixed(3)}` : ''}`);
-  finished++;
-  if (info.status === 'success' && finished < batches) return void setTimeout(runOnce, 1500);
-  process.exit(info.status === 'success' || info.status === 'skipped' ? 0 : 1); // skipped = nothing left after the sync
+  if (!info.params?.after) {
+    finished++;
+    mainStatus = info.status;
+    if (info.status === 'success' && finished < batches) return void setTimeout(runOnce, 1500);
+  }
+  // a follow-up run starts right after 'done' (coach.enrich_after_analyze) — then wait for its own 'done'
+  setImmediate(() => {
+    if (coachRunner.current) return;
+    process.exit(mainStatus === 'success' || mainStatus === 'skipped' ? 0 : 1); // skipped = nothing left after the sync
+  });
 });
 process.on('SIGINT', () => coachRunner.cancel() || process.exit(130));
 process.on('SIGTERM', () => coachRunner.cancel() || process.exit(143));

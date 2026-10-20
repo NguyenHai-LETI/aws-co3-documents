@@ -18,7 +18,7 @@ fs.copyFileSync(path.join(TRAINER, 'bank', 'taxonomy.yaml'), path.join(HOME, 'ba
 process.env.TRAINER_HOME = HOME; // must be set before config.ts is imported (dynamic imports below)
 after(() => fs.rmSync(HOME, { recursive: true, force: true }));
 
-const { DATA_DIR, RESULTS_DIR, SNAPSHOT_FILE } = await import('../server/config.ts');
+const { DATA_DIR, RESULTS_DIR, SNAPSHOT_FILE, PLANS_DIR } = await import('../server/config.ts');
 // Without process isolation another test file may have loaded config.ts first — then never write: skip.
 const it = DATA_DIR === HOME ? test : test.skip;
 
@@ -31,7 +31,9 @@ const fc = await import('../server/lib/forecast.ts');
 const prog = await import('../server/lib/progress.ts');
 const { loadBank } = await import('../server/lib/bank.ts');
 const { serializePack } = await import('../server/lib/pack-format.ts');
-const { stringifyFrontMatter } = await import('../server/lib/frontmatter.ts');
+const { stringifyFrontMatter, splitFrontMatter } = await import('../server/lib/frontmatter.ts');
+const onboarding = await import('../server/lib/onboarding.ts');
+const { loadPlans } = await import('../server/lib/plans.ts');
 
 const DAY = 86_400_000;
 const NOW = Date.now();
@@ -52,22 +54,25 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}): AppConfig {
       enrich_batch_size: 20,
       max_runs_per_day: 6,
       structured_output: true,
+      enrich_after_analyze: false,
       verify: { auto: false, auto_draft: false, batch_size: 10 },
     },
     srs: { algorithm: 'fsrs', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'manual', optimize_min_reviews: 400, ...srs },
-    practice: { default_count: 20, quick_count: 10, shuffle_options: true },
-    stats: { rushed_median_seconds: 5, recency_half_life_days: 14 },
+    practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false },
+    exam: { sealed_forms: 0, sealed_size: 50 },
+    stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300 },
     quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88 },
     server: { lan: false },
     export: { anki_deck: 'test', ankiconnect_url: '' },
     cache: { sqlite: false },
-    sync: { data_paths: [], before_ai: false, after_ai: false },
+    sync: { data_paths: [], before_ai: false, after_ai: false, auto: 'off', auto_delay_minutes: 4 },
   };
 }
 const cfg = makeCfg();
 
-// ── generated bank: 10 questions per domain, answer key A ───────────────────
+// ── generated bank: 10 questions per domain, answer key A, two exam-guide tasks per domain (odd / even) ──
 const DOMAINS: DomainId[] = ['secure', 'resilient', 'performance', 'cost'];
+const TASKS: Record<DomainId, [string, string]> = { secure: ['1.1', '1.2'], resilient: ['2.1', '2.2'], performance: ['3.1', '3.2'], cost: ['4.1', '4.2'] };
 const drafts = DOMAINS.flatMap((d) =>
   Array.from({ length: 10 }, (_, i) => ({
     id: `${d.slice(0, 3)}-${String(i + 1).padStart(2, '0')}`,
@@ -79,6 +84,7 @@ const drafts = DOMAINS.flatMap((d) =>
     topic: 'storage',
     difficulty: 'medium' as const,
     time: 60,
+    task: TASKS[d][i % 2],
   })),
 );
 const PACK = path.join(HOME, 'bank', 'packs', 'manual', 'progress-test.md');
@@ -96,26 +102,30 @@ function attempt(daysAgo: number, answers: AnswerRecord[], extra: Partial<Attemp
 
 // ── item versioning ─────────────────────────────────────────────────────────
 
-it('regradeAttempts: answers graded with an old key count against the current key; copies only, identity kept', () => {
+it('regradeAttempts: answers graded with an old key count against the current key; annotated copies, input untouched, idempotent', () => {
   const q = ids[0];
   const old = attempt(5, [ans(q, true, { key: 'B', pick: 'B' }), ans(ids[1], true)]); // was right with key B, the key is now A
   const lucky = attempt(4, [{ q, pick: 'A', key: 'C', ok: false, t: 40, est: 60 }]); // was wrong, A is now the key
   const same = attempt(3, [ans(q, true), ans(ids[2], false)]);
   const list = [old, lucky, same];
   const out = regradeAttempts(list, bank);
-  assert.notEqual(out, list, 'a new array when something was re-graded');
-  assert.equal(out[2], same, 'unchanged attempts keep their identity');
-  assert.equal(out[0].answers[1], old.answers[1], 'unchanged answers keep their identity');
-  assert.deepEqual(out[0].answers[0], { ...old.answers[0], key: 'A', ok: false, regraded: true });
-  assert.deepEqual(out[1].answers[0], { ...lucky.answers[0], key: 'A', ok: true, regraded: true });
+  assert.notEqual(out, list, 'a new array when something was re-graded or annotated');
+  // v4: every viewed answer of a non-rushed attempt carries its exposure (1 = first time the question was answered)
+  assert.deepEqual(out[0].answers[0], { ...old.answers[0], key: 'A', ok: false, regraded: true, exposure: 1 });
+  assert.deepEqual(out[1].answers[0], { ...lucky.answers[0], key: 'A', ok: true, regraded: true, exposure: 2 });
+  assert.deepEqual(out[2].answers, [{ ...same.answers[0], exposure: 3 }, { ...same.answers[1], exposure: 1 }]);
   assert.equal(old.answers[0].ok, true, 'the input is never mutated');
+  assert.equal(old.answers[0].exposure, undefined);
   assert.equal(regradeAttempts(list, bank), out, 'cached by input identity + bank version');
-  const clean = [same];
-  assert.equal(regradeAttempts(clean, bank), clean, 'nothing to re-grade → the same array');
-  // formatting differences of the stored key are not a key change; unknown questions stay as they are
+  assert.equal(regradeAttempts(out, bank), out, 'an annotated history comes back as the same array (idempotent)');
+  const copy = [...out];
+  const again = regradeAttempts(copy, bank);
+  assert.equal(again, copy, 'nothing left to re-grade or annotate → the same array');
+  assert.ok(again.every((a, i) => a === out[i] && a.answers.every((r, j) => r === out[i].answers[j])), 'unchanged attempts and answers keep their identity');
+  // formatting differences of the stored key are not a key change; unknown questions are not re-graded
   assert.equal(regradeAnswer(ans(q, true, { key: 'a' }), 'A').regraded, undefined);
   const gone = ans('not-in-bank', true, { key: 'B', pick: 'B' });
-  assert.equal(regradeAttempts([attempt(1, [gone])], bank)[0].answers[0], gone);
+  assert.deepEqual(regradeAttempts([attempt(1, [gone])], bank)[0].answers[0], { ...gone, exposure: 1 });
   // learning computations see the re-graded answers
   assert.equal(countRegraded(out), 2);
   assert.equal(countRegraded([...out, { ...out[0], rushed: true }]), 2, 'rushed attempts are not counted');
@@ -453,4 +463,192 @@ it('computeProgress: forecast for the goal date, workload until the exam, extern
   prog.deleteExternal(early.id);
   prog.deleteExternal(recent.id);
   prog.saveGoal({ examDate: null }, 720);
+});
+
+// ── v4: goal fields (A2/B7), exam-day checklist (B7), sealed forms + internal calibration (A1), onboarding plan (A2) ──
+
+it('goal.md v4 fields: minutes, rest days, study/exam time, delivery, ESL, checklist merged per item; validation; round trip', () => {
+  fs.rmSync(prog.GOAL_FILE, { force: true });
+  const g = prog.saveGoal(
+    { examDate: '2026-12-15', minutesPerDay: 45, restDays: [6, 0, 6], studyTime: '7:05', examTime: '09:30', delivery: 'online', esl: true, checklist: { esl: true, booked: false, 'not-an-item': true } },
+    720,
+  );
+  assert.deepEqual(g, { examDate: '2026-12-15', minutesPerDay: 45, restDays: [0, 6], studyTime: '07:05', examTime: '09:30', delivery: 'online', esl: true, checklist: { esl: true } });
+  const text = fs.readFileSync(prog.GOAL_FILE, 'utf8');
+  for (const re of [/^minutes_per_day: 45$/m, /^study_time: "?07:05"?$/m, /^exam_time: "?09:30"?$/m, /^delivery: online$/m, /^esl: true$/m, /^checklist:\n {2}- esl$/m, /^rest_days:\n {2}- 0\n {2}- 6$/m]) {
+    assert.match(text, re);
+  }
+  assert.match(text, /Ngày nghỉ: CN, T7/);
+  // checklist: merged item by item (true = ticked, false = unticked, ids not sent keep their state)
+  assert.deepEqual(prog.saveGoal({ checklist: { booked: true, 'id-name': true } }, 720).checklist, { booked: true, esl: true, 'id-name': true });
+  assert.deepEqual(prog.saveGoal({ checklist: { esl: false, booked: true, 'id-name': false } }, 720).checklist, { booked: true });
+  // missing = keep, null / '' / false = clear
+  const kept = prog.saveGoal({ targetScaled: 800 }, 720);
+  assert.deepEqual([kept.minutesPerDay, kept.delivery, kept.esl], [45, 'online', true]);
+  const cleared = prog.saveGoal({ esl: false, delivery: null, restDays: [], studyTime: '', checklist: null }, 720);
+  assert.deepEqual(cleared, { examDate: '2026-12-15', targetScaled: 800, minutesPerDay: 45, examTime: '09:30' });
+  const bad: [Record<string, unknown>, RegExp][] = [
+    [{ minutesPerDay: 2 }, /phút/],
+    [{ minutesPerDay: 'x' }, /phút/],
+    [{ restDays: [7] }, /Ngày nghỉ/],
+    [{ restDays: [0, 1, 2, 3, 4, 5, 6] }, /ít nhất một ngày/],
+    [{ studyTime: '25:00' }, /Giờ học/],
+    [{ examTime: '9h' }, /Giờ thi/],
+    [{ delivery: 'home' }, /online/],
+    [{ esl: 'maybe' }, /esl/],
+    [{ checklist: ['esl'] }, /checklist/],
+  ];
+  for (const [input, re] of bad) assert.throws(() => prog.saveGoal(input, 720), (e: Error & { status?: number }) => e.status === 400 && re.test(e.message), JSON.stringify(input));
+  assert.equal(prog.loadGoal().minutesPerDay, 45, 'a rejected update changes nothing');
+  // an unquoted 20:30 read by a YAML 1.1 tool (sexagesimal 1230) still means 20:30; checklist ids of a newer version survive
+  fs.writeFileSync(prog.GOAL_FILE, '---\nkind: goal\nstudy_time: 1230\nchecklist: [esl, from-the-future]\n---\n');
+  assert.deepEqual(prog.loadGoal(), { studyTime: '20:30', checklist: { esl: true, 'from-the-future': true } });
+  assert.deepEqual(prog.saveGoal({ checklist: { esl: false, 'from-the-future': false } }, 720).checklist, { 'from-the-future': true }, 'unknown ids are not touched');
+  prog.saveGoal({ studyTime: null, checklist: null }, 720);
+  assert.equal(fs.existsSync(prog.GOAL_FILE), false, 'nothing left → file removed');
+});
+
+it('exam-day checklist: due dates from the exam date, overdue items, delivery-specific items, ESL requested after booking', () => {
+  const today = fsrs.localDay(NOW);
+  const exam = fsrs.dayKey(today + 10);
+  const list = prog.examChecklist({ examDate: exam }, NOW);
+  assert.deepEqual(list.map((c) => c.id), ['esl', 'booked', 'id-name', 'rehearsal', 'reschedule', 'system-test', 'after'], 'no delivery chosen → the online items');
+  const by = Object.fromEntries(list.map((c) => [c.id, c]));
+  assert.deepEqual([by.esl.due, by.esl.overdue], [fsrs.dayKey(today - 20), true]);
+  assert.deepEqual([by['id-name'].due, by['id-name'].overdue], [fsrs.dayKey(today - 4), true]);
+  assert.deepEqual([by.rehearsal.due, by.rehearsal.overdue], [fsrs.dayKey(today + 3), undefined]);
+  assert.deepEqual([by.reschedule.due, by['system-test'].due, by.after.due], [fsrs.dayKey(today + 9), fsrs.dayKey(today + 9), exam]);
+  assert.ok(list.every((c) => c.label && c.dueText && c.hint && c.done === false));
+  assert.ok(list.filter((c) => c.link).every((c) => /^https:\/\/(aws\.amazon\.com|www\.pearsonvue\.com)\//.test(c.link!)), 'official links only');
+  const center = prog.examChecklist({ examDate: exam, delivery: 'center', checklist: { esl: true, 'id-name': true } }, NOW);
+  assert.ok(center.some((c) => c.id === 'center') && !center.some((c) => c.id === 'system-test'));
+  const cb = Object.fromEntries(center.map((c) => [c.id, c]));
+  assert.deepEqual([cb.esl.done, cb.esl.overdue, cb['id-name'].done, cb['id-name'].overdue], [true, undefined, true, undefined], 'done items are never overdue');
+  // booked without the ESL extension: it only applies to later registrations → overdue even without an exam date
+  const noDate = prog.examChecklist({ checklist: { booked: true } }, NOW);
+  assert.ok(noDate.every((c) => c.due === undefined));
+  assert.deepEqual([noDate.find((c) => c.id === 'esl')!.overdue, noDate.find((c) => c.id === 'booked')!.done], [true, true]);
+});
+
+it('sealed forms: suggested dates ≈ exam − 21 / − 7 (never before today, none without a future exam date), score of a used form', () => {
+  assert.deepEqual([0, 1].map((i) => prog.sealedOffset(i, 2)), [21, 7]);
+  assert.deepEqual([0, 1, 2].map((i) => prog.sealedOffset(i, 3)), [21, 14, 7]);
+  assert.equal(prog.sealedOffset(0, 1), 7);
+  const today = fsrs.localDay(NOW);
+  const state = {
+    size: 10,
+    forms: [
+      { id: 'S1', ids: ids.slice(0, 10), status: 'sealed' as const },
+      { id: 'S2', ids: ids.slice(10, 20), status: 'sealed' as const },
+    ],
+  };
+  const far = prog.sealedProgress(state, [], { examDate: fsrs.dayKey(today + 60) }, NOW);
+  assert.deepEqual(far.map((f) => [f.id, f.status, f.count, f.suggested, f.due]), [['S1', 'sealed', 10, fsrs.dayKey(today + 39), false], ['S2', 'sealed', 10, fsrs.dayKey(today + 53), false]]);
+  assert.ok(far.every((f) => !('ids' in f)), 'no question ids');
+  const near = prog.sealedProgress(state, [], { examDate: fsrs.dayKey(today + 10) }, NOW);
+  assert.deepEqual(near.map((f) => [f.suggested, f.due]), [[fsrs.dayKey(today), true], [fsrs.dayKey(today + 3), false]], 'exam − 21 already passed → today');
+  assert.ok(prog.sealedProgress(state, [], {}, NOW).every((f) => f.suggested === undefined), 'no exam date');
+  assert.ok(prog.sealedProgress(state, [], { examDate: fsrs.dayKey(today - 1) }, NOW).every((f) => f.suggested === undefined), 'exam date passed');
+  const a = attempt(2, ids.slice(0, 10).map((q, i) => ans(q, i < 7)), { sealedForm: 'S1', score: 70, scaled: 700, total: 10, correct: 7, file: 'results/x.md' });
+  const forms = [{ ...state.forms[0], status: 'used' as const, attempt: a.id, usedAt: a.finished }, { ...state.forms[1], status: 'released' as const }];
+  const used = prog.sealedProgress({ ...state, forms }, [a], { examDate: fsrs.dayKey(today + 10) }, NOW);
+  assert.deepEqual(used.map((f) => [f.status, f.score, f.scaled, f.attempt, f.suggested]), [['used', 70, 700, a.id, undefined], ['released', undefined, undefined, undefined, undefined]]);
+  // a used form without a recorded attempt id: the latest sealed attempt of that form
+  assert.equal(prog.sealedProgress({ ...state, forms: [{ ...state.forms[0], status: 'used' as const }] }, [a], {}, NOW)[0].score, 70);
+});
+
+it('computeProgress v4: a used sealed form is an internal calibration point; checklist, studyStart, goal echo', () => {
+  const history = simulatedHistory(120, 21).filter((a) => Date.parse(a.finished) < NOW - 3 * DAY);
+  const sealedAttempt = attempt(2, ids.slice(0, 20).map((q, i) => ans(q, i % 2 === 0)), { sealedForm: 'S1', score: 50, scaled: 500, total: 20, correct: 10, file: 'results/2026/10/sealed-exam.md' });
+  const rushedEarly = attempt(300, [ans(ids[0], true, { t: 1 })], { rushed: true });
+  const atts = regradeAttempts([rushedEarly, ...history, sealedAttempt], bank, cfg);
+  const states = stats.computeStates(atts, cfg, NOW);
+  prog.saveGoal({ examDate: fsrs.dayKey(fsrs.localDay(NOW) + 30), delivery: 'center', checklist: { booked: true } }, 720);
+  const p = prog.computeProgress({ cfg, bank, attempts: atts, states }, NOW);
+  const internal = p.external.filter((e) => e.internal);
+  assert.equal(internal.length, 1);
+  const e = internal[0];
+  assert.deepEqual([e.id, e.source, e.score, e.scaled, e.attempt, e.file], [`sealed-${sealedAttempt.id}`, 'Đề niêm phong S1', 50, 500, sealedAttempt.id, sealedAttempt.file]);
+  assert.equal(e.date, fsrs.dayKey(fsrs.localDay(Date.parse(sealedAttempt.finished))));
+  const before = stats.readinessAt(atts.filter((a) => a.id !== sealedAttempt.id), bank, cfg, Date.parse(sealedAttempt.finished));
+  assert.ok(before.answers >= prog.MIN_CALIBRATION_ANSWERS);
+  assert.equal(e.readinessAtDate, before.readiness, 'the readiness just before the sealed exam, its own answers left out');
+  assert.deepEqual([p.externalCalibration?.samples, p.externalCalibration?.offset], [1, Math.round((50 - before.readiness) * 10) / 10]);
+  assert.throws(() => prog.deleteExternal(e.id), (err: Error & { status?: number }) => err.status === 404, 'internal points cannot be deleted');
+  const first = Math.min(...history.map((a) => Date.parse(a.finished)));
+  assert.equal(p.studyStart, fsrs.dayKey(fsrs.localDay(first)), 'the first NON-rushed attempt');
+  assert.deepEqual(p.goal, { examDate: fsrs.dayKey(fsrs.localDay(NOW) + 30), targetScaled: 720, delivery: 'center', checklist: { booked: true } });
+  assert.ok(p.checklist?.some((c) => c.id === 'center' && c.due) && p.checklist.find((c) => c.id === 'booked')!.done);
+  assert.equal(p.checklistChecked, prog.CHECKLIST_CHECKED);
+  assert.deepEqual(p.sealed, [], 'no sealed forms in this data root');
+  assert.equal(prog.computeProgress({ cfg, bank, attempts: [], states: new Map() }, NOW).studyStart, undefined);
+  prog.saveGoal({ examDate: null, delivery: null, checklist: null }, 720);
+});
+
+it('onboarding: week-1 plan from the diagnostic halves — weakest tasks first, spaced review, end-of-week mock; one file per day', () => {
+  fs.rmSync(PLANS_DIR, { recursive: true, force: true });
+  const today = fsrs.dayKey(fsrs.localDay(NOW));
+  const byTask = (t: string) => bank.questions.filter((q) => q.task === t);
+  // a 2 × 14 style split: 1.1 and 2.1 missed, 3.1 half right, the rest right
+  const half1 = attempt(1, [...byTask('1.1').slice(0, 2).map((q) => ans(q.id, false)), ...byTask('2.1').slice(0, 2).map((q) => ans(q.id, false)), ...byTask('3.1').slice(0, 2).map((q, i) => ans(q.id, i === 0))], { mode: 'diagnostic', diagnostic: true });
+  const half2 = attempt(0.5, ['1.2', '2.2', '3.2', '4.1', '4.2'].flatMap((t) => byTask(t).slice(0, 2).map((q) => ans(q.id, true))), { mode: 'diagnostic', diagnostic: true });
+  const later = attempt(0.2, [ans(byTask('4.1')[4].id, false)]); // a practice test after the diagnostic is not part of it
+  const atts = regradeAttempts([half1, half2, later], bank, cfg);
+  const ctx = { cfg, bank, attempts: atts, states: stats.computeStates(atts, cfg, NOW) };
+  const r = onboarding.onboardingPlan(ctx, { now: NOW });
+  assert.equal(r.created, true);
+  const t = Object.fromEntries(r.tasks.map((x) => [x.task, x]));
+  assert.deepEqual(['1.1', '2.1', '3.1', '4.1', '1.3'].map((k) => t[k].status), ['weak', 'weak', 'partial', 'ok', 'untested']);
+  assert.deepEqual([t['1.1'].answers, t['1.1'].correct, t['4.1'].answers], [2, 0, 2], 'only the diagnostic counts');
+  assert.equal(r.tasks.length, bank.taxonomy.tasks.length);
+  assert.deepEqual(r.tasks.map((x) => x.priority), [...r.tasks.map((x) => x.priority)].sort((a, b) => b - a), 'weakest first');
+  const tax = bank.taxonomy;
+  const weight = (d: string) => tax.domains.find((x) => x.id === d)!.weight / tax.domains.reduce((s, x) => s + x.weight, 0) / tax.tasks.filter((x) => x.domain === d).length;
+  assert.equal(t['2.1'].priority, Math.round(1000 * weight('resilient') * (1 - 1 / 4)) / 10);
+  assert.equal(t['1.3'].priority, Math.round(1000 * weight('secure') * 0.5) / 10, 'untested → prior 1/2');
+  // the plan file: coach plan schema, trigger onboarding
+  const plan = r.plan;
+  assert.deepEqual([plan.id, plan.file, plan.trigger], [`plan-${today}-onboarding`, `coach/plans/${today}-onboarding.md`, 'onboarding']);
+  assert.ok(plan.sessions.length >= 4 && plan.sessions.length <= 6, `${plan.sessions.length} sessions`);
+  const fixes = plan.sessions.filter((s) => s.questions?.length);
+  assert.deepEqual(fixes.map((s) => s.title.split(' · ')[0]), ['Vá task 2.1', 'Vá task 1.1', 'Vá task 2.2'], 'highest priority tasks that have questions (1.3 has none here)');
+  const s1 = fixes[0];
+  assert.ok(s1.questions!.every((id) => bank.byId.get(id)!.task === '2.1'));
+  assert.deepEqual(new Set(s1.questions), new Set(byTask('2.1').map((q) => q.id)));
+  const seenInDiagnostic = new Set(half1.answers.map((a) => a.q));
+  assert.ok(s1.questions!.slice(0, 3).every((id) => !seenInDiagnostic.has(id)), 'never-seen questions first');
+  assert.equal(s1.feedback, 'practice');
+  const review = plan.sessions.find((s) => s.filter?.mode === 'srs')!;
+  assert.ok(review && review.feedback === 'practice');
+  const mock = plan.sessions.at(-1)!;
+  assert.deepEqual([mock.filter?.mode, mock.filter?.pearson, mock.feedback], ['exam', true, 'exam'], 'end-of-week Pearson mock');
+  const abs = path.join(PLANS_DIR, `${today}-onboarding.md`);
+  const text = fs.readFileSync(abs, 'utf8');
+  const fm = splitFrontMatter(text);
+  assert.deepEqual([fm.data.kind, fm.data.source_attempts], ['plan', [half1.id, half2.id]]);
+  assert.match(fm.body, /## 2\. Bản đồ xuất phát/);
+  assert.match(fm.body, /\| 1\.1 · .* \| 0\/2 \| ✗ cần vá \|/);
+  assert.equal(loadPlans(atts)[0].id, plan.id, 'newest plan → shown on the Dashboard');
+  // same day, same diagnostic → the stored plan, untouched
+  const mtime = fs.statSync(abs).mtimeMs;
+  const again = onboarding.onboardingPlan(ctx, { now: NOW + 60_000 });
+  assert.equal(again.created, false);
+  assert.deepEqual(again.plan, plan);
+  assert.equal(fs.statSync(abs).mtimeMs, mtime);
+  assert.equal(fs.readdirSync(PLANS_DIR).filter((f) => f.endsWith('.md')).length, 1);
+  // a third diagnostic part changes the source → today's file is rewritten (still one file)
+  const half3 = attempt(0.1, byTask('1.1').slice(2, 4).map((q) => ans(q.id, true)), { mode: 'diagnostic', diagnostic: true });
+  const atts3 = regradeAttempts([half1, half2, later, half3], bank, cfg);
+  const r3 = onboarding.onboardingPlan({ ...ctx, attempts: atts3, states: stats.computeStates(atts3, cfg, NOW) }, { now: NOW + 120_000 });
+  assert.equal(r3.created, true);
+  assert.deepEqual(splitFrontMatter(fs.readFileSync(abs, 'utf8')).data.source_attempts, [half1.id, half2.id, half3.id]);
+  assert.equal(r3.tasks.find((x) => x.task === '1.1')!.status, 'partial');
+  assert.equal(fs.readdirSync(PLANS_DIR).filter((f) => f.endsWith('.md')).length, 1);
+  // explicit attempt id: unknown → 404; a non-diagnostic attempt is used on its own
+  assert.throws(() => onboarding.onboardingPlan(ctx, { attemptId: 'nope', now: NOW }), (e: Error & { status?: number }) => e.status === 404);
+  assert.deepEqual(onboarding.diagnosticSource(atts, later.id).map((a) => a.id), [later.id]);
+  assert.deepEqual(onboarding.diagnosticSource(atts, half2.id).map((a) => a.id), [half1.id, half2.id]);
+  assert.deepEqual(onboarding.diagnosticSource(atts, half1.id).map((a) => a.id), [half1.id, half2.id], 'either part finds the other, oldest first');
+  assert.deepEqual(onboarding.diagnosticSource([later]).map((a) => a.id), [later.id], 'no diagnostic → what there is');
+  fs.rmSync(PLANS_DIR, { recursive: true, force: true });
 });

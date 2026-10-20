@@ -11,9 +11,13 @@ import { RatingButtons } from '../components/RatingButtons.tsx';
 import { AttemptBadges, ColumnChart, KvRow, TaskBadge, pctOf } from '../components/insights.tsx';
 import { BarList, ChartCard, Meter } from '../components/charts.tsx';
 import { Empty, ErrorBox, Loading, Tabs, toast } from '../components/ui.tsx';
+import { StartMap } from '../components/onboarding/StartMap.tsx';
+import { freshSplit, isDiagnostic, isExamLike, noVerdict } from '../components/onboarding/rules.ts';
+import { useStudyStart } from '../components/onboarding/useStudyStart.ts';
 import { MODE_INFO, FEEDBACK_INFO } from '../../shared/labels.ts';
 import { isCorrect, normalizeKeys } from '../../shared/scoring.ts';
-import type { AnswerRecord, Attempt, AttemptSummary, BuildTestRequest, Question } from '../../shared/types.ts';
+import { REALISM_LOW_HINT, realismLow, realismText, realismTitle } from '../../shared/realism.ts';
+import type { AnswerRecord, Attempt, AttemptSummary, BuildTestRequest, Question, ResultAnnotations } from '../../shared/types.ts';
 
 type Filter = 'all' | 'wrong' | 'right' | 'flag' | 'slow' | 'pilot' | 'elim';
 
@@ -231,7 +235,11 @@ function WhyNote({ attemptId, r, value, onSaved }: { attemptId: string; r: Answe
 
 export function ResultPage({ id }: { id: string }) {
   const { meta, topic } = useData();
-  const { data, error, loading } = useFetch<{ attempt: Attempt; summary: AttemptSummary; questions: (Question | null)[] }>(id ? `/api/results/${encodeURIComponent(id)}` : null, [id]);
+  const { data, error, loading } = useFetch<{ attempt: Attempt; summary: AttemptSummary; questions: (Question | null)[]; annotations?: ResultAnnotations }>(
+    id ? `/api/results/${encodeURIComponent(id)}` : null,
+    [id],
+  );
+  const studyStart = useStudyStart();
   const [filter, setFilter] = useState<Filter>('all');
   const [issueFor, setIssueFor] = useState<string>();
   const [askFor, setAskFor] = useState<{ q: Question; pick?: string }>();
@@ -278,6 +286,17 @@ export function ResultPage({ id }: { id: string }) {
   const regraded = rows.filter((_, i) => versions[i]?.keyChanged).length;
   const flipped = rows.filter(({ r }, i) => versions[i]?.keyChanged && okNow(i) !== r.ok).length;
   const scoredNowCorrect = rows.filter(({ r }, i) => r.scored !== false && okNow(i)).length;
+  // v4: never-viewed answers (no pick, no time), recognition, first vs repeat exposure, realism, verdict rules
+  const ann = data.annotations;
+  const unviewed = new Set(ann?.unviewed ?? ans.filter((r) => !r.pick && !r.t).map((r) => r.q));
+  const recognized = new Set(ann?.recognized ?? []);
+  const diag = isDiagnostic(a);
+  const sealedForm = a.sealedForm ?? (a.mode === 'sealed' ? '?' : undefined);
+  const fresh = (a.mode === 'exam' || a.pearson) && !sealedForm ? freshSplit(a, ann) : undefined;
+  const freshPct = fresh?.answers ? Math.round((fresh.correct / fresh.answers) * 1000) / 10 : undefined;
+  const realism = isExamLike(a) ? a.realism : undefined;
+  const lowRealism = realismLow(realism);
+  const nv = noVerdict(a, studyStart);
 
   const retry = (ids: string[], title: string) => startTest({ mode: 'ids', ids, title, feedback: 'practice', timing: { preset: 'standard' }, shuffleOptions: true });
   const again = () => {
@@ -307,17 +326,35 @@ export function ResultPage({ id }: { id: string }) {
           <h1 className="row" style={{ marginTop: 6, gap: 10 }}>
             <span>{a.title}</span>
             <AttemptBadges a={a} />
+            {sealedForm && (
+              <span className="badge accent" title={`Đề niêm phong${sealedForm !== '?' ? ` ${sealedForm}` : ''}: câu chưa từng xuất hiện khi luyện tập`}>
+                🔒 điểm trên câu mới
+              </span>
+            )}
+            {realism && (
+              <span className={`badge ${lowRealism ? 'warn' : ''}`} title={realismTitle(realism, meta)}>
+                {lowRealism ? '⚠' : '📜'} {realismText(realism)}
+              </span>
+            )}
           </h1>
         </div>
         <div className="row">
           {wrongIds.length > 0 && (
-            <button className="btn primary" onClick={() => retry(wrongIds, `Làm lại ${wrongIds.length} câu sai — ${a.title}`)}>
+            <button className={`btn ${diag ? '' : 'primary'}`} onClick={() => retry(wrongIds, `Làm lại ${wrongIds.length} câu sai — ${a.title}`)}>
               🔁 Làm lại {wrongIds.length} câu sai
             </button>
           )}
-          <button className="btn" onClick={again}>
-            ↻ Làm bài tương tự
-          </button>
+          {sealedForm ? (
+            <button className="btn" onClick={() => navigate('/new?mode=exam')} title="Đề niêm phong chỉ làm một lần — thi thử Pearson trên ngân hàng thường">
+              🎯 Thi thử khác
+            </button>
+          ) : (
+            !diag && (
+              <button className="btn" onClick={again}>
+                ↻ Làm bài tương tự
+              </button>
+            )
+          )}
           <a className="btn ghost" href={href(`/notes?f=${encodeURIComponent('trainer/' + a.file)}`)} title={a.file}>
             📄 File .md
           </a>
@@ -330,18 +367,75 @@ export function ResultPage({ id }: { id: string }) {
           được lưu). Ngưỡng ở <code>trainer/config.yaml</code> → <code>stats.rushed_median_seconds</code>.
         </div>
       )}
+      {sealedForm && (
+        <div className="ins-wrap alert info" style={{ marginBottom: 16 }}>
+          🔒 <b>Đề niêm phong{sealedForm !== '?' ? ` ${sealedForm}` : ''} — điểm trên câu mới.</b> {a.total} câu tính điểm chưa từng xuất hiện khi bạn luyện tập, nên đây là ước tính
+          trung thực nhất về năng lực với câu mới như đề thật. Điểm này nằm trong <a href={href('/stats?focus=exam')}>danh sách điểm thi thử</a> như một điểm hiệu chỉnh nội
+          bộ; các câu của đề nay đã trở lại ngân hàng luyện tập.
+        </div>
+      )}
+      {unviewed.size > 0 && !a.rushed && (
+        <div className="ins-wrap alert small" style={{ marginBottom: 16 }}>
+          👁️ <b>{unviewed.size} câu chưa xem</b> — không tính vào lịch ôn/thống kê (trong điểm bài này vẫn tính là sai).
+        </div>
+      )}
+      {diag && (
+        <section style={{ marginBottom: 22 }}>
+          <StartMap attempt={a} questions={data.questions} />
+        </section>
+      )}
 
       <section className="split-l">
         <div className="card stack">
-          <div className="small muted">Kết quả{a.pearson ? ' (chỉ câu tính điểm)' : ''}</div>
+          <div className="small muted">
+            {sealedForm ? 'Điểm trên câu mới' : diag ? 'Điểm xuất phát' : 'Kết quả'}
+            {a.pearson || sealedForm ? ' (chỉ câu tính điểm)' : ''}
+          </div>
           <div className="row" style={{ alignItems: 'baseline', gap: 12 }}>
             <span className="hero-figure">{a.score}%</span>
-            <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.passed ? '✓ Đạt' : '✗ Chưa đạt'}</span>
+            {!nv ? (
+              <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.passed ? '✓ Đạt' : '✗ Chưa đạt'}</span>
+            ) : nv === 'diagnostic' ? (
+              <span className="badge accent" title="Bài chẩn đoán đo điểm xuất phát theo từng mục exam guide — không xét đạt/chưa đạt">
+                🧭 không xét đạt
+              </span>
+            ) : nv === 'first-week' ? (
+              <span className="badge" title="Trong 7 ngày đầu học, bài ngắn (không phải thi thử) chỉ để làm quen — không xét đạt/chưa đạt">
+                🌱 tuần đầu · không xét đạt
+              </span>
+            ) : null}
           </div>
-          <Meter value={a.score} target={meta.exam.pass_pct} label="Điểm" />
+          <Meter value={a.score} target={nv ? undefined : meta.exam.pass_pct} label="Điểm" />
           <div className="small dim">
-            {a.correct}/{a.total} câu đúng · quy đổi <b>{a.scaled}</b>/1000 (đỗ ≥ {meta.exam.pass_scaled})
+            {a.correct}/{a.total} câu đúng
+            {!nv && (
+              <>
+                {' '}
+                · quy đổi <b>{a.scaled}</b>/1000 (đỗ ≥ {meta.exam.pass_scaled})
+              </>
+            )}
           </div>
+          {nv === 'first-week' && <div className="tiny muted">Tuần đầu: bài ngắn để làm quen, chưa nói lên khả năng đỗ — điểm đạt/chưa đạt dành cho bài thi thử đủ dài.</div>}
+          {fresh && fresh.total > 0 && (
+            <div
+              className={`small ${freshPct !== undefined && fresh.seenBefore * 2 >= fresh.total && a.score - freshPct >= 10 ? 'warn' : 'dim'}`}
+              title="Câu đã gặp trước đây dễ đúng hơn nhờ nhớ — điểm phần câu mới gần với đề thật hơn"
+            >
+              🔁 Đã gặp <b className="num">{fresh.seenBefore}/{fresh.total}</b> câu
+              {freshPct !== undefined ? (
+                <>
+                  {' '}
+                  · điểm phần câu mới <b className="num">{freshPct}%</b>{' '}
+                  <span className="muted">
+                    ({fresh.correct}/{fresh.answers})
+                  </span>
+                </>
+              ) : (
+                ' · không có câu mới'
+              )}
+            </div>
+          )}
+          {lowRealism && <div className="small warn">⚠ {REALISM_LOW_HINT}</div>}
           {pilots > 0 && (
             <div className="ins-wrap alert info small">
               🧪 <b>
@@ -360,7 +454,10 @@ export function ResultPage({ id }: { id: string }) {
             <KvRow k="TB mỗi câu (bạn / chuẩn)">
               {avgT}s / {avgEst}s
             </KvRow>
-            <KvRow k="Bỏ trống">{blank}</KvRow>
+            <KvRow k="Bỏ trống">
+              {blank}
+              {unviewed.size > 0 && <span className="muted" title="Không chọn, 0 giây — không tính vào lịch ôn/thống kê"> · {unviewed.size} chưa xem</span>}
+            </KvRow>
             {unsure.length > 0 && (
               <KvRow k="🤔 Chưa chắc → đúng" title="Bạn đánh dấu “chưa chắc” — bao nhiêu câu trong số đó thực ra đúng">
                 {unsure.filter((r) => r.ok).length}/{unsure.length}
@@ -464,6 +561,16 @@ export function ResultPage({ id }: { id: string }) {
                     {versions[n - 1]?.keyChanged && (
                       <span className="badge warn" title="Đáp án đã được sửa sau bài này — thống kê tính theo đáp án hiện tại">
                         ↻ chấm lại: {versions[n - 1]!.nowOk ? 'đúng' : 'sai'}
+                      </span>
+                    )}
+                    {unviewed.has(r.q) && (
+                      <span className="badge" title="Không chọn, 0 giây — không tính vào lịch ôn/thống kê (vẫn tính là sai trong điểm bài này)">
+                        👁️ chưa xem
+                      </span>
+                    )}
+                    {recognized.has(r.q) && (
+                      <span className="badge" title="Gặp lại và trả lời đúng nhanh hơn thời gian đọc đề — có thể bạn nhận ra đáp án thay vì suy luận; lượt này không được chấm “Dễ” và chỉ tính nhẹ vào mức sẵn sàng">
+                        ⚡ nhận diện
                       </span>
                     )}
                     {r.flag && <span className="badge warn">🚩 cờ</span>}

@@ -20,6 +20,20 @@ export const MODE_INFO: Record<TestMode, ModeInfo> = {
   quick: { icon: '⚡', label: 'Luyện nhanh', desc: '10 câu ngẫu nhiên, xem đáp án ngay sau mỗi câu.' },
   coach: { icon: '🤖', label: 'Kế hoạch AI Coach', desc: 'Phiên luyện do AI Coach đề xuất sau khi phân tích kết quả.' },
   ids: { icon: '📌', label: 'Danh sách chọn sẵn', desc: 'Một danh sách câu cụ thể (chọn từ ngân hàng hoặc màn hình kết quả).' },
+  sealed: { icon: '🔒', label: 'Đề niêm phong', desc: 'Mô phỏng Pearson với 50 câu chưa từng xuất hiện khi luyện — đo năng lực thật trên câu mới.' },
+  diagnostic: { icon: '🧭', label: 'Chẩn đoán đầu vào', desc: '2 câu cho mỗi mục exam guide 1.1–4.4 (28 câu) — bản đồ xuất phát theo task.' },
+};
+
+/** Requirement categories of a stem (Question.requirements, SelectionFilters.requirements, stats byRequirement), display order. */
+export const REQUIREMENTS = ['cost', 'ops', 'resilient', 'performance', 'secure', 'negative'] as const;
+
+export const REQUIREMENT_INFO: Record<string, ModeInfo> = {
+  cost: { icon: '💰', label: 'Chi phí', desc: 'Đề hỏi phương án tiết kiệm nhất (MOST cost-effective, lowest cost…).' },
+  ops: { icon: '⚙️', label: 'Vận hành', desc: 'Đề hỏi phương án ít công vận hành nhất (LEAST operational overhead, fully managed…).' },
+  resilient: { icon: '🛟', label: 'Sẵn sàng cao', desc: 'Đề hỏi tính sẵn sàng / chịu lỗi / khôi phục (highly available, fault-tolerant, RPO/RTO…).' },
+  performance: { icon: '🚀', label: 'Hiệu năng', desc: 'Đề hỏi độ trễ / thông lượng (lowest latency, high throughput…).' },
+  secure: { icon: '🔐', label: 'Bảo mật', desc: 'Đề hỏi phương án an toàn nhất (MOST secure, least privilege, encryption…).' },
+  negative: { icon: '⛔', label: 'Phủ định', desc: 'Câu hỏi phủ định (NOT / EXCEPT / LEAST…) — dễ đọc nhầm.' },
 };
 
 export const FEEDBACK_INFO: Record<FeedbackMode, ModeInfo> = {

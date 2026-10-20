@@ -38,6 +38,8 @@ export interface Question {
   words: number; // computed: words in the stem
   longForm: boolean; // computed: stem ≥ timing.long_form_min_words (exam-realistic length)
   hash: string; // computed: short hash of stem + options + answer (patch base check, change detection)
+  requirements?: string[]; // computed: requirement categories the stem asks for (taxonomy.keywords groups: cost, ops, resilient, performance, secure, negative)
+  outOfScope?: boolean; // computed: a correct option names a service the official exam guide lists as out of scope
   file: string; // path relative to trainer/
   line: number;
 }
@@ -113,7 +115,7 @@ export interface Taxonomy {
   difficulties: { id: Difficulty; label: string }[];
   topics: TopicDef[];
   timing: TimingRubric;
-  services: Record<string, { topic: string; match: string[] }>;
+  services: Record<string, { topic: string; match: string[]; scope?: 'in' | 'out'; aliases?: string[] }>; // [γ] scope: out = official out-of-scope list · aliases = official / renamed names
   features: Record<string, string[]>;
   tasks: TaskDef[];
   keywords: Record<string, string[]>; // category → phrases to highlight (qualifier, cost, ops, resilient, performance, secure)
@@ -134,7 +136,9 @@ export type TestMode =
   | 'slow' // answered slower than the estimate
   | 'quick' // 10-question sprint
   | 'coach' // session from an AI coach plan
-  | 'ids'; // explicit list (review page, bank selection)
+  | 'ids' // explicit list (review page, bank selection)
+  | 'sealed' // one sealed form: questions never seen in practice, scored as "điểm trên câu mới"
+  | 'diagnostic'; // first-day diagnostic: 2 questions per exam-guide task
 
 export type FeedbackMode = 'exam' | 'practice';
 
@@ -147,6 +151,7 @@ export interface SelectionFilters {
   services?: string[];
   tags?: string[];
   tasks?: string[];
+  requirements?: string[]; // Question.requirements categories
   search?: string;
 }
 
@@ -158,11 +163,12 @@ export interface BuildTestRequest {
   plan?: string; // "<planId>#<sessionId>"
   title?: string;
   feedback?: FeedbackMode;
-  timing?: { preset: string; minutes?: number };
+  timing?: { preset: string; minutes?: number; esl?: boolean }; // esl: × 160/130 on realistic/official (default: goal.esl)
   shuffleQuestions?: boolean;
   shuffleOptions?: boolean; // default: config practice.shuffle_options (true)
   pearson?: boolean; // exam simulation 2.0: 15 unscored items, end review screen, no pause, official timing
   recallFirst?: boolean; // hide options until the learner writes what they think the answer is
+  form?: string; // mode 'sealed': sealed form id (e.g. "S1")
 }
 
 export interface TestQuestionRef {
@@ -186,6 +192,16 @@ export interface TestSession {
   pearson?: boolean;
   unscored?: string[]; // ids of pilot (unscored) questions — only revealed after the test
   recallFirst?: boolean;
+  sealedForm?: string; // mode 'sealed': the form these questions come from
+  realism?: TestRealism; // how close the test is to the real exam (long scenario items, reading load)
+  diagnostic?: boolean; // first-day diagnostic (2 per task)
+}
+
+export interface TestRealism {
+  items: number; // exam-like questions (long scenario stem, full-sentence options)
+  total: number; // questions in the test
+  words: number; // words to read (stems + options)
+  referenceWords: number; // words of a real exam of the same length (≈ 115 per question)
 }
 
 export interface AnswerInput {
@@ -198,6 +214,7 @@ export interface AnswerInput {
   recall?: string; // recall-first: what the learner wrote before seeing the options
   hinted?: boolean; // the hint was opened
   why?: string; // learner's reason for the chosen answer (written after seeing it was wrong)
+  rt?: number; // practice mode: seconds spent reading the feedback after "Kiểm tra" (not part of t)
 }
 
 export interface SubmitRequest {
@@ -226,6 +243,10 @@ export interface AnswerRecord {
   scored?: boolean; // false = pilot (unscored) question in a pearson exam
   h?: string; // Question.hash when graded (item versioning — tells which version of the question was answered)
   regraded?: boolean; // computed on load, never stored: `ok` re-evaluated because the answer key changed since
+  rt?: number; // practice mode: seconds spent reading the feedback after answering (excluded from t)
+  unviewed?: boolean; // computed: no pick and t = 0 — the question was never shown long enough to answer (not a review)
+  exposure?: number; // computed: 1 = first time this question was answered, 2 = second time, …
+  recognized?: boolean; // computed: a repeat answered correctly faster than reading the question (likely recognition)
 }
 
 export interface Attempt {
@@ -252,6 +273,10 @@ export interface Attempt {
   pearson?: boolean;
   pilotTotal?: number; // unscored questions (pearson); total/correct/score cover scored ones only
   pilotCorrect?: number;
+  sessionId?: string; // TestSession.sessionId — submitting the same session twice returns the stored attempt
+  sealedForm?: string; // mode 'sealed'
+  realism?: TestRealism;
+  diagnostic?: boolean;
   rushed?: boolean; // computed on load: median time per answer below stats.rushed_median_seconds
   medianTime?: number; // computed on load
 }
@@ -347,6 +372,30 @@ export interface StatsResponse {
   forecast?: ExamForecast; // expected score on the exam date
   external?: ExternalScore[]; // scores logged from official / third-party practice exams
   externalCalibration?: ExternalCalibration;
+  unviewed?: number; // answers never viewed (excluded from learning stats; still wrong in the test score)
+  exposure?: ExposureSplit; // first-time vs repeat accuracy (memorisation gap)
+  byRequirement?: Bucket[]; // accuracy by what the stem asks for (cost, ops, resilient, performance, secure, negative)
+  confusions?: ConfusionPair[]; // confirmed service confusions (normalised by co-occurrence)
+}
+
+export interface ExposureSplit {
+  days: number; // window (recent days)
+  first: { answers: number; correct: number }; // first exposure to a question
+  repeat: { answers: number; correct: number }; // second+ exposure
+  recognized: number; // repeat answers flagged as recognition (faster than reading)
+}
+
+export interface ConfusionPair {
+  picked: string; // service/feature term the learner chose (in a distractor)
+  correct: string; // term in the correct option
+  picks: number; // times the distractor with `picked` was chosen when `correct` was the key
+  exposures: number; // times both appeared that way in answered questions
+  questions: number; // distinct questions behind the picks
+  rate: number; // picks / exposures
+  low: number; // lower bound (80 %) of the rate
+  base: number; // learner's overall wrong-pick rate (baseline)
+  ids: string[]; // bank questions containing both terms (drill set)
+  merged?: string[]; // [β1] pairs with the same root folded into this one ("DataSync ⟶ cdc-replication")
 }
 
 // ── AI coach ────────────────────────────────────────────────────────────────
@@ -443,6 +492,8 @@ export interface BankQuality {
   distractors?: DistractorReport; // option pick / strike-out analytics from the learner's answers
   semantic?: SemanticStatus; // local embedding provider used for semantic duplicates
   verification?: VerifySummary; // blind-solve verdicts (second model answers without the key)
+  sealed?: number; // [γ] questions held back in sealed forms — left out of every number and list above
+  scope?: ScopeReport; // [γ] questions that name services the exam guide lists as out of scope
 }
 
 export interface EnrichStatus {
@@ -580,7 +631,7 @@ export interface FsrsInfo {
   metrics?: { logLoss?: number; rmse?: number; defaultLogLoss?: number; defaultRmse?: number };
   optimizer: 'available' | 'unavailable'; // optional native optimizer package installed?
   mode?: 'auto' | 'manual' | 'off'; // srs.optimize
-  historyReviews?: number; // reviews in the optimizer's training set now (rushed attempts and never-viewed blanks left out; the scheduler still counts blanks)
+  historyReviews?: number; // reviews in the optimizer's training set now (rushed attempts and never-viewed blanks left out, like the scheduler)
   trainingItems?: number; // optimizer items they make (reviews ≥ 1 day after the previous answer)
   adopted?: boolean; // the last optimization predicts the history better than the defaults → used
   running?: boolean; // an optimization is running in the background
@@ -600,6 +651,13 @@ export interface WorkloadDay {
 export interface ExamGoal {
   examDate?: string; // YYYY-MM-DD
   targetScaled?: number; // default taxonomy exam.pass_scaled
+  minutesPerDay?: number; // study budget (onboarding)
+  restDays?: number[]; // 0 = Sunday … 6 = Saturday
+  studyTime?: string; // HH:MM preferred study time (reminders)
+  examTime?: string; // HH:MM booked exam time (rehearsal at the same hour)
+  delivery?: 'online' | 'center'; // Pearson VUE OnVUE or test centre
+  esl?: boolean; // ESL +30 accommodation requested (exam taken in English)
+  checklist?: Record<string, boolean>; // exam-day checklist items ticked by the learner
 }
 
 export interface ExamForecast {
@@ -625,6 +683,8 @@ export interface ExternalScore {
   readinessAtDate?: number; // app readiness on that date (computed)
   note?: string;
   file: string;
+  internal?: boolean; // a used sealed form of this app ("điểm trên câu mới"), not an external exam — cannot be deleted
+  attempt?: string; // internal: the attempt id (results/…)
 }
 
 export interface ExternalCalibration {
@@ -641,9 +701,63 @@ export interface ProgressResponse {
   workload: WorkloadDay[];
   goal: ExamGoal;
   forecast?: ExamForecast; // needs goal.examDate
-  external: ExternalScore[]; // newest first
+  external: ExternalScore[]; // newest first (external scores + used sealed forms with internal: true)
   externalCalibration?: ExternalCalibration;
   regraded?: number; // answers re-graded against a changed answer key (non-rushed attempts)
+  sealed?: SealedFormProgress[]; // sealed forms (no question ids), in form order
+  checklist?: ChecklistItem[]; // exam-day checklist (due dates need goal.examDate)
+  checklistChecked?: string; // YYYY-MM-DD the official policy links were last checked
+  studyStart?: string; // YYYY-MM-DD of the first non-rushed attempt
+}
+
+/** One sealed form as GET /api/progress shows it: status, size, when to take it, score once used. */
+export interface SealedFormProgress {
+  id: string; // "S1"
+  status: 'sealed' | 'used' | 'released';
+  count: number; // scored questions in the form
+  suggested?: string; // YYYY-MM-DD (status sealed + goal.examDate): form 1 ≈ exam − 21 days, last form ≈ exam − 7, never before today
+  due?: boolean; // suggested date reached and the form is still sealed
+  usedAt?: string; // ISO time the form was taken
+  attempt?: string; // attempt id that used it
+  score?: number; // % on the form's scored questions (status used)
+  scaled?: number;
+}
+
+/** Exam-day logistics (ESL +30, booking, ID, reschedule deadline, OnVUE system test, …). Ticks live in results/goal.md. */
+export interface ChecklistItem {
+  id: string; // stable: esl, booked, id-name, reschedule, system-test, center, rehearsal, after
+  label: string; // Vietnamese, one line
+  done: boolean;
+  due?: string; // YYYY-MM-DD relative to goal.examDate
+  dueText: string; // when, in words ("trước khi đặt lịch", "1 ngày trước ngày thi")
+  overdue?: boolean; // due date passed and not done
+  link?: string; // official policy page
+  hint?: string; // one-line detail
+}
+
+/** POST /api/onboarding/plan {attemptId?} — the deterministic week-1 plan (coach/plans/<date>-onboarding.md). */
+export interface OnboardingPlanResponse {
+  plan: PlanSummary; // trigger 'onboarding'
+  created: boolean; // false = today's plan for the same diagnostic already existed (returned unchanged)
+  tasks: OnboardingTask[]; // per exam-guide task, weakest (highest priority) first
+}
+
+export interface OnboardingTask {
+  task: string; // "1.1" … "4.4"
+  label: string;
+  domain: string;
+  answers: number; // diagnostic answers (viewed)
+  correct: number;
+  status: 'ok' | 'partial' | 'weak' | 'untested'; // all right · some right · none right · no answer
+  priority: number; // task weight × (1 − smoothed accuracy)
+}
+
+/** GET /api/results/:id → `annotations` (computed from the history; the stored attempt is returned as graded). */
+export interface ResultAnnotations {
+  exposure: Record<string, number>; // qid → 1 = first time answered, 2 = second time, … (viewed answers of non-rushed attempts)
+  recognized: string[]; // repeats answered right faster than reading the question (likely recognition)
+  unviewed: string[]; // never viewed (no pick, no time): not reviews, left out of stats — still wrong in the score
+  fresh?: { total: number; seenBefore: number; answers: number; correct: number }; // scored answers: seen before vs first time (as graded)
 }
 // ── [L] end ──
 
@@ -804,3 +918,51 @@ export interface AnkiPushResult {
   hint?: string;
 }
 // ── [X] end ──
+
+// ═══ v4 contracts (waves A + B) ═══
+
+export interface SealedForm {
+  id: string; // "S1", "S2"
+  ids: string[]; // question ids (scored items of the sealed exam)
+  status: 'sealed' | 'used' | 'released';
+  usedAt?: string; // ISO time the form was taken (status used)
+  attempt?: string; // attempt id that used it
+  releasedAt?: string; // [γ] ISO time the learner opened the form early (status released)
+}
+
+export interface SealedState {
+  forms: SealedForm[];
+  size: number; // questions per form
+  file?: string; // path relative to the data root (results/sealed.md)
+}
+
+// ── [γ] sealed forms API (GET /api/sealed, POST /api/sealed/release | create) — never any question id ──
+
+/** One sealed form without its question ids (same shape as /api/meta `sealed`, plus releasedAt). */
+export interface SealedFormSummary {
+  id: string;
+  status: SealedForm['status'];
+  count: number; // questions in the form
+  usedAt?: string;
+  attempt?: string;
+  releasedAt?: string;
+}
+
+/** [γ] Bank → Chất lượng → 🎯 Phạm vi đề thi: active questions (not sealed) naming out-of-scope services. */
+export interface ScopeReport {
+  services: { name: string; topic: string; aliases?: string[]; answers: number; distractors: number }[]; // taxonomy services with scope: out
+  answer: { id: string; services: string[] }[]; // a correct option names an out-of-scope service (Question.outOfScope)
+  distractor: { id: string; options: { key: string; services: string[] }[] }[]; // only distractors do (correct options in scope)
+  excluded: boolean; // config practice.exclude_out_of_scope: `answer` questions are left out of practice modes
+}
+
+/** Body of GET /api/sealed and of the release / create routes (which add `released` / `created`). */
+export interface SealedStatus {
+  forms: SealedFormSummary[];
+  size: number; // questions per form (0 = no forms)
+  file?: string; // results/sealed.md when it exists
+  sealed: number; // questions held back right now (forms with status 'sealed')
+  released?: string; // POST /api/sealed/release: the form just opened
+  created?: string[]; // POST /api/sealed/create: the new form ids
+  notes?: string[]; // POST /api/sealed/create: warnings (a form came out smaller than asked, …)
+}

@@ -29,16 +29,18 @@ const cfg: AppConfig = {
     enrich_batch_size: 20,
     max_runs_per_day: 6,
     structured_output: true,
+      enrich_after_analyze: false,
     verify: { auto: false, auto_draft: false, batch_size: 10 },
   },
   srs: { algorithm: 'leitner', desired_retention: 0.9, daily_limit: 50, mastered_stability_days: 21, intervals_days: [1, 3, 7, 14, 30], mastered_box: 4, weights: [], optimize: 'off', optimize_min_reviews: 400 },
-  practice: { default_count: 20, quick_count: 10, shuffle_options: true },
-  stats: { rushed_median_seconds: 5, recency_half_life_days: 14 },
+  practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false },
+    exam: { sealed_forms: 0, sealed_size: 50 },
+  stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300 },
   quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88 },
   server: { lan: false },
   export: { anki_deck: 'test', ankiconnect_url: '' },
   cache: { sqlite: false },
-  sync: { data_paths: [], before_ai: false, after_ai: false },
+  sync: { data_paths: [], before_ai: false, after_ai: false, auto: 'off', auto_delay_minutes: 4 },
 };
 
 const words = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(' ');

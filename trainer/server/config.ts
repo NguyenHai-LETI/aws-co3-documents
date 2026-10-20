@@ -51,6 +51,7 @@ export interface AppConfig {
     enrich_batch_size: number;
     max_runs_per_day: number; // safety cap for scheduled runs
     structured_output: boolean; // generate / enrich / longform return JSON (--json-schema) and the app writes the files
+    enrich_after_analyze: boolean; // after an analyze run, enrich ~10 questions the learner is about to meet
     verify: {
       auto: boolean; // blind-solve new and just-edited questions after AI runs
       auto_draft: boolean; // mismatch / ambiguous verdict on an AI-written question → status: draft until reviewed
@@ -68,8 +69,9 @@ export interface AppConfig {
     optimize: 'auto' | 'manual' | 'off'; // fit personal FSRS parameters from the review history
     optimize_min_reviews: number; // reviews needed before optimizing
   };
-  practice: { default_count: number; quick_count: number; shuffle_options: boolean };
-  stats: { rushed_median_seconds: number; recency_half_life_days: number };
+  practice: { default_count: number; quick_count: number; shuffle_options: boolean; exclude_out_of_scope: boolean };
+  exam: { sealed_forms: number; sealed_size: number }; // sealed forms: questions held back from practice to measure readiness on unseen items
+  stats: { rushed_median_seconds: number; recency_half_life_days: number; recognized_wpm: number };
   quality: {
     embeddings: 'auto' | 'ollama' | 'off'; // semantic duplicates with a local embedding model (auto = Ollama when it runs)
     ollama_url: string;
@@ -90,6 +92,8 @@ export interface AppConfig {
     data_paths: string[];
     before_ai: boolean; // AI coach runs sync first, so the AI sees results / bank changes from the other machine
     after_ai: boolean; // ...and push what a successful run wrote (plans, packs, patches, profile) right away
+    auto: 'idle' | 'off'; // sync on its own a few minutes after a submitted test (and pull at start / push at shutdown)
+    auto_delay_minutes: number;
   };
 }
 
@@ -108,6 +112,7 @@ const DEFAULT_CONFIG: AppConfig = {
     enrich_batch_size: 20,
     max_runs_per_day: 6,
     structured_output: true,
+    enrich_after_analyze: false,
     verify: { auto: true, auto_draft: true, batch_size: 10 },
   },
   srs: {
@@ -121,13 +126,14 @@ const DEFAULT_CONFIG: AppConfig = {
     optimize: 'auto',
     optimize_min_reviews: 400,
   },
-  practice: { default_count: 20, quick_count: 10, shuffle_options: true },
-  stats: { rushed_median_seconds: 5, recency_half_life_days: 14 },
+  practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true },
+  exam: { sealed_forms: 2, sealed_size: 50 },
+  stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300 },
   quality: { embeddings: 'auto', ollama_url: 'http://127.0.0.1:11434', embedding_model: 'embeddinggemma', semantic_threshold: 0.88 },
   server: { lan: false },
   export: { anki_deck: 'AWS SAA-C03', ankiconnect_url: 'http://127.0.0.1:8765' },
   cache: { sqlite: true },
-  sync: { data_paths: ['trainer/results', 'trainer/coach', 'trainer/bank'], before_ai: true, after_ai: true },
+  sync: { data_paths: ['trainer/results', 'trainer/coach', 'trainer/bank'], before_ai: true, after_ai: true, auto: 'idle', auto_delay_minutes: 4 },
 };
 
 export function loadConfig(): AppConfig {
@@ -144,6 +150,7 @@ export function loadConfig(): AppConfig {
     coach,
     srs: { ...DEFAULT_CONFIG.srs, ...(raw.srs ?? {}) },
     practice: { ...DEFAULT_CONFIG.practice, ...(raw.practice ?? {}) },
+    exam: { ...DEFAULT_CONFIG.exam, ...(raw.exam ?? {}) },
     stats: { ...DEFAULT_CONFIG.stats, ...(raw.stats ?? {}) },
     quality: { ...DEFAULT_CONFIG.quality, ...(raw.quality ?? {}) },
     server: { ...DEFAULT_CONFIG.server, ...(raw.server ?? {}) },

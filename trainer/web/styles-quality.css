@@ -11,6 +11,14 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
+.qq-todo {
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* [γ] + 🎯 Phạm vi đề thi */
+}
+@media (max-width: 1180px) {
+  .qq-todo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 @media (max-width: 960px) {
   .qq-todo,
   .ins-qkpis.qq-vkpis {
@@ -266,4 +274,37 @@
   flex-wrap: nowrap;
   gap: 8px;
   align-items: baseline;
+}
+
+/* [γ] 🎯 exam scope: out-of-scope services as compact chips (name · answers · distractors) */
+.sc-services {
+  gap: 6px;
+  margin-top: 10px;
+}
+.sc-service {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* [γ] 🔒 sealed questions: Bank header note and the locked question drawer */
+.sc-sealed-note {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+.sc-locked {
+  padding: 18px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  text-align: center;
+}
+.sc-locked .sc-lock-icon {
+  font-size: 34px;
+  line-height: 1;
 }

@@ -14,6 +14,7 @@ import { LintSection } from '../components/quality/LintSection.tsx';
 import { DistractorSection } from '../components/quality/DistractorSection.tsx';
 import { DuplicateSection } from '../components/quality/DuplicateSection.tsx';
 import { VerifySection } from '../components/quality/VerifySection.tsx';
+import { ScopeSection } from '../components/quality/ScopeSection.tsx';
 import { QuestionQuality } from '../components/quality/QuestionQuality.tsx';
 import { startVerify, useAiReady } from '../components/quality/common.tsx';
 import { applyFilters, isDueState, isMasteredState } from '../../shared/filters.ts';
@@ -23,8 +24,8 @@ import type { Meta } from '../lib/store.tsx';
 
 type Tab = 'questions' | 'packs' | 'quality' | 'health' | 'issues';
 const TABS: Tab[] = ['questions', 'packs', 'quality', 'health', 'issues'];
-type QSec = 'overview' | 'lint' | 'distractors' | 'dups' | 'verify'; // sections of the 📐 Chất lượng tab (?sec=)
-const QSECS: QSec[] = ['overview', 'lint', 'distractors', 'dups', 'verify'];
+type QSec = 'overview' | 'lint' | 'distractors' | 'dups' | 'verify' | 'scope'; // sections of the 📐 Chất lượng tab (?sec=)
+const QSECS: QSec[] = ['overview', 'lint', 'distractors', 'dups', 'verify', 'scope'];
 type Progress = '' | 'unseen' | 'wrong' | 'due' | 'mastered' | 'flagged';
 type Feature = '' | 'long' | 'short' | 'hint' | 'nohint' | 'enriched' | 'notenriched' | 'notask' | 'shortexpl' | 'longest';
 const FEATURES: { id: Feature; label: string }[] = [
@@ -78,13 +79,40 @@ function ProgressBadge({ s, meta }: { s?: QuestionState; meta?: Meta }) {
   );
 }
 
+/** [γ] A sealed question opened by id (link, issue list…): its content stays hidden until the form is taken or opened early. */
+function SealedDrawer({ onClose }: { onClose: () => void }) {
+  return (
+    <Drawer open onClose={onClose}>
+      <div className="stack">
+        <div className="sc-locked stack sm">
+          <div className="sc-lock-icon" aria-hidden="true">
+            🔒
+          </div>
+          <b>Câu này đang niêm phong</b>
+          <div className="small dim">
+            Câu thuộc một đề niêm phong — được giữ kín (không luyện, không tìm kiếm, không xuất Anki) để điểm của đề đo năng lực trên câu bạn chưa từng gặp. Làm đề
+            niêm phong hoặc “Mở sớm” ở trang Thống kê thì câu trở lại ngân hàng.
+          </div>
+          <div>
+            <a className="btn sm" href={href('/stats')} onClick={onClose}>
+              📊 Đến trang Thống kê
+            </a>
+          </div>
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+
 function QuestionDrawer({ q, onClose, onIssue, onAsk }: { q: Question | undefined; onClose: () => void; onIssue: (id: string) => void; onAsk: (q: Question) => void }) {
   const { state, bank, meta, task } = useData();
   const [reveal, setReveal] = useState(false);
   useEffect(() => setReveal(false), [q?.id]);
   if (!q) return null;
+  const sealed = new Set(bank?.sealed ?? []);
+  if (sealed.has(q.id)) return <SealedDrawer onClose={onClose} />;
   const s = state?.states[q.id];
-  const variants = (bank?.questions ?? []).filter((x) => x.variantOf.includes(q.id));
+  const variants = (bank?.questions ?? []).filter((x) => x.variantOf.includes(q.id) && !sealed.has(x.id));
   const t = task(q.task);
   return (
     <Drawer open onClose={onClose}>
@@ -175,10 +203,10 @@ function QuestionDrawer({ q, onClose, onIssue, onAsk }: { q: Question | undefine
           <div>
             Đề {q.words ?? countWords(q.stem)} từ{q.longForm ? ' · 📜 câu dài (giống đề thật)' : ''} · gợi ý: {q.hint ? 'có' : 'chưa'} · ENRICH: {q.enriched ?? 'chưa'}
           </div>
-          {q.variantOf.length > 0 && (
+          {q.variantOf.some((v) => !sealed.has(v)) && (
             <div>
               Biến thể của:{' '}
-              {q.variantOf.map((v) => (
+              {q.variantOf.filter((v) => !sealed.has(v)).map((v) => (
                 <a key={v} href={href(`/bank?q=${encodeURIComponent(v)}`)} style={{ marginRight: 8 }}>
                   <code>{v}</code>
                 </a>
@@ -301,6 +329,7 @@ function QualityTab({
     { id: 'distractors', label: '🎯 Phương án nhiễu', count: qd.distractors ? qd.distractors.weakDistractors.length + qd.distractors.suspectedKeys.length : undefined },
     { id: 'dups', label: '👯 Câu trùng', count: qd.duplicates.length },
     { id: 'verify', label: '🧪 Giải mù', count: qd.verification?.review },
+    { id: 'scope', label: '🎯 Phạm vi đề thi', count: qd.scope ? qd.scope.answer.length + qd.scope.distractor.length : undefined },
   ];
   return (
     <div className="stack">
@@ -316,6 +345,7 @@ function QualityTab({
       {sec === 'distractors' && <DistractorSection report={qd.distractors} onOpen={onOpen} onIssue={onIssue} />}
       {sec === 'dups' && <DuplicateSection pairs={qd.duplicates} semantic={qd.semantic} onOpenPair={onOpenPair} onChanged={reload} />}
       {sec === 'verify' && <VerifySection summary={qd.verification} selected={selected} onOpen={onOpen} onIssue={onIssue} onChanged={reload} />}
+      {sec === 'scope' && <ScopeSection report={qd.scope} onOpen={onOpen} onChanged={reload} />}
     </div>
   );
 }
@@ -339,10 +369,16 @@ function QualityOverview({ qd, onFeature, onSec }: { qd: BankQuality; onFeature:
   const dr = qd.distractors;
   const vs = qd.verification;
   const sem = qd.semantic;
+  const sc = qd.scope;
   const semantic = qd.duplicates.filter((d) => d.kind === 'semantic').length;
 
   return (
     <div className="stack">
+      {!!qd.sealed && (
+        <div className="small muted sc-sealed-note">
+          🔒 {qd.sealed} câu đang niêm phong không được tính trong mọi số liệu và danh sách của mục Chất lượng.
+        </div>
+      )}
       <div className="ins-qkpis">
         <QTile
           label="📜 Câu dài (giống đề thật)"
@@ -393,6 +429,13 @@ function QualityOverview({ qd, onFeature, onSec }: { qd: BankQuality; onFeature:
             sub={vs ? `chờ duyệt · ${vs.verified} câu đã kiểm · ${vs.ok} khớp` : 'server chưa hỗ trợ'}
             status={vs?.review ? 'warn' : undefined}
             onClick={() => onSec('verify')}
+          />
+          <QTile
+            label="🎯 Phạm vi đề thi"
+            value={sc ? sc.answer.length : '—'}
+            sub={sc ? `câu có đáp án ngoài phạm vi · ${sc.distractor.length} câu có phương án nhiễu ngoài phạm vi` : 'server chưa hỗ trợ'}
+            status={sc?.answer.length ? 'warn' : undefined}
+            onClick={() => onSec('scope')}
           />
         </div>
       </div>

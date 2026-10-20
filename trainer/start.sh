@@ -2,12 +2,16 @@
 # Start the SAA-C03 Trainer and open the browser (macOS / Linux). Usage: ./start.sh [--lan]   (PORT=4000 ./start.sh)
 # --lan (or LAN=1): also open it to phones on the same Wi-Fi (access code / QR on the 🧰 Công cụ page).
 # Installs npm packages when needed; if the app is already running, just opens it (and turns LAN access on if asked).
+# Exit code 75 from the server = "restart me": ⇅ Đồng bộ brought newer app code and the learner pressed "Khởi động lại" —
+# the loop below runs npm install when package-lock.json changed, then starts the server again (the open page reloads).
 cd "$(dirname "$0")" || exit 1
 PORT="${PORT:-3003}"
 URL="http://localhost:$PORT"
 WANT_LAN=0
 for a in "$@"; do [ "$a" = "--lan" ] && WANT_LAN=1; done
 case "${LAN:-}" in 1|true|yes|on) WANT_LAN=1 ;; esac
+RESTART_CODE=75
+NPM="${TRAINER_NPM:-npm}" # tests substitute a fake npm
 
 pause_on_error() {
   # start.command (double-click) sets TRAINER_PAUSE=1 so the Terminal window stays readable
@@ -55,14 +59,33 @@ fi
 
 # npm install when node_modules is missing or package-lock.json changed since the last install (e.g. after a sync).
 STAMP="node_modules/.trainer-lock.json"
-if [ ! -d node_modules ] || ! cmp -s package-lock.json "$STAMP"; then
-  echo "→ Cài thư viện (npm install)…"
-  if ! PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-audit --no-fund; then
-    echo "✗ npm install thất bại — kiểm tra mạng rồi chạy lại."
-    pause_on_error
+ensure_deps() {
+  if [ ! -d node_modules ] || ! cmp -s package-lock.json "$STAMP"; then
+    echo "→ Cài thư viện (npm install)…"
+    if ! PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 "$NPM" install --no-audit --no-fund; then
+      echo "✗ npm install thất bại — kiểm tra mạng rồi chạy lại."
+      return 1
+    fi
+    cp package-lock.json "$STAMP" 2>/dev/null
   fi
-  cp package-lock.json "$STAMP" 2>/dev/null
-fi
+  return 0
+}
+ensure_deps || pause_on_error
 
 echo "→ Đang khởi động… (Ctrl+C hoặc đóng cửa sổ này để dừng)"
-OPEN=1 PORT="$PORT" node server/index.ts "$@" || pause_on_error
+OPEN_NOW=1
+RESTARTS=0
+while :; do
+  OPEN=$OPEN_NOW PORT="$PORT" TRAINER_LAUNCHER=1 node server/index.ts "$@"
+  code=$?
+  [ "$code" -eq "$RESTART_CODE" ] || break
+  RESTARTS=$((RESTARTS + 1))
+  if [ "$RESTARTS" -gt 20 ]; then
+    echo "✗ Server xin khởi động lại quá nhiều lần liên tiếp — dừng. Chạy lại ./start.sh để thử tiếp."
+    pause_on_error
+  fi
+  echo "↻ Khởi động lại để dùng bản mới…"
+  OPEN_NOW=0 # the page that asked for the restart reloads by itself
+  ensure_deps || pause_on_error
+done
+[ "$code" -eq 0 ] || pause_on_error

@@ -23,7 +23,12 @@ function copyData(dest: string, opts: { results?: boolean }) {
   // sandboxes never start the semantic-duplicate job (on a machine running Ollama it would embed the whole bank);
   // tests that need it set quality.embeddings themselves
   const cfgText = fs.readFileSync(path.join(TRAINER_ROOT, 'config.yaml'), 'utf8');
-  fs.writeFileSync(path.join(dest, 'config.yaml'), cfgText.replace(/^(\s+embeddings:\s*)\w+/m, '$1off'));
+  // …nor hold back sealed forms or sync on their own (tests that need these set them explicitly)
+  const sandboxCfg = cfgText
+    .replace(/^(\s+embeddings:\s*)\w+/m, '$1off')
+    .replace(/^(\s+sealed_forms:\s*)\d+/m, '$10')
+    .replace(/^(\s+auto:\s*)idle\b/m, '$1off');
+  fs.writeFileSync(path.join(dest, 'config.yaml'), sandboxCfg);
   const coach = path.join(TRAINER_ROOT, 'coach');
   fs.mkdirSync(path.join(dest, 'coach'), { recursive: true });
   for (const f of fs.existsSync(coach) ? fs.readdirSync(coach) : []) {

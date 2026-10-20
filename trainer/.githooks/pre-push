@@ -1,0 +1,76 @@
+#!/bin/sh
+# Pre-push gate of the SAA-C03 trainer — enable once per clone: cd trainer && npm run hooks:install
+# Runs `npm run check:fast` (typecheck + unit tests, ~15 s) when the pushed commits change app code. Pushes that only
+# carry learner data (config.yaml → sync.data_paths: results, coach, bank — what ⇅ Đồng bộ and the AI coach commit) or
+# files outside the app folder (notes, practice exams) pass straight through; the app's own syncs push with --no-verify.
+# Skip once: git push --no-verify. TRAINER_HOOK_CMD replaces the command (tests).
+remote="${1:-origin}"
+hook_dir=$(cd "$(dirname "$0")" && pwd) || exit 0
+app_dir=$(dirname "$hook_dir")
+prefix=$(cd "$app_dir" && git rev-parse --show-prefix 2>/dev/null) || exit 0
+prefix=${prefix%/} # "trainer" ('' when the app is the repo root)
+
+# repo-relative data paths through the app's own config loader (defaults when it cannot run)
+data_paths=$(cd "$app_dir" && node -e "import('./server/config.ts').then((m)=>console.log(m.loadConfig().sync.data_paths.join('\n'))).catch(()=>{})" 2>/dev/null)
+if [ -z "$data_paths" ]; then
+  base=${prefix:+$prefix/}
+  data_paths="${base}results ${base}coach ${base}bank"
+fi
+
+# is_code <repo-relative path>: app code = inside the app folder, outside the data paths, not a top-level doc
+is_code() {
+  f=$1
+  if [ -n "$prefix" ]; then
+    case "$f" in
+      "$prefix"/*) ;;
+      *) return 1 ;;
+    esac
+  fi
+  for d in $data_paths; do
+    case "$f" in
+      "$d" | "$d"/*) return 1 ;;
+    esac
+  done
+  rel=${f#"$prefix"/}
+  case "$rel" in
+    */*) return 0 ;;
+    *.md) return 1 ;;
+  esac
+  return 0
+}
+
+changed=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;; # deleting a branch
+  esac
+  known=0
+  case "$remote_sha" in
+    *[!0]*) git cat-file -e "$remote_sha^{commit}" 2>/dev/null && known=1 ;;
+  esac
+  if [ "$known" = 1 ]; then
+    files=$(git -c core.quotepath=off log --format= --name-only "$remote_sha..$local_sha" 2>/dev/null)
+  else
+    files=$(git -c core.quotepath=off log --format= --name-only "$local_sha" --not --remotes="$remote" 2>/dev/null) # new branch / unknown tip
+  fi
+  changed="$changed
+$files"
+done
+
+n=0
+while IFS= read -r f; do
+  [ -n "$f" ] && is_code "$f" && n=$((n + 1))
+done <<LIST
+$(printf '%s\n' "$changed" | sort -u)
+LIST
+
+[ "$n" -gt 0 ] || exit 0
+echo "pre-push: $n file code thay đổi → npm run check:fast (typecheck + unit test)…"
+cmd=${TRAINER_HOOK_CMD:-npm run check:fast}
+if (cd "$app_dir" && sh -c "$cmd"); then
+  echo "pre-push: ✓ check:fast ổn."
+  exit 0
+fi
+echo "pre-push: ✗ check:fast thất bại — sửa lỗi rồi push lại (bỏ qua một lần: git push --no-verify)." >&2
+exit 1

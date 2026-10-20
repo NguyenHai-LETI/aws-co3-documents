@@ -1,6 +1,8 @@
 // Two-machine sync through git: commit the data folders (cfg.sync.data_paths) → pull --rebase → push.
 // Git never gets a chance to prompt: no terminal prompt, no askpass program, no GCM dialog, no controlling tty,
 // and every step is killed after a timeout. Failures come back as Vietnamese hints instead of raw git errors.
+// Also here: the quiet auto sync (config sync.auto: idle — after a submitted test, at startup, a push at shutdown) and
+// the detection of app code received from the other machine (SyncRunResult.codeFiles → SSE `update`, see version.ts).
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,12 +10,18 @@ import path from 'node:path';
 import { COACH_DIR, DATA_DIR, REPO_DIR, loadConfig } from '../config.ts';
 import { fmtLocal } from './time.ts';
 import { migrateResults } from './migrations.ts';
+import { isCodePath } from './version.ts';
 import type { SyncResult, SyncStep } from '../../shared/types.ts';
 
 export const SYNC_STEP_TIMEOUT_MS = 60_000;
 const FETCH_TIMEOUT_MS = 20_000;
 const FETCH_MAX_AGE_MS = 60_000;
 const MAX_OUTPUT = 4000;
+/** SyncButton turns into a warning when data waits this long without being pushed. */
+export const STALE_UNPUSHED_MS = 24 * 3600_000;
+
+/** Who started a sync (SSE `sync`, the auto-sync status, the server log). */
+export type SyncSource = 'manual' | 'auto' | 'startup' | 'shutdown' | 'ai';
 
 export interface SyncOptions {
   repoDir?: string; // default REPO_DIR (explicit = caller knows it is safe, e.g. tests on a temp clone)
@@ -24,6 +32,9 @@ export interface SyncOptions {
   force?: boolean; // ignore a running AI coach
   timeoutMs?: number; // per git step
   now?: Date;
+  /** Commit + push only, never pull (shutdown: a rebase cut short by the exit would leave the repo half-rebased). */
+  pushOnly?: boolean;
+  source?: SyncSource; // default 'manual'
 }
 
 /** SyncResult (shared contract) + optional details. On failure `message` says what failed, `hint` what to do. */
@@ -36,6 +47,32 @@ export interface SyncRunResult extends SyncResult {
   migrated?: number; // result files remapped to the current answer layout after the pull (migrateResults)
   conflicts?: string[];
   hint?: string;
+  /** App code files (server/, shared/, web/, package files…) changed by the received commits — restart / reload needed. */
+  codeFiles?: string[];
+  source?: SyncSource;
+}
+
+/** One finished sync of this process (any source). */
+export interface SyncRecord {
+  at: string; // ISO
+  ok: boolean;
+  message: string;
+  hint?: string;
+  source: SyncSource;
+  committed?: number;
+  received?: number;
+  pushed?: number;
+}
+
+export interface AutoSyncStatus {
+  mode: 'idle' | 'off'; // config sync.auto
+  delayMinutes: number; // config sync.auto_delay_minutes
+  disabled?: string; // sync impossible here (TRAINER_HOME sandbox…) — auto sync never runs
+  dueAt?: string; // next quiet sync (ISO)
+  reason?: 'submit' | 'retry' | 'startup';
+  running?: boolean;
+  failures: number; // consecutive failed auto syncs (exponential backoff)
+  last?: SyncRecord; // last auto / startup / shutdown sync
 }
 
 export interface SyncStatus {
@@ -53,6 +90,11 @@ export interface SyncStatus {
   lastSync?: { at: string; subject: string }; // newest "trainer: sync" commit on this branch
   syncing?: boolean;
   disabled?: boolean; // sync not possible here (test sandbox, not a git repo, …)
+  lastRun?: SyncRecord; // last sync run by this server process (any source)
+  lastOkAt?: string; // last successful sync of this server process (ISO)
+  unpushedSince?: string; // oldest data change not on the remote yet: uncommitted data file (mtime) or local commit (ISO)
+  stale?: boolean; // unpushedSince is older than 24 h → the other machine misses these results
+  auto?: AutoSyncStatus;
 }
 
 // ── running git ─────────────────────────────────────────────────────────────
@@ -294,6 +336,31 @@ async function countRange(repoDir: string, range: string, timeoutMs: number): Pr
   return r.code === 0 ? Number(r.stdout.trim()) || 0 : 0;
 }
 
+/** App folder inside the repo ("trainer"): the common parent of the data paths, which live next to the app code. */
+export function appDirOf(dataPaths: string[]): string {
+  const parents = new Set(
+    dataPaths
+      .map((p) => p.trim().replace(/\\/g, '/').replace(/\/+$/, ''))
+      .filter(Boolean)
+      .map((p) => path.posix.dirname(p)),
+  );
+  const [only] = parents;
+  return parents.size === 1 && only !== '.' ? only : '';
+}
+
+/** Repo-relative files that changed between two commits and belong to the app code (server/, shared/, web/, …). */
+export async function changedCodeFiles(repoDir: string, from: string, to: string, appDir: string, timeoutMs = 20_000): Promise<string[]> {
+  const r = await runGit(['diff', '--name-only', '-z', from, to, '--'], repoDir, timeoutMs);
+  if (r.code !== 0) return [];
+  return r.stdout
+    .split('\0')
+    .filter(Boolean)
+    .filter((f) => {
+      const inApp = !appDir ? f : f.startsWith(appDir + '/') ? f.slice(appDir.length + 1) : '';
+      return !!inApp && isCodePath(inApp);
+    });
+}
+
 const fetchState = new Map<string, { at: number; ok: boolean; error?: string; okAt?: number }>();
 
 async function fetchRemote(repoDir: string, remote: string, timeoutMs: number): Promise<{ ok: boolean; error?: string; output: string; timedOut: boolean }> {
@@ -312,10 +379,11 @@ async function fetchRemote(repoDir: string, remote: string, timeoutMs: number): 
 
 // ── status ──────────────────────────────────────────────────────────────────
 
-export async function syncStatus(opts: { repoDir?: string; dataPaths?: string[]; host?: string; fetch?: boolean; maxAgeMs?: number } = {}): Promise<SyncStatus> {
+export async function syncStatus(opts: { repoDir?: string; dataPaths?: string[]; host?: string; fetch?: boolean; maxAgeMs?: number; now?: number } = {}): Promise<SyncStatus> {
   const repoDir = opts.repoDir ?? REPO_DIR;
   const host = opts.host ?? os.hostname();
-  const base: SyncStatus = { host, branch: '', remote: '', ahead: 0, behind: 0, dirtyData: 0, syncing: isSyncing() };
+  const base: SyncStatus = { host, branch: '', remote: '', ahead: 0, behind: 0, dirtyData: 0, syncing: isSyncing(), ...processRecords() };
+  if (!opts.repoDir) base.auto = autoSync.status();
   const disabled = opts.repoDir ? undefined : syncDisabledReason(repoDir);
   if (disabled) return { ...base, error: disabled, disabled: true };
   if (!fs.existsSync(repoDir)) return { ...base, error: `Không tìm thấy thư mục repo ${repoDir}.`, disabled: true };
@@ -331,18 +399,26 @@ export async function syncStatus(opts: { repoDir?: string; dataPaths?: string[];
   const dataPaths = await usablePaths(repoDir, opts.dataPaths ?? loadConfig().sync.data_paths, 10_000);
 
   const status: SyncStatus = { ...base, branch };
+  let oldest = Infinity; // oldest change that is not on the remote yet (epoch ms)
   if (dataPaths.length) {
     const st = await runGit(['status', '--porcelain=v1', '-z', '-uall', '--', ...dataPaths], repoDir, 20_000);
     const files = parsePorcelain(st.stdout);
     status.dirtyData = files.length;
     status.dirtyFiles = files.slice(0, 50);
+    for (const f of files) {
+      try {
+        oldest = Math.min(oldest, fs.statSync(path.join(repoDir, f)).mtimeMs);
+      } catch {
+        // deleted file: its deletion is the change, its age is unknown
+      }
+    }
   }
   const last = await runGit(['log', '-1', '--format=%cI%x1f%s', '--grep=^trainer: sync', 'HEAD'], repoDir, 10_000);
   const [at, subject] = last.stdout.trim().split('\x1f');
   if (at && subject) status.lastSync = { at, subject };
 
   const up = await upstreamOf(repoDir, branch);
-  if (!up) return { ...status, error: explainGitError('no upstream', { repoDir }) };
+  if (!up) return { ...withAge(status, oldest, opts.now), error: explainGitError('no upstream', { repoDir }) };
   status.remote = up.ref;
   const url = await runGit(['remote', 'get-url', up.remote], repoDir, 10_000);
   if (url.code === 0) status.remoteUrl = redact(url.stdout.trim()).replace('***@', '');
@@ -360,17 +436,68 @@ export async function syncStatus(opts: { repoDir?: string; dataPaths?: string[];
     status.ahead = a || 0;
     status.behind = b || 0;
   }
-  return status;
+  if (status.ahead > 0) {
+    // committed locally (e.g. a sync whose push failed) but not pushed: the oldest such commit
+    const firstLocal = await runGit(['log', '--reverse', '--format=%cI', `${up.ref}..HEAD`], repoDir, 10_000);
+    const t = Date.parse(firstLocal.stdout.split('\n')[0] ?? '');
+    if (Number.isFinite(t)) oldest = Math.min(oldest, t);
+  }
+  return withAge(status, oldest, opts.now);
+}
+
+function withAge(status: SyncStatus, oldest: number, now = Date.now()): SyncStatus {
+  if (!Number.isFinite(oldest)) return status;
+  return { ...status, unpushedSince: new Date(oldest).toISOString(), stale: now - oldest > STALE_UNPUSHED_MS };
 }
 
 // ── sync ────────────────────────────────────────────────────────────────────
 
+// ── what this process synced (status, SSE `sync`, update detection) ─────────
+
+let lastRun: SyncRecord | undefined;
+let lastOkAt: string | undefined;
+type SyncListener = (r: SyncRunResult) => void;
+const listeners = new Set<SyncListener>();
+
+/** Called after every real (not dry-run) sync of this process, whatever started it. Returns an unsubscribe function. */
+export function onSyncDone(fn: SyncListener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function processRecords(): Pick<SyncStatus, 'lastRun' | 'lastOkAt'> {
+  return { ...(lastRun ? { lastRun } : {}), ...(lastOkAt ? { lastOkAt } : {}) };
+}
+
+function recordRun(r: SyncRunResult, source: SyncSource): SyncRecord {
+  const rec: SyncRecord = { at: new Date().toISOString(), ok: r.ok, message: r.message, source };
+  if (r.hint) rec.hint = r.hint;
+  for (const k of ['committed', 'received', 'pushed'] as const) if (r[k] !== undefined) rec[k] = r[k];
+  lastRun = rec;
+  if (r.ok) lastOkAt = rec.at;
+  for (const fn of listeners) {
+    try {
+      fn(r);
+    } catch (e) {
+      console.error('sync listener failed', e);
+    }
+  }
+  return rec;
+}
+
 /** add → commit → pull --rebase --autostash → push. One sync at a time per process. */
 export function runSync(opts: SyncOptions = {}): Promise<SyncRunResult> {
   if (running) return running;
-  running = doSync(opts).finally(() => {
-    running = undefined;
-  });
+  const source = opts.source ?? 'manual';
+  running = doSync(opts)
+    .then((r) => {
+      const out: SyncRunResult = { ...r, source };
+      if (!opts.dryRun) recordRun(out, source);
+      return out;
+    })
+    .finally(() => {
+      running = undefined;
+    });
   return running;
 }
 
@@ -379,6 +506,7 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
   const host = opts.host ?? os.hostname();
   const timeoutMs = opts.timeoutMs ?? SYNC_STEP_TIMEOUT_MS;
   const steps: SyncStep[] = [];
+  const codeFiles = new Set<string>(); // app code received from the other machine
   // `message` = one-line outcome; the advice for failures goes to `hint` (the UI shows it as its own 💡 line)
   const result = (ok: boolean, message: string, extra: Partial<SyncRunResult> = {}): SyncRunResult => ({
     ok,
@@ -386,6 +514,7 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
     steps,
     host,
     ...(opts.dryRun ? { dryRun: true } : {}),
+    ...(codeFiles.size ? { codeFiles: [...codeFiles] } : {}),
     ...extra,
   });
 
@@ -419,7 +548,9 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
   if (!branch) return result(false, 'Repo đang ở trạng thái “detached HEAD”.', { hint: 'Chuyển về nhánh chính (git switch main) rồi đồng bộ lại.' });
   const up = await upstreamOf(repoDir, branch);
   if (!up) return result(false, `Nhánh ${branch} chưa có upstream.`, { branch, hint: explainGitError('no upstream', { repoDir }) });
-  const dataPaths = await usablePaths(repoDir, opts.dataPaths ?? loadConfig().sync.data_paths, timeoutMs);
+  const configuredPaths = opts.dataPaths ?? loadConfig().sync.data_paths;
+  const dataPaths = await usablePaths(repoDir, configuredPaths, timeoutMs);
+  const appDir = appDirOf(configuredPaths);
 
   // 2. dry run: what would be committed / exchanged (fetch only)
   if (opts.dryRun) {
@@ -508,17 +639,31 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
       return fail('git pull', r, { branch, committed });
     }
     // commits from the other machine = upstream commits the local tip did not have (independent of earlier fetches)
-    received += before.ok ? await countRange(repoDir, `${before.stdout.trim()}..${up.ref}`, timeoutMs) : 0;
+    const got = before.ok ? await countRange(repoDir, `${before.stdout.trim()}..${up.ref}`, timeoutMs) : 0;
+    received += got;
+    // app code among them (the local commits were in `before` already, so the diff is what arrived)
+    if (got > 0) for (const f of await changedCodeFiles(repoDir, before.stdout.trim(), 'HEAD', appDir, timeoutMs)) codeFiles.add(f);
     return afterPull();
   };
-  const pulled = await pull();
-  if (pulled) return pulled;
+  if (!opts.pushOnly) {
+    const pulled = await pull();
+    if (pulled) return pulled;
+  }
 
-  // 5. push (retry once when the other machine pushed in between)
+  // 5. push (retry once when the other machine pushed in between — except push-only: data stays committed locally)
   let pushed = await countRange(repoDir, `${up.ref}..HEAD`, timeoutMs);
   if (pushed > 0) {
     let push = await step(['push', '--no-verify', up.remote, `HEAD:refs/heads/${up.branch}`]);
-    if (!push.ok && /\[rejected\]|non-fast-forward|fetch first/i.test(push.output)) {
+    const rejected = !push.ok && /\[rejected\]|non-fast-forward|fetch first/i.test(push.output);
+    if (rejected && opts.pushOnly) {
+      return result(false, 'Máy kia vừa đẩy dữ liệu mới nên chưa đẩy được — dữ liệu máy này đã nằm trong commit cục bộ.', {
+        branch,
+        committed,
+        pushed: 0,
+        hint: 'Lần mở app sau (hoặc khi bấm ⇅ Đồng bộ) app sẽ kéo dữ liệu máy kia về rồi đẩy lên.',
+      });
+    }
+    if (rejected) {
       const again = await pull();
       if (again) return again;
       pushed = await countRange(repoDir, `${up.ref}..HEAD`, timeoutMs);
@@ -527,7 +672,7 @@ async function doSync(opts: SyncOptions): Promise<SyncRunResult> {
     if (!push.ok) return fail('git push', push, { branch, committed, received, migrated, pushed: 0 });
   }
 
-  fetchState.set(repoDir, { at: Date.now(), ok: true, okAt: Date.now() }); // pull just fetched
+  if (!opts.pushOnly) fetchState.set(repoDir, { at: Date.now(), ok: true, okAt: Date.now() }); // pull just fetched
   const parts: string[] = [];
   if (committed) parts.push(`commit ${committed} file dữ liệu`);
   if (pushed) parts.push(`đẩy ${pushed} commit lên GitHub`);
@@ -564,7 +709,7 @@ export async function syncForAi(phase: 'before' | 'after', opts: { force?: boole
   try {
     // a sync started from the UI may be in flight (possibly a dry run) — wait for it, then run a real one
     while (running) await running.catch(() => undefined);
-    const r = await runSync({ force: opts.force });
+    const r = await runSync({ force: opts.force, source: 'ai' });
     return { phase, ok: r.ok, message: r.message, hint: r.hint, committed: r.committed, received: r.received, pushed: r.pushed, migrated: r.migrated, conflicts: r.conflicts };
   } catch (e) {
     return { phase, ok: false, message: (e as Error).message };
@@ -578,4 +723,221 @@ export function aiSyncLine(n: AiSyncNote): string {
   if (n.ok) return `⇅ Đồng bộ ${when}: ${n.message}`;
   const after = n.phase === 'before' ? 'AI vẫn chạy với dữ liệu trên máy này.' : 'Kết quả AI vẫn nằm trên máy này — bấm ⇅ Đồng bộ sau.';
   return `⚠️ Không đồng bộ được ${when}: ${n.message}${n.hint ? ` ${n.hint}` : ''} ${after}`;
+}
+
+// ── auto sync when idle (config sync.auto: idle) ────────────────────────────
+// After a submitted test the server waits `auto_delay_minutes`; when no new test was built meanwhile (the learner is not
+// in the middle of one) it runs a quiet sync — never while the AI coach or another sync runs (tried again a minute
+// later). Failures back off exponentially (up to an hour) and stop after a few tries until the next submit. index.ts adds
+// a pull at startup and a bounded push at shutdown. Results are committed locally even offline (a restore point each).
+
+export interface AutoSyncDeps {
+  now(): number;
+  setTimer(fn: () => void, ms: number): unknown;
+  clearTimer(timer: unknown): void;
+  run(source: SyncSource): Promise<SyncRunResult>;
+  settings(): { mode: 'idle' | 'off'; delayMs: number };
+  /** Why a sync cannot start right now (coach / another sync running) → tried again AUTO_SYNC_BUSY_RETRY_MS later. */
+  busy(): string | undefined;
+  /** Why syncing is impossible here (TRAINER_HOME sandbox outside the repo…) → never scheduled. */
+  disabled(): string | undefined;
+  log?(line: string): void;
+}
+
+export const AUTO_SYNC_BUSY_RETRY_MS = 60_000;
+export const AUTO_SYNC_MAX_BACKOFF_MS = 60 * 60_000;
+export const AUTO_SYNC_MAX_FAILURES = 6;
+
+export class AutoSync {
+  private readonly deps: AutoSyncDeps;
+  private timer: unknown = undefined;
+  private dueAt: number | undefined;
+  private reason: AutoSyncStatus['reason'];
+  private failures = 0;
+  private current: Promise<void> | undefined;
+  private last: SyncRecord | undefined;
+
+  constructor(deps: AutoSyncDeps) {
+    this.deps = deps;
+  }
+
+  /** On, and possible here. */
+  active(): boolean {
+    return this.deps.settings().mode === 'idle' && !this.deps.disabled();
+  }
+
+  /** A test was submitted: quiet sync after `auto_delay_minutes` (or the current backoff after failures). */
+  noteSubmit(): void {
+    if (this.active()) this.schedule(this.backoffMs(), 'submit');
+  }
+
+  /**
+   * A test was built — the learner is busy: no quiet sync mid-test; the next submit schedules again. The startup pull
+   * stays (it brings the other machine's results, which the first test of the day should already see).
+   */
+  noteTestBuilt(): void {
+    if (this.reason !== 'startup') this.cancel();
+  }
+
+  /**
+   * Server start, right away: pull what the other machine pushed meanwhile (and push what is still here). Resolves with
+   * the result — undefined when auto sync is off or impossible here, or a sync / the coach is busy (retried later).
+   */
+  startup(): Promise<SyncRunResult | undefined> {
+    if (!this.active()) return Promise.resolve(undefined);
+    this.cancel();
+    return this.run('startup');
+  }
+
+  /** A sync started elsewhere (⇅ button, AI coach) succeeded: the backoff and a pending retry are over. */
+  noteExternal(r: Pick<SyncRunResult, 'ok'>): void {
+    if (!r.ok) return;
+    this.failures = 0;
+    if (this.reason === 'retry') this.cancel();
+  }
+
+  cancel(): void {
+    if (this.timer !== undefined) this.deps.clearTimer(this.timer);
+    this.timer = undefined;
+    this.dueAt = undefined;
+    this.reason = undefined;
+  }
+
+  /** Resolves when the auto sync in flight (if any) has finished. */
+  idle(): Promise<void> {
+    return this.current ?? Promise.resolve();
+  }
+
+  status(): AutoSyncStatus {
+    const s = this.deps.settings();
+    const disabled = this.deps.disabled();
+    return {
+      mode: s.mode,
+      delayMinutes: Math.round(s.delayMs / 6000) / 10,
+      ...(disabled ? { disabled } : {}),
+      ...(this.dueAt !== undefined ? { dueAt: new Date(this.dueAt).toISOString(), reason: this.reason } : {}),
+      ...(this.current ? { running: true } : {}),
+      failures: this.failures,
+      ...(this.last ? { last: this.last } : {}),
+    };
+  }
+
+  private backoffMs(): number {
+    const base = this.deps.settings().delayMs;
+    if (!this.failures) return base;
+    return Math.min(Math.max(base, 60_000) * 2 ** this.failures, AUTO_SYNC_MAX_BACKOFF_MS);
+  }
+
+  private schedule(ms: number, reason: NonNullable<AutoSyncStatus['reason']>): void {
+    this.cancel();
+    this.reason = reason;
+    this.dueAt = this.deps.now() + ms;
+    this.timer = this.deps.setTimer(() => void this.fire(), ms);
+  }
+
+  private fire(): void {
+    const reason = this.reason ?? 'submit';
+    this.timer = undefined;
+    this.dueAt = undefined;
+    this.reason = undefined;
+    if (this.active()) void this.run(reason);
+  }
+
+  private run(reason: NonNullable<AutoSyncStatus['reason']>): Promise<SyncRunResult | undefined> {
+    if (this.current || this.deps.busy()) {
+      this.schedule(AUTO_SYNC_BUSY_RETRY_MS, reason);
+      return Promise.resolve(undefined);
+    }
+    const source: SyncSource = reason === 'startup' ? 'startup' : 'auto';
+    const run = this.deps
+      .run(source)
+      .catch((e: Error): SyncRunResult => ({ ok: false, message: e.message, steps: [], host: '' }))
+      .then((r) => {
+        this.last = { at: new Date(this.deps.now()).toISOString(), ok: r.ok, message: r.message, source };
+        if (r.hint) this.last.hint = r.hint;
+        for (const k of ['committed', 'received', 'pushed'] as const) if (r[k] !== undefined) this.last[k] = r[k];
+        const label = source === 'startup' ? 'Đồng bộ khi mở app' : 'Tự đồng bộ';
+        if (r.ok) {
+          this.failures = 0;
+          this.deps.log?.(`⇅ ${label}: ${r.message}`);
+          return r;
+        }
+        this.failures++;
+        if (this.failures >= AUTO_SYNC_MAX_FAILURES) {
+          this.deps.log?.(`⚠️ ${label} lỗi ${this.failures} lần liền — tạm dừng tới lần nộp bài sau: ${r.message}`);
+          return r;
+        }
+        const wait = this.backoffMs();
+        this.deps.log?.(`⚠️ ${label} lỗi: ${r.message} — thử lại sau ${Math.round(wait / 60_000)} phút`);
+        if (this.timer === undefined) this.schedule(wait, 'retry'); // a submit meanwhile already scheduled one
+        return r;
+      })
+      .finally(() => {
+        this.current = undefined;
+      });
+    this.current = run.then(() => undefined);
+    return run;
+  }
+}
+
+function autoSettings(): { mode: 'idle' | 'off'; delayMs: number } {
+  const c = loadConfig().sync;
+  const minutes = Number(c.auto_delay_minutes);
+  const on = (c.auto as unknown) === 'idle' || (c.auto as unknown) === true;
+  return { mode: on ? 'idle' : 'off', delayMs: (Number.isFinite(minutes) && minutes >= 0 ? minutes : 4) * 60_000 };
+}
+
+/** The server's scheduler (timers are unref'd: importing this module never keeps a script alive). */
+export const autoSync = new AutoSync({
+  now: () => Date.now(),
+  setTimer: (fn, ms) => {
+    const t = setTimeout(fn, ms);
+    t.unref();
+    return t;
+  },
+  clearTimer: (t) => clearTimeout(t as ReturnType<typeof setTimeout>),
+  run: (source) => runSync({ source }),
+  settings: autoSettings,
+  busy: () => (isSyncing() ? 'Đang có một lượt đồng bộ khác.' : coachRunning() ? 'AI Coach đang chạy.' : undefined),
+  disabled: () => syncDisabledReason(),
+  log: (line) => console.log(`  ${line}`),
+});
+onSyncDone((r) => {
+  if (r.source === 'manual' || r.source === 'ai') autoSync.noteExternal(r);
+});
+
+/** Something to push: data files not committed yet, or local commits the upstream lacks (local git only, no network). */
+export async function hasUnpushed(opts: { repoDir?: string; dataPaths?: string[] } = {}): Promise<boolean> {
+  const repoDir = opts.repoDir ?? REPO_DIR;
+  const dataPaths = await usablePaths(repoDir, opts.dataPaths ?? loadConfig().sync.data_paths, 10_000);
+  if (dataPaths.length) {
+    const st = await runGit(['status', '--porcelain=v1', '-z', '-uall', '--', ...dataPaths], repoDir, 10_000);
+    if (st.code === 0 && parsePorcelain(st.stdout).length) return true;
+  }
+  const ahead = await runGit(['rev-list', '--count', '@{u}..HEAD'], repoDir, 10_000);
+  return ahead.code === 0 && Number(ahead.stdout.trim()) > 0;
+}
+
+/**
+ * Shutdown with sync.auto: idle — commit + push what is still only here, within `maxMs` (never a pull: a rebase cut short
+ * by the exit would leave the repo half-rebased). Skipped when nothing is pending, while a sync or the coach runs, or when
+ * syncing is impossible here. Resolves undefined when skipped or out of time (a push still running finishes on its own).
+ */
+export async function shutdownPush(maxMs = 15_000, onPush?: () => void): Promise<SyncRunResult | undefined> {
+  autoSync.cancel();
+  if (!autoSync.active() || isSyncing() || coachRunning()) return undefined;
+  const deadline = Date.now() + maxMs;
+  if (!(await hasUnpushed())) return undefined;
+  const left = deadline - Date.now();
+  if (left < 1000) return undefined;
+  onPush?.();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const out = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), left);
+  });
+  try {
+    return await Promise.race([runSync({ pushOnly: true, source: 'shutdown', timeoutMs: Math.min(SYNC_STEP_TIMEOUT_MS, left) }), out]);
+  } finally {
+    clearTimeout(timer);
+  }
 }

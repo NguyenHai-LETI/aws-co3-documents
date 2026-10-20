@@ -4,10 +4,12 @@
 // scanned in memory with the same matching rules. Vietnamese: the tokenizer removes diacritics, but "đ" is a letter of its
 // own in Unicode, so it is folded to "d" before indexing and in queries ("dap an" finds "đáp án"). Snippets are cut from
 // the original text here (not with snippet()), so they keep the Vietnamese spelling.
+// Questions of a sealed form ([γ] sealed.ts) are never indexed nor found — not even by their exact id.
 import fs from 'node:fs';
 import { loadBank, type BankState } from './bank.ts';
 import { listNotes, notePath, plainText, splitSections } from './notes.ts';
 import { ftsAvailable, getMeta, setMeta, stmt, transaction, withDb } from './index-db.ts';
+import { sealedIds, sealedKey } from './sealed.ts';
 import type { Question, SearchHit, SearchResponse } from '../../shared/types.ts';
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -120,18 +122,23 @@ interface QuestionDoc {
   tags: string; // id, topic, domain, task, pack, services, tags
 }
 
-const qDocsMemo = new WeakMap<BankState, QuestionDoc[]>();
+const qDocsMemo = new WeakMap<BankState, { key: string; docs: QuestionDoc[] }>();
+/** Searchable questions: the whole bank minus the sealed ones (memo per bank object and sealed set). */
 function questionDocs(bank: BankState): QuestionDoc[] {
-  let docs = qDocsMemo.get(bank);
-  if (!docs) {
-    docs = bank.questions.map((q) => ({
-      q,
-      fields: [plainText(q.stem), q.options.map((o) => plainText(o.text)).join(' · '), plainText(q.explanation), [q.concept, q.hint].filter(Boolean).join(' · ')],
-      tags: [q.id, q.topic, q.domain, q.task ?? '', q.pack, ...q.services, ...q.tags].join(' '),
-    }));
-    qDocsMemo.set(bank, docs);
+  const key = sealedKey();
+  let hit = qDocsMemo.get(bank);
+  if (!hit || hit.key !== key) {
+    const sealed = sealedIds();
+    const docs = bank.questions
+      .filter((q) => !sealed.has(q.id))
+      .map((q) => ({
+        q,
+        fields: [plainText(q.stem), q.options.map((o) => plainText(o.text)).join(' · '), plainText(q.explanation), [q.concept, q.hint].filter(Boolean).join(' · ')],
+        tags: [q.id, q.topic, q.domain, q.task ?? '', q.pack, ...q.services, ...q.tags].join(' '),
+      }));
+    qDocsMemo.set(bank, (hit = { key, docs }));
   }
-  return docs;
+  return hit.docs;
 }
 
 interface NoteFile {
@@ -213,10 +220,11 @@ function noteHit(d: { file: string; title: string; heading: string; anchor: stri
   };
 }
 
-/** Exact question id typed into the box → that question first. */
+/** Exact question id typed into the box → that question first (never a sealed one). */
 function exactId(bank: BankState, q: string): Question | undefined {
   const id = q.trim();
-  return bank.byId.get(id) ?? bank.questions.find((x) => x.id.toLowerCase() === id.toLowerCase());
+  const hit = bank.byId.get(id) ?? bank.questions.find((x) => x.id.toLowerCase() === id.toLowerCase());
+  return hit && !sealedIds().has(hit.id) ? hit : undefined;
 }
 
 // Retired / draft questions stay findable (the Bank page shows them) but rank below active ones.
@@ -225,7 +233,7 @@ const statusWeight = (q: Question) => (q.status === 'active' ? 1 : 0.6);
 // ── FTS5 ────────────────────────────────────────────────────────────────────
 
 function refreshQuestions(db: DatabaseSync, bank: BankState): void {
-  const version = `${bank.version}:v${INDEX_VERSION}`;
+  const version = `${bank.version}:${sealedKey()}:v${INDEX_VERSION}`; // a form sealed / used / released → re-index
   if (getMeta(db, 'q_bank') === version) return;
   transaction(db, () => {
     db.exec('DELETE FROM q_fts');

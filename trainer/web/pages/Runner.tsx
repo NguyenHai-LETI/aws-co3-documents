@@ -1,27 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import {
-  buildAnswers,
+  buildSubmitRequest,
   clearActive,
+  dropFromOutbox,
   elapsedSeconds,
+  flushOutbox,
   isPearson,
   isRecallFirst,
   loadActive,
+  queueSubmit,
   reconcileActive,
   remainingSeconds,
   saveActive,
+  sendQueued,
+  useOutbox,
   type ActiveTest,
+  type OutboxEntry,
   type ReviewFilter,
 } from '../lib/session.ts';
-import { api } from '../lib/api.ts';
 import { navigate, href } from '../lib/router.ts';
-import { fmtDuration } from '../lib/format.ts';
+import { fmtDateTime, fmtDuration } from '../lib/format.ts';
 import { useData } from '../lib/store.tsx';
 import { InlineMarkdown } from '../lib/markdown.tsx';
 import { QuestionView } from '../components/QuestionView.tsx';
 import { Empty, Modal, toast } from '../components/ui.tsx';
 import { isCorrect } from '../../shared/scoring.ts';
 import { MODE_INFO, FEEDBACK_INFO } from '../../shared/labels.ts';
-import type { Attempt, SubmitRequest } from '../../shared/types.ts';
 
 const HL_KEY = 'trainer.highlight';
 const WARN_MINUTES = [15, 5];
@@ -55,16 +59,22 @@ function isTypingTarget(el: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || h.isContentEditable;
 }
 
-/** Pure: adds `add` seconds to the current question (not while paused or on the review screen). */
+/**
+ * Pure: adds `add` seconds to the current question (not while paused or on the review screen). Once "Kiểm tra" showed
+ * the feedback (practice) the answer time `t` is frozen: later seconds — reading the explanation, writing "vì sao", coming
+ * back to it — are reading time `rt`, so a learner who reads explanations is not graded "slow" by FSRS and the stats.
+ */
 function credit(s: ActiveTest, add: number): ActiveTest {
   const q = s.questions[s.current];
   if (!q || !(add > 0) || s.pausedAt || s.stage === 'review') return s;
+  if (s.revealed[q.id]) return { ...s, read: { ...s.read, [q.id]: (s.read?.[q.id] ?? 0) + add } };
   return { ...s, spent: { ...s.spent, [q.id]: (s.spent[q.id] ?? 0) + add } };
 }
 
 export function Runner() {
   const { meta, byId, refresh, error: dataError } = useData();
   const [t, setT] = useState<ActiveTest | undefined>(() => loadActive());
+  const outbox = useOutbox(); // finished tests waiting for the server ("⏳ chờ nộp")
   const [now, setNow] = useState(Date.now());
   const [confirm, setConfirm] = useState(false); // classic "Nộp bài?" dialog
   const [endConfirm, setEndConfirm] = useState(false); // pearson "Kết thúc bài thi?"
@@ -205,31 +215,37 @@ export function Runner() {
   }, [t, goId, goIndex]);
 
   // ── submit ────────────────────────────────────────────────────────────────
+  // Write-ahead: the finished test goes to the outbox before the request, so neither a closed tab nor a lost response can
+  // lose it. No answer from the server → it stays "⏳ chờ nộp" and App.tsx sends the same request again (same finishedAt;
+  // the server returns the stored attempt when an earlier try did arrive). A refusal (4xx) brings the test back.
   const submit = useCallback(
     async (timedOut = false) => {
       if (!t || submittedRef.current) return;
       submittedRef.current = true;
       setSubmitting(true);
       const final = credit(t, document.hidden ? 0 : lap());
-      const req: SubmitRequest = {
-        session: final.session,
-        answers: buildAnswers(final),
-        startedAt: new Date(final.startedAt).toISOString(),
-        finishedAt: new Date().toISOString(),
-        timedOut,
-        timeUsed: Math.round(final.session.timeLimit && timedOut ? final.session.timeLimit : elapsedSeconds(final)),
-      };
-      try {
-        const { attempt } = await api.post<{ attempt: Attempt }>('/api/results', req);
-        clearActive();
+      const req = buildSubmitRequest(final, timedOut);
+      const sid = req.session.sessionId;
+      queueSubmit(req);
+      clearActive();
+      const r = await sendQueued(sid);
+      if ('attempt' in r) {
         if (timedOut) toast('⏰ Hết giờ — bài đã được nộp tự động.');
-        navigate(`/result/${encodeURIComponent(attempt.id)}`, { replace: true });
-      } catch (e) {
-        submittedRef.current = false;
-        setSubmitting(false);
-        update(() => final); // keep the credited time for the retry
-        toast(`Nộp bài lỗi: ${(e as Error).message} — bài vẫn được lưu tạm, thử lại.`);
+        navigate(`/result/${encodeURIComponent(r.attempt.id)}`, { replace: true });
+        return;
       }
+      if (r.retryable) {
+        setT(undefined); // the runner now shows the waiting submit
+        setSubmitting(false);
+        toast(`${timedOut ? '⏰ Hết giờ — ' : ''}⏳ Chưa gửi được bài (${r.error}) — bài đã được lưu, app sẽ tự nộp lại khi có kết nối.`);
+        return;
+      }
+      dropFromOutbox(sid);
+      saveActive(final);
+      submittedRef.current = false;
+      setSubmitting(false);
+      update(() => final); // keep the credited time for the retry
+      toast(`Nộp bài lỗi: ${r.error} — bài vẫn được giữ, thử lại.`);
     },
     [t, lap, update],
   );
@@ -301,8 +317,9 @@ export function Runner() {
 
   const check = useCallback(() => {
     if (!q) return;
-    update((s) => ({ ...s, revealed: { ...s.revealed, [q.id]: true } }));
-  }, [q, update]);
+    const add = lap(); // the answer time ends here — the seconds that follow are reading time (rt)
+    update((s) => ({ ...credit(s, add), revealed: { ...s.revealed, [q.id]: true } }));
+  }, [q, lap, update]);
 
   const toggleFlag = useCallback(() => {
     if (q) update((s) => ({ ...s, flags: { ...s.flags, [q.id]: !s.flags[q.id] } }));
@@ -401,11 +418,15 @@ export function Runner() {
   if (!t || !q) {
     return (
       <div className="runner">
-        <Empty icon="📝" title="Không có bài test nào đang làm">
-          <a className="btn primary" href={href('/new')} style={{ marginTop: 12 }}>
-            ✍️ Tạo bài test
-          </a>
-        </Empty>
+        {outbox.length ? (
+          <PendingSubmits entries={outbox} />
+        ) : (
+          <Empty icon="📝" title="Không có bài test nào đang làm">
+            <a className="btn primary" href={href('/new')} style={{ marginTop: 12 }}>
+              ✍️ Tạo bài test
+            </a>
+          </Empty>
+        )}
       </div>
     );
   }
@@ -413,9 +434,11 @@ export function Runner() {
   const elapsed = elapsedSeconds(t, now);
   const limit = t.session.timeLimit;
   const timerCls = remaining === undefined ? '' : remaining <= 120 ? 'danger' : remaining <= limit * 0.15 ? 'warn' : '';
-  const spentHere = (t.spent[q.id] ?? 0) + (t.pausedAt || document.hidden || reviewing ? 0 : (now - activeSince.current) / 1000);
+  const live = t.pausedAt || document.hidden || reviewing ? 0 : (now - activeSince.current) / 1000; // not credited yet
+  const spentHere = (t.spent[q.id] ?? 0) + (revealed ? 0 : live); // frozen once "Kiểm tra" showed the feedback
   const expected = t.questions.filter((x) => (t.answers[x.id] ?? []).length > 0).reduce((s, x) => s + x.time, 0);
-  const paceDiff = elapsed - expected;
+  const reading = Object.values(t.read ?? {}).reduce((s, x) => s + x, 0) + (revealed ? live : 0); // practice: rt
+  const paceDiff = elapsed - reading - expected;
   const unanswered = t.questions.length - answeredCount;
   const flagged = t.questions.filter((x) => t.flags[x.id]).length;
   const navItems = t.questions.map((x, i) => ({ x, i })).filter(({ x }) => !onlyOpen || !(t.answers[x.id] ?? []).length || t.flags[x.id]);
@@ -665,7 +688,14 @@ export function Runner() {
                       💡 Gợi ý <span className="kbd">H</span>
                     </button>
                   )}
-                  <span className={`small q-time ${spentHere > q.time ? 'warn' : 'muted'}`} title="Thời gian ở câu này / thời gian chuẩn">
+                  <span
+                    className={`small q-time ${spentHere > q.time ? 'warn' : 'muted'}`}
+                    title={
+                      revealed
+                        ? 'Thời gian trả lời (chốt lúc bấm Kiểm tra) / thời gian chuẩn — thời gian đọc giải thích sau đó không bị tính là làm chậm'
+                        : 'Thời gian ở câu này / thời gian chuẩn'
+                    }
+                  >
                     ⏱ {fmtDuration(spentHere)} / {fmtDuration(q.time)}
                   </span>
                 </div>
@@ -790,6 +820,71 @@ export function Runner() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+/** Finished tests the server has not confirmed yet (no connection when submitting). They are sent again automatically. */
+function PendingSubmits({ entries }: { entries: OutboxEntry[] }) {
+  const [busy, setBusy] = useState(false);
+  const retry = async () => {
+    setBusy(true);
+    const sent = await flushOutbox({ explicit: true });
+    setBusy(false);
+    if (sent.length) navigate(`/result/${encodeURIComponent(sent[sent.length - 1].attempt.id)}`, { replace: true });
+    else toast('Vẫn chưa gửi được — app sẽ tự thử lại khi có kết nối.');
+  };
+  const discard = (e: OutboxEntry) => {
+    if (window.confirm(`Bỏ bài “${e.req.session.title}”? Các câu trả lời của bài này sẽ không được lưu.`)) dropFromOutbox(e.req.session.sessionId);
+  };
+  return (
+    <div className="card pad-lg stack pending-submits">
+      <div>
+        <h2>⏳ Bài đang chờ nộp</h2>
+        <p className="small dim" style={{ marginTop: 6 }}>
+          Chưa gửi được tới máy chủ (mất mạng, hoặc app đang khởi động lại). Bài đã được lưu trên trình duyệt này và sẽ <b>tự nộp lại</b> khi có kết nối
+          hoặc khi mở lại trang — không cần làm lại, giờ nộp giữ nguyên.
+        </p>
+      </div>
+      {entries.map((e) => {
+        const answered = e.req.answers.filter((a) => a.pick.length > 0).length;
+        return (
+          <div key={e.req.session.sessionId} className={`alert ${e.permanent ? 'bad' : 'warn'} stack sm`}>
+            <div>
+              <b>
+                {MODE_INFO[e.req.session.mode]?.icon} {e.req.session.title}
+              </b>{' '}
+              <span className="small">
+                · đã trả lời {answered}/{e.req.answers.length} câu · xong lúc {fmtDateTime(e.req.finishedAt)}
+              </span>
+            </div>
+            <div className="tiny">
+              {e.error ? `Lần gửi gần nhất: ${e.error}` : 'Đang gửi…'}
+              {e.tries ? ` · đã thử ${e.tries} lần` : ''}
+              {e.permanent ? ' · máy chủ từ chối nên app không tự gửi lại — bấm “Thử nộp lại ngay” hoặc bỏ bài' : ''}
+            </div>
+            <div className="row">
+              <button type="button" className="btn ghost sm" onClick={() => discard(e)}>
+                🗑 Bỏ bài này
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <div className="row">
+        <button type="button" className="btn primary" onClick={() => void retry()} disabled={busy}>
+          {busy ? (
+            <>
+              <span className="spinner" /> Đang nộp…
+            </>
+          ) : (
+            '🔁 Thử nộp lại ngay'
+          )}
+        </button>
+        <a className="btn ghost" href={href('/')}>
+          ← Về Tổng quan
+        </a>
+      </div>
     </div>
   );
 }

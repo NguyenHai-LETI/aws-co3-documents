@@ -2,6 +2,8 @@
 rem Start the SAA-C03 Trainer and open the browser (Windows): double-click this file. Other port: set PORT=4000
 rem start.bat --lan (or set LAN=1): also open it to phones on the same Wi-Fi (access code / QR on the Cong cu page).
 rem Installs npm packages when needed; if the app is already running, just opens it (and turns LAN access on if asked).
+rem Exit code 75 from the server = restart: a sync brought newer app code and the learner pressed "Khoi dong lai" -
+rem npm install runs when package-lock.json changed, then the server starts again (the open page reloads by itself).
 setlocal
 cd /d "%~dp0"
 if "%PORT%"=="" set "PORT=3003"
@@ -36,7 +38,10 @@ start "" "%URL%/#/tools"
 exit /b 0
 
 :notrunning
+set "OPEN=1"
+set "TRAINER_LAUNCHER=1"
 
+:deps
 rem npm install when node_modules is missing or package-lock.json changed since the last install (e.g. after a sync).
 if not exist "node_modules\" goto install
 fc /b package-lock.json node_modules\.trainer-lock.json >nul 2>nul
@@ -55,10 +60,20 @@ copy /y package-lock.json node_modules\.trainer-lock.json >nul
 
 :run
 echo Dang khoi dong... (Ctrl+C hoac dong cua so nay de dung)
-set "OPEN=1"
-node server\index.ts %*
-if errorlevel 1 goto fail
-exit /b 0
+rem One parenthesized block, read by cmd in one go: a sync that replaced this file while the server ran cannot make cmd
+rem go on reading the new file at an old offset ("goto" looks the label up again, in whatever the file is now).
+(
+  node server\index.ts %*
+  if errorlevel 75 if not errorlevel 76 goto restart
+  if errorlevel 1 goto fail
+  exit /b 0
+)
+
+:restart
+echo Khoi dong lai de dung ban moi...
+rem the page that asked for the restart reloads by itself: no second browser tab
+set "OPEN="
+goto deps
 
 :fail
 echo.

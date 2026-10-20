@@ -41,7 +41,12 @@ function toSession(raw: Record<string, unknown>, i: number): PlanSession {
             services: filter.services ? asStringList(filter.services) : undefined,
             packs: filter.packs ? asStringList(filter.packs) : undefined,
             difficulties: filter.difficulties ? (asStringList(filter.difficulties) as Difficulty[]) : undefined,
+            tasks: filter.tasks ? asStringList(filter.tasks) : undefined,
+            requirements: filter.requirements ? asStringList(filter.requirements) : undefined,
           },
+          pearson: filter.pearson === true ? true : undefined,
+          recallFirst: filter.recallFirst === true ? true : undefined,
+          form: asString(filter.form),
           feedback: (asString(filter.feedback) as FeedbackMode | undefined) ?? undefined,
           timing: raw.timing ? { preset: String(raw.timing) } : undefined,
         } as BuildTestRequest)

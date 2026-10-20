@@ -7,6 +7,9 @@ import { WHY_MAX_CHARS, attemptById, cleanNote, gradeAndSave, loadAttempts, resu
 import { buildTest, modeCounts } from '../lib/select.ts';
 import { planSummary } from '../lib/plans.ts';
 import { newDataSince, scheduleSnapshot } from '../lib/snapshot.ts';
+import { attemptBySession } from '../lib/results.ts'; // [δ] idempotent submit
+import { autoSync } from '../lib/sync.ts'; // [δ] quiet sync after a submit
+import { resultAnnotations } from '../lib/regrade.ts'; // [β1] GET /api/results/:id annotations
 import type { Attempt, AttemptSummary, BuildTestRequest, PlansResponse, SelectionFilters, SubmitRequest } from '../../shared/types.ts';
 
 const PAGE_DEFAULT = 50;
@@ -43,11 +46,20 @@ route('POST', '/api/tests', async (req) => {
   return { session, questions: session.questions.map((r) => ctx.bank.byId.get(r.id)) };
 });
 
+/**
+ * [δ] Idempotent by `session.sessionId`: a retried submit (response lost on flaky Wi-Fi, the browser outbox after a
+ * reconnect) gets the attempt already stored for that session — `duplicate: true`, nothing written, no double count.
+ * Lookup and write run without an await in between, so two racing submits of one session cannot both write.
+ */
 route('POST', '/api/results', async (req) => {
   const body = await readBody<SubmitRequest>(req);
   if (!body.session?.questions?.length) throw new HttpError(400, 'session is required');
+  const sid = typeof body.session.sessionId === 'string' && body.session.sessionId.length <= 200 ? body.session.sessionId : undefined;
+  const stored = attemptBySession(sid);
+  if (stored) return { attempt: stored, duplicate: true };
   const attempt = gradeAndSave(body, loadBank());
   scheduleSnapshot(); // coach/snapshot.md is rebuilt ~3 s later, after the response
+  autoSync.noteSubmit(); // sync.auto: idle → quiet sync after auto_delay_minutes unless another test starts first
   return { attempt };
 });
 
@@ -94,11 +106,16 @@ route('GET', '/api/results', (_req, url) => {
   });
 });
 
+/**
+ * [β1] The stored attempt (as graded at the time) + `annotations` from the learning view of the history (ResultAnnotations:
+ * exposure per question, recognized repeats, never-viewed answers, seen-before vs first-time split of the scored ones).
+ */
 route('GET', '/api/results/:id', (_req, _url, [id]) => {
   const bank = loadBank();
   const attempt = attemptById(loadAttempts(currentConfig()), decodeURIComponent(id));
   if (!attempt) throw new HttpError(404, 'Result not found');
-  return { attempt, summary: summarize(attempt, bank), questions: attempt.answers.map((r) => bank.byId.get(r.q) ?? null) };
+  const annotations = resultAnnotations(attemptById(context().attempts, attempt.id), attempt);
+  return { attempt, summary: summarize(attempt, bank), questions: attempt.answers.map((r) => bank.byId.get(r.q) ?? null), annotations };
 });
 
 /** Memoized per data state, refreshed at least every 5 minutes (see contextStats). */

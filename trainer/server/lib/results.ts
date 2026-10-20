@@ -11,6 +11,7 @@ import { ParseCache, statSig, type FileParse } from './index-db.ts';
 import { detectFeatures, detectServices } from './classify.ts';
 import { fmtLocal, localIso, stampParts } from './time.ts';
 import { isCorrect, normalizeKeys, pct, scaledScore } from '../../shared/scoring.ts';
+import { markFormUsed } from './sealed.ts';
 import { fmtDuration } from '../../shared/timing.ts';
 import { FEEDBACK_INFO, MODE_INFO } from '../../shared/labels.ts';
 import type { AnswerInput, AnswerRecord, Attempt, AttemptPoint, AttemptSummary, Question, ResultsPage, SubmitRequest, Taxonomy, TestMode } from '../../shared/types.ts';
@@ -94,7 +95,16 @@ function toAnswer(a: Record<string, unknown>): AnswerRecord {
   if (why) r.why = why;
   if (a.scored === false) r.scored = false;
   if (typeof a.h === 'string' && a.h) r.h = a.h;
+  const rt = num(a.rt);
+  if (rt > 0) r.rt = Math.round(rt);
   return r;
+}
+
+function realismOf(v: unknown): Attempt['realism'] {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  const r = { items: num(o.items), total: num(o.total), words: num(o.words), referenceWords: num(o.referenceWords) };
+  return r.total > 0 ? r : undefined;
 }
 
 /** Median seconds per *answered* question (0 when nothing was answered). */
@@ -130,6 +140,10 @@ function toAttempt(data: Record<string, unknown>, file: string): Attempt | undef
     scaled: num(data.scaled),
     passed: data.passed === true,
     plan: asString(data.plan),
+    sessionId: asString(data.session),
+    sealedForm: asString(data.sealed_form),
+    diagnostic: data.diagnostic === true ? true : undefined,
+    realism: realismOf(data.realism),
     selection: data.selection,
     answers,
     file,
@@ -180,7 +194,33 @@ export function loadAttempts(cfg: AppConfig = loadConfig()): Attempt[] {
   resultParses.flush(removed ? present : undefined, useSqlite);
   attempts.sort((a, b) => a.finished.localeCompare(b.finished));
   listCache = { version, threshold, attempts };
+  indexSessions(attempts);
   return attempts;
+}
+
+// ── idempotent submit: TestSession.sessionId → the attempt stored for it ────
+// Rebuilt with every new loadAttempts() list, extended by gradeAndSave() — POST /api/results checks it without a scan of
+// results/ (the check and the write run in one synchronous stretch, so two racing submits cannot both write).
+
+let sessions: Map<string, Attempt> | undefined;
+
+function indexSessions(attempts: Attempt[]): void {
+  const m = new Map<string, Attempt>();
+  for (const a of attempts) if (a.sessionId && !m.has(a.sessionId)) m.set(a.sessionId, a); // oldest wins (the stored one)
+  sessions = m;
+}
+
+/** The attempt already stored for this test session (a retried submit), if its result file still exists. */
+export function attemptBySession(sessionId: string | undefined): Attempt | undefined {
+  if (!sessionId) return undefined;
+  if (!sessions) loadAttempts(); // first submit before anything was loaded (the server loads at startup)
+  const a = sessions?.get(sessionId);
+  if (!a) return undefined;
+  if (!fs.existsSync(path.resolve(DATA_DIR, a.file))) {
+    sessions?.delete(sessionId); // the learner deleted the result: a new submit writes it again
+    return undefined;
+  }
+  return a;
 }
 
 /** Short version of the results directory (changes whenever a result file is added, edited or removed). */
@@ -365,6 +405,8 @@ function toRecord(q: Question, a: AnswerInput | undefined, pilot: boolean, tax: 
   const why = cleanNote(a?.why, WHY_MAX_CHARS);
   if (why) r.why = why;
   if (pilot) r.scored = false;
+  const rt = Math.round(Number(a?.rt) || 0);
+  if (rt > 0) r.rt = rt; // practice: time spent reading the feedback (kept out of t)
   r.h = q.hash; // which version of the question was answered (item versioning)
   return r;
 }
@@ -401,7 +443,7 @@ export function gradeSubmission(req: SubmitRequest, bank: BankState): GradedSubm
   };
 }
 
-const ANSWER_KEYS = ['q', 'pick', 'key', 'ok', 't', 'est', 'flag', 'unsure', 'elim', 'recall', 'recallHit', 'hinted', 'why', 'scored', 'h', 'regraded'];
+const ANSWER_KEYS = ['q', 'pick', 'key', 'ok', 't', 'est', 'flag', 'unsure', 'elim', 'recall', 'recallHit', 'hinted', 'why', 'scored', 'h', 'regraded', 'rt', 'unviewed', 'exposure', 'recognized'];
 
 /** Compact front-matter form of an answer (+ unknown keys of the previous version of the record). */
 function answerData(r: AnswerRecord, prev?: Record<string, unknown>): Record<string, unknown> {
@@ -417,13 +459,15 @@ function answerData(r: AnswerRecord, prev?: Record<string, unknown>): Record<str
   if (r.why) o.why = r.why;
   if (r.scored === false) o.scored = false;
   if (r.h) o.h = r.h;
+  if (r.rt) o.rt = r.rt;
   for (const [k, v] of Object.entries(prev ?? {})) if (!ANSWER_KEYS.includes(k) && v !== undefined) o[k] = v;
   return o;
 }
 
 const TOP_KEYS = [
   'id', 'kind', 'layout', 'mode', 'title', 'feedback', 'started', 'finished', 'time_limit', 'time_used', 'timed_out', 'estimate_total', 'timing',
-  'total', 'answered', 'correct', 'score', 'scaled', 'passed', 'pearson', 'pilot_total', 'pilot_correct', 'plan', 'selection', 'answers',
+  'total', 'answered', 'correct', 'score', 'scaled', 'passed', 'pearson', 'pilot_total', 'pilot_correct', 'plan', 'session', 'sealed_form', 'diagnostic',
+  'realism', 'selection', 'answers',
 ];
 
 /** Front matter for an attempt; keys of `prev` the app does not know are preserved (before `answers`). */
@@ -453,6 +497,10 @@ function frontMatterData(a: Attempt, prev: Record<string, unknown> = {}, extra: 
     pilot_total: a.pearson ? (a.pilotTotal ?? 0) : undefined,
     pilot_correct: a.pearson ? (a.pilotCorrect ?? 0) : undefined,
     plan: a.plan,
+    session: a.sessionId,
+    sealed_form: a.sealedForm,
+    diagnostic: a.diagnostic ? true : undefined,
+    realism: a.realism,
     selection: a.selection,
   };
   const out: Record<string, unknown> = {};
@@ -498,6 +546,10 @@ export function gradeAndSave(req: SubmitRequest, bank: BankState): Attempt {
     scaled: scaledScore(g.score),
     passed: g.score >= passPct,
     plan: session.plan,
+    sessionId: session.sessionId,
+    sealedForm: session.sealedForm,
+    diagnostic: session.diagnostic ? true : undefined,
+    realism: session.realism,
     selection,
     answers: g.records,
     file: rel(file),
@@ -508,7 +560,9 @@ export function gradeAndSave(req: SubmitRequest, bank: BankState): Attempt {
   };
   const data = frontMatterData(attempt, {}, { estimate_total: session.estimateTotal, timing: session.timingPreset });
   writeAtomic(file, stringifyFrontMatter(data, ['answers']) + '\n' + renderBody(attempt, g.questions, bank, session.estimateTotal, cfg));
+  if (session.sealedForm) markFormUsed(session.sealedForm, attempt.id, attempt.finished); // its questions return to the practice pool
   resultParses.drop(file, cfg.cache?.sqlite !== false); // a stored row of a deleted file with the same name must not come back
+  if (attempt.sessionId && sessions && !sessions.has(attempt.sessionId)) sessions.set(attempt.sessionId, attempt);
   return attempt;
 }
 

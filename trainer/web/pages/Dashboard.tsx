@@ -1,18 +1,25 @@
+import { useState } from 'react';
+import { api } from '../lib/api.ts';
 import { useData, useFetch } from '../lib/store.tsx';
 import { href, navigate } from '../lib/router.ts';
 import { startTest } from '../lib/start.ts';
 import { loadActive } from '../lib/session.ts';
 import { fmtDateTime, fmtDuration, fmtRelative } from '../lib/format.ts';
 import { AttemptBadges, ReadinessCard } from '../components/insights.tsx';
+import { toast } from '../components/ui.tsx';
 import { ExamCountdown } from '../components/progress/ExamCountdown.tsx';
+import { useProgress } from '../components/progress/useProgress.ts';
+import { Onboarding, onboardingSkipped, setOnboardingSkipped } from '../components/onboarding/Onboarding.tsx';
+import { DIAGNOSTIC_PART, DIAGNOSTIC_TITLE, isDiagnostic, isDiagnosticPart, scoreTone } from '../components/onboarding/rules.ts';
+import { useStudyStart } from '../components/onboarding/useStudyStart.ts';
 import { MODE_INFO } from '../../shared/labels.ts';
-import type { AttemptSummary, PlansResponse, ResultsPage, StatsResponse } from '../../shared/types.ts';
+import type { AttemptSummary, OnboardingPlanResponse, PlansResponse, ResultsPage, StatsResponse } from '../../shared/types.ts';
 
 const RECENT = 6;
 
 function ActionCard({ icon, title, desc, cta, onClick, tone }: { icon: string; title: string; desc: string; cta: string; onClick: () => void; tone?: 'accent' }) {
   return (
-    <button className={`mode-card ${tone === 'accent' ? 'on' : ''}`} onClick={onClick}>
+    <button className={`mode-card lrn-action ${tone === 'accent' ? 'on' : ''}`} onClick={onClick} title={`${title}\n${desc}`}>
       <span className="t">
         {icon} {title}
       </span>
@@ -30,7 +37,11 @@ export function Dashboard() {
   // paginated APIs: only the newest attempts and the latest plan summary (no Markdown bodies) — older servers answer
   // `?limit=` with the full legacy array, which is handled too
   const { data: page } = useFetch<ResultsPage | AttemptSummary[]>(`/api/results?limit=${RECENT}`);
-  const { data: plans } = useFetch<PlansResponse>('/api/plans?limit=1');
+  const { data: plans, reload: reloadPlans } = useFetch<PlansResponse>('/api/plans?limit=1');
+  const { data: progress, error: progressError } = useProgress();
+  const studyStart = useStudyStart();
+  const [skipped, setSkipped] = useState(onboardingSkipped);
+  const [planning, setPlanning] = useState(false);
   const active = loadActive();
   if (!meta) return null;
   const results = Array.isArray(page) ? page.slice(0, RECENT) : page?.items;
@@ -43,26 +54,92 @@ export function Dashboard() {
   const firstTime = totalResults === 0; // no flash of the onboarding box while loading
   const dueToday = c.srs ?? 0;
   const backlog = c.backlog ?? T?.backlog ?? 0;
+  // first day: the onboarding wizard (once the goal is known, so it never jumps from step 1 to step 2)
+  const wizard = firstTime && !skipped;
+  const wizardReady = !!progress || !!progressError;
+  // after the diagnostic: its second half (split 2 × 14), then the week-1 plan
+  const recent = results ?? [];
+  const lastDiag = recent.find((a) => isDiagnostic(a));
+  const needSecondHalf = recent.filter((a) => isDiagnosticPart(a)).length === 1 && !recent.some((a) => isDiagnostic(a) && !isDiagnosticPart(a));
+  const onboardingPlan = plan?.trigger === 'onboarding';
+  const planAfterDiag = !!plan && !!lastDiag && new Date(plan.created).getTime() >= new Date(lastDiag.finished).getTime();
+  const offerPlan = !!lastDiag && !needSecondHalf && !planAfterDiag;
+  const makePlan = async () => {
+    if (!lastDiag) return;
+    setPlanning(true);
+    try {
+      const r = await api.post<OnboardingPlanResponse>('/api/onboarding/plan', { attemptId: lastDiag.id });
+      toast(r.created ? `🗓️ Đã lập kế hoạch tuần 1 (${r.plan.sessions.length} phiên).` : '🗓️ Kế hoạch tuần 1 hôm nay đã có.');
+      reloadPlans();
+    } catch (e) {
+      toast(`Không lập được kế hoạch: ${(e as Error).message}`);
+    } finally {
+      setPlanning(false);
+    }
+  };
+
+  const head = (
+    <div className="page-head">
+      <div>
+        <h1>Chào bạn 👋</h1>
+        <p>
+          {meta.exam.name} · {meta.exam.questions} câu / {meta.exam.duration_min} phút · đỗ ≥ {meta.exam.pass_scaled}/1000
+        </p>
+      </div>
+      <div className="row">
+        <a className="btn primary" href={href('/new')}>
+          ✍️ Tạo bài test
+        </a>
+      </div>
+    </div>
+  );
+
+  // first day: only the wizard (no competing "what to do today" cards on an empty history)
+  if (wizard) {
+    return (
+      <div>
+        {head}
+        {active && (
+          <div className="ins-wrap alert info row between" style={{ marginBottom: 16 }}>
+            <span>
+              ⏯️ Bạn đang làm dở <b>{active.session.title}</b> · {Object.keys(active.answers).length}/{active.questions.length} câu
+            </span>
+            <button className="btn primary sm" onClick={() => navigate('/run')}>
+              Làm tiếp
+            </button>
+          </div>
+        )}
+        {wizardReady && (
+          <Onboarding
+            goal={progress?.goal}
+            onSkip={() => {
+              setSkipped(true);
+              toast('Đã ẩn hướng dẫn — mở lại ở hộp “Bắt đầu thế nào?”.');
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <h1>Chào bạn 👋</h1>
-          <p>
-            {meta.exam.name} · {meta.exam.questions} câu / {meta.exam.duration_min} phút · đỗ ≥ {meta.exam.pass_scaled}/1000
-          </p>
-        </div>
-        <div className="row">
-          <a className="btn primary" href={href('/new')}>
-            ✍️ Tạo bài test
-          </a>
-        </div>
-      </div>
+      {head}
 
       {firstTime && (
         <section className="card pad-lg" style={{ background: 'var(--accent-soft)', borderColor: 'transparent' }}>
-          <h2 style={{ fontSize: 18 }}>Bắt đầu thế nào?</h2>
+          <div className="row between">
+            <h2 style={{ fontSize: 18 }}>Bắt đầu thế nào?</h2>
+            <button
+              className="btn ghost sm"
+              onClick={() => {
+                setOnboardingSkipped(false);
+                setSkipped(false);
+              }}
+            >
+              🧭 Mở lại hướng dẫn 3 bước
+            </button>
+          </div>
           <ol className="small" style={{ margin: '8px 0 0', paddingLeft: 20, lineHeight: 1.8 }}>
             <li>
               Làm 1 bài <b>⚡ Luyện nhanh</b> hoặc chọn <b>📚 Theo chủ đề</b> để làm quen — mỗi câu có thời gian chuẩn, đồng hồ chạy theo tổng thời gian.
@@ -123,12 +200,32 @@ export function Dashboard() {
             {active && (
               <ActionCard tone="accent" icon="⏯️" title="Tiếp tục bài đang làm" desc={`${active.session.title} · ${Object.keys(active.answers).length}/${active.questions.length} câu`} cta="Làm tiếp" onClick={() => navigate('/run')} />
             )}
-            {nextSession && plan && (
+            {needSecondHalf && (
               <ActionCard
                 tone={active ? undefined : 'accent'}
-                icon="🤖"
+                icon="🧭"
+                title={`Chẩn đoán phần 2/2 · ${DIAGNOSTIC_PART} câu`}
+                desc="Mỗi mục exam guide thêm 1 câu khác — bản đồ xuất phát đủ 2 câu/mục, kế hoạch tuần 1 chính xác hơn."
+                cta="Làm phần 2"
+                onClick={() => void startTest({ mode: 'diagnostic', count: DIAGNOSTIC_PART, title: `${DIAGNOSTIC_TITLE} · phần 2/2` })}
+              />
+            )}
+            {offerPlan && (
+              <ActionCard
+                tone={active ? undefined : 'accent'}
+                icon="🗓️"
+                title="Lập kế hoạch tuần 1"
+                desc="Từ bài chẩn đoán: vá các mục ✗ trọng số cao, ôn xen kẽ — tự lập, không cần AI."
+                cta={planning ? 'Đang lập…' : 'Lập kế hoạch'}
+                onClick={() => !planning && void makePlan()}
+              />
+            )}
+            {nextSession && plan && (
+              <ActionCard
+                tone={active || needSecondHalf || offerPlan ? undefined : 'accent'}
+                icon={onboardingPlan ? '🗓️' : '🤖'}
                 title={nextSession.title}
-                desc={nextSession.why ?? `Phiên trong kế hoạch AI ${fmtRelative(plan.created)}`}
+                desc={nextSession.why ?? (onboardingPlan ? 'Phiên trong kế hoạch tuần 1' : `Phiên trong kế hoạch AI ${fmtRelative(plan.created)}`)}
                 cta={`${nextSession.questions?.length ?? nextSession.filter?.count ?? ''} câu`}
                 onClick={() => startTest({ mode: 'coach', plan: `${plan.id}#${nextSession.id}` })}
               />
@@ -156,10 +253,16 @@ export function Dashboard() {
       <section className="grid c2">
         <div className="card">
           <div className="card-head">
-            <h2>🤖 Kế hoạch AI Coach</h2>
-            <a className="small" href={href('/coach')}>
-              Mở AI Coach →
-            </a>
+            <h2>{onboardingPlan ? '🗓️ Kế hoạch tuần 1' : '🤖 Kế hoạch AI Coach'}</h2>
+            {onboardingPlan && lastDiag ? (
+              <a className="small" href={href(`/result/${encodeURIComponent(lastDiag.id)}`)}>
+                🧭 Bản đồ xuất phát →
+              </a>
+            ) : (
+              <a className="small" href={href('/coach')}>
+                Mở AI Coach →
+              </a>
+            )}
           </div>
           {!plan ? (
             <div className="small muted">
@@ -169,6 +272,7 @@ export function Dashboard() {
             <div className="stack sm">
               <div className="small dim">
                 {fmtDateTime(plan.created)} · {plan.summary ?? plan.id}
+                {onboardingPlan && <span className="muted"> · tự lập từ bài chẩn đoán (không dùng AI)</span>}
               </div>
               {plan.sessions.map((s) => (
                 <div key={s.id} className="row between nowrap small">
@@ -207,7 +311,7 @@ export function Dashboard() {
                   </span>
                   <span className="row nowrap" style={{ gap: 4 }}>
                     <AttemptBadges a={a} />
-                    <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.score}%</span>
+                    <span className={`badge ${scoreTone(a, studyStart)}`}>{a.score}%</span>
                   </span>
                 </a>
               ))}

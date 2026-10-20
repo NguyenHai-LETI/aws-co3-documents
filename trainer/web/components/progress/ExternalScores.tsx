@@ -1,6 +1,8 @@
 // [L] Scores from official / third-party practice exams (results/external/*.md) next to the app readiness on the same
 // date, and the calibration that follows: offset = mean(score − readiness) over the last 5 → adjusted readiness.
+// [β2] Used sealed forms appear here too (internal: true): "điểm trên câu mới", linked to the result, not deletable.
 import { useState } from 'react';
+import { href } from '../../lib/router.ts';
 import { toast } from '../ui.tsx';
 import { scaledScore } from '../../../shared/scoring.ts';
 import { fmtDay, postProgress, signed, todayKey } from './useProgress.ts';
@@ -94,9 +96,9 @@ export function ExternalScores({ scores, calibration, readiness }: { scores: Ext
     <div className="card stack">
       <div className="card-head" style={{ marginBottom: 0 }}>
         <div>
-          <h2>📝 Điểm thi thử bên ngoài</h2>
+          <h2>📝 Điểm thi thử bên ngoài{scores.some((s) => s.internal) ? ' & đề niêm phong' : ''}</h2>
           <div className="small muted" style={{ marginTop: 2 }}>
-            Đề chính thức / bên thứ ba — so với mức sẵn sàng của app cùng ngày
+            Đề chính thức / bên thứ ba và đề niêm phong (câu chưa gặp) — so với mức sẵn sàng của app cùng ngày
           </div>
         </div>
         {!adding && (
@@ -118,14 +120,25 @@ export function ExternalScores({ scores, calibration, readiness }: { scores: Ext
           {scores.map((s) => {
             const diff = typeof s.readinessAtDate === 'number' ? s.score - s.readinessAtDate : undefined;
             return (
-              <div key={s.id} className="lrn-ext-item" role="listitem">
+              <div key={s.id} className={`lrn-ext-item ${s.internal ? 'internal' : ''}`} role="listitem">
                 <div className="lrn-ext-main">
-                  <div className="small">
+                  <div className="small row" style={{ gap: 6 }}>
                     <b>{s.source}</b>
+                    {s.internal && (
+                      <span className="badge accent" title="Đề niêm phong của app: câu chưa từng gặp khi luyện — điểm hiệu chỉnh nội bộ">
+                        🔒 câu mới
+                      </span>
+                    )}
                   </div>
                   <div className="tiny muted">
                     {fmtDay(s.date)}
                     {s.note ? ` · ${s.note}` : ''}
+                    {s.internal && s.attempt && (
+                      <>
+                        {' · '}
+                        <a href={href(`/result/${encodeURIComponent(s.attempt)}`)}>xem kết quả →</a>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="lrn-ext-nums">
@@ -137,9 +150,13 @@ export function ExternalScores({ scores, calibration, readiness }: { scores: Ext
                     {diff === undefined ? 'app: chưa đủ dữ liệu' : `app ${s.readinessAtDate}% · chênh ${signed(diff)}`}
                   </div>
                 </div>
-                <button className="btn ghost sm" title="Xoá điểm này" aria-label={`Xoá điểm ${s.source} ngày ${fmtDay(s.date)}`} onClick={() => void remove(s)}>
-                  ✕
-                </button>
+                {s.internal ? (
+                  <span className="lrn-ext-spacer" aria-hidden />
+                ) : (
+                  <button className="btn ghost sm" title="Xoá điểm này" aria-label={`Xoá điểm ${s.source} ngày ${fmtDay(s.date)}`} onClick={() => void remove(s)}>
+                    ✕
+                  </button>
+                )}
               </div>
             );
           })}

@@ -1,6 +1,7 @@
 // Thin fetch wrapper. Every mutating request carries X-Trainer: 1 (the server rejects
 // cross-site POSTs without it, which protects the "run AI coach" endpoint).
 export class ApiError extends Error {
+  /** HTTP status; 0 = no answer at all (network down, server restarting, timeout). */
   status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -8,12 +9,25 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json', 'X-Trainer': '1' } : method === 'GET' ? {} : { 'X-Trainer': '1' },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+export interface RequestOptions {
+  /** Give up after this many ms (→ ApiError 0) instead of waiting for a hung connection (flaky phone Wi-Fi). */
+  timeoutMs?: number;
+}
+
+async function request<T>(method: string, url: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: body !== undefined ? { 'Content-Type': 'application/json', 'X-Trainer': '1' } : method === 'GET' ? {} : { 'X-Trainer': '1' },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
+    });
+  } catch (e) {
+    const name = (e as Error | undefined)?.name;
+    // "Failed to fetch" / "Load failed" / "NetworkError…" depending on the browser → one Vietnamese message
+    throw new ApiError(0, name === 'TimeoutError' || name === 'AbortError' ? 'máy chủ không trả lời kịp' : 'không kết nối được máy chủ');
+  }
   const text = await res.text();
   let data: unknown = undefined;
   try {
@@ -26,6 +40,15 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     throw new ApiError(res.status, msg);
   }
   return data as T;
+}
+
+/**
+ * The same request may succeed later: no answer (network, timeout, server restarting), a temporary server error, or a
+ * LAN session that needs the access code again. Other 4xx answers will not change by retrying.
+ */
+export function isRetryable(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return false;
+  return e.status === 0 || e.status === 401 || e.status === 408 || e.status === 429 || e.status >= 500;
 }
 
 // Identical GETs started together (React StrictMode runs every effect twice in `npm start`'s dev build; several
@@ -47,5 +70,5 @@ function sharedGet<T>(url: string): Promise<T> {
 
 export const api = {
   get: <T>(url: string) => sharedGet<T>(url),
-  post: <T>(url: string, body: unknown = {}) => request<T>('POST', url, body),
+  post: <T>(url: string, body: unknown = {}, opts?: RequestOptions) => request<T>('POST', url, body, opts),
 };

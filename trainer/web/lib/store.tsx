@@ -36,6 +36,9 @@ export interface Meta {
   host: string;
   coachHosts: string[];
   syncAi?: { before: boolean; after: boolean }; // config sync.before_ai / after_ai (older servers: undefined)
+  sealed?: { id: string; status: 'sealed' | 'used' | 'released'; count: number; usedAt?: string; attempt?: string }[]; // sealed forms (no ids)
+  codeVersion?: string; // code the server runs (compare with the page's to offer a restart/reload)
+  launcher?: boolean; // started by a launcher script that restarts the server on exit code 75
   versions?: DataVersions; // {bank, results, plans} — same values as the SSE `data` event (older servers: undefined)
 }
 
@@ -44,6 +47,7 @@ export interface BankData {
   packs: Pack[];
   questions: Question[];
   problems: BankProblem[];
+  sealed?: string[]; // ids currently sealed: hide them everywhere except a sealed exam
 }
 
 export interface StateData {
@@ -54,6 +58,8 @@ export interface StateData {
 
 /** What states / counts depend on: everything but the plans (the bank too — pools and counts). */
 const stateKey = (v: DataVersions | undefined) => (v ? [v.bank, v.results, v.params ?? '', v.config ?? '', v.day ?? ''].join('|') : '');
+/** Sealed forms' ids + statuses from meta: a change means bank.sealed must be refetched. */
+const sealedSig = (m: Meta) => JSON.stringify((m.sealed ?? []).map((f) => [f.id, f.status]));
 
 interface DataCtx {
   meta?: Meta;
@@ -81,7 +87,7 @@ let source: EventSource | undefined;
 function ensureSource() {
   if (source) return;
   source = new EventSource('/api/events');
-  for (const name of ['data', 'coach', 'coach-done']) {
+  for (const name of ['data', 'coach', 'coach-done', 'sync', 'update', 'hello']) {
     source.addEventListener(name, (e) => {
       let data: unknown;
       try {
@@ -113,7 +119,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState(0);
   const [versions, setVersions] = useState<DataVersions>();
   // versions = meta's (latest known); stateVersions = what the loaded states were computed from (may lag behind meta)
-  const loaded = useRef<{ bank?: BankData; versions?: DataVersions; stateVersions?: DataVersions }>({});
+  const loaded = useRef<{ bank?: BankData; versions?: DataVersions; stateVersions?: DataVersions; sealedSig?: string }>({});
   const queue = useRef<Promise<void>>(Promise.resolve());
 
   /**
@@ -132,9 +138,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       bankStale ? api.get<BankData>('/api/bank') : undefined,
       stateStale ? api.get<StateData>('/api/state') : undefined,
     ]);
-    const fresh = b ?? (cur.bank && m.bankVersion !== cur.bank.version ? await api.get<BankData>('/api/bank') : undefined);
-    const keepBank = cur.bank && fresh && fresh.version === cur.bank.version ? cur.bank : (fresh ?? cur.bank);
-    loaded.current = { bank: keepBank, versions: m.versions ?? next, stateVersions: s ? (s.versions ?? m.versions ?? next) : cur.stateVersions };
+    // a sealed form used / released changes bank.sealed without a new bank version (sealed.md lives under results/)
+    const seal = sealedSig(m);
+    const sealedMoved = !!cur.bank && cur.sealedSig !== undefined && cur.sealedSig !== seal;
+    const fresh = b ?? (cur.bank && (m.bankVersion !== cur.bank.version || sealedMoved) ? await api.get<BankData>('/api/bank') : undefined);
+    const keepBank = cur.bank && fresh && fresh.version === cur.bank.version && !sealedMoved ? cur.bank : (fresh ?? cur.bank);
+    loaded.current = { bank: keepBank, sealedSig: seal, versions: m.versions ?? next, stateVersions: s ? (s.versions ?? m.versions ?? next) : cur.stateVersions };
     setMeta(m);
     if (keepBank !== cur.bank) setBank(keepBank);
     if (s) setState(s);

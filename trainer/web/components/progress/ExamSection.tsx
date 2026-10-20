@@ -1,6 +1,6 @@
-// [L] Stats → "🎯 Ngày thi & dự báo": exam date + target score, the forecast for the exam day (if study stops now /
-// if due reviews are done on time), per-domain forecast, review workload until the exam, external practice-exam scores
-// with the readiness calibration.
+// [L] Stats → "🎯 Ngày thi & dự báo": exam date + target score (+ study budget), the forecast for the exam day (if study
+// stops now / if due reviews are done on time), per-domain forecast, review workload until the exam, [β2] the exam-day
+// checklist and the sealed forms, external practice-exam scores (+ sealed calibration points) with the calibration.
 import { useEffect, useState } from 'react';
 import { useData } from '../../lib/store.tsx';
 import { KvRow, passTone } from '../insights.tsx';
@@ -9,8 +9,54 @@ import { scaledScore } from '../../../shared/scoring.ts';
 import { ForecastDomains, ForecastLegend, ForecastTrack } from './ForecastViz.tsx';
 import { WorkloadChart } from './Workload.tsx';
 import { ExternalScores } from './ExternalScores.tsx';
+import { ExamChecklist } from './ExamChecklist.tsx';
+import { SealedPanel } from './SealedPanel.tsx';
+import { StudyBudgetFields, budgetFromGoal, budgetPayload, budgetText, restDaysText, type StudyBudget } from '../onboarding/Onboarding.tsx';
 import { daysLeftText, fmtDay, postProgress, todayKey } from './useProgress.ts';
 import type { ExamForecast, ExamGoal, ProgressResponse } from '../../../shared/types.ts';
+
+/** [β2] Daily study budget (minutes, rest days, preferred time) — set during onboarding, edited here. */
+function BudgetForm({ goal }: { goal: ExamGoal }) {
+  const [b, setB] = useState<StudyBudget>(() => budgetFromGoal(goal));
+  const [busy, setBusy] = useState(false);
+  const key = JSON.stringify([goal.minutesPerDay, goal.restDays, goal.studyTime]);
+  useEffect(() => setB(budgetFromGoal(goal)), [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = JSON.stringify(budgetPayload(b)) !== JSON.stringify(budgetPayload(budgetFromGoal(goal)));
+  const summary = goal.minutesPerDay ? `${goal.minutesPerDay}′/ngày · ${restDaysText(goal.restDays)}${goal.studyTime ? ` · ${goal.studyTime}` : ''}` : 'chưa đặt';
+  const save = async () => {
+    setBusy(true);
+    try {
+      await postProgress('/api/goal', budgetPayload(b));
+      toast('⏱ Đã lưu lịch học.');
+    } catch (e) {
+      toast(`Không lưu được: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <details className="lrn-budget">
+      <summary className="small">
+        ⏱ Lịch học: <b>{summary}</b>
+      </summary>
+      <form
+        className="stack sm lrn-budget-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save();
+        }}
+      >
+        <StudyBudgetFields value={b} onChange={setB} idPrefix="goal" />
+        <div className="row between">
+          <span className="tiny muted">{budgetText(b, goal.examDate)}</span>
+          <button className="btn primary sm" type="submit" disabled={busy || !dirty || (!!b.minutes.trim() && Number(b.minutes) < 5)}>
+            Lưu lịch học
+          </button>
+        </div>
+      </form>
+    </details>
+  );
+}
 
 function GoalForm({ goal, passScaled }: { goal: ExamGoal; passScaled: number }) {
   const [date, setDate] = useState(goal.examDate ?? '');
@@ -120,6 +166,7 @@ export function ExamSection({ progress, readiness }: { progress: ProgressRespons
             {forecast && <span className={`badge ${forecast.daysLeft < 0 ? 'warn' : 'accent'}`}>{daysLeftText(forecast.daysLeft)}</span>}
           </div>
           <GoalForm goal={goal} passScaled={passScaled} />
+          <BudgetForm goal={goal} />
           {forecast && !forecast.seen ? (
             <div className="small muted">Chưa làm câu nào — dự báo điểm cho ngày {fmtDay(forecast.examDate)} sẽ có ngay sau bài test đầu tiên.</div>
           ) : forecast ? (
@@ -134,6 +181,10 @@ export function ExamSection({ progress, readiness }: { progress: ProgressRespons
           {forecast && !!forecast.seen && <ForecastDomains forecast={forecast} domains={meta.domains} passPct={meta.exam.pass_pct} />}
           <WorkloadChart days={progress.workload} dailyLimit={meta.srs.daily_limit} examDate={goal.examDate} />
         </div>
+      </div>
+      <div className="grid c2 lrn-gap lrn-align-start">
+        <ExamChecklist progress={progress} />
+        <SealedPanel progress={progress} />
       </div>
       <div className="lrn-gap">
         <ExternalScores scores={progress.external} calibration={progress.externalCalibration} readiness={readiness} />

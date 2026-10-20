@@ -7,9 +7,11 @@
 //            above", "Choose TWO" ≠ number of keys, option letters in the explanation) → the edit is rejected;
 //   medium = a test-wise cue or a style flaw worth fixing (correct option longest, stem echo, absolute words,
 //            unemphasized NOT, a/an cue, overlapping options) → warning;
-//   low    = maintenance work for ENRICH (short explanation) → warning.
+//   low    = maintenance work for ENRICH (short explanation, a distractor naming an out-of-scope service) → warning.
 // Codes are stable: they are stored nowhere, but patch reports, the UI and `validate --lint` refer to them.
+// Taxonomy-aware rules (oos-answer, oos-distractor: services marked `scope: out`) run only when `tax` is passed.
 import { LETTER_REF_RE } from './pack-format.ts';
+import { outOfScopeIn } from './taxonomy.ts';
 import { countWords } from '../../shared/timing.ts';
 import type { BankState } from './bank.ts';
 import type { LintFlaw, LintSeverity, LintSummary, Question, Taxonomy } from '../../shared/types.ts';
@@ -34,7 +36,19 @@ export const LINT_RULES: readonly LintRule[] = [
   { code: 'negative-stem', severity: 'medium', label: 'Câu hỏi phủ định không nhấn mạnh', fix: 'Viết hoa NOT / EXCEPT / LEAST (như đề thật) hoặc hỏi theo hướng khẳng định.' },
   { code: 'grammar-cue', severity: 'medium', label: 'Mạo từ a/an lộ đáp án', fix: 'Kết thúc đề bằng câu hỏi trọn vẹn, không để “a/an” trước phương án.' },
   { code: 'overlapping-options', severity: 'medium', label: 'Phương án chồng lấn nhau', fix: 'Mỗi phương án phải loại trừ nhau — phương án dài chứa trọn phương án ngắn thì cũng “đúng”.' },
+  {
+    code: 'oos-answer',
+    severity: 'medium',
+    label: 'Đáp án là dịch vụ ngoài phạm vi đề',
+    fix: 'Đề thật không hỏi dịch vụ ngoài phạm vi (danh sách chính thức SAA-C03): retire câu (status: retired) hoặc viết lại để đáp án là dịch vụ trong phạm vi.',
+  },
   { code: 'short-explanation', severity: 'low', label: 'Giải thích quá ngắn', fix: 'ENRICH “explain”: vì sao đúng + từng phương án nhiễu + tóm tắt 🇻🇳.' },
+  {
+    code: 'oos-distractor',
+    severity: 'low',
+    label: 'Phương án nhiễu là dịch vụ ngoài phạm vi',
+    fix: 'ENRICH “distractors”: thay bằng dịch vụ trong phạm vi hay bị nhầm với đáp án đúng — dịch vụ ngoài phạm vi bị loại ngay.',
+  },
 ];
 
 const RULE = new Map(LINT_RULES.map((r) => [r.code, r]));
@@ -332,13 +346,29 @@ function shortExplanation(q: LintInput): LintFlaw[] {
   return [flaw('short-explanation', n ? `Giải thích chỉ ${n} từ (< ${SHORT_EXPLANATION_WORDS}) — chưa nói vì sao các phương án nhiễu sai` : 'Chưa có giải thích')];
 }
 
+/**
+ * Exam scope (taxonomy `scope: out` = the official out-of-scope list): a correct option naming such a service makes the
+ * whole question off-exam (oos-answer); otherwise each distractor naming one is an easy give-away (oos-distractor).
+ */
+function scopeFlaws(q: LintInput, tax?: Taxonomy): LintFlaw[] {
+  if (!tax) return [];
+  const keys = correctKeys(q);
+  const named = q.options.map((o) => ({ o, services: outOfScopeIn(o.text, tax) })).filter((x) => x.services.length);
+  const right = named.filter((x) => keys.has(x.o.key));
+  if (right.length) {
+    const services = [...new Set(right.flatMap((x) => x.services))];
+    return [flaw('oos-answer', `Đáp án đúng nêu dịch vụ ngoài phạm vi đề thi (${services.join(', ')}) — đề thật SAA-C03 không hỏi dịch vụ này`, right[0].o.key)];
+  }
+  return named.map((x) => flaw('oos-distractor', `Phương án nhiễu ${x.o.key} nêu dịch vụ ngoài phạm vi (${x.services.join(', ')}) — loại được ngay vì đề thật không dùng`, x.o.key));
+}
+
 function flaw(code: string, message: string, option?: string): LintFlaw {
   const f: LintFlaw = { code, severity: RULE.get(code)!.severity, message };
   if (option) f.option = option;
   return f;
 }
 
-const CHECKS: ((q: LintInput) => LintFlaw[])[] = [
+const CHECKS: ((q: LintInput, tax?: Taxonomy) => LintFlaw[])[] = [
   duplicateOptions,
   allNoneAbove,
   chooseCount,
@@ -350,15 +380,16 @@ const CHECKS: ((q: LintInput) => LintFlaw[])[] = [
   grammarCue,
   overlappingOptions,
   shortExplanation,
+  scopeFlaws,
 ];
 
 const byRank = (a: LintFlaw, b: LintFlaw) =>
   SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || (CODE_RANK.get(a.code) ?? 99) - (CODE_RANK.get(b.code) ?? 99) || (a.option ?? '').localeCompare(b.option ?? '');
 
-/** Flaws of one question, most severe first. Pure function: no I/O. `tax` is accepted for future taxonomy-aware rules. */
-export function lintQuestion(q: Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'explanation'>, _tax?: Taxonomy): LintFlaw[] {
+/** Flaws of one question, most severe first. Pure function: no I/O. With `tax`, also the exam-scope rules (oos-*). */
+export function lintQuestion(q: Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'explanation'>, tax?: Taxonomy): LintFlaw[] {
   const input: LintInput = { id: q.id, stem: q.stem ?? '', options: q.options ?? [], answer: q.answer ?? [], explanation: q.explanation ?? '' };
-  return CHECKS.flatMap((check) => check(input)).sort(byRank);
+  return CHECKS.flatMap((check) => check(input, tax)).sort(byRank);
 }
 
 /** Flaws introduced by an edit: codes present after but not before (same code on the same option counts once). */
@@ -378,11 +409,18 @@ function badness(flaws: LintFlaw[]): number[] {
 
 let cache: { version: string; value: LintSummary } | undefined;
 
-/** Lint every active question: per-rule counts, flagged ids per rule and the worst questions. Cached by bank version. */
-export function lintBank(bank: BankState, opts: { cache?: boolean } = {}): LintSummary {
+/** Cache key part for an exclusion set (sealed questions): the sorted ids. */
+const excludeKey = (exclude?: ReadonlySet<string>) => (exclude?.size ? [...exclude].sort().join(',') : '');
+
+/**
+ * Lint every active question: per-rule counts, flagged ids per rule and the worst questions. Cached by bank version.
+ * `exclude` (sealed questions) are left out of every number and list.
+ */
+export function lintBank(bank: BankState, opts: { cache?: boolean; exclude?: ReadonlySet<string> } = {}): LintSummary {
   const useCache = opts.cache !== false && !!bank.version;
-  if (useCache && cache?.version === bank.version) return cache.value;
-  const active = bank.questions.filter((q) => q.status === 'active');
+  const key = `${bank.version}|${excludeKey(opts.exclude)}`;
+  if (useCache && cache?.version === key) return cache.value;
+  const active = bank.questions.filter((q) => q.status === 'active' && !opts.exclude?.has(q.id));
   const byCode: LintSummary['byCode'] = {};
   for (const r of LINT_RULES) byCode[r.code] = { severity: r.severity, label: r.label, count: 0 };
   const ids: Record<string, string[]> = {};
@@ -408,16 +446,16 @@ export function lintBank(bank: BankState, opts: { cache?: boolean } = {}): LintS
     bySeverity,
     ids,
   };
-  if (useCache) cache = { version: bank.version, value };
+  if (useCache) cache = { version: key, value };
   return value;
 }
 
 /** Every flagged active question for one rule (or all rules), worst first — the drill-down behind the summary cap. */
-export function lintQuestionsFor(bank: BankState, code?: string): { id: string; flaws: LintFlaw[] }[] {
-  const summary = lintBank(bank);
+export function lintQuestionsFor(bank: BankState, code?: string, exclude?: ReadonlySet<string>): { id: string; flaws: LintFlaw[] }[] {
+  const summary = lintBank(bank, { exclude });
   const wanted = code ? new Set(summary.ids?.[code] ?? []) : undefined;
   return bank.questions
-    .filter((q) => q.status === 'active' && (!wanted || wanted.has(q.id)))
+    .filter((q) => q.status === 'active' && !exclude?.has(q.id) && (!wanted || wanted.has(q.id)))
     .map((q) => ({ id: q.id, flaws: lintQuestion(q, bank.taxonomy) }))
     .filter((x) => x.flaws.length)
     .sort((a, b) => {

@@ -9,6 +9,9 @@
 //   repair    — structured runs only: the rejected items go back once through `--resume <session_id>`.
 //   verify    — coach.verify.auto: questions the run added or changed (new hash) are blind-solved; mismatches on
 //               AI-written / just-changed questions go to `status: draft` (coach.verify.auto_draft).
+// After a successful analyze, coach.enrich_after_analyze starts a follow-up ENRICH run (its own record) over the next
+// ~10 questions the learner is about to meet (enrich.ts upcomingIds: the new plan's sessions, reviews due by tomorrow,
+// the next never-seen questions) — ENRICH batches put those first anyway.
 import { execFile, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -19,7 +22,7 @@ import { context } from '../context.ts';
 import { loadBank, type BankState } from './bank.ts';
 import { DAY_MS, localDateKey, localIso, stampParts } from './time.ts';
 import { applyPatch, applyPatchItems, combineResults, ledgerPath, type PatchResult } from './patch.ts';
-import { MAX_BATCH, MAX_LONGFORM, idList, learnerNotes, longformTargets, parseTasks, patchPath, readRunInfos, repoRel, selectBatch, writeBatchFile, writeLongformFile } from './enrich.ts';
+import { MAX_BATCH, MAX_LONGFORM, idList, learnerNotes, longformTargets, parseTasks, patchPath, readRunInfos, repoRel, selectBatch, upcomingIds, writeBatchFile, writeLongformFile } from './enrich.ts';
 import { askCostsSince } from './ask.ts';
 import { writeSnapshot } from './snapshot.ts';
 import { aiSyncLine, syncForAi, type AiSyncNote } from './sync.ts';
@@ -52,6 +55,7 @@ const fmtLimit = (ms: number) => (ms >= 60_000 ? `${Math.round(ms / 60_000)} ph�
 const IS_WIN = process.platform === 'win32';
 export const COACH_TASKS: readonly CoachTask[] = ['analyze', 'generate', 'enrich', 'longform', 'verify'];
 export const DEFAULT_VERIFY_MODEL = 'opus';
+export const AFTER_ANALYZE_BATCH = 10; // coach.enrich_after_analyze: questions of the follow-up ENRICH run
 
 /** Run record = shared CoachRunInfo + optional extras written by this runner (UI may show them). */
 export type RunInfo = CoachRunInfo & {
@@ -295,10 +299,10 @@ export function resolvedModels(cfg: AppConfig): { analyze: string; generate: str
   return { analyze: modelFor('analyze', cfg), generate: modelFor('generate', cfg), enrich: modelFor('enrich', cfg), ask: modelFor('ask', cfg), verify: modelFor('verify', cfg) };
 }
 
-/** Scheduled runs started today (local date) — compared with coach.max_runs_per_day. */
+/** Scheduled runs started today (local date) — compared with coach.max_runs_per_day. A follow-up run (`params.after`) rides on its analyze run. */
 export function scheduledRunsToday(runs: CoachRunInfo[] = readRunInfos(200), now = new Date()): number {
   const today = localDateKey(now);
-  return runs.filter((r) => r.trigger === 'schedule' && r.status !== 'skipped' && localDateKey(r.startedAt) === today).length;
+  return runs.filter((r) => r.trigger === 'schedule' && r.status !== 'skipped' && !r.params?.after && localDateKey(r.startedAt) === today).length;
 }
 
 /** generate / enrich / longform answer in JSON (coach.structured_output) — needs a CLI with --json-schema / --tools. */
@@ -727,7 +731,7 @@ function prepare(task: CoachTask, runId: string, params: Record<string, unknown>
     return { params: { ids: t.ids, count: t.ids.length, ...(t.total > t.ids.length ? { remaining: t.total - t.ids.length } : {}) } };
   }
   if (task !== 'enrich' && task !== 'longform') return { params: mode };
-  const { bank, states, attempts } = context();
+  const { bank, states, attempts, plans } = context();
   if (task === 'enrich') {
     const { todos, examTasks } = parseTasks(params.tasks);
     const ids = idList(params.ids);
@@ -735,12 +739,19 @@ function prepare(task: CoachTask, runId: string, params: Record<string, unknown>
     const size = clampInt(params.size, 1, MAX_BATCH, clampInt(cfg.coach.enrich_batch_size, 1, MAX_BATCH, 20));
     const wantsDistractors = todos.includes('distractors');
     const report = wantsDistractors ? distractorReport(bank, attempts) : undefined;
-    const items = selectBatch(bank, states, { size, tasks: params.tasks, ids, report });
+    const onlyUpcoming = params.upcoming === true; // follow-up of an analyze run (coach.enrich_after_analyze)
+    const upcoming = ids.length ? [] : upcomingIds({ bank, states, attempts, plans, cfg });
+    const items = selectBatch(bank, states, { size, tasks: params.tasks, ids, report, upcoming, onlyUpcoming });
     if (!items.length) {
       throw new NothingToDoError(
-        ids.length ? 'Không có câu nào để ENRICH trong danh sách (id không tồn tại hoặc câu đã retired).' : `Không còn câu nào cần ENRICH (${[...todos, ...examTasks].join(', ')}) 🎉`,
+        ids.length
+          ? 'Không có câu nào để ENRICH trong danh sách (id không tồn tại hoặc câu đã retired).'
+          : onlyUpcoming
+            ? 'Các câu bạn sắp gặp đều đã được ENRICH 🎉'
+            : `Không còn câu nào cần ENRICH (${[...todos, ...examTasks].join(', ')}) 🎉`,
       );
     }
+    const soon = items.filter((i) => i.tier === 'upcoming').length;
     const note = typeof (params.note ?? params.reason) === 'string' ? String(params.note ?? params.reason).replace(/\s+/g, ' ').trim().slice(0, 300) : '';
     const file = writeBatchFile(runId, items, bank, {
       todos,
@@ -752,7 +763,16 @@ function prepare(task: CoachTask, runId: string, params: Record<string, unknown>
       note: note || undefined,
     });
     return {
-      params: { size: items.length, tasks: [...todos, ...examTasks], batch: repoRel(file), patch: repoRel(patchPath(runId)), ids: items.map((i) => i.q.id), ...(note ? { note } : {}), ...mode },
+      params: {
+        size: items.length,
+        tasks: [...todos, ...examTasks],
+        batch: repoRel(file),
+        patch: repoRel(patchPath(runId)),
+        ids: items.map((i) => i.q.id),
+        ...(soon ? { upcomingItems: soon } : {}), // questions of the batch the learner is about to meet
+        ...(note ? { note } : {}),
+        ...mode,
+      },
       bases: Object.fromEntries(items.map((i) => [i.q.id, i.q.hash])),
     };
   }
@@ -1460,6 +1480,30 @@ export class CoachRunner extends EventEmitter {
     releaseLock(info.id); // only our own lock — never one another process took meanwhile
     this.current = undefined;
     this.emit('done', info);
+    this.followUp(info);
+  }
+
+  /**
+   * coach.enrich_after_analyze: right after a successful analyze, a small ENRICH run (own record, same trigger) over the
+   * questions the learner is about to meet — the new plan's sessions first. Started synchronously after 'done' (a
+   * listener can tell from `current` that a run goes on); 'followup' reports it or why it was skipped.
+   */
+  private followUp(info: RunInfo) {
+    if (info.task !== 'analyze' || info.status !== 'success') return;
+    let enabled = false;
+    try {
+      enabled = !!loadConfig().coach.enrich_after_analyze;
+    } catch {
+      return;
+    }
+    if (!enabled) return;
+    try {
+      const run = this.start('enrich', info.trigger, { size: AFTER_ANALYZE_BATCH, upcoming: true, after: info.id }, { syncBefore: false }); // the analyze run just synced
+      this.emit('followup', { after: info.id, run });
+    } catch (e) {
+      // nothing upcoming needs work (NothingToDoError), or another process took the lock — the analyze run succeeded anyway
+      this.emit('followup', { after: info.id, skipped: (e as Error).message });
+    }
   }
 
   /** Stops a run that is syncing or running a CLI phase; a run already in its final sync is left to finish. */

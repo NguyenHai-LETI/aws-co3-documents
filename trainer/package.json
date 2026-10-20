@@ -24,7 +24,11 @@
     "enrich-batch": "node scripts/enrich-batch.ts",
     "sync": "node scripts/sync.ts",
     "test:e2e": "node --test \"tests/e2e/*.test.ts\"",
-    "test:ui": "node tests/ui/smoke.mjs"
+    "test:ui": "node tests/ui/smoke.mjs",
+    "check": "npm run validate && npm run typecheck && npm test && npm run test:e2e",
+    "check:fast": "npm run typecheck && npm test",
+    "hooks:install": "node -e \"const {execFileSync:x}=require('node:child_process');const p=x('git',['rev-parse','--show-prefix']).toString().trim()+'.githooks';require('node:fs').chmodSync('.githooks/pre-push',0o755);x('git',['config','core.hooksPath',p]);console.log('git core.hooksPath = '+p+' (pre-push: npm run check:fast khi push co thay doi code)')\"",
+    "seal": "node scripts/seal.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.1.2",

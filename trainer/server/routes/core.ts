@@ -9,6 +9,8 @@ import { addIssue, loadIssues } from '../lib/issues.ts';
 import { findClaude } from '../lib/coach-runner.ts';
 import { listNotes, readNote } from '../lib/notes.ts';
 import { ensureSnapshot, scheduleSnapshot } from '../lib/snapshot.ts';
+import { loadSealed, sealedIds } from '../lib/sealed.ts';
+import { codeVersion } from '../lib/version.ts';
 import os from 'node:os';
 
 route('GET', '/api/meta', () => {
@@ -37,12 +39,16 @@ route('GET', '/api/meta', () => {
     host: os.hostname(),
     coachHosts: cfg.coach.hosts,
     syncAi: { before: cfg.sync.before_ai, after: cfg.sync.after_ai }, // AI Coach runs sync before / after themselves
+    sealed: loadSealed().forms.map(({ ids, ...f }) => ({ ...f, count: ids.length })), // never the question ids
+    codeVersion: codeVersion(), // code the server process runs (the UI offers a restart when a sync brings newer code)
+    launcher: process.env.TRAINER_LAUNCHER === '1', // started by start.sh/.bat/.command (can restart itself)
   };
 });
 
 route('GET', '/api/bank', () => {
   const bank = loadBank();
-  return { version: bank.version, packs: bank.packs, questions: bank.questions, problems: bank.problems };
+  // sealed questions stay in the payload (a sealed exam renders them) but the UI hides them everywhere else
+  return { version: bank.version, packs: bank.packs, questions: bank.questions, problems: bank.problems, sealed: [...sealedIds()] };
 });
 
 route('GET', '/api/issues', () => loadIssues().reverse());

@@ -1,6 +1,9 @@
 // The in-progress test lives in localStorage so a reload/closed tab can resume it.
 // It is a per-browser convenience only — the result is written to results/*.md on submit.
-import type { AnswerInput, BuildTestRequest, Question, TestSession } from '../../shared/types.ts';
+// Finished tests go through an outbox (also localStorage) until the server confirmed them — see "outbox" below.
+import { useSyncExternalStore } from 'react';
+import { api, ApiError, isRetryable } from './api.ts';
+import type { AnswerInput, Attempt, BuildTestRequest, Question, SubmitRequest, TestSession } from '../../shared/types.ts';
 
 export type ReviewFilter = 'all' | 'flagged' | 'unanswered';
 
@@ -11,7 +14,8 @@ export interface ActiveTest {
   flags: Record<string, boolean>;
   unsure: Record<string, boolean>;
   revealed: Record<string, boolean>; // practice mode: answer checked
-  spent: Record<string, number>; // seconds per question
+  spent: Record<string, number>; // seconds per question until it was answered (t; frozen by "Kiểm tra" in practice)
+  read: Record<string, number>; // practice: seconds spent on the question after "Kiểm tra" showed the feedback (rt)
   elim: Record<string, string[]>; // option keys struck out per question
   recall: Record<string, string>; // recall-first: what the learner wrote before seeing the options
   recallShown: Record<string, boolean>; // recall-first: options unlocked for this question
@@ -47,6 +51,7 @@ function normalize(raw: unknown): ActiveTest | undefined {
     unsure: obj(r.unsure),
     revealed: obj(r.revealed),
     spent: obj(r.spent),
+    read: obj(r.read),
     elim: obj(r.elim),
     recall: obj(r.recall),
     recallShown: obj(r.recallShown),
@@ -93,6 +98,7 @@ export function startActive(session: TestSession, questions: Question[], req?: B
     unsure: {},
     revealed: {},
     spent: {},
+    read: {},
     elim: {},
     recall: {},
     recallShown: {},
@@ -224,6 +230,7 @@ export function buildAnswers(t: ActiveTest): AnswerInput[] {
     const elim = (t.elim[q.id] ?? []).filter((k) => !pick.includes(k));
     const recall = (t.recall[q.id] ?? '').trim().slice(0, 300);
     const why = (t.why[q.id] ?? '').trim().slice(0, 500);
+    const rt = Math.round(t.read?.[q.id] ?? 0);
     return {
       q: q.id,
       pick,
@@ -234,6 +241,163 @@ export function buildAnswers(t: ActiveTest): AnswerInput[] {
       recall: recall || undefined,
       hinted: t.hinted[q.id] || undefined,
       why: why && pick.length ? why : undefined,
+      rt: rt > 0 ? rt : undefined,
     };
   });
+}
+
+/** POST /api/results body. `finishedAt` is fixed here once: retries of this submit send exactly the same request. */
+export function buildSubmitRequest(t: ActiveTest, timedOut: boolean, now = Date.now()): SubmitRequest {
+  return {
+    session: t.session,
+    answers: buildAnswers(t),
+    startedAt: new Date(t.startedAt).toISOString(),
+    finishedAt: new Date(now).toISOString(),
+    timedOut,
+    timeUsed: Math.round(t.session.timeLimit && timedOut ? t.session.timeLimit : elapsedSeconds(t, now)),
+  };
+}
+
+// ── outbox: finished tests waiting for the server ───────────────────────────
+// Submitting stores the request here first (write-ahead) and removes it once the server confirmed. A submit that got no
+// answer (Wi-Fi drop, server restarting for an update, LAN code expired) stays as "⏳ chờ nộp" and is sent again on
+// `online`, page load, tab focus and every 30 s while the page is open (App.tsx) — the same request each time (same
+// finishedAt), and the server returns the attempt it already stored for that sessionId when an earlier try did arrive.
+// No Background Sync: Safari on iOS has none.
+
+export interface OutboxEntry {
+  req: SubmitRequest;
+  queuedAt: number; // epoch ms
+  tries: number;
+  lastTry?: number;
+  error?: string; // last failure, for the "⏳ chờ nộp" view
+  permanent?: boolean; // the server refused it (4xx other than 401/408/429): not retried automatically
+}
+
+export interface SentSubmit {
+  sessionId: string;
+  title: string;
+  attempt: Attempt;
+}
+
+const OUTBOX_KEY = 'trainer.outbox.v1';
+export const SUBMIT_TIMEOUT_MS = 20_000;
+
+let outboxSnap: OutboxEntry[] | undefined;
+const outboxListeners = new Set<() => void>();
+
+function readOutbox(): OutboxEntry[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]') as unknown;
+    return Array.isArray(raw) ? raw.filter((e): e is OutboxEntry => !!e && typeof e === 'object' && !!(e as OutboxEntry).req?.session?.sessionId) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function loadOutbox(): OutboxEntry[] {
+  outboxSnap ??= readOutbox();
+  return outboxSnap;
+}
+
+function writeOutbox(list: OutboxEntry[]): void {
+  outboxSnap = list;
+  try {
+    if (list.length) localStorage.setItem(OUTBOX_KEY, JSON.stringify(list));
+    else localStorage.removeItem(OUTBOX_KEY);
+  } catch {
+    // storage full / disabled — the entry lives in memory until the page closes
+  }
+  for (const fn of outboxListeners) fn();
+}
+
+function patchEntry(sessionId: string, fn: (e: OutboxEntry) => OutboxEntry): void {
+  const list = readOutbox(); // another tab may have changed it
+  writeOutbox(list.map((e) => (e.req.session.sessionId === sessionId ? fn(e) : e)));
+}
+
+/** Stores a finished test before sending it (replaces an older entry of the same session). */
+export function queueSubmit(req: SubmitRequest, now = Date.now()): OutboxEntry {
+  const entry: OutboxEntry = { req, queuedAt: now, tries: 0 };
+  writeOutbox([...readOutbox().filter((e) => e.req.session.sessionId !== req.session.sessionId), entry]);
+  return entry;
+}
+
+export function dropFromOutbox(sessionId: string): void {
+  writeOutbox(readOutbox().filter((e) => e.req.session.sessionId !== sessionId));
+}
+
+function subscribeOutbox(fn: () => void): () => void {
+  outboxListeners.add(fn);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === OUTBOX_KEY || e.key === null) {
+      outboxSnap = readOutbox();
+      fn();
+    }
+  };
+  window.addEventListener('storage', onStorage); // another tab queued / sent one
+  return () => {
+    outboxListeners.delete(fn);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+/** Entries waiting in this browser (re-renders when they change, also from another tab). */
+export function useOutbox(): OutboxEntry[] {
+  return useSyncExternalStore(subscribeOutbox, loadOutbox, loadOutbox);
+}
+
+export type SendOutcome = { attempt: Attempt } | { error: string; retryable: boolean };
+
+const sending = new Map<string, Promise<SendOutcome>>();
+
+/** Sends one queued submit (one request per session at a time); removes it from the outbox once the server answered. */
+export function sendQueued(sessionId: string, now = Date.now()): Promise<SendOutcome> {
+  const running = sending.get(sessionId);
+  if (running) return running;
+  const entry = readOutbox().find((e) => e.req.session.sessionId === sessionId);
+  if (!entry) return Promise.resolve({ error: 'Không còn bài này trong hàng chờ.', retryable: false });
+  patchEntry(sessionId, (e) => ({ ...e, tries: e.tries + 1, lastTry: now }));
+  const p = api
+    .post<{ attempt: Attempt }>('/api/results', entry.req, { timeoutMs: SUBMIT_TIMEOUT_MS })
+    .then((r): SendOutcome => {
+      dropFromOutbox(sessionId);
+      return { attempt: r.attempt };
+    })
+    .catch((e: unknown): SendOutcome => {
+      const retryable = isRetryable(e);
+      const msg = e instanceof Error ? e.message : String(e);
+      const error = e instanceof ApiError && e.status === 401 ? `${msg} — mở lại trang và nhập mã truy cập` : msg;
+      patchEntry(sessionId, (x) => ({ ...x, error, permanent: !retryable || undefined }));
+      return { error, retryable };
+    })
+    .finally(() => sending.delete(sessionId));
+  sending.set(sessionId, p);
+  return p;
+}
+
+let flushing: Promise<SentSubmit[]> | undefined;
+
+/**
+ * Sends the waiting entries and resolves with the submits that went through. Automatic flushes (App.tsx) skip permanent
+ * refusals and entries already in flight (the runner's own first try reports itself); `explicit` (the learner's "Thử nộp
+ * lại ngay") sends refused ones too and waits for those in flight.
+ */
+export function flushOutbox(opts: { explicit?: boolean } = {}): Promise<SentSubmit[]> {
+  if (flushing && !opts.explicit) return flushing;
+  const run = (async () => {
+    const sent: SentSubmit[] = [];
+    for (const e of readOutbox()) {
+      const sid = e.req.session.sessionId;
+      if (!opts.explicit && (e.permanent || sending.has(sid))) continue;
+      const r = await sendQueued(sid);
+      if ('attempt' in r) sent.push({ sessionId: sid, title: e.req.session.title, attempt: r.attempt });
+      else if (r.retryable) break; // server unreachable: the others would fail the same way
+    }
+    return sent;
+  })().finally(() => {
+    if (flushing === run) flushing = undefined;
+  });
+  if (!opts.explicit) flushing = run;
+  return run;
 }
