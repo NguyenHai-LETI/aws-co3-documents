@@ -181,6 +181,7 @@ A gaming leaderboard needs an in-memory store with sorted sets and persistence. 
 - difficulty: medium
 - time: 50
 - source: practice-exams/03-database-services-exam-v2.md#Q8
+- status: retired
 
 A company needs a petabyte-scale data warehouse for complex OLAP queries over structured data. Which service?
 
@@ -292,6 +293,7 @@ IoT sensors send time-stamped metrics needing efficient storage and time-series 
 - difficulty: medium
 - time: 50
 - source: practice-exams/03-database-services-exam-v2.md#Q13
+- status: retired
 
 A company wants an immutable, cryptographically verifiable ledger of financial transactions. Which service?
 

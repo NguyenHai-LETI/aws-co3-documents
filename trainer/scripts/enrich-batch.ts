@@ -1,7 +1,7 @@
 // Prepares an ENRICH batch without running the AI (for /trainer-enrich in Claude Code, or by hand):
 // writes coach/enrich/<run_id>-batch.md and prints where the patch / new pack must go.
 // Usage:
-//   node trainer/scripts/enrich-batch.ts [--size 20] [--tasks explain,hint,classify,balance] [--run-id <id>]
+//   node trainer/scripts/enrich-batch.ts [--size 20] [--tasks explain,hint,classify,balance] [--ids <id,id,…>] [--run-id <id>]
 //   node trainer/scripts/enrich-batch.ts --longform [--count 5] [--run-id <id>]
 //   node trainer/scripts/enrich-batch.ts --status [--json]
 import path from 'node:path';
@@ -67,7 +67,13 @@ if (longform) {
   console.log('   Tiếp theo: làm theo trainer/coach/ENRICH.md phần B.');
 } else {
   const { todos } = parseTasks(opt('tasks'));
-  const items = selectBatch(bank, states, { size: int(opt('size'), cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks') });
+  const ids = opt('ids')
+    ?.split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const unknown = ids?.filter((id) => !bank.byId.has(id)) ?? [];
+  if (unknown.length) console.log(`⚠️  Không có trong ngân hàng: ${unknown.join(', ')}`);
+  const items = selectBatch(bank, states, { size: int(opt('size'), ids?.length || cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks'), ids });
   if (!items.length) {
     console.log('✓ Không còn câu nào cần ENRICH cho lựa chọn này.');
     process.exit(0);

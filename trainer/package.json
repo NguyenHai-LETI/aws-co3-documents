@@ -22,6 +22,7 @@
     "classify-tasks": "node scripts/classify-tasks.ts",
     "apply-patch": "node scripts/apply-patch.ts",
     "enrich-batch": "node scripts/enrich-batch.ts",
+    "coverage": "node scripts/coverage.ts",
     "sync": "node scripts/sync.ts",
     "test:e2e": "node --test \"tests/e2e/*.test.ts\"",
     "test:ui": "node tests/ui/smoke.mjs"

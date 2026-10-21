@@ -8,7 +8,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import type { IncomingMessage } from 'node:http';
-import type { CoachRunInfo, QuestionState } from '../shared/types.ts';
+import type { CoachEvent, CoachRunInfo, QuestionState } from '../shared/types.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-ai-'));
@@ -603,4 +603,97 @@ test('schedule: times, launchd plist, crontab block merge, Windows tasks', () =>
     sched.parseSchtasksCsv('"\\Microsoft\\Other","N/A","Ready"\r\n"\\SAA-Trainer-Coach-0830","10/17/2026 8:30:00 AM","Ready"\r\n'),
     [{ name: 'SAA-Trainer-Coach-0830', next: '10/17/2026 8:30:00 AM', status: 'Ready' }],
   );
+});
+
+// ── coach runner: CLI errors + automatic retry, against a fake CLI (no Claude call) ──
+
+// Stand-in for the Claude Code CLI: --version, auth status, and a stream-json run whose outcome depends on
+// FAKE_CLAUDE_MODE and how many runs it has served (FAKE_CLAUDE_COUNT). Error results mirror a real
+// coach/runs/*.raw.jsonl: subtype "success" with is_error: true and the reason in `result`.
+const FAKE_CLI = `
+import fs from 'node:fs';
+const argv = process.argv.slice(2);
+const out = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
+const RACE = 'Failed to refresh OAuth token: another Claude Code process is refreshing it or exited mid-refresh. This is usually transient; retry in a minute, and if it persists close other Claude Code processes or sign in again';
+const fail = (text) => {
+  out({ type: 'assistant', message: { content: [{ type: 'text', text }] }, error: 'server_error', is_api_error_message: true });
+  out({ type: 'result', subtype: 'success', is_error: true, result: text, total_cost_usd: 0, num_turns: 1 });
+  process.exitCode = 1;
+};
+if (argv[0] === '--version') console.log('2.1.282 (Claude Code)');
+else if (argv[0] === 'auth') console.log(JSON.stringify({ loggedIn: true }));
+else {
+  const file = process.env.FAKE_CLAUDE_COUNT;
+  const n = (fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8')) : 0) + 1;
+  fs.writeFileSync(file, String(n));
+  const mode = process.env.FAKE_CLAUDE_MODE;
+  out({ type: 'system', subtype: 'init', model: 'claude-fake', permissionMode: 'dontAsk' });
+  if (mode === 'race-after-tool') {
+    out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: 'x.md' } }] } });
+    fail(RACE);
+  } else if (mode === 'limit') fail('Claude AI usage limit reached|1760000000');
+  else if (mode === 'race' || (mode === 'race-then-ok' && n === 1)) fail(RACE);
+  else out({ type: 'result', subtype: 'success', is_error: false, result: 'Đã viết kế hoạch', total_cost_usd: 0.01, num_turns: 3 });
+}
+`;
+
+test('coach runner: login race → one automatic retry; errors show the CLI message, not "success"', async () => {
+  const fake = path.join(home, 'fake-claude.mjs');
+  const count = path.join(home, 'fake-claude.count');
+  fs.writeFileSync(fake, FAKE_CLI);
+  Object.assign(process.env, { CLAUDE_BIN: fake, TRAINER_ALLOW_COACH: '1', FAKE_CLAUDE_COUNT: count });
+  const delay = runner.RETRY.delayMs;
+  runner.RETRY.delayMs = 20;
+  const run = (mode: string, onEvent?: (ev: CoachEvent) => void) => {
+    process.env.FAKE_CLAUDE_MODE = mode;
+    fs.rmSync(count, { force: true });
+    const events: CoachEvent[] = [];
+    const listen = (ev: CoachEvent) => {
+      events.push(ev);
+      onEvent?.(ev);
+    };
+    runner.coachRunner.on('event', listen);
+    return new Promise<{ info: CoachRunInfo; events: CoachEvent[]; calls: number }>((resolve) => {
+      runner.coachRunner.once('done', (info: CoachRunInfo) => {
+        runner.coachRunner.off('event', listen);
+        resolve({ info, events, calls: Number(fs.readFileSync(count, 'utf8')) });
+      });
+      runner.coachRunner.start('analyze', 'manual');
+    });
+  };
+  try {
+    const ok = await run('race-then-ok');
+    assert.equal(ok.calls, 2);
+    assert.equal(ok.info.status, 'success');
+    assert.equal(ok.info.summary, 'Đã viết kế hoạch');
+    assert.ok(ok.events.some((e) => e.kind === 'stderr' && /tự thử lại/.test(e.text)));
+
+    const race = await run('race');
+    assert.equal(race.calls, 2, 'retried once, not forever');
+    assert.equal(race.info.status, 'error');
+    assert.match(race.info.error ?? '', /^Failed to refresh OAuth token/);
+    assert.equal(race.info.summary, undefined, 'an error is not shown as the run summary');
+    assert.ok(!race.events.some((e) => e.kind === 'result'));
+    assert.equal(race.events.filter((e) => e.kind === 'error' && /OAuth/.test(e.text)).length, 2, 'one line per attempt, no duplicate assistant text');
+    assert.ok(race.events.some((e) => /\/login/.test(e.text)), 'tells how to fix the login');
+
+    const limit = await run('limit');
+    assert.equal(limit.calls, 1, 'usage limits are not retried');
+    assert.match(limit.info.error ?? '', /usage limit/);
+
+    const busy = await run('race-after-tool');
+    assert.equal(busy.calls, 1, 'no retry once a tool ran (files may already be written)');
+    assert.equal(busy.info.status, 'error');
+
+    runner.RETRY.delayMs = 10_000;
+    const cancelled = await run('race', (ev) => {
+      if (/tự thử lại/.test(ev.text)) setImmediate(() => runner.coachRunner.cancel());
+    });
+    assert.equal(cancelled.calls, 1);
+    assert.equal(cancelled.info.status, 'cancelled', 'cancel works while waiting for the retry');
+    assert.equal(runner.readLock(), undefined, 'lock released');
+  } finally {
+    runner.RETRY.delayMs = delay;
+    for (const k of ['CLAUDE_BIN', 'TRAINER_ALLOW_COACH', 'FAKE_CLAUDE_COUNT', 'FAKE_CLAUDE_MODE']) delete process.env[k];
+  }
 });

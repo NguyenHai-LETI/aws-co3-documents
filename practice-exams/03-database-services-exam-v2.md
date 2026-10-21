@@ -1,9 +1,10 @@
 # 🗄️ Practice Exam 03 — Database Services (SAA-C03) · V2
 
-**30 questions** · scenario-based · English. Answers in `03-database-services-answers-v2.txt`.
+**34 questions** · scenario-based · English. Answers in `03-database-services-answers-v2.txt`.
 
 - **Part A — Vận dụng:** Q1–Q20
 - **Part B — Khó / Nâng cao:** Q21–Q30
+- **Part C — Câu hỏi bẫy (Traps):** Q31–Q34
 
 ---
 
@@ -226,3 +227,37 @@
 - B. Multi-AZ with automatic failover (replication group with replicas)
 - C. Memcached multi-node
 - D. Cluster mode disabled, single node
+
+---
+
+## Part C — Câu hỏi bẫy (Traps)
+
+> Mỗi câu có một lựa chọn "gần đúng" rất dễ chọn nhầm. Đọc kỹ ràng buộc.
+
+**31.** A read-heavy reporting workload must offload reads off a busy relational primary, but reports must reflect just-written data with only millisecond staleness. Which offers the BEST read offloading?
+
+- A. RDS Read Replica (asynchronous)
+- B. RDS Multi-AZ standby
+- C. Migrate to Aurora and use Aurora Replicas
+- D. RDS Proxy
+
+**32.** A Lambda-based application opens too many concurrent connections and exhausts the RDS PostgreSQL connection limit, causing errors. What fixes this?
+
+- A. Add Read Replicas
+- B. Enable Multi-AZ
+- C. Enable RDS Proxy
+- D. Increase instance size
+
+**33.** An application needs automatic failover for high availability AND wants the standby to also serve read queries to avoid paying for separate replicas. Which deployment?
+
+- A. Multi-AZ Instance (classic)
+- B. Multi-AZ DB Cluster
+- C. Single cross-AZ Read Replica
+- D. Aurora Global Database
+
+**34.** A MySQL-based workload on AWS must survive an entire Region outage with RTO under one minute and provide low-latency reads to users worldwide. Which is BEST?
+
+- A. Multi-AZ deployment
+- B. Cross-Region Read Replica
+- C. Aurora Global Database
+- D. Cross-Region snapshot copy

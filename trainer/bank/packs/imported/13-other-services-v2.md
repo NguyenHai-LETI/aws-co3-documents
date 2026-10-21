@@ -43,6 +43,7 @@ A company must provide managed virtual desktops (DaaS) to remote employees. Whic
 - difficulty: medium
 - time: 50
 - source: practice-exams/13-other-services-exam-v2.md#Q2
+- status: retired
 
 A company must stream a desktop application to users' browsers without installing it locally. Which service?
 

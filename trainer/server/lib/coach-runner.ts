@@ -19,6 +19,25 @@ import type { ClaudeStatus, CoachEvent, CoachRunInfo, CoachTask, CostSummary } f
 const LOCK_FILE = path.join(COACH_DIR, '.lock');
 const RUN_TIMEOUT_MS = 40 * 60_000;
 const IS_WIN = process.platform === 'win32';
+
+/** One automatic retry for transient CLI failures (tests shorten the delay). */
+export const RETRY = { attempts: 2, delayMs: 60_000 };
+
+/**
+ * Failures that usually pass within a minute: the OAuth token refresh racing another Claude Code process
+ * (VS Code extension, a terminal session — the CLI says "retry in a minute"), or an overloaded API.
+ * Usage limits are not transient and are not retried.
+ */
+export function isTransientCliError(text: string | undefined): boolean {
+  return !!text && /another Claude Code process|usually transient|overloaded/i.test(text);
+}
+
+export function isAuthError(text: string | undefined): boolean {
+  return !!text && /OAuth|\/login|log ?in again|authenticat|credential/i.test(text);
+}
+
+const AUTH_HINT =
+  '💡 Claude Code chưa lấy được token đăng nhập — thường do một phiên Claude Code khác (VS Code, terminal) đang làm mới token cùng lúc. Chạy lại sau 1 phút; nếu vẫn lỗi, đóng bớt các phiên Claude Code khác hoặc mở terminal chạy `claude` → `/login`.';
 export const COACH_TASKS: readonly CoachTask[] = ['analyze', 'generate', 'enrich', 'longform'];
 
 /** Run record = shared CoachRunInfo + optional extras written by this runner (UI may show them). */
@@ -459,7 +478,7 @@ function prepare(task: CoachTask, runId: string, params: Record<string, unknown>
 }
 
 export class CoachRunner extends EventEmitter {
-  current?: { info: RunInfo; child: ChildProcess; events: CoachEvent[] };
+  current?: { info: RunInfo; child: ChildProcess; events: CoachEvent[]; stopWaiting: () => boolean };
 
   status() {
     return { running: this.current?.info, lockedBy: this.current ? undefined : readLock() };
@@ -499,12 +518,10 @@ export class CoachRunner extends EventEmitter {
     const prompt = buildPrompt(task, id, trigger, runParams);
     const args = cliArgs(prompt, cfg, claude.version, task);
     const { cmd, pre } = claudeCommand(claude.path);
-    const child = spawn(cmd, [...pre, ...args], { cwd: REPO_DIR, env: cliEnv(cfg), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     fs.writeFileSync(LOCK_FILE, JSON.stringify({ pid: process.pid, runId: id }));
     const raw = fs.createWriteStream(path.join(RUNS_DIR, `${id}.raw.jsonl`));
     const evOut = fs.createWriteStream(path.join(RUNS_DIR, `${id}.events.jsonl`));
     const events: CoachEvent[] = [];
-    this.current = { info, child, events };
     const saveInfo = () => fs.writeFileSync(path.join(RUNS_DIR, `${id}.json`), JSON.stringify(info, null, 2));
     saveInfo();
 
@@ -520,36 +537,83 @@ export class CoachRunner extends EventEmitter {
     emit('start', `${TASK_LABEL[task]}${size} · Claude Code ${claude.version?.split(' ')[0] ?? ''}${model ? ` · model ${model}` : ''} · ${shownPath}`);
     if (runParams.batch) emit('start', `Lô câu hỏi: ${String(runParams.batch)}`);
 
-    let buf = '';
+    let child: ChildProcess;
+    let attempt = 0;
     let resultSeen = false;
-    child.stdout!.on('data', (chunk: Buffer) => {
-      raw.write(chunk);
-      buf += chunk.toString('utf8');
-      let nl: number;
-      while ((nl = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
-        if (!line) continue;
-        let msg: Record<string, unknown>;
-        try {
-          msg = JSON.parse(line);
-        } catch {
-          emit('text', line.slice(0, 500));
-          continue;
+    let stopped = false; // timeout: never retry
+    let retryTimer: NodeJS.Timeout | undefined;
+    /** Ends a run that is waiting for its retry (cancel / timeout); false when the CLI is running. */
+    const stopWaiting = (): boolean => {
+      if (!retryTimer) return false;
+      clearTimeout(retryTimer);
+      retryTimer = undefined;
+      finish(null, 'SIGTERM');
+      return true;
+    };
+
+    const launch = () => {
+      attempt++;
+      resultSeen = false;
+      const firstEvent = events.length;
+      let buf = '';
+      let stderrTail = '';
+      child = spawn(cmd, [...pre, ...args], { cwd: REPO_DIR, env: cliEnv(cfg), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      this.current = { info, child, events, stopWaiting };
+      child.stdout!.on('data', (chunk: Buffer) => {
+        raw.write(chunk);
+        buf += chunk.toString('utf8');
+        let nl: number;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let msg: Record<string, unknown>;
+          try {
+            msg = JSON.parse(line);
+          } catch {
+            emit('text', line.slice(0, 500));
+            continue;
+          }
+          this.handleMessage(msg, info, emit, () => (resultSeen = true));
         }
-        this.handleMessage(msg, info, emit, () => (resultSeen = true));
-      }
-    });
-    child.stderr!.on('data', (chunk: Buffer) => {
-      const t = chunk.toString('utf8').trim();
-      if (t) emit('stderr', t.slice(0, 1000));
-    });
+      });
+      child.stderr!.on('data', (chunk: Buffer) => {
+        const t = chunk.toString('utf8').trim();
+        if (!t) return;
+        stderrTail = (stderrTail + '\n' + t).slice(-2000);
+        emit('stderr', t.slice(0, 1000));
+      });
+      child.on('error', (e) => {
+        info.status = 'error';
+        info.error = e.message;
+        emit('error', e.message);
+      });
+      child.on('close', (code, signal) => {
+        const failed = info.status === 'error' || (info.status === 'running' && !(code === 0 && resultSeen));
+        // starting over is only safe while the attempt has not touched any file (no tool call yet)
+        const untouched = !events.slice(firstEvent).some((e) => e.kind === 'tool');
+        if (failed && untouched && !signal && !stopped && attempt < RETRY.attempts && isTransientCliError(`${info.error ?? ''}\n${stderrTail}`)) {
+          info.status = 'running';
+          info.error = undefined;
+          info.summary = undefined;
+          saveInfo();
+          emit('stderr', `Lỗi tạm thời của Claude Code — tự thử lại sau ${Math.round(RETRY.delayMs / 1000)} giây (lần ${attempt + 1}/${RETRY.attempts}).`);
+          retryTimer = setTimeout(() => {
+            retryTimer = undefined;
+            launch();
+          }, RETRY.delayMs);
+          return;
+        }
+        finish(code, signal);
+      });
+    };
 
     const timer = setTimeout(() => {
       emit('error', `⏱ Quá ${RUN_TIMEOUT_MS / 60000} phút — dừng lượt chạy.`);
       info.status = 'error';
       info.error = 'timeout';
-      child.kill('SIGTERM');
+      stopped = true;
+      if (!stopWaiting()) child.kill('SIGTERM');
     }, RUN_TIMEOUT_MS);
 
     const finish = (code: number | null, signal: NodeJS.Signals | null) => {
@@ -559,6 +623,7 @@ export class CoachRunner extends EventEmitter {
         else info.status = code === 0 && resultSeen ? 'success' : 'error';
         if (info.status === 'error' && !info.error) info.error = `CLI exited with code ${code}`;
       }
+      if (info.status === 'error' && isAuthError(info.error)) emit('stderr', AUTH_HINT);
       if (info.status !== 'cancelled') {
         try {
           this.postProcess(info, emit);
@@ -579,12 +644,7 @@ export class CoachRunner extends EventEmitter {
       this.current = undefined;
       this.emit('done', info);
     };
-    child.on('error', (e) => {
-      info.status = 'error';
-      info.error = e.message;
-      emit('error', e.message);
-    });
-    child.on('close', finish);
+    launch();
     return info;
   }
 
@@ -641,6 +701,7 @@ export class CoachRunner extends EventEmitter {
       return;
     }
     if (type === 'assistant') {
+      if (msg.is_api_error_message) return; // the same text arrives in the result message
       const content = ((msg.message as { content?: unknown[] })?.content ?? []) as Record<string, unknown>[];
       for (const c of content) {
         if (c.type === 'text' && typeof c.text === 'string' && c.text.trim()) emit('text', c.text.trim().slice(0, 1500));
@@ -661,21 +722,28 @@ export class CoachRunner extends EventEmitter {
     if (type === 'result') {
       markResult();
       info.costUsd = typeof msg.total_cost_usd === 'number' ? msg.total_cost_usd : undefined;
-      info.summary = typeof msg.result === 'string' ? msg.result.slice(0, 4000) : undefined;
-      if (msg.is_error || (typeof msg.subtype === 'string' && msg.subtype !== 'success')) {
+      const text = typeof msg.result === 'string' ? msg.result.trim() : '';
+      const failed = !!msg.is_error || (typeof msg.subtype === 'string' && msg.subtype !== 'success');
+      if (failed) {
+        // API / login errors keep subtype "success" (is_error: true): the reason is the result text
         info.status = 'error';
-        info.error = String(msg.subtype ?? 'error');
-      } else info.status = 'success';
+        info.error = (text || String(msg.subtype ?? 'error')).slice(0, 1000);
+        info.summary = undefined;
+      } else {
+        info.status = 'success';
+        info.summary = text ? text.slice(0, 4000) : undefined;
+      }
       const denials = Array.isArray(msg.permission_denials) ? msg.permission_denials.length : 0;
       if (denials) emit('stderr', `${denials} thao tác bị chặn bởi quyền hạn (${allowedTools(info.task).filter((t) => /^(Edit|Bash)/.test(t)).join(', ')}).`);
-      emit('result', info.summary ?? '(không có tóm tắt)');
+      if (failed) emit('error', info.error ?? 'error');
+      else emit('result', info.summary ?? '(không có tóm tắt)');
     }
   }
 
   cancel(): boolean {
     if (!this.current) return false;
     this.current.info.status = 'cancelled';
-    this.current.child.kill('SIGTERM');
+    if (!this.current.stopWaiting()) this.current.child.kill('SIGTERM');
     return true;
   }
 }

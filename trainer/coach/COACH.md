@@ -85,7 +85,8 @@ kế hoạch mới thay vì chồng thêm việc.
 
 **3a. Xử lý issues mở** (snapshot §11, file `trainer/bank/issues.md`). Với từng issue: mở câu trong pack
 (snapshot ghi đường dẫn), kiểm tra với notes + kiến thức AWS. Sửa tại chỗ nếu đúng là lỗi (giữ id; có thể
-đặt `- status: retired` nếu không cứu được), hoặc giữ nguyên nếu người học hiểu sai. Sau đó sửa dòng issue:
+đặt `- status: retired` nếu không cứu được), hoặc giữ nguyên nếu người học hiểu sai. Issue có nội dung bắt đầu bằng `review:` do
+`/trainer-review` (một lượt AI soát độc lập) ghi — kiểm chứng lại như mọi issue, người soát cũng có thể sai. Sau đó sửa dòng issue:
 `- [ ] …` → `- [x] … → ✅ YYYY-MM-DD coach: <đã sửa gì>` hoặc `→ ❎ YYYY-MM-DD coach: <vì sao không sửa>`.
 
 **3b. Câu bị 👎 và câu gần trùng** (snapshot §14). Câu bị đánh giá thấp (👎 ≥ 2 và nhiều hơn 👍, hoặc 👎 có ghi chú chỉ ra lỗi):

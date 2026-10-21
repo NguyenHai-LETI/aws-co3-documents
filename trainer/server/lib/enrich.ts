@@ -64,12 +64,14 @@ function domainWeight(bank: BankState, q: Question): number {
  * learner relevance (answered wrong before > seen > unseen), then exam weight of the domain,
  * then how often they were missed; ties stay grouped by topic so one batch shares notes.
  */
-export function selectBatch(bank: BankState, states: Map<string, QuestionState>, opts: { size?: number; tasks?: unknown } = {}): BatchItem[] {
+export function selectBatch(bank: BankState, states: Map<string, QuestionState>, opts: { size?: number; tasks?: unknown; ids?: string[] } = {}): BatchItem[] {
   const { todos, examTasks } = parseTasks(opts.tasks);
   const size = clampInt(opts.size, 1, MAX_BATCH, 20);
+  const only = opts.ids?.length ? new Set(opts.ids) : undefined; // e.g. questions /trainer-coverage suspects are misclassified
   const items: BatchItem[] = [];
   for (const q of bank.questions) {
     if (q.status === 'retired') continue;
+    if (only && !only.has(q.id)) continue;
     if (examTasks.length && !examTasks.includes(q.task ?? '')) continue;
     const todo = pendingTodos(q).filter((t) => todos.includes(t));
     if (!todo.length) continue;

@@ -28,3 +28,9 @@
 28_B - Cache always consistent on writes, higher write latency = write-through.
 29_A - Query S3 data from Redshift without loading = Redshift Spectrum.
 30_B - Redis AZ failover with minimal loss = Multi-AZ replication group with automatic failover.
+
+--- Part C — Câu hỏi bẫy (Traps) ---
+31_C - Bẫy: RDS Read Replica là ASYNC → có lag, không đảm bảo "millisecond staleness". Aurora Replicas dùng shared storage, lag ~ms → offload read gần real-time. (Cần strong-consistency tuyệt đối thì đọc thẳng primary.)
+32_C - Bẫy: vấn đề là connection exhaustion, KHÔNG phải read scaling → RDS Proxy (connection pooling), chuẩn cho Lambda+RDS. Read Replica/Multi-AZ/scale up đều không giải quyết gốc.
+33_B - Bẫy: Multi-AZ Instance cổ điển standby KHÔNG đọc được. Cần HA tự động + standby đọc được = RDS Multi-AZ DB Cluster (1 writer + 2 readable standby / 3 AZ, failover ~35s).
+34_C - Bẫy: Multi-AZ chỉ chống AZ sập (trong 1 Region). Region sập + RTO<1 phút + đọc gần user toàn cầu = Aurora Global Database (RPO~1s). Cross-Region Read Replica failover thủ công; snapshot copy khôi phục chậm.
