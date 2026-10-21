@@ -241,19 +241,24 @@ A company must build, train, and deploy custom ML models end-to-end in a managed
 - topic: ml
 - services: Forecast
 - difficulty: hard
-- time: 65
+- time: 90
+- enriched: 2026-10-21
 - source: practice-exams/12-ml-ai-exam-v2.md#Q11
 
 A company must forecast future product demand from historical time-series data without building models manually. Which service?
 
-- A. Amazon SageMaker only
-- B. Amazon Personalize
-- C. Amazon Comprehend
-- D. Amazon Forecast
+- A. Amazon SageMaker AI (formerly SageMaker), which requires manually designing and training a custom forecasting model
+- B. Amazon QuickSight, which can chart historical trends but needs an analyst to configure each forecast manually
+- C. Amazon Kinesis Data Analytics, which processes streaming data in real time but does not generate demand forecasts
+- D. Amazon Forecast, which builds and trains the forecasting model automatically from the historical data
 
 **Answer:** D
 
-**Explanation:** Time-series demand forecasting = Amazon Forecast.
+**Explanation:** Amazon Forecast is the purpose-built managed service that trains and selects a time-series forecasting model automatically, so no data-science team has to design one by hand.
+- SageMaker AI (formerly SageMaker): a general ML platform where you still have to build, train, and tune the forecasting model yourself.
+- QuickSight: visualizes trends and offers a basic forecast widget, but each chart's forecast must be configured manually, it is not a dedicated demand-forecasting pipeline.
+- Kinesis Data Analytics: processes streaming data in real time; it does not train or produce forward-looking demand predictions.
+> 🇻🇳 Cần dự báo tự động, không tự xây model → Amazon Forecast; các lựa chọn khác đều cần tự thiết lập mô hình/báo cáo.
 
 ---
 

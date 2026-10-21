@@ -307,19 +307,24 @@ Which service helps deploy a serverless application defined with a simplified te
 - topic: devtools
 - services: CodeCommit, CodePipeline
 - difficulty: easy
-- time: 45
+- time: 60
+- enriched: 2026-10-21
 - source: practice-exams/08-developer-tools-exam.md#Q14
 
 A pipeline should automatically start when code is pushed to the main branch. Which source integration provides this?
 
-- A. Manual approval action
-- B. CodeBuild webhook only
-- C. S3 versioning
-- D. CodeCommit (or GitHub) source action in CodePipeline
+- A. A manual approval action configured before the pipeline reaches the production stage
+- B. A CloudFormation stack update applied manually after each push to the source repository
+- C. Amazon S3 versioning enabled on the pipeline's artifact bucket
+- D. A CodeCommit (or GitHub) source action configured in CodePipeline
 
 **Answer:** D
 
-**Explanation:** Auto-start on push = CodeCommit/GitHub source action in CodePipeline.
+**Explanation:** A source action for CodeCommit or GitHub in CodePipeline listens for commits and automatically starts a new pipeline execution whenever code lands on the configured branch.
+- A manual approval action: gates a later stage from proceeding; it does not start the pipeline when code is pushed.
+- A CloudFormation stack update applied manually: requires a human to run the update, so nothing happens automatically on push.
+- S3 versioning on the artifact bucket: tracks object versions for rollback, it does not watch a source repository for new commits.
+> 🇻🇳 Cần tự khởi chạy khi có commit → source action (CodeCommit/GitHub) gắn trong CodePipeline; các lựa chọn khác không theo dõi commit.
 
 ---
 

@@ -339,19 +339,24 @@ SNS + SQS fan-out: multiple queues subscribe to one topic so each service proces
 - services: SQS, S3
 - tags: sqs-large-messages
 - difficulty: medium
-- time: 55
+- time: 75
+- enriched: 2026-10-21
 - source: practice-exams/07-application-integration-exam-v2.md#Q15
 
-A message larger than the SQS 256 KB limit must be sent. Which approach?
+A message larger than the SQS 1 MiB limit must be sent. Which approach?
 
-- A. Compress to under 256 KB always
-- B. SQS Extended Client Library storing payload in S3
-- C. Use SNS instead
-- D. Split manually and hope
+- A. Compress the payload so it fits under the SQS message size limit before sending
+- B. Use the SQS Extended Client Library to store the payload in Amazon S3 and send a reference through SQS
+- C. Publish the payload to an SNS topic instead, which enforces its own separate size limit
+- D. Manually split the payload into multiple SQS messages and reassemble them in the consumer
 
 **Answer:** B
 
-**Explanation:** Payload > 256 KB = SQS Extended Client Library (store in S3).
+**Explanation:** The SQS Extended Client Library automatically stores the full payload in an S3 object and sends only a small reference message through SQS, so the application can handle payloads above the queue's size limit without custom logic.
+- Compressing the payload: ratio is not guaranteed, so some payloads (already-compressed files, binary data) can still exceed the limit.
+- Publishing to SNS instead: SNS enforces its own message size limit too, so swapping the service does not remove the size constraint.
+- Manually splitting into multiple messages: the consumer must reassemble the parts itself, which risks partial delivery and out-of-order processing that the Extended Client Library avoids.
+> 🇻🇳 Payload vượt giới hạn SQS → dùng Extended Client Library lưu ở S3, không nên tự nén/tách hay đổi sang SNS.
 
 ---
 

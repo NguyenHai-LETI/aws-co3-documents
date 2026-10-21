@@ -245,19 +245,24 @@ Step Functions vs SQS — which favors Step Functions?
 - services: Data Firehose, S3, Redshift, OpenSearch, SQS, Kinesis Data Streams
 - tags: streaming-ingestion, sharding, decoupling
 - difficulty: hard
-- time: 80
+- time: 95
+- enriched: 2026-10-21
 - source: practice-exams/14-service-comparisons-exam-v2.md#Q11
 
-Kinesis Data Streams vs Kinesis Data Firehose vs SQS — which statement set is CORRECT?
+Kinesis Data Streams vs Amazon Data Firehose (formerly Kinesis Data Firehose) vs SQS — which statement set is CORRECT?
 
-- A. Firehose supports multiple consumer replay
-- B. SQS delivers directly to S3 with no code
-- C. All three replay data
-- D. Data Streams = real-time, replay, multiple consumers, shards; Firehose = managed buffered delivery to S3/Redshift/OpenSearch; SQS = decoupling queue, no replay
+- A. Data Firehose supports multiple independent consumers replaying the same records after they arrive in the stream
+- B. SQS automatically delivers every queued message straight to an S3 bucket without any custom consumer code
+- C. Data Streams, Data Firehose, and SQS all let consumers replay records that were already processed and removed
+- D. Data Streams = real-time, replay, multiple consumers, shards; Data Firehose = managed buffered delivery to S3/Redshift/OpenSearch; SQS = decoupling queue, no replay
 
 **Answer:** D
 
-**Explanation:** Data Streams=real-time/replay/shards; Firehose=managed delivery; SQS=decoupling, no replay.
+**Explanation:** Kinesis Data Streams retains records so multiple consumers can read and replay them from shards in real time; Data Firehose is a managed, buffered delivery pipeline into S3, Redshift, or OpenSearch with no replay; and SQS is a decoupling queue where a message disappears once it is successfully processed, with no replay.
+- Data Firehose supporting multi-consumer replay: that capability belongs to Data Streams' shard-based retention, not Firehose's one-way delivery pipeline.
+- SQS delivering straight to S3 with no code: SQS needs a consumer (e.g., a Lambda function) to read and write the messages; it has no native S3 delivery.
+- All three allowing replay: only Data Streams retains records long enough to replay; Firehose and SQS do not keep processed data around.
+> 🇻🇳 Data Streams có replay nhiều consumer qua shard; Data Firehose chỉ đẩy dữ liệu một chiều; SQS xoá message sau khi xử lý xong, không replay được.
 
 ---
 

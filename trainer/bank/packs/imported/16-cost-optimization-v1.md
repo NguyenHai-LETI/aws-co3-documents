@@ -382,19 +382,24 @@ Which service identifies idle/underutilized resources and Reserved Instance oppo
 - services: EC2 Auto Scaling
 - tags: spot-instances
 - difficulty: easy
-- time: 45
+- time: 70
+- enriched: 2026-10-21
 - source: practice-exams/16-cost-optimization-exam.md#Q17
 
 To cost-optimize a fleet that can tolerate interruptions but needs some baseline guaranteed capacity, which is BEST?
 
-- A. Mix On-Demand (baseline) + Spot (burst) via Auto Scaling mixed instances policy
-- B. All Reserved at peak
-- C. All On-Demand
-- D. All Dedicated Hosts
+- A. Use an Auto Scaling mixed instances policy that pairs On-Demand for the capacity that must keep running with Spot Instances for the rest
+- B. Size Standard Reserved Instances to cover the fleet's peak demand, committing to a one- or three-year term
+- C. Run the entire fleet as On-Demand instances at the standard hourly rate with no long-term commitment
+- D. Run the fleet on Dedicated Hosts, which bill per physical host rather than per instance
 
 **Answer:** A
 
-**Explanation:** Baseline + burst = On-Demand + Spot mixed instances policy.
+**Explanation:** An Auto Scaling mixed instances policy lets you pin a portion of the group to On-Demand for the capacity that must stay up while filling the rest with cheaper Spot Instances for the interruption-tolerant workload.
+- Reserved Instances sized for peak: locks in a long-term commitment priced for the busiest hour, so most of the time you pay for capacity you do not use.
+- On-Demand for the entire fleet: no commitment discount and no Spot savings, so it costs more than necessary for capacity that can tolerate interruption.
+- Dedicated Hosts: billed per physical host for licensing/compliance needs, not a cost-optimization option for an interruption-tolerant fleet.
+> 🇻🇳 Cần vừa có phần chạy ổn định vừa tận dụng giá rẻ khi chấp nhận gián đoạn → mixed instances policy (On-Demand + Spot).
 
 ---
 

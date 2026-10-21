@@ -263,19 +263,24 @@ A regulated workload must keep data on-premises for residency but use AWS APIs/s
 - services: AWS Backup
 - tags: s3-object-lock, compliance
 - difficulty: hard
-- time: 70
+- time: 90
+- enriched: 2026-10-21
 - source: practice-exams/13-other-services-exam-v2.md#Q12
 
 AWS Backup must enforce that backups cannot be deleted before a retention period, even by admins (ransomware protection). Which feature?
 
-- A. S3 Object Lock only
-- B. IAM policy only
-- C. KMS grant
-- D. AWS Backup Vault Lock (compliance mode)
+- A. S3 Object Lock applied directly to the backup vault's underlying storage
+- B. An IAM policy that denies the backup-delete action for all users
+- C. A KMS key policy that restricts who can decrypt the backup data
+- D. Vault Lock in compliance mode, which blocks deletion or retention shortening even by the account's root user
 
 **Answer:** D
 
-**Explanation:** Immutable backups vs ransomware = AWS Backup Vault Lock (compliance mode).
+**Explanation:** Vault Lock in compliance mode makes the retention policy immutable: once locked, nobody — including the account root user — can delete a backup or shorten its retention period before it expires, which is exactly the ransomware-resistant guarantee required here.
+- S3 Object Lock on the vault's storage: backup vaults are not buckets you apply Object Lock to directly; vault-level immutability comes from Vault Lock, not S3's feature.
+- An IAM deny policy: it only stops users without permission to change it; an admin with sufficient rights can still edit or remove the policy and then delete the backup.
+- A KMS key policy restricting decryption: that protects confidentiality, not deletion — the encrypted backup object could still be deleted.
+> 🇻🇳 Cần khoá retention không ai sửa/xoá được kể cả admin → Vault Lock compliance mode; IAM/KMS vẫn có thể bị người có quyền thay đổi.
 
 ---
 

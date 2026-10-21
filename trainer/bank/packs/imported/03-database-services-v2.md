@@ -569,19 +569,24 @@ An Aurora cluster needs near-instant read scaling and automatic replacement of t
 - services: RDS
 - tags: automated-backups, pitr
 - difficulty: hard
-- time: 70
+- time: 95
+- enriched: 2026-10-21
 - source: practice-exams/03-database-services-exam-v2.md#Q25
 
 A regulated database must retain automated backups and enable point-in-time recovery to any second within the retention window. Which RDS capability provides this?
 
-- A. Read Replicas
-- B. Manual snapshots only
-- C. Multi-AZ standby
-- D. Automated backups with transaction logs (PITR)
+- A. Read replicas kept in sync for read scaling, which do not provide a backup or recovery mechanism
+- B. Manual snapshots taken periodically, each restoring to a single fixed moment rather than continuously across the retention window
+- C. Multi-AZ standby for automatic failover, which is not a point-in-time recovery mechanism
+- D. Continuous transaction-log backup that restores the database to any point within the retention window
 
 **Answer:** D
 
-**Explanation:** PITR to any second = automated backups + transaction logs.
+**Explanation:** RDS automated backups continuously capture transaction logs in addition to daily snapshots, which lets you restore the database to any specific second within the configured retention window rather than only to a snapshot's fixed timestamp.
+- Read replicas: stay in sync with the primary for read scaling; they are not a backup or point-in-time recovery mechanism.
+- Manual snapshots: each one is a fixed restore point at the moment it was taken, not continuous coverage across the retention window.
+- Multi-AZ standby: provides automatic failover for availability, it does not offer point-in-time recovery to an arbitrary timestamp.
+> 🇻🇳 Khôi phục tới bất kỳ giây nào trong cửa sổ lưu trữ cần backup tự động + transaction log (PITR); Read Replica/Multi-AZ không phải tính năng khôi phục.
 
 ---
 

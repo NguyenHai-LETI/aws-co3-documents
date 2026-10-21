@@ -359,19 +359,24 @@ A producer must send messages larger than 256 KB through SQS. What is the recomm
 - services: SQS
 - tags: decoupling, sqs-dlq
 - difficulty: easy
-- time: 45
+- time: 60
+- enriched: 2026-10-21
 - source: practice-exams/07-application-integration-exam.md#Q16
 
 Which combination implements a durable, decoupled async architecture where a failed consumer does not lose messages?
 
-- A. Direct Lambda invocation
-- B. EventBridge bus only
-- C. SQS queue with message retention and a DLQ
-- D. SNS only
+- A. Direct, synchronous Lambda invocation from the producer with no buffering layer
+- B. An EventBridge event bus with no queue or dead-letter target configured
+- C. An SQS queue with a redrive policy and dead-letter queue to retain unprocessed items
+- D. An SNS topic with no subscriber queue, delivering straight to an HTTP endpoint
 
 **Answer:** C
 
-**Explanation:** Durable decoupling, no message loss = SQS with retention + DLQ.
+**Explanation:** An SQS queue durably buffers requests between producer and consumer; combined with a redrive policy and dead-letter queue, items that a failing consumer cannot process are retained instead of dropped.
+- Synchronous Lambda invocation: there is no buffer, so if the consumer fails the request is simply lost unless the caller retries it itself.
+- EventBridge bus with no queue/DLQ target: once EventBridge's own retries are exhausted, an event with no durable downstream buffer is dropped.
+- SNS topic with no subscriber queue: delivering straight to an HTTP endpoint with no queue behind it means a failing endpoint can exhaust SNS retries and lose the notification.
+> 🇻🇳 Cần đệm bền vững cho consumer lỗi → SQS + DLQ; EventBridge/SNS/Lambda trực tiếp đều không giữ lại item khi không có hàng đợi phía sau.
 
 ---
 

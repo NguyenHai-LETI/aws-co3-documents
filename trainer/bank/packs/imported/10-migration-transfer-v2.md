@@ -267,19 +267,24 @@ A migration must keep the source database fully operational and continuously rep
 - services: DMS, Snow Family
 - tags: offline-transfer, cdc-replication
 - difficulty: hard
-- time: 75
+- time: 95
+- enriched: 2026-10-21
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q12
 
 A very large database migration over limited bandwidth must combine offline bulk transfer with ongoing change capture. Which approach?
 
-- A. Transfer Family only
-- B. DataSync only
-- C. Manual export/import once
-- D. DMS with Snowball Edge for initial bulk load, then CDC over the network
+- A. AWS Transfer Family moving nightly file exports of the database to the target environment
+- B. AWS DataSync performing a one-time scheduled copy of the exported database files, with no capture of changes made afterward
+- C. A single manual export and import of the full database performed once before cutover
+- D. DMS paired with a Snow Family device for the initial offline load, then continuous change capture over the network
 
 **Answer:** D
 
-**Explanation:** Bulk + ongoing = DMS with Snowball Edge initial load then CDC.
+**Explanation:** For a very large database over limited bandwidth, DMS combined with a Snow Family device moves the bulk of the data offline on the device, then DMS continues replicating changes over the network once the device's data lands in AWS.
+- Transfer Family: moves files over SFTP/FTPS/FTP; it has no concept of database change capture or continuous replication.
+- DataSync: copies files or objects on a one-time or scheduled basis, with no capture of changes made to the source after the copy runs.
+- A single manual export and import: only captures the database's state at one point in time, so any changes made during the transfer window are lost.
+> 🇻🇳 Dữ liệu lớn + băng thông hạn chế + cần đồng bộ thay đổi liên tục → DMS + Snow Family (offline) rồi CDC qua mạng.
 
 ---
 
@@ -289,19 +294,24 @@ A very large database migration over limited bandwidth must combine offline bulk
 - topic: migration
 - services: DataSync, Storage Gateway, Transfer Family
 - difficulty: hard
-- time: 75
+- time: 85
+- enriched: 2026-10-21
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q13
 
 DataSync vs Storage Gateway vs Transfer Family — which statement is TRUE?
 
-- A. Storage Gateway only does SFTP
-- B. Transfer Family is for Hadoop clusters
+- A. Storage Gateway provides managed SFTP/FTPS endpoints for exchanging files with external partners
+- B. Transfer Family continuously syncs on-premises files to S3 in the background with no user-initiated transfer
 - C. DataSync = one-time/scheduled bulk transfer; Storage Gateway = ongoing hybrid access; Transfer Family = managed SFTP/FTPS/FTP
-- D. All three are for real-time database replication
+- D. These three services replace AWS DMS for real-time relational database replication
 
 **Answer:** C
 
-**Explanation:** DataSync=bulk transfer; Storage Gateway=hybrid access; Transfer Family=managed SFTP/FTPS/FTP.
+**Explanation:** DataSync performs one-time or scheduled bulk data transfers between on-premises storage and AWS, Storage Gateway provides ongoing hybrid access for applications that still read/write data on-premises, and Transfer Family offers managed SFTP/FTPS/FTP endpoints for partner file exchange — each one solves a different hybrid-storage problem.
+- Storage Gateway providing managed SFTP endpoints: that is Transfer Family's role, not Storage Gateway's.
+- Transfer Family continuously syncing files in the background: that behavior describes DataSync or Storage Gateway, not Transfer Family's user-initiated protocol transfers.
+- Replacing DMS for database replication: none of the three move relational data continuously; that is DMS's job, not a storage/file transfer service.
+> 🇻🇳 Ba dịch vụ giải quyết ba vấn đề khác nhau: DataSync (chuyển khối), Storage Gateway (truy cập hybrid liên tục), Transfer Family (SFTP/FTPS/FTP quản lý).
 
 ---
 

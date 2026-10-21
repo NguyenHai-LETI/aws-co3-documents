@@ -1,0 +1,150 @@
+{
+ "run": "2026-10-21_222321_enrich",
+ "task": "enrich",
+ "created": "2026-10-21T22:37:45+07:00",
+ "updated": "2026-10-21T22:37:45+07:00",
+ "questions": {
+  "08-v2-11": {
+   "file": "bank/packs/imported/08-developer-tools-v2.md",
+   "before": "## Q 08-v2-11\n- domain: resilient\n- task: 2.2\n- topic: devtools\n- services: CodePipeline, CodeBuild\n- difficulty: hard\n- time: 95\n- source: practice-exams/08-developer-tools-exam-v2.md#Q11\n\nA pipeline must run integration tests in a build stage, then deploy to a staging environment, require manual approval, then deploy to production. Which two services combine for this? (Choose TWO)\n\n- A. CodePipeline (stages + manual approval action)\n- B. CodeArtifact only\n- C. CodeCommit only\n- D. X-Ray\n- E. CodeBuild (test/build stage)\n\n**Answer:** A, E\n\n**Explanation:** Pipeline with test/build + approval + deploy = CodePipeline + CodeBuild.",
+   "beforeSig": "060a6083e1c6",
+   "afterSig": "69aa825cfa06",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "08-v2-07": {
+   "file": "bank/packs/imported/08-developer-tools-v2.md",
+   "before": "## Q 08-v2-07\n- domain: resilient\n- task: 2.1\n- topic: devtools\n- services: CodeDeploy, Lambda\n- tags: deployment-strategies\n- difficulty: medium\n- time: 50\n- source: practice-exams/08-developer-tools-exam-v2.md#Q7\n\nA Lambda deployment must shift traffic gradually (canary 10% then 90%) with automatic rollback on alarms. Which service enables this?\n\n- A. CodeBuild\n- B. CodeDeploy (Lambda deployment)\n- C. CloudFormation only\n- D. CodeCommit\n\n**Answer:** B\n\n**Explanation:** Lambda canary traffic shifting + rollback = CodeDeploy Lambda deployment.",
+   "beforeSig": "967be31e5cd9",
+   "afterSig": "cc6e29a46470",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "16-v1-17": {
+   "file": "bank/packs/imported/16-cost-optimization-v1.md",
+   "before": "## Q 16-v1-17\n- domain: cost\n- task: 4.2\n- topic: cost\n- services: EC2 Auto Scaling\n- tags: spot-instances\n- difficulty: easy\n- time: 45\n- source: practice-exams/16-cost-optimization-exam.md#Q17\n\nTo cost-optimize a fleet that can tolerate interruptions but needs some baseline guaranteed capacity, which is BEST?\n\n- A. Mix On-Demand (baseline) + Spot (burst) via Auto Scaling mixed instances policy\n- B. All Reserved at peak\n- C. All On-Demand\n- D. All Dedicated Hosts\n\n**Answer:** A\n\n**Explanation:** Baseline + burst = On-Demand + Spot mixed instances policy.",
+   "beforeSig": "7faabd6c6282",
+   "afterSig": "2e909b3b6ebf",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "12-v2-11": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-11\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Forecast\n- difficulty: hard\n- time: 65\n- source: practice-exams/12-ml-ai-exam-v2.md#Q11\n\nA company must forecast future product demand from historical time-series data without building models manually. Which service?\n\n- A. Amazon SageMaker only\n- B. Amazon Personalize\n- C. Amazon Comprehend\n- D. Amazon Forecast\n\n**Answer:** D\n\n**Explanation:** Time-series demand forecasting = Amazon Forecast.",
+   "beforeSig": "889f2809ddd6",
+   "afterSig": "b5ca11d6a243",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "04-v2-20": {
+   "file": "bank/packs/imported/04-networking-services-v2.md",
+   "before": "## Q 04-v2-20\n- domain: performance\n- task: 3.4\n- topic: networking\n- services: NLB\n- difficulty: medium\n- time: 60\n- source: practice-exams/04-networking-services-exam-v2.md#Q20\n\nAn NLB must forward traffic to targets while preserving the client's source IP. Which is TRUE?\n\n- A. Source IP requires a NAT Gateway\n- B. NLB preserves the source IP by default for instance targets\n- C. NLB always hides the client IP\n- D. Only ALB preserves source IP\n\n**Answer:** B\n\n**Explanation:** NLB preserves client source IP by default (instance targets).",
+   "beforeSig": "e8d717f5cb9f",
+   "afterSig": "17a23601d51b",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "07-v1-16": {
+   "file": "bank/packs/imported/07-application-integration-v1.md",
+   "before": "## Q 07-v1-16\n- domain: resilient\n- task: 2.1\n- topic: integration\n- services: SQS\n- tags: decoupling, sqs-dlq\n- difficulty: easy\n- time: 45\n- source: practice-exams/07-application-integration-exam.md#Q16\n\nWhich combination implements a durable, decoupled async architecture where a failed consumer does not lose messages?\n\n- A. Direct Lambda invocation\n- B. EventBridge bus only\n- C. SQS queue with message retention and a DLQ\n- D. SNS only\n\n**Answer:** C\n\n**Explanation:** Durable decoupling, no message loss = SQS with retention + DLQ.",
+   "beforeSig": "38996305caa7",
+   "afterSig": "2cb0f7aa7dfc",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "07-v2-15": {
+   "file": "bank/packs/imported/07-application-integration-v2.md",
+   "before": "## Q 07-v2-15\n- domain: resilient\n- task: 2.1\n- topic: integration\n- services: SQS, S3\n- tags: sqs-large-messages\n- difficulty: medium\n- time: 55\n- source: practice-exams/07-application-integration-exam-v2.md#Q15\n\nA message larger than the SQS 256 KB limit must be sent. Which approach?\n\n- A. Compress to under 256 KB always\n- B. SQS Extended Client Library storing payload in S3\n- C. Use SNS instead\n- D. Split manually and hope\n\n**Answer:** B\n\n**Explanation:** Payload > 256 KB = SQS Extended Client Library (store in S3).",
+   "beforeSig": "6507c6456ece",
+   "afterSig": "b96982076c69",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "08-v1-14": {
+   "file": "bank/packs/imported/08-developer-tools-v1.md",
+   "before": "## Q 08-v1-14\n- domain: resilient\n- task: 2.2\n- topic: devtools\n- services: CodeCommit, CodePipeline\n- difficulty: easy\n- time: 45\n- source: practice-exams/08-developer-tools-exam.md#Q14\n\nA pipeline should automatically start when code is pushed to the main branch. Which source integration provides this?\n\n- A. Manual approval action\n- B. CodeBuild webhook only\n- C. S3 versioning\n- D. CodeCommit (or GitHub) source action in CodePipeline\n\n**Answer:** D\n\n**Explanation:** Auto-start on push = CodeCommit/GitHub source action in CodePipeline.",
+   "beforeSig": "46810518d021",
+   "afterSig": "24f3e32cd0c5",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "10-v2-12": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-12\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: DMS, Snow Family\n- tags: offline-transfer, cdc-replication\n- difficulty: hard\n- time: 75\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q12\n\nA very large database migration over limited bandwidth must combine offline bulk transfer with ongoing change capture. Which approach?\n\n- A. Transfer Family only\n- B. DataSync only\n- C. Manual export/import once\n- D. DMS with Snowball Edge for initial bulk load, then CDC over the network\n\n**Answer:** D\n\n**Explanation:** Bulk + ongoing = DMS with Snowball Edge initial load then CDC.",
+   "beforeSig": "90130bc0dd39",
+   "afterSig": "272155e5600b",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "10-v2-13": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-13\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: DataSync, Storage Gateway, Transfer Family\n- difficulty: hard\n- time: 75\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q13\n\nDataSync vs Storage Gateway vs Transfer Family — which statement is TRUE?\n\n- A. Storage Gateway only does SFTP\n- B. Transfer Family is for Hadoop clusters\n- C. DataSync = one-time/scheduled bulk transfer; Storage Gateway = ongoing hybrid access; Transfer Family = managed SFTP/FTPS/FTP\n- D. All three are for real-time database replication\n\n**Answer:** C\n\n**Explanation:** DataSync=bulk transfer; Storage Gateway=hybrid access; Transfer Family=managed SFTP/FTPS/FTP.",
+   "beforeSig": "b163f31f8684",
+   "afterSig": "f58d96f8e25c",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "13-v2-12": {
+   "file": "bank/packs/imported/13-other-services-v2.md",
+   "before": "## Q 13-v2-12\n- domain: resilient\n- task: 2.2\n- topic: other\n- services: AWS Backup\n- tags: s3-object-lock, compliance\n- difficulty: hard\n- time: 70\n- source: practice-exams/13-other-services-exam-v2.md#Q12\n\nAWS Backup must enforce that backups cannot be deleted before a retention period, even by admins (ransomware protection). Which feature?\n\n- A. S3 Object Lock only\n- B. IAM policy only\n- C. KMS grant\n- D. AWS Backup Vault Lock (compliance mode)\n\n**Answer:** D\n\n**Explanation:** Immutable backups vs ransomware = AWS Backup Vault Lock (compliance mode).",
+   "beforeSig": "8387716a7250",
+   "afterSig": "f6a26a4500d8",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "14-v2-11": {
+   "file": "bank/packs/imported/14-service-comparisons-v2.md",
+   "before": "## Q 14-v2-11\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Data Firehose, S3, Redshift, OpenSearch, SQS, Kinesis Data Streams\n- tags: streaming-ingestion, sharding, decoupling\n- difficulty: hard\n- time: 80\n- source: practice-exams/14-service-comparisons-exam-v2.md#Q11\n\nKinesis Data Streams vs Kinesis Data Firehose vs SQS — which statement set is CORRECT?\n\n- A. Firehose supports multiple consumer replay\n- B. SQS delivers directly to S3 with no code\n- C. All three replay data\n- D. Data Streams = real-time, replay, multiple consumers, shards; Firehose = managed buffered delivery to S3/Redshift/OpenSearch; SQS = decoupling queue, no replay\n\n**Answer:** D\n\n**Explanation:** Data Streams=real-time/replay/shards; Firehose=managed delivery; SQS=decoupling, no replay.",
+   "beforeSig": "0e87760ef24c",
+   "afterSig": "a1b1b90ded22",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "15-v1-14": {
+   "file": "bank/packs/imported/15-resilience-disaster-recovery-v1.md",
+   "before": "## Q 15-v1-14\n- domain: resilient\n- task: 2.2\n- topic: resilience\n- tags: read-replicas\n- difficulty: easy\n- time: 50\n- source: practice-exams/15-resilience-disaster-recovery-exam.md#Q14\n\nA pilot-light DR setup for a database typically keeps which component running in the DR Region?\n\n- A. Full production fleet at scale\n- B. A continuously replicated database (e.g., read replica) that can be promoted\n- C. Only S3 backups\n- D. Nothing at all\n\n**Answer:** B\n\n**Explanation:** Pilot Light DB = continuously replicated DB ready to promote.",
+   "beforeSig": "2a5040d1f9f9",
+   "afterSig": "3f61591568fc",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "15-v2-24": {
+   "file": "bank/packs/imported/15-resilience-disaster-recovery-v2.md",
+   "before": "## Q 15-v2-24\n- domain: resilient\n- task: 2.2\n- topic: resilience\n- services: Aurora\n- tags: aurora-global-database, multi-region, s3-replication\n- difficulty: hard\n- time: 100\n- source: practice-exams/15-resilience-disaster-recovery-exam-v2.md#Q24\n\nAn Aurora Global Database must be promoted in the secondary Region during a Regional outage. Which two are TRUE? (Choose TWO)\n\n- A. Promotion loses all data always\n- B. Only Multi-AZ is involved\n- C. Managed unplanned failover promotes the secondary Region\n- D. Typical cross-Region replication lag is under a second\n- E. Aurora Global requires DynamoDB\n\n**Answer:** C, D\n\n**Explanation:** Aurora Global = managed unplanned failover + sub-second replication lag.",
+   "beforeSig": "ee7b3c13d964",
+   "afterSig": "e811e5066287",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "16-v2-29": {
+   "file": "bank/packs/imported/16-cost-optimization-v2.md",
+   "before": "## Q 16-v2-29\n- domain: cost\n- task: 4.2\n- topic: cost\n- services: EC2, Fargate, Lambda\n- tags: savings-plans\n- difficulty: hard\n- time: 70\n- source: practice-exams/16-cost-optimization-exam-v2.md#Q29\n\nA workload's compute commitment must cover Lambda and Fargate too, not just EC2. Which purchasing option applies?\n\n- A. EC2 Instance Savings Plans only\n- B. Spot only\n- C. Standard RIs\n- D. Compute Savings Plans (cover EC2, Fargate, Lambda)\n\n**Answer:** D\n\n**Explanation:** Cover EC2+Fargate+Lambda = Compute Savings Plans.",
+   "beforeSig": "4bdf7482ee9f",
+   "afterSig": "cac89bb644a0",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "17-v2-08": {
+   "file": "bank/packs/imported/17-gap-services-v2.md",
+   "before": "## Q 17-v2-08\n- domain: secure\n- task: 1.2\n- topic: networking\n- services: Network Firewall, VPC\n- difficulty: medium\n- time: 50\n- source: practice-exams/17-gap-services-exam-v2.md#Q8\n\nA managed, stateful network firewall with intrusion prevention across a VPC is needed. Which service?\n\n- A. WAF only\n- B. Security Groups only\n- C. AWS Network Firewall\n- D. NACLs only\n\n**Answer:** C\n\n**Explanation:** Managed stateful firewall + IPS for VPC = AWS Network Firewall.",
+   "beforeSig": "0dcc6f604629",
+   "afterSig": "50b906801ce2",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "03-v2-25": {
+   "file": "bank/packs/imported/03-database-services-v2.md",
+   "before": "## Q 03-v2-25\n- domain: resilient\n- task: 2.2\n- topic: database\n- services: RDS\n- tags: automated-backups, pitr\n- difficulty: hard\n- time: 70\n- source: practice-exams/03-database-services-exam-v2.md#Q25\n\nA regulated database must retain automated backups and enable point-in-time recovery to any second within the retention window. Which RDS capability provides this?\n\n- A. Read Replicas\n- B. Manual snapshots only\n- C. Multi-AZ standby\n- D. Automated backups with transaction logs (PITR)\n\n**Answer:** D\n\n**Explanation:** PITR to any second = automated backups + transaction logs.",
+   "beforeSig": "10c475493139",
+   "afterSig": "916b02eec501",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "04-v1-13": {
+   "file": "bank/packs/imported/04-networking-services-v1.md",
+   "before": "## Q 04-v1-13\n- domain: performance\n- task: 3.4\n- topic: networking\n- services: S3, CloudFront\n- tags: cloudfront-origin-security\n- difficulty: easy\n- time: 45\n- source: practice-exams/04-networking-services-exam.md#Q13\n\nRestricting access so that an S3 origin can ONLY be reached through CloudFront uses which feature?\n\n- A. VPC endpoint policy\n- B. Bucket ACL public-read\n- C. Signed URLs only\n- D. Origin Access Control (OAC) / Origin Access Identity (OAI)\n\n**Answer:** D\n\n**Explanation:** Lock S3 origin to CloudFront only = OAC/OAI.",
+   "beforeSig": "a84ce23645ff",
+   "afterSig": "9bb1c3df061a",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "05-v1-18": {
+   "file": "bank/packs/imported/05-security-services-v1.md",
+   "before": "## Q 05-v1-18\n- domain: secure\n- task: 1.2\n- topic: security\n- services: PrivateLink, EC2, KMS\n- tags: subnets\n- difficulty: easy\n- time: 45\n- source: practice-exams/05-security-services-exam.md#Q18\n\nAn application on EC2 in a private subnet needs to call AWS APIs (e.g., KMS) without traversing the internet. Which solution is BEST?\n\n- A. NAT Gateway only\n- B. Interface VPC Endpoint (PrivateLink)\n- C. Internet Gateway\n- D. Public IP on the instance\n\n**Answer:** B\n\n**Explanation:** Private API access from private subnet = Interface VPC Endpoint.",
+   "beforeSig": "cae3799e3840",
+   "afterSig": "2131963cd75f",
+   "at": "2026-10-21T22:37:45+07:00"
+  },
+  "05-v2-13": {
+   "file": "bank/packs/imported/05-security-services-v2.md",
+   "before": "## Q 05-v2-13\n- domain: secure\n- task: 1.1\n- topic: security\n- services: IAM\n- tags: mfa, iam-policies\n- difficulty: medium\n- time: 55\n- source: practice-exams/05-security-services-exam-v2.md#Q13\n\nAn organization must enforce MFA for all IAM users performing sensitive actions. Which approach?\n\n- A. Disable programmatic access\n- B. Rely on strong passwords\n- C. Enable MFA and use IAM policy conditions requiring aws:MultiFactorAuthPresent\n- D. Use root MFA only\n\n**Answer:** C\n\n**Explanation:** Enforce MFA on sensitive actions = MFA + policy condition aws:MultiFactorAuthPresent.",
+   "beforeSig": "c045fac0e4db",
+   "afterSig": "78cb8f27664e",
+   "at": "2026-10-21T22:37:45+07:00"
+  }
+ },
+ "createdIds": [],
+ "packs": []
+}

@@ -315,19 +315,24 @@ A multi-AZ RDS primary fails. What happens?
 - topic: resilience
 - tags: read-replicas
 - difficulty: easy
-- time: 50
+- time: 55
+- enriched: 2026-10-21
 - source: practice-exams/15-resilience-disaster-recovery-exam.md#Q14
 
 A pilot-light DR setup for a database typically keeps which component running in the DR Region?
 
-- A. Full production fleet at scale
-- B. A continuously replicated database (e.g., read replica) that can be promoted
-- C. Only S3 backups
-- D. Nothing at all
+- A. A fully scaled, production-equivalent fleet already serving live traffic
+- B. A continuously replicated, promotable standby instance (for example, a cross-Region read replica)
+- C. A scaled-down but fully functional replica of every application tier
+- D. No infrastructure provisioned until a failover is manually declared
 
 **Answer:** B
 
-**Explanation:** Pilot Light DB = continuously replicated DB ready to promote.
+**Explanation:** Pilot light keeps only the critical data tier continuously running and in sync in the DR Region — typically a replicated, promotable database instance — while compute is launched only when a failover is actually declared.
+- A fully scaled, production-equivalent fleet already serving traffic: that describes a multi-site active-active setup, not pilot light.
+- A scaled-down but fully functional replica of every tier: that describes warm standby, which keeps compute running too, not just the data tier.
+- No infrastructure provisioned until failover: that describes backup and restore, which has no continuously running component at all.
+> 🇻🇳 Pilot light chỉ giữ tầng dữ liệu chạy sẵn (vd read replica có thể promote); compute chỉ bật khi failover thật sự xảy ra.
 
 ---
 

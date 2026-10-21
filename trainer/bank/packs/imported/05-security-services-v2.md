@@ -295,19 +295,24 @@ TLS certificates for an ALB must be provisioned and auto-renewed at no additiona
 - services: IAM
 - tags: mfa, iam-policies
 - difficulty: medium
-- time: 55
+- time: 70
+- enriched: 2026-10-21
 - source: practice-exams/05-security-services-exam-v2.md#Q13
 
 An organization must enforce MFA for all IAM users performing sensitive actions. Which approach?
 
-- A. Disable programmatic access
-- B. Rely on strong passwords
+- A. Disable programmatic (CLI/API) access for all IAM users, with no MFA requirement added for console sign-in
+- B. Require long, complex passwords through the account password policy, with no added MFA condition
 - C. Enable MFA and use IAM policy conditions requiring aws:MultiFactorAuthPresent
-- D. Use root MFA only
+- D. Enable MFA on the root user while leaving individual IAM users without an MFA requirement
 
 **Answer:** C
 
-**Explanation:** Enforce MFA on sensitive actions = MFA + policy condition aws:MultiFactorAuthPresent.
+**Explanation:** Enabling MFA devices for IAM users and then adding an explicit aws:MultiFactorAuthPresent condition to the relevant IAM policies blocks sensitive actions unless the request was authenticated with MFA, which directly enforces the requirement for every IAM user.
+- Disabling programmatic access: removes CLI/API access but adds no MFA requirement, so sensitive actions via the console still need no second factor.
+- Requiring long, complex passwords: raises the bar against guessing but adds no MFA condition, so a single compromised password is still enough.
+- Enabling MFA on the root user only: protects just the root account; the individual IAM users who actually perform the sensitive actions remain without an MFA requirement.
+> 🇻🇳 Bắt buộc MFA cho hành động nhạy cảm cần bật MFA + policy condition aws:MultiFactorAuthPresent; chỉ làm root MFA hay mật khẩu mạnh là chưa đủ.
 
 ---
 

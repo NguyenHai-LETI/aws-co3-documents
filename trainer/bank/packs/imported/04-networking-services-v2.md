@@ -442,19 +442,24 @@ An IPv6-only workload in a private subnet needs outbound internet access but mus
 - topic: networking
 - services: NLB
 - difficulty: medium
-- time: 60
+- time: 80
+- enriched: 2026-10-21
 - source: practice-exams/04-networking-services-exam-v2.md#Q20
 
 An NLB must forward traffic to targets while preserving the client's source IP. Which is TRUE?
 
-- A. Source IP requires a NAT Gateway
-- B. NLB preserves the source IP by default for instance targets
-- C. NLB always hides the client IP
-- D. Only ALB preserves source IP
+- A. A NAT Gateway placed in front of the NLB is required to pass the original client address through to targets
+- B. By default, an NLB forwards the original client address straight through to instance targets without altering it
+- C. An NLB replaces the original client address with its own node IP before forwarding to targets
+- D. An Application Load Balancer preserves the client's original IP at the TCP layer by default
 
 **Answer:** B
 
-**Explanation:** NLB preserves client source IP by default (instance targets).
+**Explanation:** For instance targets, an NLB operates at Layer 4 and forwards packets with the client's original source address unchanged, so the backend sees the real client IP without any extra configuration.
+- NAT Gateway in front of the NLB: NAT rewrites the source address to the NAT device's IP, which would hide the client's real address instead of passing it through.
+- NLB replacing the address with its own node IP: that describes how some proxies behave, not an NLB forwarding to instance targets, which keeps the original packet.
+- ALB preserving the address at the TCP layer: ALB is a Layer 7 proxy that terminates the TCP connection and exposes the client IP via the X-Forwarded-For header, not by preserving the packet's source IP.
+> 🇻🇳 NLB (Layer 4) chuyển gói tin gần như nguyên vẹn nên target instance thấy đúng IP gốc; ALB cần header X-Forwarded-For vì nó đầu cuối TCP.
 
 ---
 

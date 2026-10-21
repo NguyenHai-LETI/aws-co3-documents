@@ -536,20 +536,25 @@ A DR plan must be validated regularly without impacting production. Which servic
 - services: Aurora
 - tags: aurora-global-database, multi-region, s3-replication
 - difficulty: hard
-- time: 100
+- time: 120
+- enriched: 2026-10-21
 - source: practice-exams/15-resilience-disaster-recovery-exam-v2.md#Q24
 
 An Aurora Global Database must be promoted in the secondary Region during a Regional outage. Which two are TRUE? (Choose TWO)
 
-- A. Promotion loses all data always
-- B. Only Multi-AZ is involved
-- C. Managed unplanned failover promotes the secondary Region
+- A. Promoting the secondary Region discards every change that was not yet captured by the most recent manual snapshot
+- B. A separate Multi-AZ deployment must be manually configured in the secondary Region before failover is possible
+- C. A one-click managed failover switches the standby cluster in the other Region to primary
 - D. Typical cross-Region replication lag is under a second
-- E. Aurora Global requires DynamoDB
+- E. Aurora Global Database requires a Network Load Balancer in front of each Region's cluster to support failover
 
 **Answer:** C, D
 
-**Explanation:** Aurora Global = managed unplanned failover + sub-second replication lag.
+**Explanation:** Aurora Global Database offers a managed, one-click failover that switches the standby cluster in the other Region to primary without manual snapshot recovery, and under typical conditions the cross-Region replication lag is well under a second, so little data is at risk.
+- Discarding everything since the last manual snapshot: failover promotes the continuously replicated cluster itself, it is not a snapshot restore.
+- Requiring a separately configured Multi-AZ deployment first: the secondary cluster's built-in cross-Region replication already supports failover without a separate Multi-AZ setup.
+- Requiring a Network Load Balancer in front of each cluster: failover is handled through Aurora's own cluster endpoints, not an external load balancer.
+> 🇻🇳 Aurora Global Database: failover quản lý một cú click + độ trễ sao chép thường dưới 1 giây; không cần snapshot, Multi-AZ riêng, hay NLB.
 
 ---
 

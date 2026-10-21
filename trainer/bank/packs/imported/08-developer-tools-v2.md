@@ -153,19 +153,24 @@ A managed artifact repository for storing and sharing software packages (npm, Ma
 - services: CodeDeploy, Lambda
 - tags: deployment-strategies
 - difficulty: medium
-- time: 50
+- time: 75
+- enriched: 2026-10-21
 - source: practice-exams/08-developer-tools-exam-v2.md#Q7
 
 A Lambda deployment must shift traffic gradually (canary 10% then 90%) with automatic rollback on alarms. Which service enables this?
 
-- A. CodeBuild
-- B. CodeDeploy (Lambda deployment)
-- C. CloudFormation only
-- D. CodeCommit
+- A. AWS Step Functions shifting traffic through a fixed delay, with manual rollback if errors appear
+- B. AWS CodeDeploy shifting traffic through canary and linear stages, with automatic rollback triggered by CloudWatch alarms
+- C. AWS CloudFormation deploying a new Lambda version with no built-in traffic-shifting or alarm-based rollback
+- D. Amazon Route 53 weighted routing shifting traffic between two Lambda function URLs with no automatic rollback
 
 **Answer:** B
 
-**Explanation:** Lambda canary traffic shifting + rollback = CodeDeploy Lambda deployment.
+**Explanation:** AWS CodeDeploy natively supports canary and linear traffic-shifting for Lambda aliases and rolls back automatically when a configured CloudWatch alarm fires, which is exactly the gradual, alarm-driven rollout the scenario needs.
+- Step Functions with a fixed delay: shifts traffic on a timer, not based on real request weighting, and any rollback has to be scripted manually.
+- CloudFormation alone: deploys the new version but has no built-in traffic-shifting or alarm-based rollback; that behavior comes from CodeDeploy, not CloudFormation by itself.
+- Route 53 weighted routing: splits traffic between endpoints at the DNS level, with no automatic rollback tied to alarms.
+> 🇻🇳 Canary + rollback tự động theo alarm cho Lambda → AWS CodeDeploy; các lựa chọn khác thiếu một trong hai cơ chế này.
 
 ---
 
@@ -240,20 +245,25 @@ Automated code reviews and application profiling to find the most expensive line
 - topic: devtools
 - services: CodePipeline, CodeBuild
 - difficulty: hard
-- time: 95
+- time: 115
+- enriched: 2026-10-21
 - source: practice-exams/08-developer-tools-exam-v2.md#Q11
 
 A pipeline must run integration tests in a build stage, then deploy to a staging environment, require manual approval, then deploy to production. Which two services combine for this? (Choose TWO)
 
-- A. CodePipeline (stages + manual approval action)
-- B. CodeArtifact only
-- C. CodeCommit only
-- D. X-Ray
-- E. CodeBuild (test/build stage)
+- A. AWS CodePipeline to sequence the release stages and pause before the production stage
+- B. AWS Step Functions to orchestrate a workflow that calls the test suite as one step
+- C. AWS CloudFormation to deploy the build artifact directly to production
+- D. Amazon EventBridge to trigger a Lambda function after each release
+- E. AWS CodeBuild to compile the application and run its automated test suite
 
 **Answer:** A, E
 
-**Explanation:** Pipeline with test/build + approval + deploy = CodePipeline + CodeBuild.
+**Explanation:** CodePipeline chains the source, build, staging, and approval steps into one release workflow that can pause before promoting to production, while CodeBuild performs the compile and automated test run inside that workflow.
+- Step Functions: orchestrates a custom workflow but has no built-in source/approval/deploy actions, so it cannot replace the pipeline itself.
+- CloudFormation: provisions or updates infrastructure; it does not compile code, run tests, or gate a release with approval.
+- EventBridge: routes events to targets like Lambda; it does not execute builds, tests, or deployment stages.
+> 🇻🇳 Cần dịch vụ điều phối toàn bộ pipeline (CodePipeline) và dịch vụ build/test (CodeBuild); các dịch vụ khác chỉ làm một phần việc khác.
 
 ---
 

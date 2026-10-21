@@ -183,19 +183,24 @@ Traffic must be transparently inspected by a fleet of third-party firewall appli
 - topic: networking
 - services: Network Firewall, VPC
 - difficulty: medium
-- time: 50
+- time: 65
+- enriched: 2026-10-21
 - source: practice-exams/17-gap-services-exam-v2.md#Q8
 
 A managed, stateful network firewall with intrusion prevention across a VPC is needed. Which service?
 
-- A. WAF only
-- B. Security Groups only
-- C. AWS Network Firewall
-- D. NACLs only
+- A. AWS WAF, a web application firewall with no network-layer intrusion-prevention capability
+- B. Security groups, stateful instance-level firewalls with no intrusion-prevention signatures
+- C. AWS Network Firewall, a managed, stateful firewall with intrusion-prevention rule groups across the VPC
+- D. Network ACLs, stateless subnet-level filters with no intrusion-prevention capability
 
 **Answer:** C
 
-**Explanation:** Managed stateful firewall + IPS for VPC = AWS Network Firewall.
+**Explanation:** AWS Network Firewall is the managed service built specifically for stateful, VPC-wide traffic inspection, offering intrusion-prevention rule groups (Suricata-compatible) that security groups, NACLs, and WAF do not provide.
+- AWS WAF: protects HTTP(S) applications at Layer 7 (behind CloudFront, ALB, or API Gateway); it has no network-layer intrusion-prevention capability.
+- Security groups: stateful but instance-level only, with no deep packet inspection or intrusion-prevention signatures.
+- Network ACLs: stateless subnet-level allow/deny rules, with no intrusion-prevention capability at all.
+> 🇻🇳 Cần tường lửa có trạng thái + IPS toàn VPC → AWS Network Firewall; WAF/SG/NACL đều thiếu một phần yêu cầu này.
 
 ---
 

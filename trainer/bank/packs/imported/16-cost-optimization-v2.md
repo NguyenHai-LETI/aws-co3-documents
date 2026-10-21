@@ -655,19 +655,24 @@ A NAT Gateway is used only to let private instances reach a few AWS services (S3
 - services: EC2, Fargate, Lambda
 - tags: savings-plans
 - difficulty: hard
-- time: 70
+- time: 100
+- enriched: 2026-10-21
 - source: practice-exams/16-cost-optimization-exam-v2.md#Q29
 
 A workload's compute commitment must cover Lambda and Fargate too, not just EC2. Which purchasing option applies?
 
-- A. EC2 Instance Savings Plans only
-- B. Spot only
-- C. Standard RIs
-- D. Compute Savings Plans (cover EC2, Fargate, Lambda)
+- A. EC2 Instance Savings Plans, which cap the commitment's reach to EC2 usage and leave Fargate and Lambda spend unaffected
+- B. Spot Instances, which lower EC2 costs through interruptible capacity but have no equivalent commitment option for Fargate or Lambda
+- C. Standard Reserved Instances, which commit to specific EC2 instance families and do not apply to Fargate or Lambda usage
+- D. A Savings Plan that automatically applies its hourly commitment across EC2, Fargate, and Lambda usage, regardless of instance family or Region
 
 **Answer:** D
 
-**Explanation:** Cover EC2+Fargate+Lambda = Compute Savings Plans.
+**Explanation:** A Compute Savings Plan is a flexible, hourly-commitment pricing model that automatically applies its discount to usage across EC2, Fargate, and Lambda, regardless of instance family, size, OS, or Region, which is exactly the cross-service coverage the workload needs.
+- EC2 Instance Savings Plans: cap the commitment's reach to EC2 usage within a chosen instance family, leaving Fargate and Lambda spend unaffected.
+- Spot Instances: lower EC2 (and some Fargate Spot) costs through interruptible capacity, but there is no equivalent commitment-based discount for Lambda.
+- Standard Reserved Instances: tie the commitment to a specific EC2 instance family and Region, with no coverage for Fargate or Lambda at all.
+> 🇻🇳 Cần một cam kết áp dụng chung cho EC2 + Fargate + Lambda → Compute Savings Plans; các lựa chọn khác chỉ áp dụng cho một phần compute.
 
 ---
 

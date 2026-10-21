@@ -1,0 +1,264 @@
+# Patch do app ghi từ kết quả JSON của lượt 2026-10-21_222321_enrich (coach.structured_output) — định dạng SCHEMA.md §8.
+run_id: 2026-10-21_222321_enrich
+items:
+  - id: 08-v2-11
+    base: e7535b9c72
+    options:
+      A: AWS CodePipeline to sequence the release stages and pause before the production stage
+      B: AWS Step Functions to orchestrate a workflow that calls the test suite as one step
+      C: AWS CloudFormation to deploy the build artifact directly to production
+      D: Amazon EventBridge to trigger a Lambda function after each release
+      E: AWS CodeBuild to compile the application and run its automated test suite
+    explanation: |-
+      CodePipeline chains the source, build, staging, and approval steps into one release workflow that can pause before promoting to production, while CodeBuild performs the compile and automated test run inside that workflow.
+      - Step Functions: orchestrates a custom workflow but has no built-in source/approval/deploy actions, so it cannot replace the pipeline itself.
+      - CloudFormation: provisions or updates infrastructure; it does not compile code, run tests, or gate a release with approval.
+      - EventBridge: routes events to targets like Lambda; it does not execute builds, tests, or deployment stages.
+      > 🇻🇳 Cần dịch vụ điều phối toàn bộ pipeline (CodePipeline) và dịch vụ build/test (CodeBuild); các dịch vụ khác chỉ làm một phần việc khác.
+  - id: 16-v1-17
+    base: 509ea60688
+    options:
+      A: Use an Auto Scaling mixed instances policy that pairs On-Demand for the capacity that must keep running with Spot Instances for the rest
+      B: Size Standard Reserved Instances to cover the fleet's peak demand, committing to a one- or three-year term
+      C: Run the entire fleet as On-Demand instances at the standard hourly rate with no long-term commitment
+      D: Run the fleet on Dedicated Hosts, which bill per physical host rather than per instance
+    explanation: |-
+      An Auto Scaling mixed instances policy lets you pin a portion of the group to On-Demand for the capacity that must stay up while filling the rest with cheaper Spot Instances for the interruption-tolerant workload.
+      - Reserved Instances sized for peak: locks in a long-term commitment priced for the busiest hour, so most of the time you pay for capacity you do not use.
+      - On-Demand for the entire fleet: no commitment discount and no Spot savings, so it costs more than necessary for capacity that can tolerate interruption.
+      - Dedicated Hosts: billed per physical host for licensing/compliance needs, not a cost-optimization option for an interruption-tolerant fleet.
+      > 🇻🇳 Cần vừa có phần chạy ổn định vừa tận dụng giá rẻ khi chấp nhận gián đoạn → mixed instances policy (On-Demand + Spot).
+  - id: 12-v2-11
+    base: af146342ff
+    options:
+      A: Amazon SageMaker AI (formerly SageMaker), which requires manually designing and training a custom forecasting model
+      B: Amazon QuickSight, which can chart historical trends but needs an analyst to configure each forecast manually
+      C: Amazon Kinesis Data Analytics, which processes streaming data in real time but does not generate demand forecasts
+      D: Amazon Forecast, which builds and trains the forecasting model automatically from the historical data
+    explanation: |-
+      Amazon Forecast is the purpose-built managed service that trains and selects a time-series forecasting model automatically, so no data-science team has to design one by hand.
+      - SageMaker AI (formerly SageMaker): a general ML platform where you still have to build, train, and tune the forecasting model yourself.
+      - QuickSight: visualizes trends and offers a basic forecast widget, but each chart's forecast must be configured manually, it is not a dedicated demand-forecasting pipeline.
+      - Kinesis Data Analytics: processes streaming data in real time; it does not train or produce forward-looking demand predictions.
+      > 🇻🇳 Cần dự báo tự động, không tự xây model → Amazon Forecast; các lựa chọn khác đều cần tự thiết lập mô hình/báo cáo.
+  - id: 04-v2-20
+    base: 7c546e34d0
+    options:
+      A: A NAT Gateway placed in front of the NLB is required to pass the original client address through to targets
+      B: By default, an NLB forwards the original client address straight through to instance targets without altering it
+      C: An NLB replaces the original client address with its own node IP before forwarding to targets
+      D: An Application Load Balancer preserves the client's original IP at the TCP layer by default
+    explanation: |-
+      For instance targets, an NLB operates at Layer 4 and forwards packets with the client's original source address unchanged, so the backend sees the real client IP without any extra configuration.
+      - NAT Gateway in front of the NLB: NAT rewrites the source address to the NAT device's IP, which would hide the client's real address instead of passing it through.
+      - NLB replacing the address with its own node IP: that describes how some proxies behave, not an NLB forwarding to instance targets, which keeps the original packet.
+      - ALB preserving the address at the TCP layer: ALB is a Layer 7 proxy that terminates the TCP connection and exposes the client IP via the X-Forwarded-For header, not by preserving the packet's source IP.
+      > 🇻🇳 NLB (Layer 4) chuyển gói tin gần như nguyên vẹn nên target instance thấy đúng IP gốc; ALB cần header X-Forwarded-For vì nó đầu cuối TCP.
+  - id: 07-v1-16
+    base: fd47a3e50e
+    options:
+      A: Direct, synchronous Lambda invocation from the producer with no buffering layer
+      B: An EventBridge event bus with no queue or dead-letter target configured
+      C: An SQS queue with a redrive policy and dead-letter queue to retain unprocessed items
+      D: An SNS topic with no subscriber queue, delivering straight to an HTTP endpoint
+    explanation: |-
+      An SQS queue durably buffers requests between producer and consumer; combined with a redrive policy and dead-letter queue, items that a failing consumer cannot process are retained instead of dropped.
+      - Synchronous Lambda invocation: there is no buffer, so if the consumer fails the request is simply lost unless the caller retries it itself.
+      - EventBridge bus with no queue/DLQ target: once EventBridge's own retries are exhausted, an event with no durable downstream buffer is dropped.
+      - SNS topic with no subscriber queue: delivering straight to an HTTP endpoint with no queue behind it means a failing endpoint can exhaust SNS retries and lose the notification.
+      > 🇻🇳 Cần đệm bền vững cho consumer lỗi → SQS + DLQ; EventBridge/SNS/Lambda trực tiếp đều không giữ lại item khi không có hàng đợi phía sau.
+  - id: 07-v2-15
+    base: 9e5177a4f3
+    stem: A message larger than the SQS 1 MiB limit must be sent. Which approach?
+    options:
+      A: Compress the payload so it fits under the SQS message size limit before sending
+      B: Use the SQS Extended Client Library to store the payload in Amazon S3 and send a reference through SQS
+      C: Publish the payload to an SNS topic instead, which enforces its own separate size limit
+      D: Manually split the payload into multiple SQS messages and reassemble them in the consumer
+    explanation: |-
+      The SQS Extended Client Library automatically stores the full payload in an S3 object and sends only a small reference message through SQS, so the application can handle payloads above the queue's size limit without custom logic.
+      - Compressing the payload: ratio is not guaranteed, so some payloads (already-compressed files, binary data) can still exceed the limit.
+      - Publishing to SNS instead: SNS enforces its own message size limit too, so swapping the service does not remove the size constraint.
+      - Manually splitting into multiple messages: the consumer must reassemble the parts itself, which risks partial delivery and out-of-order processing that the Extended Client Library avoids.
+      > 🇻🇳 Payload vượt giới hạn SQS → dùng Extended Client Library lưu ở S3, không nên tự nén/tách hay đổi sang SNS.
+  - id: 08-v1-14
+    base: bc451eae9d
+    options:
+      A: A manual approval action configured before the pipeline reaches the production stage
+      B: A CloudFormation stack update applied manually after each push to the source repository
+      C: Amazon S3 versioning enabled on the pipeline's artifact bucket
+      D: A CodeCommit (or GitHub) source action configured in CodePipeline
+    explanation: |-
+      A source action for CodeCommit or GitHub in CodePipeline listens for commits and automatically starts a new pipeline execution whenever code lands on the configured branch.
+      - A manual approval action: gates a later stage from proceeding; it does not start the pipeline when code is pushed.
+      - A CloudFormation stack update applied manually: requires a human to run the update, so nothing happens automatically on push.
+      - S3 versioning on the artifact bucket: tracks object versions for rollback, it does not watch a source repository for new commits.
+      > 🇻🇳 Cần tự khởi chạy khi có commit → source action (CodeCommit/GitHub) gắn trong CodePipeline; các lựa chọn khác không theo dõi commit.
+  - id: 08-v2-07
+    base: 86d81bd0fb
+    options:
+      A: AWS Step Functions shifting traffic through a fixed delay, with manual rollback if errors appear
+      B: AWS CodeDeploy shifting traffic through canary and linear stages, with automatic rollback triggered by CloudWatch alarms
+      C: AWS CloudFormation deploying a new Lambda version with no built-in traffic-shifting or alarm-based rollback
+      D: Amazon Route 53 weighted routing shifting traffic between two Lambda function URLs with no automatic rollback
+    explanation: |-
+      AWS CodeDeploy natively supports canary and linear traffic-shifting for Lambda aliases and rolls back automatically when a configured CloudWatch alarm fires, which is exactly the gradual, alarm-driven rollout the scenario needs.
+      - Step Functions with a fixed delay: shifts traffic on a timer, not based on real request weighting, and any rollback has to be scripted manually.
+      - CloudFormation alone: deploys the new version but has no built-in traffic-shifting or alarm-based rollback; that behavior comes from CodeDeploy, not CloudFormation by itself.
+      - Route 53 weighted routing: splits traffic between endpoints at the DNS level, with no automatic rollback tied to alarms.
+      > 🇻🇳 Canary + rollback tự động theo alarm cho Lambda → AWS CodeDeploy; các lựa chọn khác thiếu một trong hai cơ chế này.
+  - id: 10-v2-12
+    base: 180ed04f51
+    options:
+      A: AWS Transfer Family moving nightly file exports of the database to the target environment
+      B: AWS DataSync performing a one-time scheduled copy of the exported database files, with no capture of changes made afterward
+      C: A single manual export and import of the full database performed once before cutover
+      D: DMS paired with a Snow Family device for the initial offline load, then continuous change capture over the network
+    explanation: |-
+      For a very large database over limited bandwidth, DMS combined with a Snow Family device moves the bulk of the data offline on the device, then DMS continues replicating changes over the network once the device's data lands in AWS.
+      - Transfer Family: moves files over SFTP/FTPS/FTP; it has no concept of database change capture or continuous replication.
+      - DataSync: copies files or objects on a one-time or scheduled basis, with no capture of changes made to the source after the copy runs.
+      - A single manual export and import: only captures the database's state at one point in time, so any changes made during the transfer window are lost.
+      > 🇻🇳 Dữ liệu lớn + băng thông hạn chế + cần đồng bộ thay đổi liên tục → DMS + Snow Family (offline) rồi CDC qua mạng.
+  - id: 10-v2-13
+    base: 10c199e315
+    options:
+      A: Storage Gateway provides managed SFTP/FTPS endpoints for exchanging files with external partners
+      B: Transfer Family continuously syncs on-premises files to S3 in the background with no user-initiated transfer
+      D: These three services replace AWS DMS for real-time relational database replication
+    explanation: |-
+      DataSync performs one-time or scheduled bulk data transfers between on-premises storage and AWS, Storage Gateway provides ongoing hybrid access for applications that still read/write data on-premises, and Transfer Family offers managed SFTP/FTPS/FTP endpoints for partner file exchange — each one solves a different hybrid-storage problem.
+      - Storage Gateway providing managed SFTP endpoints: that is Transfer Family's role, not Storage Gateway's.
+      - Transfer Family continuously syncing files in the background: that behavior describes DataSync or Storage Gateway, not Transfer Family's user-initiated protocol transfers.
+      - Replacing DMS for database replication: none of the three move relational data continuously; that is DMS's job, not a storage/file transfer service.
+      > 🇻🇳 Ba dịch vụ giải quyết ba vấn đề khác nhau: DataSync (chuyển khối), Storage Gateway (truy cập hybrid liên tục), Transfer Family (SFTP/FTPS/FTP quản lý).
+  - id: 13-v2-12
+    base: cd91e09008
+    options:
+      A: S3 Object Lock applied directly to the backup vault's underlying storage
+      B: An IAM policy that denies the backup-delete action for all users
+      C: A KMS key policy that restricts who can decrypt the backup data
+      D: Vault Lock in compliance mode, which blocks deletion or retention shortening even by the account's root user
+    explanation: |-
+      Vault Lock in compliance mode makes the retention policy immutable: once locked, nobody — including the account root user — can delete a backup or shorten its retention period before it expires, which is exactly the ransomware-resistant guarantee required here.
+      - S3 Object Lock on the vault's storage: backup vaults are not buckets you apply Object Lock to directly; vault-level immutability comes from Vault Lock, not S3's feature.
+      - An IAM deny policy: it only stops users without permission to change it; an admin with sufficient rights can still edit or remove the policy and then delete the backup.
+      - A KMS key policy restricting decryption: that protects confidentiality, not deletion — the encrypted backup object could still be deleted.
+      > 🇻🇳 Cần khoá retention không ai sửa/xoá được kể cả admin → Vault Lock compliance mode; IAM/KMS vẫn có thể bị người có quyền thay đổi.
+  - id: 14-v2-11
+    base: ff43c4def1
+    stem: Kinesis Data Streams vs Amazon Data Firehose (formerly Kinesis Data Firehose) vs SQS — which statement set is CORRECT?
+    options:
+      A: Data Firehose supports multiple independent consumers replaying the same records after they arrive in the stream
+      B: SQS automatically delivers every queued message straight to an S3 bucket without any custom consumer code
+      C: Data Streams, Data Firehose, and SQS all let consumers replay records that were already processed and removed
+      D: Data Streams = real-time, replay, multiple consumers, shards; Data Firehose = managed buffered delivery to S3/Redshift/OpenSearch; SQS = decoupling queue, no replay
+    explanation: |-
+      Kinesis Data Streams retains records so multiple consumers can read and replay them from shards in real time; Data Firehose is a managed, buffered delivery pipeline into S3, Redshift, or OpenSearch with no replay; and SQS is a decoupling queue where a message disappears once it is successfully processed, with no replay.
+      - Data Firehose supporting multi-consumer replay: that capability belongs to Data Streams' shard-based retention, not Firehose's one-way delivery pipeline.
+      - SQS delivering straight to S3 with no code: SQS needs a consumer (e.g., a Lambda function) to read and write the messages; it has no native S3 delivery.
+      - All three allowing replay: only Data Streams retains records long enough to replay; Firehose and SQS do not keep processed data around.
+      > 🇻🇳 Data Streams có replay nhiều consumer qua shard; Data Firehose chỉ đẩy dữ liệu một chiều; SQS xoá message sau khi xử lý xong, không replay được.
+  - id: 15-v1-14
+    base: ecfd6d7314
+    options:
+      A: A fully scaled, production-equivalent fleet already serving live traffic
+      B: A continuously replicated, promotable standby instance (for example, a cross-Region read replica)
+      C: A scaled-down but fully functional replica of every application tier
+      D: No infrastructure provisioned until a failover is manually declared
+    explanation: |-
+      Pilot light keeps only the critical data tier continuously running and in sync in the DR Region — typically a replicated, promotable database instance — while compute is launched only when a failover is actually declared.
+      - A fully scaled, production-equivalent fleet already serving traffic: that describes a multi-site active-active setup, not pilot light.
+      - A scaled-down but fully functional replica of every tier: that describes warm standby, which keeps compute running too, not just the data tier.
+      - No infrastructure provisioned until failover: that describes backup and restore, which has no continuously running component at all.
+      > 🇻🇳 Pilot light chỉ giữ tầng dữ liệu chạy sẵn (vd read replica có thể promote); compute chỉ bật khi failover thật sự xảy ra.
+  - id: 15-v2-24
+    base: e59e355b6d
+    options:
+      A: Promoting the secondary Region discards every change that was not yet captured by the most recent manual snapshot
+      B: A separate Multi-AZ deployment must be manually configured in the secondary Region before failover is possible
+      C: A one-click managed failover switches the standby cluster in the other Region to primary
+      E: Aurora Global Database requires a Network Load Balancer in front of each Region's cluster to support failover
+    explanation: |-
+      Aurora Global Database offers a managed, one-click failover that switches the standby cluster in the other Region to primary without manual snapshot recovery, and under typical conditions the cross-Region replication lag is well under a second, so little data is at risk.
+      - Discarding everything since the last manual snapshot: failover promotes the continuously replicated cluster itself, it is not a snapshot restore.
+      - Requiring a separately configured Multi-AZ deployment first: the secondary cluster's built-in cross-Region replication already supports failover without a separate Multi-AZ setup.
+      - Requiring a Network Load Balancer in front of each cluster: failover is handled through Aurora's own cluster endpoints, not an external load balancer.
+      > 🇻🇳 Aurora Global Database: failover quản lý một cú click + độ trễ sao chép thường dưới 1 giây; không cần snapshot, Multi-AZ riêng, hay NLB.
+  - id: 16-v2-29
+    base: f2bd22cb0d
+    options:
+      A: EC2 Instance Savings Plans, which cap the commitment's reach to EC2 usage and leave Fargate and Lambda spend unaffected
+      B: Spot Instances, which lower EC2 costs through interruptible capacity but have no equivalent commitment option for Fargate or Lambda
+      C: Standard Reserved Instances, which commit to specific EC2 instance families and do not apply to Fargate or Lambda usage
+      D: A Savings Plan that automatically applies its hourly commitment across EC2, Fargate, and Lambda usage, regardless of instance family or Region
+    explanation: |-
+      A Compute Savings Plan is a flexible, hourly-commitment pricing model that automatically applies its discount to usage across EC2, Fargate, and Lambda, regardless of instance family, size, OS, or Region, which is exactly the cross-service coverage the workload needs.
+      - EC2 Instance Savings Plans: cap the commitment's reach to EC2 usage within a chosen instance family, leaving Fargate and Lambda spend unaffected.
+      - Spot Instances: lower EC2 (and some Fargate Spot) costs through interruptible capacity, but there is no equivalent commitment-based discount for Lambda.
+      - Standard Reserved Instances: tie the commitment to a specific EC2 instance family and Region, with no coverage for Fargate or Lambda at all.
+      > 🇻🇳 Cần một cam kết áp dụng chung cho EC2 + Fargate + Lambda → Compute Savings Plans; các lựa chọn khác chỉ áp dụng cho một phần compute.
+  - id: 17-v2-08
+    base: 636865ccca
+    options:
+      A: AWS WAF, a web application firewall with no network-layer intrusion-prevention capability
+      B: Security groups, stateful instance-level firewalls with no intrusion-prevention signatures
+      C: AWS Network Firewall, a managed, stateful firewall with intrusion-prevention rule groups across the VPC
+      D: Network ACLs, stateless subnet-level filters with no intrusion-prevention capability
+    explanation: |-
+      AWS Network Firewall is the managed service built specifically for stateful, VPC-wide traffic inspection, offering intrusion-prevention rule groups (Suricata-compatible) that security groups, NACLs, and WAF do not provide.
+      - AWS WAF: protects HTTP(S) applications at Layer 7 (behind CloudFront, ALB, or API Gateway); it has no network-layer intrusion-prevention capability.
+      - Security groups: stateful but instance-level only, with no deep packet inspection or intrusion-prevention signatures.
+      - Network ACLs: stateless subnet-level allow/deny rules, with no intrusion-prevention capability at all.
+      > 🇻🇳 Cần tường lửa có trạng thái + IPS toàn VPC → AWS Network Firewall; WAF/SG/NACL đều thiếu một phần yêu cầu này.
+  - id: 03-v2-25
+    base: c8078691c8
+    options:
+      A: Read replicas kept in sync for read scaling, which do not provide a backup or recovery mechanism
+      B: Manual snapshots taken periodically, each restoring to a single fixed moment rather than continuously across the retention window
+      C: Multi-AZ standby for automatic failover, which is not a point-in-time recovery mechanism
+      D: Continuous transaction-log backup that restores the database to any point within the retention window
+    explanation: |-
+      RDS automated backups continuously capture transaction logs in addition to daily snapshots, which lets you restore the database to any specific second within the configured retention window rather than only to a snapshot's fixed timestamp.
+      - Read replicas: stay in sync with the primary for read scaling; they are not a backup or point-in-time recovery mechanism.
+      - Manual snapshots: each one is a fixed restore point at the moment it was taken, not continuous coverage across the retention window.
+      - Multi-AZ standby: provides automatic failover for availability, it does not offer point-in-time recovery to an arbitrary timestamp.
+      > 🇻🇳 Khôi phục tới bất kỳ giây nào trong cửa sổ lưu trữ cần backup tự động + transaction log (PITR); Read Replica/Multi-AZ không phải tính năng khôi phục.
+  - id: 04-v1-13
+    base: f8db6bc473
+    options:
+      A: A VPC endpoint policy restricting which networks can reach the S3 origin directly
+      B: A bucket ACL granting public-read access to the S3 origin
+      C: CloudFront signed URLs restricting which viewers can request objects, with the S3 origin still open to direct requests
+      D: Origin Access Control (OAC), or the older Origin Access Identity (OAI), which lets CloudFront authenticate to the S3 origin through a restrictive bucket policy
+    explanation: |-
+      Origin Access Control (or the older Origin Access Identity) lets CloudFront sign its requests to the S3 origin, and a matching bucket policy denies any request that is not signed this way — exactly the CloudFront-only restriction required.
+      - A VPC endpoint policy: controls access from within a VPC; it does not block public internet requests made directly to the S3 origin's public endpoint.
+      - A bucket ACL granting public-read: makes the origin more open, not less — the opposite of restricting access to CloudFront only.
+      - CloudFront signed URLs: control which viewers can request objects through CloudFront, but leave the S3 origin itself reachable directly unless paired with OAC/OAI.
+      > 🇻🇳 Khoá S3 origin chỉ nhận request từ CloudFront cần OAC/OAI + bucket policy; signed URL chỉ kiểm soát phía viewer, không khoá origin.
+  - id: 05-v1-18
+    base: 5a0530a029
+    options:
+      A: A NAT Gateway in a public subnet routing the instance's API calls out to the internet
+      B: An Interface VPC Endpoint (PrivateLink) for KMS placed in the private subnet
+      C: A bastion host in a public subnet that proxies the EC2 instance's API calls to KMS
+      D: A public IP assigned to the EC2 instance so it can reach KMS over the internet
+    explanation: |-
+      An Interface VPC Endpoint powered by AWS PrivateLink places a private IP for the KMS API inside the VPC, so the EC2 instance calls KMS entirely over the AWS network without ever routing through the internet.
+      - A NAT Gateway: routes outbound traffic to the internet through an internet gateway, which is exactly the path the requirement rules out.
+      - A bastion host proxying the calls: still needs its own path to the internet (or an internet-facing hop) to reach the public KMS endpoint, so traffic still leaves the AWS private network.
+      - A public IP on the instance: a private subnet has no route to an internet gateway, and even if it did, the traffic would traverse the internet.
+      > 🇻🇳 Gọi API AWS từ subnet private mà không ra internet → Interface VPC Endpoint (PrivateLink); NAT/IGW/public IP đều cần đường ra internet.
+  - id: 05-v2-13
+    base: 98a501d48e
+    options:
+      A: Disable programmatic (CLI/API) access for all IAM users, with no MFA requirement added for console sign-in
+      B: Require long, complex passwords through the account password policy, with no added MFA condition
+      D: Enable MFA on the root user while leaving individual IAM users without an MFA requirement
+    explanation: |-
+      Enabling MFA devices for IAM users and then adding an explicit aws:MultiFactorAuthPresent condition to the relevant IAM policies blocks sensitive actions unless the request was authenticated with MFA, which directly enforces the requirement for every IAM user.
+      - Disabling programmatic access: removes CLI/API access but adds no MFA requirement, so sensitive actions via the console still need no second factor.
+      - Requiring long, complex passwords: raises the bar against guessing but adds no MFA condition, so a single compromised password is still enough.
+      - Enabling MFA on the root user only: protects just the root account; the individual IAM users who actually perform the sensitive actions remain without an MFA requirement.
+      > 🇻🇳 Bắt buộc MFA cho hành động nhạy cảm cần bật MFA + policy condition aws:MultiFactorAuthPresent; chỉ làm root MFA hay mật khẩu mạnh là chưa đủ.

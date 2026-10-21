@@ -406,19 +406,24 @@ Which IAM best practice should be applied to the AWS account root user?
 - services: PrivateLink, EC2, KMS
 - tags: subnets
 - difficulty: easy
-- time: 45
+- time: 70
+- enriched: 2026-10-21
 - source: practice-exams/05-security-services-exam.md#Q18
 
 An application on EC2 in a private subnet needs to call AWS APIs (e.g., KMS) without traversing the internet. Which solution is BEST?
 
-- A. NAT Gateway only
-- B. Interface VPC Endpoint (PrivateLink)
-- C. Internet Gateway
-- D. Public IP on the instance
+- A. A NAT Gateway in a public subnet routing the instance's API calls out to the internet
+- B. An Interface VPC Endpoint (PrivateLink) for KMS placed in the private subnet
+- C. A bastion host in a public subnet that proxies the EC2 instance's API calls to KMS
+- D. A public IP assigned to the EC2 instance so it can reach KMS over the internet
 
 **Answer:** B
 
-**Explanation:** Private API access from private subnet = Interface VPC Endpoint.
+**Explanation:** An Interface VPC Endpoint powered by AWS PrivateLink places a private IP for the KMS API inside the VPC, so the EC2 instance calls KMS entirely over the AWS network without ever routing through the internet.
+- A NAT Gateway: routes outbound traffic to the internet through an internet gateway, which is exactly the path the requirement rules out.
+- A bastion host proxying the calls: still needs its own path to the internet (or an internet-facing hop) to reach the public KMS endpoint, so traffic still leaves the AWS private network.
+- A public IP on the instance: a private subnet has no route to an internet gateway, and even if it did, the traffic would traverse the internet.
+> 🇻🇳 Gọi API AWS từ subnet private mà không ra internet → Interface VPC Endpoint (PrivateLink); NAT/IGW/public IP đều cần đường ra internet.
 
 ---
 

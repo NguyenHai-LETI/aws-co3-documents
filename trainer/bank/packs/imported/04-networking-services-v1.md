@@ -286,19 +286,24 @@ Users must be served from the AWS Region that gives them the lowest network late
 - services: S3, CloudFront
 - tags: cloudfront-origin-security
 - difficulty: easy
-- time: 45
+- time: 65
+- enriched: 2026-10-21
 - source: practice-exams/04-networking-services-exam.md#Q13
 
 Restricting access so that an S3 origin can ONLY be reached through CloudFront uses which feature?
 
-- A. VPC endpoint policy
-- B. Bucket ACL public-read
-- C. Signed URLs only
-- D. Origin Access Control (OAC) / Origin Access Identity (OAI)
+- A. A VPC endpoint policy restricting which networks can reach the S3 origin directly
+- B. A bucket ACL granting public-read access to the S3 origin
+- C. CloudFront signed URLs restricting which viewers can request objects, with the S3 origin still open to direct requests
+- D. Origin Access Control (OAC), or the older Origin Access Identity (OAI), which lets CloudFront authenticate to the S3 origin through a restrictive bucket policy
 
 **Answer:** D
 
-**Explanation:** Lock S3 origin to CloudFront only = OAC/OAI.
+**Explanation:** Origin Access Control (or the older Origin Access Identity) lets CloudFront sign its requests to the S3 origin, and a matching bucket policy denies any request that is not signed this way — exactly the CloudFront-only restriction required.
+- A VPC endpoint policy: controls access from within a VPC; it does not block public internet requests made directly to the S3 origin's public endpoint.
+- A bucket ACL granting public-read: makes the origin more open, not less — the opposite of restricting access to CloudFront only.
+- CloudFront signed URLs: control which viewers can request objects through CloudFront, but leave the S3 origin itself reachable directly unless paired with OAC/OAI.
+> 🇻🇳 Khoá S3 origin chỉ nhận request từ CloudFront cần OAC/OAI + bucket policy; signed URL chỉ kiểm soát phía viewer, không khoá origin.
 
 ---
 
