@@ -241,8 +241,31 @@ it('ensureSealed creates the forms once: deterministic file (no timestamps), str
 
 it('eligibleForSealing reports why questions were left out', () => {
   const e = S.eligibleForSealing(bankNow(), loadConfig());
-  assert.deepEqual(e.excluded, { inactive: 2, earlier: 0, outOfScope: 1, siblings: 4, quality: 2 });
+  assert.deepEqual(e.excluded, { inactive: 2, earlier: 0, outOfScope: 1, siblings: 4, quality: 2, unverified: 0 });
   assert.equal(e.pool.length, drafts.length);
+});
+
+it('[v5] an AI-written question is sealed only once a second model confirmed the key of its current version', () => {
+  const ai = { origin: 'ai' as const, hash: 'h1' };
+  const v = (x: Record<string, unknown>) => ({ qid: 'q', at: '', model: '', hash: 'h1', outcome: 'ok', ...x }) as never;
+  assert.equal(S.verifiedForSealing({ origin: 'imported', hash: 'h1' }, undefined), true, 'imported questions need no verdict');
+  assert.equal(S.verifiedForSealing(ai, undefined), false, 'never blind-solved');
+  assert.equal(S.verifiedForSealing(ai, v({})), true);
+  assert.equal(S.verifiedForSealing(ai, v({ hash: 'old' })), false, 'verdict of an older version');
+  assert.equal(S.verifiedForSealing(ai, v({ outcome: 'mismatch' })), false);
+  assert.equal(S.verifiedForSealing(ai, v({ outcome: 'mismatch', decision: 'approved' })), true, 'the learner approved the key');
+  assert.equal(S.verifiedForSealing(ai, v({ outcome: 'ambiguous', grounded: { hash: 'h1', outcome: 'ok', check: 'grounded', fact: 'correct' } })), true);
+  assert.equal(S.verifiedForSealing({ origin: 'doc', hash: 'h1' }, undefined), false, 'generated from notes = AI-written');
+
+  const bank = bankNow();
+  const target = bank.questions.find((q) => S.eligibleForSealing(bank, loadConfig(), new Set(), {}).pool.some((p) => p.id === q.id))!;
+  const aiBank = { ...bank, questions: bank.questions.map((q) => (q.id === target.id ? { ...q, origin: 'ai' as const } : q)) } as typeof bank;
+  const without = S.eligibleForSealing(aiBank, loadConfig(), new Set(), {});
+  assert.equal(without.excluded.unverified, 1);
+  assert.ok(!without.pool.some((q) => q.id === target.id));
+  const verified = S.eligibleForSealing(aiBank, loadConfig(), new Set(), { [target.id]: v({ qid: target.id, hash: target.hash }) });
+  assert.equal(verified.excluded.unverified, 0);
+  assert.ok(verified.pool.some((q) => q.id === target.id));
 });
 
 it('reading: sealedIds / sealedKey / formIds; the status route shape never carries a question id', () => {

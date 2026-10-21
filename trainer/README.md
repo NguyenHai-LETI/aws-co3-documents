@@ -78,7 +78,7 @@ trainer/
 | Chế độ | Lấy câu nào |
 |--------|-------------|
 | 🎯 Thi thử SAA-C03 | 65 câu theo trọng số domain 30/26/24/20, ưu tiên câu chưa gặp, rồi câu giống đề thật; không bao giờ lấy cả câu gốc lẫn biến thể của nó. **Mô phỏng Pearson VUE**: 15 câu thử nghiệm không tính điểm (chỉ lộ sau khi nộp), màn hình Review cuối bài, không tạm dừng, cảnh báo 15′/5′, phân tích sức bền theo từng phần tư. Đồng hồ mặc định **theo tải đọc đề thật** (xem dưới) |
-| 🔒 Đề niêm phong | 50 câu **chưa từng xuất hiện khi luyện** + 15 câu thử nghiệm, mô phỏng Pearson; chỉ **lần nộp đầu tiên** của mỗi đề là **điểm trên câu mới** (điểm hiệu chỉnh nội bộ) — làm lại = luyện thường (🔁). 2 đề được giữ riêng từ trước buổi luyện đầu tiên (`exam.sealed_forms`, `exam.sealed_size`); gợi ý làm ≈ 3 tuần và ≈ 1 tuần trước ngày thi |
+| 🔒 Đề niêm phong | 50 câu **chưa từng xuất hiện khi luyện** + 15 câu thử nghiệm, mô phỏng Pearson; chỉ **lần nộp đầu tiên** của mỗi đề là **điểm trên câu mới** (điểm hiệu chỉnh nội bộ) — làm lại = luyện thường (🔁). 2 đề được giữ riêng từ trước buổi luyện đầu tiên (`exam.sealed_forms`, `exam.sealed_size`); câu do AI viết chỉ được chọn khi model thứ hai đã giải mù khớp đáp án; gợi ý làm ≈ 3 tuần và ≈ 1 tuần trước ngày thi |
 | 🧭 Chẩn đoán đầu vào | 2 câu cho mỗi mục exam guide 1.1–4.4 (28 câu, chia được 2 × 14), ưu tiên câu chưa gặp, không xét đạt/chưa đạt → **Bản đồ xuất phát** |
 | 📚 Theo chủ đề | chọn 1+ chủ đề (+ domain, độ khó) |
 | 📦 Theo bộ đề | làm lại nguyên 1 pack |

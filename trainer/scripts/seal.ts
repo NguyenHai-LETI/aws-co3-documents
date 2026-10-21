@@ -63,7 +63,7 @@ function printStatus() {
 
 function printCreated(r: CreateResult) {
   const x = r.excluded;
-  console.log(`✓ Đã tạo ${r.created.join(', ')} từ ${r.pool} câu đủ điều kiện (loại: ${x.outOfScope} ngoài phạm vi · ${x.siblings} có câu anh em · ${x.quality} chất lượng chưa ổn · ${x.earlier} thuộc đề cũ · ${x.inactive} draft/retired).`);
+  console.log(`✓ Đã tạo ${r.created.join(', ')} từ ${r.pool} câu đủ điều kiện (loại: ${x.outOfScope} ngoài phạm vi · ${x.siblings} có câu anh em · ${x.quality} chất lượng chưa ổn · ${x.unverified} câu AI chưa giải mù khớp · ${x.earlier} thuộc đề cũ · ${x.inactive} draft/retired).`);
   for (const n of r.notes) console.log(`  ⚠️ ${n}`);
 }
 

@@ -20,6 +20,8 @@ export interface Sandbox {
 function copyData(dest: string, opts: { results?: boolean }) {
   fs.mkdirSync(dest, { recursive: true });
   fs.cpSync(path.join(TRAINER_ROOT, 'bank'), path.join(dest, 'bank'), { recursive: true });
+  // the real blind-solve ledger is learner data: every sandbox starts without verdicts (tests write their own)
+  fs.rmSync(path.join(dest, 'bank', 'verify.md'), { force: true });
   // sandboxes never start the semantic-duplicate job (on a machine running Ollama it would embed the whole bank);
   // tests that need it set quality.embeddings themselves
   const cfgText = fs.readFileSync(path.join(TRAINER_ROOT, 'config.yaml'), 'utf8');

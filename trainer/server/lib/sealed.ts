@@ -27,7 +27,8 @@ import { loadIssues } from './issues.ts';
 import { aggregateRatings, loadRatings, lowRatedIds } from './ratings.ts';
 import { CLUSTER_RULES, buildClusters, clusterIndex, clusteredIds } from './clusters.ts';
 import { localIso } from './time.ts';
-import type { Attempt, Question, SealedForm, SealedFormSummary, SealedState, SealedStatus, Taxonomy } from '../../shared/types.ts';
+import { latestVerdicts } from './verify.ts'; // used at call time only (verify.ts imports this module too)
+import type { Attempt, Question, SealedForm, SealedFormSummary, SealedState, SealedStatus, Taxonomy, VerifyVerdict } from '../../shared/types.ts';
 
 export const SEALED_FILE = path.join(RESULTS_DIR, 'sealed.md');
 export const MIN_FORM_SIZE = 10;
@@ -322,11 +323,23 @@ export function seenIds(attempts: Attempt[]): Set<string> {
 
 export interface Eligibility {
   pool: Question[];
-  excluded: { inactive: number; earlier: number; outOfScope: number; siblings: number; quality: number };
+  excluded: { inactive: number; earlier: number; outOfScope: number; siblings: number; quality: number; unverified: number };
+}
+
+/**
+ * An AI-written question (origin ai / doc) may be sealed only once a second model confirmed its key for the current version:
+ * blind solve `ok`, a grounded fact-check `correct`, or a review the learner approved. A sealed question is never shown in
+ * practice, so a wrong key there would go unnoticed until the form is taken. Imported / hand-written questions need no verdict.
+ */
+export function verifiedForSealing(q: Pick<Question, 'origin' | 'hash'>, v: VerifyVerdict | undefined): boolean {
+  if (q.origin !== 'ai' && q.origin !== 'doc') return true;
+  const ok = (x: VerifyVerdict | undefined) =>
+    !!x && x.hash === q.hash && (x.outcome === 'ok' || x.decision === 'approved' || (x.check === 'grounded' && x.fact === 'correct'));
+  return ok(v) || ok(v?.grounded);
 }
 
 /** Candidates for new forms and why the others were left out (see the header for the rules). */
-export function eligibleForSealing(bank: BankState, _cfg: AppConfig, history: Set<string> = new Set()): Eligibility {
+export function eligibleForSealing(bank: BankState, _cfg: AppConfig, history: Set<string> = new Set(), verdicts?: Record<string, VerifyVerdict>): Eligibility {
   const tax = bank.taxonomy;
   const active = bank.questions.filter((q) => q.status === 'active');
   // [v5] the cluster index (clusters.ts, semantic pairs per the current config) is the single sibling definition; only
@@ -340,13 +353,22 @@ export function eligibleForSealing(bank: BankState, _cfg: AppConfig, history: Se
   } catch {
     // unreadable issue / rating files: no exclusion from them
   }
-  const excluded = { inactive: bank.questions.length - active.length, earlier: 0, outOfScope: 0, siblings: 0, quality: 0 };
+  let verdictOf = verdicts;
+  if (!verdictOf) {
+    try {
+      verdictOf = latestVerdicts(bank);
+    } catch {
+      verdictOf = {}; // unreadable bank/verify.md: AI-written questions simply count as unverified
+    }
+  }
+  const excluded = { inactive: bank.questions.length - active.length, earlier: 0, outOfScope: 0, siblings: 0, quality: 0, unverified: 0 };
   const pool: Question[] = [];
   for (const q of active) {
     if (history.has(q.id)) excluded.earlier++;
     else if (correctOutOfScope(q, tax).length) excluded.outOfScope++; // never on the real exam, whatever practice.exclude_out_of_scope says
     else if (siblings.has(q.id)) excluded.siblings++;
     else if (issues.has(q.id) || lowRated.has(q.id) || lintQuestion(q, tax).some((f) => f.severity === 'high')) excluded.quality++;
+    else if (!verifiedForSealing(q, verdictOf[q.id])) excluded.unverified++;
     else pool.push(q);
   }
   return { pool, excluded };
