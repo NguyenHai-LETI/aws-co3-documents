@@ -3,6 +3,7 @@ import { api, ApiError } from './api.ts';
 import type {
   BankProblem,
   ClaudeStatus,
+  DataVersions,
   Difficulty,
   DomainDef,
   Pack,
@@ -34,6 +35,13 @@ export interface Meta {
   paths: { trainer: string; repo: string; data: string };
   host: string;
   coachHosts: string[];
+  syncAi?: { before: boolean; after: boolean }; // config sync.before_ai / after_ai (older servers: undefined)
+  sealed?: { id: string; status: 'sealed' | 'used' | 'released'; count: number; usedAt?: string; attempt?: string }[]; // sealed forms (no ids)
+  sealedError?: string; // [γ] results/sealed.md is broken: what to fix (its questions stay hidden, nothing is written meanwhile)
+  codeVersion?: string; // code the server runs (compare with the page's to offer a restart/reload)
+  launcher?: boolean; // started by a launcher script that restarts the server on exit code 75
+  versions?: DataVersions; // {bank, results, plans} — same values as the SSE `data` event (older servers: undefined)
+  access?: import('../../shared/types.ts').MetaAccess; // [v5] π: this machine / LAN practice / LAN admin, ui dist|dev, secure context
 }
 
 export interface BankData {
@@ -41,12 +49,19 @@ export interface BankData {
   packs: Pack[];
   questions: Question[];
   problems: BankProblem[];
+  sealed?: string[]; // ids currently sealed: hide them everywhere except a sealed exam
 }
 
 export interface StateData {
   states: Record<string, QuestionState>;
   counts: Record<string, number>;
+  versions?: DataVersions; // data versions these states were computed from (older servers: undefined)
 }
+
+/** What states / counts depend on: everything but the plans (the bank too — pools and counts). */
+const stateKey = (v: DataVersions | undefined) => (v ? [v.bank, v.results, v.params ?? '', v.config ?? '', v.day ?? ''].join('|') : '');
+/** Sealed forms' ids + statuses from meta: a change means bank.sealed must be refetched. */
+const sealedSig = (m: Meta) => JSON.stringify((m.sealed ?? []).map((f) => [f.id, f.status]));
 
 interface DataCtx {
   meta?: Meta;
@@ -56,6 +71,9 @@ interface DataCtx {
   error?: string;
   /** increments whenever results/bank/plans change on disk — pages use it as a refetch key */
   version: number;
+  /** versions of the loaded data (bank / results / plans) — finer refetch keys than `version` */
+  versions?: DataVersions;
+  /** meta + states again, the bank only when its version changed; resolves when the data is current */
   refresh: () => Promise<void>;
   topic: (id: string) => TopicDef | undefined;
   domain: (id: string) => DomainDef | undefined;
@@ -71,7 +89,7 @@ let source: EventSource | undefined;
 function ensureSource() {
   if (source) return;
   source = new EventSource('/api/events');
-  for (const name of ['data', 'coach', 'coach-done']) {
+  for (const name of ['data', 'coach', 'coach-done', 'sync', 'update', 'hello']) {
     source.addEventListener(name, (e) => {
       let data: unknown;
       try {
@@ -101,28 +119,63 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<StateData>();
   const [error, setError] = useState<string>();
   const [version, setVersion] = useState(0);
+  const [versions, setVersions] = useState<DataVersions>();
+  // versions = meta's (latest known); stateVersions = what the loaded states were computed from (may lag behind meta)
+  const loaded = useRef<{ bank?: BankData; versions?: DataVersions; stateVersions?: DataVersions; sealedSig?: string }>({});
+  const queue = useRef<Promise<void>>(Promise.resolve());
 
-  const refresh = useCallback(async () => {
-    try {
-      const [m, b, s] = await Promise.all([api.get<Meta>('/api/meta'), api.get<BankData>('/api/bank'), api.get<StateData>('/api/state')]);
-      setMeta(m);
-      setBank((prev) => (prev?.version === b.version ? prev : b));
-      setState(s);
-      setError(undefined);
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  /**
+   * Loads the shared data. `next` = versions announced by the server (SSE `data`): meta always (small), the bank
+   * (≈ 650 KB) only when its version moved, states / counts when results, the bank, the FSRS parameters, config.yaml
+   * or the day moved — compared with the versions the held states were computed from (a parallel meta response may
+   * already be newer). Without `next` (first load, explicit refresh): meta + states, and the bank when meta reports
+   * another bank version than the one held.
+   */
+  const load = useCallback(async (next?: DataVersions) => {
+    const cur = loaded.current;
+    const bankStale = !cur.bank || (!!next && next.bank !== cur.bank.version);
+    const stateStale = !next || !cur.stateVersions || stateKey(next) !== stateKey(cur.stateVersions);
+    const [m, b, s] = await Promise.all([
+      api.get<Meta>('/api/meta'),
+      bankStale ? api.get<BankData>('/api/bank') : undefined,
+      stateStale ? api.get<StateData>('/api/state') : undefined,
+    ]);
+    // a sealed form used / released changes bank.sealed without a new bank version (sealed.md lives under results/)
+    const seal = sealedSig(m);
+    const sealedMoved = !!cur.bank && cur.sealedSig !== undefined && cur.sealedSig !== seal;
+    const fresh = b ?? (cur.bank && (m.bankVersion !== cur.bank.version || sealedMoved) ? await api.get<BankData>('/api/bank') : undefined);
+    const keepBank = cur.bank && fresh && fresh.version === cur.bank.version && !sealedMoved ? cur.bank : (fresh ?? cur.bank);
+    loaded.current = { bank: keepBank, sealedSig: seal, versions: m.versions ?? next, stateVersions: s ? (s.versions ?? m.versions ?? next) : cur.stateVersions };
+    setMeta(m);
+    if (keepBank !== cur.bank) setBank(keepBank);
+    if (s) setState(s);
+    setVersions(m.versions ?? next);
+    setError(undefined);
   }, []);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  /** Runs loads one after another (an SSE event during a load must not be overwritten by the older response). */
+  const sync = useCallback(
+    (next?: DataVersions) => {
+      const run = queue.current.then(() => load(next)).catch((e: Error) => setError(e.message));
+      queue.current = run;
+      return run;
+    },
+    [load],
+  );
+  const refresh = useCallback(() => sync(), [sync]);
 
-  useServerEvent('data', () => {
-    void refresh().then(() => setVersion((v) => v + 1));
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return; // StrictMode mounts twice in development — load once
+    started.current = true;
+    void sync();
+  }, [sync]);
+
+  useServerEvent<DataVersions | undefined>('data', (v) => {
+    void sync(v && typeof v.bank === 'string' ? v : undefined).then(() => setVersion((x) => x + 1));
   });
   useServerEvent('coach-done', () => {
-    void refresh().then(() => setVersion((v) => v + 1));
+    void sync().then(() => setVersion((x) => x + 1));
   });
 
   const byId = useMemo(() => new Map((bank?.questions ?? []).map((q) => [q.id, q])), [bank]);
@@ -131,8 +184,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const task = useCallback((id: string | undefined) => (id ? meta?.tasks?.find((t) => t.id === id) : undefined), [meta]);
 
   const value = useMemo<DataCtx>(
-    () => ({ meta, bank, state, byId, error, version, refresh, topic, domain, task }),
-    [meta, bank, state, byId, error, version, refresh, topic, domain, task],
+    () => ({ meta, bank, state, byId, error, version, versions, refresh, topic, domain, task }),
+    [meta, bank, state, byId, error, version, versions, refresh, topic, domain, task],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
@@ -154,9 +207,10 @@ export interface FetchResult<T> {
 
 /**
  * Fetch helper that refetches when `deps` or the global data version change. A refetch of the
- * same URL keeps the previous data on screen; switching to another URL never shows stale data.
+ * same URL keeps the previous data on screen; switching to another URL never shows stale data —
+ * unless `keep` is set (pagination, filters): then the previous URL's data stays until the new one arrives.
  */
-export function useFetch<T>(url: string | null, deps: unknown[] = []): FetchResult<T> {
+export function useFetch<T>(url: string | null, deps: unknown[] = [], opts: { keep?: boolean } = {}): FetchResult<T> {
   const { version } = useData();
   const [res, setRes] = useState<{ url: string; data?: T; error?: string; status?: number }>();
   const [loading, setLoading] = useState(false);
@@ -181,7 +235,8 @@ export function useFetch<T>(url: string | null, deps: unknown[] = []): FetchResu
   }, [url, version, n, ...deps]);
   const reload = useCallback(() => setN((x) => x + 1), []);
   const cur = url && res?.url === url ? res : undefined;
-  return { data: cur?.data, error: cur?.error, status: cur?.status, loading: !!url && (loading || !cur), reload };
+  const shown = cur ?? (opts.keep && url ? res : undefined);
+  return { data: shown?.data, error: cur?.error, status: cur?.status, loading: !!url && (loading || !cur), reload };
 }
 
 // ── shared GET cache ────────────────────────────────────────────────────────
@@ -195,17 +250,20 @@ interface SharedState {
 }
 interface SharedEntry {
   state: SharedState;
-  loadedVersion?: number;
+  loadedVersion?: number; // data version the last request was issued for
   inflight?: Promise<void>;
+  again?: number; // a newer data version (or an explicit reload) arrived while a request was in flight
+  touched: number; // sequence number of the last local update (updateShared)
   listeners: Set<() => void>;
 }
+let sharedSeq = 0;
 const sharedCache = new Map<string, SharedEntry>();
 const EMPTY_SHARED: SharedState = {};
 
 function sharedEntry(url: string): SharedEntry {
   let e = sharedCache.get(url);
   if (!e) {
-    e = { state: EMPTY_SHARED, listeners: new Set() };
+    e = { state: EMPTY_SHARED, touched: 0, listeners: new Set() };
     sharedCache.set(url, e);
   }
   return e;
@@ -216,24 +274,40 @@ function emitShared(e: SharedEntry, state: SharedState) {
   for (const l of e.listeners) l();
 }
 
-/** (Re)load a shared URL; concurrent callers share one request. */
+/**
+ * (Re)load a shared URL; concurrent callers share one request. A call while a request is in flight (newer data version,
+ * explicit reload) runs another request once it settles — the running one may predate the change; the returned promise
+ * resolves after that second load.
+ */
 export function loadShared(url: string, version = -1): Promise<void> {
   const e = sharedEntry(url);
-  if (e.inflight) return e.inflight;
+  if (e.inflight) {
+    e.again = version;
+    return e.inflight.then(() => e.inflight);
+  }
   e.loadedVersion = version;
-  e.inflight = api
+  const started = ++sharedSeq;
+  const run = api
     .get<unknown>(url)
-    .then((d) => emitShared(e, { data: d }))
+    // a local update (POST result) newer than this request wins over the response
+    .then((d) => {
+      if (e.touched < started) emitShared(e, { data: d });
+    })
     .catch((err: Error) => emitShared(e, { data: e.state.data, error: err.message, status: err instanceof ApiError ? err.status : undefined }))
     .finally(() => {
       e.inflight = undefined;
+      const again = e.again;
+      e.again = undefined;
+      if (again !== undefined) void loadShared(url, again);
     });
-  return e.inflight;
+  e.inflight = run;
+  return run;
 }
 
 /** Locally update shared data (e.g. append the item a POST returned). */
 export function updateShared<T>(url: string, fn: (prev: T | undefined) => T) {
   const e = sharedEntry(url);
+  e.touched = ++sharedSeq;
   emitShared(e, { data: fn(e.state.data as T | undefined) });
 }
 
@@ -253,7 +327,7 @@ export function useShared<T>(url: string | null): { data?: T; error?: string; st
   const getSnapshot = useCallback(() => e?.state ?? EMPTY_SHARED, [e]);
   const state = useSyncExternalStore(subscribe, getSnapshot);
   useEffect(() => {
-    if (url && e && e.loadedVersion !== version && !e.inflight) void loadShared(url, version);
+    if (url && e && e.loadedVersion !== version) void loadShared(url, version); // in flight → reloads after it settles
   }, [url, e, version]);
   const reload = useCallback(() => {
     if (url) void loadShared(url, version);

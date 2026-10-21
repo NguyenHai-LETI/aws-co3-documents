@@ -1,16 +1,21 @@
-// Prepares an ENRICH batch without running the AI (for /trainer-enrich in Claude Code, or by hand):
-// writes coach/enrich/<run_id>-batch.md and prints where the patch / new pack must go.
+// Prepares an ENRICH batch without running the AI (for /trainer-enrich in Claude Code, or by hand — interactive mode:
+// the AI writes the patch / pack file itself): writes coach/enrich/<run_id>-batch.md and prints where they must go.
 // Usage:
-//   node trainer/scripts/enrich-batch.ts [--size 20] [--tasks explain,hint,classify,balance] [--ids <id,id,…>] [--run-id <id>]
+//   node trainer/scripts/enrich-batch.ts [--size 20] [--tasks explain,hint,classify,balance,distractors] [--run-id <id>]
+//   node trainer/scripts/enrich-batch.ts --ids 03-v2-01,05-v1-12 [--tasks distractors] [--note "…"] [--run-id <id>]
 //   node trainer/scripts/enrich-batch.ts --longform [--count 5] [--run-id <id>]
+//   node trainer/scripts/enrich-batch.ts --twins [--count 10] [--ids a,b --kind surface|contrast] [--run-id <id>]   (TWINS.md)
+//   node trainer/scripts/enrich-batch.ts --family [--count 2] [--topic …] [--task 2.2] [--requirement cost] [--run-id <id>]   (FAMILY.md)
 //   node trainer/scripts/enrich-batch.ts --status [--json]
 import path from 'node:path';
-import { PACKS_DIR, loadConfig } from '../server/config.ts';
-import { loadBank } from '../server/lib/bank.ts';
-import { loadAttempts } from '../server/lib/results.ts';
-import { computeStates } from '../server/lib/stats.ts';
+import { PACKS_DIR } from '../server/config.ts';
+import { context } from '../server/context.ts';
+import { distractorReport, optionStats } from '../server/lib/quality.ts';
+import { latestVerdicts } from '../server/lib/verify.ts';
 import { stampParts } from '../server/lib/time.ts';
-import { MAX_BATCH, MAX_LONGFORM, enrichStatus, learnerNotes, longformTargets, parseTasks, patchPath, repoRel, selectBatch, writeBatchFile, writeLongformFile } from '../server/lib/enrich.ts';
+import { MAX_FAMILIES, MAX_TWINS, familyFocus, familySeeds, twinsTargets, writeFamilyFile, writeTwinsFile } from '../server/lib/twins.ts';
+import { TWIN_KINDS, type TwinKind } from '../server/lib/ai-output.ts';
+import { MAX_BATCH, MAX_LONGFORM, enrichStatus, idList, learnerNotes, longformTargets, parseTasks, patchPath, repoRel, selectBatch, upcomingIds, writeBatchFile, writeLongformFile } from '../server/lib/enrich.ts';
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(`--${name}`);
@@ -23,8 +28,7 @@ const int = (v: string | undefined, dflt: number, max: number) => {
   return Number.isFinite(n) && n > 0 ? Math.min(max, n) : dflt;
 };
 
-const cfg = loadConfig();
-const bank = loadBank();
+const { cfg, bank, attempts, states, plans } = context(); // re-graded attempts: answer-key fixes count against the new key
 
 if (flag('status')) {
   const st = enrichStatus(bank);
@@ -37,14 +41,58 @@ if (flag('status')) {
   process.exit(0);
 }
 
-const attempts = loadAttempts();
-const states = computeStates(attempts, cfg);
 const s = stampParts();
 const longform = flag('longform');
-const runId = opt('run-id') ?? `${s.date}_${s.time}_${longform ? 'longform' : 'enrich'}`;
+const twins = flag('twins');
+const family = flag('family');
+const runId = opt('run-id') ?? `${s.date}_${s.time}_${longform ? 'longform' : twins ? 'twins' : family ? 'family' : 'enrich'}`;
 if (!/^[\w-]+$/.test(runId)) {
   console.error('✗ --run-id chỉ gồm chữ, số, "_" và "-"');
   process.exit(2);
+}
+
+const hhmm = s.time.slice(0, 4);
+const aiPlan = (word: string, ids: string) => ({
+  packFile: `${repoRel(path.join(PACKS_DIR, 'ai'))}/${s.date}-${hhmm}-${word}-<slug>.md`,
+  packId: `ai-${s.date}-${hhmm}-${word}`,
+  idPrefix: `ai-${s.compact}-${hhmm}-${ids}`,
+});
+
+if (twins) {
+  const kind = opt('kind') as TwinKind | undefined;
+  if (kind && !(TWIN_KINDS as readonly string[]).includes(kind)) {
+    console.error(`✗ --kind phải là ${TWIN_KINDS.join(' | ')}`);
+    process.exit(2);
+  }
+  const targets = twinsTargets(bank, states, { count: int(opt('count'), cfg.coach.twins_per_run, MAX_TWINS), ids: idList(opt('ids')), kind });
+  if (!targets.length) {
+    console.log('✓ Không có câu nào cần câu song sinh lúc này.');
+    process.exit(0);
+  }
+  const plan = { count: targets.length, ...aiPlan('twins', 'tw') };
+  const file = writeTwinsFile(runId, targets, bank, plan);
+  console.log(`🪞 ${targets.length} câu gốc → ${repoRel(file)}`);
+  console.log(`   run_id: ${runId}`);
+  console.log(`   pack mới: ${plan.packFile} (pack id ${plan.packId}, id câu ${plan.idPrefix}01…)`);
+  console.log('   Tiếp theo: làm theo trainer/coach/TWINS.md (chế độ tương tác).');
+  process.exit(0);
+}
+
+if (family) {
+  let focus;
+  try {
+    focus = familyFocus({ topic: opt('topic'), task: opt('task'), requirement: opt('requirement') }, bank);
+  } catch (e) {
+    console.error(`✗ ${(e as Error).message}`);
+    process.exit(2);
+  }
+  const plan = { count: int(opt('count'), 2, MAX_FAMILIES), ...aiPlan('family', 'fa'), familyPrefix: `ai-${s.compact}-${hhmm}-f` };
+  const file = writeFamilyFile(runId, bank, plan, focus, familySeeds(bank, focus));
+  console.log(`🎯 ${plan.count} họ câu → ${repoRel(file)}`);
+  console.log(`   run_id: ${runId}`);
+  console.log(`   pack mới: ${plan.packFile} (pack id ${plan.packId}, id câu ${plan.idPrefix}01…, id họ ${plan.familyPrefix}1…)`);
+  console.log('   Tiếp theo: làm theo trainer/coach/FAMILY.md (chế độ tương tác).');
+  process.exit(0);
 }
 
 if (longform) {
@@ -53,13 +101,7 @@ if (longform) {
     console.log('✓ Không còn câu ngắn nào cần biến thể dài.');
     process.exit(0);
   }
-  const hhmm = s.time.slice(0, 4);
-  const plan = {
-    count: targets.length,
-    packFile: `${repoRel(path.join(PACKS_DIR, 'ai'))}/${s.date}-${hhmm}-longform-<slug>.md`,
-    packId: `ai-${s.date}-${hhmm}-longform`,
-    idPrefix: `ai-${s.compact}-${hhmm}-lf`,
-  };
+  const plan = { count: targets.length, ...aiPlan('longform', 'lf') };
   const file = writeLongformFile(runId, targets, bank, plan);
   console.log(`📏 ${targets.length} câu gốc → ${repoRel(file)}`);
   console.log(`   run_id: ${runId}`);
@@ -67,18 +109,25 @@ if (longform) {
   console.log('   Tiếp theo: làm theo trainer/coach/ENRICH.md phần B.');
 } else {
   const { todos } = parseTasks(opt('tasks'));
-  const ids = opt('ids')
-    ?.split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-  const unknown = ids?.filter((id) => !bank.byId.has(id)) ?? [];
-  if (unknown.length) console.log(`⚠️  Không có trong ngân hàng: ${unknown.join(', ')}`);
-  const items = selectBatch(bank, states, { size: int(opt('size'), ids?.length || cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks'), ids });
+  const distractors = todos.includes('distractors');
+  const report = distractors ? distractorReport(bank, attempts) : undefined;
+  const ids = idList(opt('ids'));
+  // same order as the app's ENRICH runs: questions the learner is about to meet first (B9)
+  const upcoming = ids.length ? [] : upcomingIds({ bank, states, attempts, plans, cfg });
+  const items = selectBatch(bank, states, { size: int(opt('size'), cfg.coach.enrich_batch_size, MAX_BATCH), tasks: opt('tasks'), ids, report, upcoming });
   if (!items.length) {
     console.log('✓ Không còn câu nào cần ENRICH cho lựa chọn này.');
     process.exit(0);
   }
-  const file = writeBatchFile(runId, items, bank, { todos, notes: learnerNotes(attempts, items.map((i) => i.q.id)) });
+  const file = writeBatchFile(runId, items, bank, {
+    todos,
+    notes: learnerNotes(attempts, items.map((i) => i.q.id)),
+    report,
+    stats: distractors ? optionStats(bank, attempts) : undefined,
+    verdicts: latestVerdicts(bank),
+    mode: 'files',
+    note: opt('note'),
+  });
   const patch = repoRel(patchPath(runId));
   console.log(`🧰 ${items.length} câu → ${repoRel(file)}`);
   console.log(`   run_id: ${runId}`);

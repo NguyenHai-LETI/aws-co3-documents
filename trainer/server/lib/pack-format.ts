@@ -22,7 +22,8 @@ const Q_HEADING = /^##\s+Q:?\s+(\S+)(.*)$/;
 const OTHER_HEADING = /^#{1,2}\s/;
 const META_LINE = /^\s*[-*]\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$/;
 const OPTION_LINE = /^\s*[-*]\s+(?:\[([ xX])\]\s+)?([A-H])[.)]\s+(.*)$/;
-const CHOOSE_RE = /\((?:Choose|Select)\s+(TWO|THREE|FOUR|2|3|4)\)/i;
+/** "(Choose TWO)", "(Select THREE.)" — the exam's multiple-response marker, with or without the period. */
+export const CHOOSE_RE = /\((?:Choose|Select)\s+(TWO|THREE|FOUR|2|3|4)\.?\)/i;
 
 export const META_KEYS = [
   'domain',
@@ -40,7 +41,12 @@ export const META_KEYS = [
   'task',
   'hint',
   'enriched',
+  'skills', // [v5] exam-guide bullets "3.5.s7" (ENRICH classify) — without it bank.ts guesses them (Question.skillsGuessed)
+  'family', // [v5] qualifier family id: same scenario + same options, another final question (lint family-options)
 ] as const;
+
+/** An exam-guide bullet id: "<task>.k<n>" (knowledge) or "<task>.s<n>" (skill), e.g. "3.5.s7". */
+export const SKILL_ID_RE = /^[1-4]\.[1-9]\.[ks][1-9][0-9]?$/;
 
 /** Short content hash of what a learner sees + the key — used as `base` in AI patches and to detect edits. */
 export function questionHash(stem: string, options: Option[], answer: string[]): string {
@@ -48,8 +54,14 @@ export function questionHash(stem: string, options: Option[], answer: string[]):
   return crypto.createHash('sha1').update(src).digest('hex').slice(0, 10);
 }
 
-/** Option-letter references in an explanation break when options are shuffled for display. */
-export const LETTER_REF_RE = /(^|\n)\s*[-*]?\s*\(?[A-H]\)?\s*[:.)–—-]\s|\b(?:[Oo]ption|[Aa]nswer|[Cc]hoice|[Đđ]áp án)\s+[A-H]\b|=\s*[A-H]\b(?![’'])|\([A-H]\)/; // uppercase letters only — "answer a few" is prose
+/**
+ * Option-letter references in an explanation break when options are shuffled for display: a line starting "A:" / "- B." ,
+ * "option B", "answer C", "choice D", "đáp án A", "phương án B", "lựa chọn C" (also "đáp án đúng là B"), "= A", "(B)".
+ * Unicode-aware (`u` + explicit letter boundaries: `\b` never matches next to đ / Đ). Uppercase letters only — "answer a
+ * few" and "RPO = a few minutes" are prose.
+ */
+export const LETTER_REF_RE =
+  /(^|\n)\s*[-*]?\s*\(?[A-H]\)?\s*[:.)–—-]\s|(?<![\p{L}\p{N}])(?:[Oo]ption|[Aa]nswer|[Cc]hoice|(?:[Đđ]áp án|[Pp]hương án|[Ll]ựa chọn)(?:\s+(?:đúng|sai))?(?:\s+là)?)\s+[A-H](?![\p{L}\p{N}])|=\s*[A-H](?![\p{L}\p{N}’'])|\([A-H]\)/u;
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const STATUSES: QuestionStatus[] = ['active', 'draft', 'retired'];
@@ -338,6 +350,11 @@ function parseBlock(b: RawBlock, ctx: Ctx): Question | undefined {
     warn(`time ${time}s is far from the rubric estimate ${rubricTime}s (SCHEMA.md §4)`);
   }
 
+  const skills = [...new Set(getList('skills').map((s) => s.toLowerCase()))];
+  for (const s of skills) if (!SKILL_ID_RE.test(s)) warn(`Invalid skill id "${s}" (exam-guide bullet: <task>.k<n> or <task>.s<n>, e.g. 3.5.s7)`);
+  const family = get('family')?.trim() || undefined;
+  if (family && !ID_RE.test(family)) warn(`Invalid family id "${family}" (kebab-case a-z0-9)`);
+
   const task = get('task');
   if (task) {
     const def = tax.tasks?.find((t) => t.id === task);
@@ -384,6 +401,8 @@ function parseBlock(b: RawBlock, ctx: Ctx): Question | undefined {
     task: task || undefined,
     hint: get('hint') || undefined,
     enriched: get('enriched') || undefined,
+    ...(skills.length ? { skills } : {}),
+    ...(family ? { family } : {}),
     words,
     longForm: words >= (tax.timing.long_form_min_words ?? 55),
     hash: questionHash(stemText, opts, answer ?? []),
@@ -415,6 +434,8 @@ export interface QuestionDraft {
   task?: string;
   hint?: string;
   enriched?: string;
+  skills?: string[]; // [v5] stored exam-guide bullets only (never the heuristic guess)
+  family?: string; // [v5] qualifier family id
 }
 
 export function serializeQuestion(q: QuestionDraft): string {
@@ -427,6 +448,8 @@ export function serializeQuestion(q: QuestionDraft): string {
   out.push(`- difficulty: ${q.difficulty}`);
   out.push(`- time: ${q.time}`);
   if (q.variantOf?.length) out.push(`- variant_of: ${q.variantOf.join(', ')}`);
+  if (q.skills?.length) out.push(`- skills: ${q.skills.join(', ')}`);
+  if (q.family) out.push(`- family: ${q.family}`);
   if (q.concept) out.push(`- concept: ${q.concept}`);
   if (q.refs?.length) out.push(`- refs: ${q.refs.join(', ')}`);
   if (q.hint) out.push(`- hint: ${q.hint.replace(/\s+/g, ' ').trim()}`);
@@ -483,5 +506,8 @@ export function toDraft(q: Question): QuestionDraft {
     task: q.task,
     hint: q.hint,
     enriched: q.enriched,
+    // only stored skills: a guessed list (bank.ts heuristic) must never end up in a file as if ENRICH had written it
+    ...(q.skills?.length && !q.skillsGuessed ? { skills: [...q.skills] } : {}),
+    ...(q.family ? { family: q.family } : {}),
   };
 }

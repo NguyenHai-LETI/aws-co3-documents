@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "saa-trainer": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["trainer/scripts/mcp-server.ts"],
+      "env": { "TRAINER_PORT": "${TRAINER_PORT:-3003}" }
+    }
+  }
+}

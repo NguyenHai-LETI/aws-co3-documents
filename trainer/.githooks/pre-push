@@ -1,0 +1,126 @@
+#!/bin/sh
+# Pre-push gate of the SAA-C03 trainer — enable once per clone: cd trainer && npm run hooks:install
+# Runs `npm run check:fast` (typecheck + unit tests, ~15 s) on the commits being pushed when they change app code — in a
+# temporary checkout of exactly that commit (git worktree), so neither uncommitted edits nor another checked-out branch
+# can make a broken push look green. Pushes that only carry learner data (config.yaml → sync.data_paths: results, coach,
+# bank — what ⇅ Đồng bộ and the AI coach commit), inbox/ documents, Markdown docs or files outside the app folder (notes,
+# practice exams) pass straight through; the app's own syncs push with --no-verify.
+# Skip once: git push --no-verify. TRAINER_HOOK_CMD replaces the command (tests). Line endings: LF (.gitattributes).
+remote="${1:-origin}"
+hook_dir=$(cd "$(dirname "$0")" && pwd) || exit 0
+app_dir=$(dirname "$hook_dir")
+prefix=$(cd "$app_dir" && git rev-parse --show-prefix 2>/dev/null) || exit 0
+prefix=${prefix%/} # "trainer" ('' when the app is the repo root)
+
+# repo-relative data paths through the app's own config loader (defaults when it cannot run)
+data_paths=$(cd "$app_dir" && node -e "import('./server/config.ts').then((m)=>console.log(m.loadConfig().sync.data_paths.join('\n'))).catch(()=>{})" 2>/dev/null)
+if [ -z "$data_paths" ]; then
+  base=${prefix:+$prefix/}
+  data_paths="${base}results ${base}coach ${base}bank"
+fi
+
+# is_code <repo-relative path>: inside the app folder, outside the data paths, not inbox/ material, not Markdown
+is_code() {
+  f=$1
+  if [ -n "$prefix" ]; then
+    case "$f" in
+      "$prefix"/*) ;;
+      *) return 1 ;;
+    esac
+  fi
+  for d in $data_paths; do
+    case "$f" in
+      "$d" | "$d"/*) return 1 ;;
+    esac
+  done
+  rel=${f#"$prefix"/}
+  case "$rel" in
+    inbox/*) return 1 ;;
+    *.md) return 1 ;;
+  esac
+  return 0
+}
+
+# local tips (commit ids) whose pushed commits change app code
+shas=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;; # deleting a branch
+  esac
+  known=0
+  case "$remote_sha" in
+    *[!0]*) git cat-file -e "$remote_sha^{commit}" 2>/dev/null && known=1 ;;
+  esac
+  if [ "$known" = 1 ]; then
+    files=$(git -c core.quotepath=off log --format= --name-only "$remote_sha..$local_sha" 2>/dev/null)
+  else
+    files=$(git -c core.quotepath=off log --format= --name-only "$local_sha" --not --remotes="$remote" 2>/dev/null) # new branch / unknown tip
+  fi
+  code=0
+  while IFS= read -r f; do
+    [ -n "$f" ] && is_code "$f" && code=1
+  done <<LIST
+$files
+LIST
+  [ "$code" = 1 ] && shas="$shas $local_sha"
+done
+[ -n "$shas" ] || exit 0
+
+cmd=${TRAINER_HOOK_CMD:-npm run check:fast}
+
+# run_check <sha>: the check on a temporary checkout of that commit (node_modules shared through a symlink)
+run_check() {
+  sha=$1
+  short=$(git rev-parse --short "$sha")
+  windows=0
+  case "$(uname -s 2>/dev/null)" in
+    MINGW* | MSYS* | CYGWIN*) windows=1 ;; # no cheap symlink for node_modules there
+  esac
+  tmp=""
+  if [ "$windows" = 0 ]; then
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/trainer-prepush.XXXXXX" 2>/dev/null) || tmp=""
+  fi
+  if [ -n "$tmp" ] && git worktree add --quiet --detach "$tmp/wt" "$sha" >/dev/null 2>&1; then
+    dir="$tmp/wt${prefix:+/$prefix}"
+    [ -d "$app_dir/node_modules" ] && [ ! -e "$dir/node_modules" ] && ln -s "$app_dir/node_modules" "$dir/node_modules"
+    echo "pre-push: kiểm tra đúng bản sắp push ($short) → $cmd …"
+    (
+      cd "$dir" || exit 1
+      unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
+      sh -c "$cmd"
+    )
+    status=$?
+    git worktree remove --force "$tmp/wt" >/dev/null 2>&1
+    rm -rf "$tmp"
+    git worktree prune >/dev/null 2>&1
+    return $status
+  fi
+  [ -n "$tmp" ] && rm -rf "$tmp"
+  # no separate checkout: only valid when the working tree is exactly the commit being pushed
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse "$sha")" ]; then
+    echo "pre-push: ✗ đang push $short nhưng thư mục làm việc ở commit khác — checkout đúng nhánh rồi push lại (bỏ qua: git push --no-verify)." >&2
+    return 1
+  fi
+  dirty=0
+  while IFS= read -r line; do
+    [ -n "$line" ] && is_code "${line#???}" && dirty=1
+  done <<LIST
+$(git -c core.quotepath=off status --porcelain --untracked-files=no)
+LIST
+  if [ "$dirty" = 1 ]; then
+    echo "pre-push: ✗ có sửa đổi code chưa commit — kết quả kiểm tra sẽ không phải của bản sắp push. Commit hoặc stash chúng rồi push lại (bỏ qua: git push --no-verify)." >&2
+    return 1
+  fi
+  echo "pre-push: kiểm tra $short → $cmd …"
+  (cd "$app_dir" && sh -c "$cmd")
+}
+
+for sha in $(printf '%s\n' $shas | sort -u); do
+  if ! run_check "$sha"; then
+    echo "pre-push: ✗ check:fast thất bại — sửa lỗi rồi push lại (bỏ qua một lần: git push --no-verify)." >&2
+    exit 1
+  fi
+done
+echo "pre-push: ✓ check:fast ổn."
+exit 0

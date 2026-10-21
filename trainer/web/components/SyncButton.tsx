@@ -1,13 +1,26 @@
 // "⇅ Đồng bộ" (sidebar footer): commit learning data → git pull --rebase → git push, for learners who
-// study on two machines sharing one repo. Status pills: ↑ commits to push, ↓ commits to pull, ● changed data files.
+// study on two machines sharing one repo. Status pills: ↑ commits to push, ↓ commits to pull, ● changed data files,
+// ⏳ data waiting > 24 h to be pushed; right side: when the last sync succeeded. The server also syncs on its own
+// (config sync.auto: idle — a few minutes after a submitted test, at startup, at shutdown); SSE `sync` refreshes this.
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api, ApiError } from '../lib/api.ts';
-import { useData } from '../lib/store.tsx';
+import { useData, useServerEvent } from '../lib/store.tsx';
 import { fmtDateTime, fmtRelative } from '../lib/format.ts';
 import { Modal, toast } from './ui.tsx';
 import { KvRow, hostListed } from './insights.tsx';
 import type { SyncResult } from '../../shared/types.ts';
+
+type SyncSource = 'manual' | 'auto' | 'startup' | 'shutdown' | 'ai';
+
+interface SyncRecord {
+  at: string;
+  ok: boolean;
+  message: string;
+  hint?: string;
+  source: SyncSource;
+  blocked?: string; // waits for the learner (code commits, uncommitted edits, a conflict…)
+}
 
 /** GET /api/sync/status (contract fields + optional extras the server may add). */
 export interface SyncStatus {
@@ -24,7 +37,42 @@ export interface SyncStatus {
   lastSync?: { at: string; subject: string };
   syncing?: boolean;
   disabled?: boolean; // sync impossible here (test sandbox, not a git repo, …)
+  lastRun?: SyncRecord; // last sync of the server process (any source)
+  lastOkAt?: string; // last successful sync of the server process
+  unpushedSince?: string; // oldest data change not on the remote yet
+  stale?: boolean; // unpushedSince older than 24 h
+  unpushedCode?: string[]; // local commits outside the data folders: automatic syncs keep the push back
+  dirtyCode?: string[]; // uncommitted edits outside the data folders: automatic syncs do not pull
+  unmerged?: string[]; // files with conflict markers: every sync stops
+  auto?: {
+    mode: 'idle' | 'off';
+    delayMinutes: number;
+    disabled?: string;
+    dueAt?: string;
+    reason?: 'submit' | 'retry' | 'startup';
+    running?: boolean;
+    failures: number;
+    last?: SyncRecord;
+  };
 }
+
+const SOURCE_LABEL: Record<SyncSource, string> = { manual: 'bấm tay', auto: 'tự động', startup: 'khi mở app', shutdown: 'khi tắt app', ai: 'cùng AI Coach' };
+
+/** Newest successful sync known: this server process, or the newest "trainer: sync" commit (either machine). */
+function lastSyncAt(st: SyncStatus | undefined): string | undefined {
+  const times = [st?.lastOkAt, st?.lastSync?.at].filter((x): x is string => !!x);
+  return times.sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+}
+
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+/** Age without "trước": "26 giờ", "2 ngày". */
+const age = (iso: string) => fmtRelative(iso).replace(/ trước$/, '');
+
+const fileList = (files: string[], max = 3) => files.slice(0, max).join(', ') + (files.length > max ? `, … (+${files.length - max})` : '');
 
 type RunResult = SyncResult & { hint?: string; conflicts?: string[]; dryRun?: boolean; migrated?: number };
 
@@ -88,6 +136,8 @@ export function SyncButton() {
     const t = setInterval(() => void check(true), 10 * 60_000);
     return () => clearInterval(t);
   }, [check]);
+  // a sync finished on the server (auto sync after a test, at startup, the AI coach, another tab) → fresh pills
+  useServerEvent('sync', () => void check(false));
 
   const run = async (dryRun: boolean) => {
     setBusy(dryRun ? 'dry' : 'sync');
@@ -113,8 +163,13 @@ export function SyncButton() {
   const files = st?.dirtyFiles ?? (Array.isArray(st?.dirtyData) ? st.dirtyData : []);
   const host = st?.host || meta?.host || '';
   const coachHosts = meta?.coachHosts ?? [];
-  const problem = !disabled && (st?.error || (stErr && !unsupported));
+  // something the learner should look at: git errors, conflicts, code commits held back, a failed / blocked auto sync
+  const problem =
+    !disabled && (st?.error || (stErr && !unsupported) || !!st?.unmerged?.length || !!st?.unpushedCode?.length || (st?.auto?.last && !st.auto.last.ok));
   const resultHints = result && !result.ok ? (result.hint ? [result.hint] : syncHints([result.message, ...result.steps.filter((s) => !s.ok).map((s) => s.output)].join('\n'))) : [];
+  const lastAt = lastSyncAt(st);
+  const stale = !disabled && !!st?.stale && !!st.unpushedSince;
+  const auto = st?.auto;
 
   const modal = (
     <Modal open={open} onClose={() => setOpen(false)} title="⇅ Đồng bộ giữa các máy">
@@ -122,6 +177,9 @@ export function SyncButton() {
         <div className="small dim">
           Lưu dữ liệu học (kết quả, coach, ngân hàng câu hỏi) lên git: <b>commit → pull --rebase → push</b>. Dùng khi học trên 2 máy với cùng một repo — các file nhật ký
           (báo lỗi, đánh giá, hỏi AI) được gộp tự động.
+          {meta?.syncAi && (meta.syncAi.before || meta.syncAi.after) && (
+            <> AI Coach cũng tự đồng bộ {meta.syncAi.before && meta.syncAi.after ? 'trước và sau' : meta.syncAi.before ? 'trước' : 'sau'} mỗi lượt chạy.</>
+          )}
         </div>
         {unsupported ? (
           <div className="ins-wrap alert small">Server này chưa hỗ trợ đồng bộ (cần bản server mới).</div>
@@ -146,11 +204,55 @@ export function SyncButton() {
               <KvRow k="File dữ liệu thay đổi">{dirty}</KvRow>
             </div>
             <div className="tiny muted ins-wrap">
-              {st.lastSync ? `Lần đồng bộ gần nhất: ${fmtDateTime(st.lastSync.at)} (${fmtRelative(st.lastSync.at)})` : 'Chưa có lần đồng bộ nào trên nhánh này.'}
+              {lastAt ? `Đồng bộ lần cuối: ${fmtDateTime(lastAt)} (${fmtRelative(lastAt)})` : 'Chưa có lần đồng bộ nào trên nhánh này.'}
+              {st.lastRun && !st.lastRun.ok && (st.lastRun.source === 'manual' || st.lastRun.source === 'ai') // automatic ones: see the line below
+                ? ` · lần thử gần nhất (${SOURCE_LABEL[st.lastRun.source]}, ${fmtRelative(st.lastRun.at)}) lỗi: ${st.lastRun.message}`
+                : ''}
               {st.fetchedAt ? ` · đã kiểm tra remote ${fmtRelative(st.fetchedAt)}` : ''}
               {st.remoteUrl ? ` · ${st.remoteUrl}` : ''}
             </div>
+            {stale && st.unpushedSince && (
+              <div className="ins-wrap alert warn small" role="status">
+                ⏳ Có dữ liệu học chưa đẩy lên GitHub từ <b>{fmtDateTime(st.unpushedSince)}</b> ({fmtRelative(st.unpushedSince)}) — máy kia chưa thấy các bài
+                này. Bấm <b>⇅ Đồng bộ ngay</b>.
+              </div>
+            )}
+            {!!st.unmerged?.length && (
+              <div className="ins-wrap alert bad small" role="alert">
+                ⛔ Repo còn file đang xung đột: <code>{fileList(st.unmerged)}</code> — mọi lần đồng bộ (và nút khởi động lại) dừng cho tới khi sửa xong.
+                <HintList hints={st.lastRun?.hint ? [st.lastRun.hint] : ['Mở Terminal tại thư mục repo: `git checkout HEAD -- <file>` để lấy bản đã commit, hoặc sửa tay rồi `git add <file>`.']} />
+              </div>
+            )}
+            {!!st.unpushedCode?.length && (
+              <div className="ins-wrap alert warn small" role="status">
+                ⚠️ Có commit code chưa đẩy lên GitHub (<code>{fileList(st.unpushedCode)}</code>) — đồng bộ tự động chỉ đẩy dữ liệu học nên đang giữ lại cả các bài mới.
+                Đẩy code bằng tay (<code>git push</code>, qua kiểm tra pre-push) hoặc bấm <b>⇅ Đồng bộ ngay</b> để đẩy tất cả.
+              </div>
+            )}
+            {!!st.dirtyCode?.length && auto?.mode === 'idle' && !st.unmerged?.length && (
+              <div className="tiny muted ins-wrap">
+                Có sửa đổi chưa commit ngoài thư mục dữ liệu (<code>{fileList(st.dirtyCode)}</code>) — đồng bộ tự động không cất tạm code của bạn nên chưa kéo dữ liệu
+                máy kia về; <b>⇅ Đồng bộ ngay</b> sẽ cất tạm rồi áp lại.
+              </div>
+            )}
           </>
+        )}
+        {auto && !auto.disabled && !disabled && !unsupported && (
+          <div className="tiny muted ins-wrap">
+            {auto.mode === 'idle' ? (
+              <>
+                ⇅ <b>Tự đồng bộ khi rảnh: bật</b> — {auto.delayMinutes} phút sau mỗi bài nộp (nếu chưa bắt đầu bài mới), kéo về khi mở app, đẩy lên khi tắt app.
+                {auto.running ? ' Đang tự đồng bộ…' : auto.dueAt ? ` Lần tới: ${hhmm(auto.dueAt)}${auto.reason === 'retry' ? ' (thử lại sau lỗi)' : ''}.` : ''}
+                {auto.last ? ` Lần tự đồng bộ gần nhất (${SOURCE_LABEL[auto.last.source]}, ${fmtRelative(auto.last.at)}): ${auto.last.ok ? '✓' : '✗'} ${auto.last.message}` : ''}
+                {auto.last && !auto.last.ok && auto.last.hint && !st?.unpushedCode?.length && !st?.dirtyCode?.length && !st?.unmerged?.length ? ` 💡 ${auto.last.hint}` : ''}
+                {auto.failures > 1 ? ` · lỗi ${auto.failures} lần liền` : ''} Tắt: <code>sync.auto: off</code> trong <code>trainer/config.yaml</code>.
+              </>
+            ) : (
+              <>
+                Tự đồng bộ khi rảnh đang tắt — chỉ đồng bộ khi bấm nút này hoặc khi AI Coach chạy. Bật: <code>sync.auto: idle</code> trong <code>trainer/config.yaml</code>.
+              </>
+            )}
+          </div>
         )}
         {checking && st && (
           <div className="tiny muted row" style={{ gap: 6 }}>
@@ -244,7 +346,19 @@ export function SyncButton() {
           setOpen(true);
           void check(true);
         }}
-        title={unsupported ? 'Server chưa hỗ trợ đồng bộ' : st?.error ? st.error : 'Đồng bộ dữ liệu học qua git (học trên 2 máy)'}
+        title={
+          unsupported
+            ? 'Server chưa hỗ trợ đồng bộ'
+            : st?.error
+              ? st.error
+              : st?.unmerged?.length
+                ? `Repo còn file đang xung đột: ${fileList(st.unmerged)} — bấm để xem cách sửa.`
+                : st?.auto?.last && !st.auto.last.ok
+                  ? `Tự đồng bộ: ${st.auto.last.message}`
+                  : stale && st?.unpushedSince
+                    ? `Có dữ liệu chưa đẩy lên GitHub từ ${fmtDateTime(st.unpushedSince)} (${fmtRelative(st.unpushedSince)}) — máy kia chưa thấy các bài này. Bấm để đồng bộ.`
+                    : `Đồng bộ dữ liệu học qua git (học trên 2 máy)${lastAt ? ` · lần cuối ${fmtDateTime(lastAt)} (${fmtRelative(lastAt)})` : ''}`
+        }
       >
         <span>⇅ Đồng bộ</span>
         {st && !st.error && (
@@ -264,10 +378,20 @@ export function SyncButton() {
                 ●{dirty}
               </span>
             )}
+            {stale && st.unpushedSince && (
+              <span className="ins-pill warn" title={`Dữ liệu chưa đẩy lên GitHub từ ${fmtRelative(st.unpushedSince)}`}>
+                ⏳ {age(st.unpushedSince)}
+              </span>
+            )}
           </>
         )}
-        {(st?.syncing || busy === 'sync') && <span className="spinner" style={{ width: 12, height: 12 }} />}
+        {(st?.syncing || auto?.running || busy === 'sync') && <span className="spinner" style={{ width: 12, height: 12 }} />}
         {problem && <span className="ins-pill warn">⚠</span>}
+        {!disabled && !unsupported && lastAt && !stale && (
+          <span className="tiny muted" style={{ marginLeft: 'auto', fontWeight: 400 }}>
+            {fmtRelative(lastAt)}
+          </span>
+        )}
       </button>
       {/* portal: the sidebar is sticky (its own stacking context) — rendered inside it, positioned marks
           of the main column would paint over the modal */}

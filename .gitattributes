@@ -3,8 +3,13 @@
 trainer/bank/issues.md merge=union
 trainer/bank/ratings.md merge=union
 trainer/coach/qa/*.md merge=union
+trainer/bank/verify.md merge=union
+trainer/results/leeches.md merge=union
+# FSRS optimizer output: one JSON object per line, the newest `optimizedAt` wins — keep both machines' lines
+trainer/results/fsrs-params.json merge=union
 
 # Launchers need their native line endings whatever core.autocrlf says.
 trainer/*.bat text eol=crlf
 trainer/*.sh text eol=lf
 trainer/*.command text eol=lf
+trainer/.githooks/* text eol=lf

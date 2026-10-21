@@ -8,14 +8,47 @@ import { Markdown } from '../lib/markdown.tsx';
 import { Chip, Empty, Modal, Seg, Tabs, copyText, toast, toggle } from '../components/ui.tsx';
 import { BarList } from '../components/charts.tsx';
 import { COACH_TASK_LABEL, EnrichPanel, KvRow, fmtUsd, hostListed } from '../components/insights.tsx';
-import type { ClaudeStatus, CoachEvent, CoachRunInfo, CostSummary, EnrichStatus, Plan, PlanSession } from '../../shared/types.ts';
+import { AntiRotePanel } from '../components/coach/AntiRote.tsx';
+import type { ClaudeStatus, CoachEvent, CoachRunInfo, CoachRunOutcome, CostSummary, EnrichStatus, Plan, PlanSession, PlanSummary, PlansResponse, UndoResult } from '../../shared/types.ts';
 
-type ModelMap = { analyze: string; generate: string; enrich: string; ask: string };
+type ModelMap = { analyze: string; generate: string; enrich: string; ask: string; verify?: string };
+
+/** Run records of the AI pipeline carry what the run did (structured output, repairs, blind-solve verdicts…). */
+type CoachRun = CoachRunInfo & { outcome?: CoachRunOutcome; undoable?: { changed: number; created: number } };
+
+/** Task label (COACH_TASK_LABEL, plus tasks it may not list yet). */
+const taskLabel = (task: string) => COACH_TASK_LABEL[task] ?? ({ verify: '🧪 Giải mù', twins: '🪞 Câu song sinh', family: '🎯 Họ câu' } as Record<string, string>)[task] ?? task;
+
+/** [v5] Label of a run: verify runs name their scope (🔗 kiểm chứng tài liệu / 🧾 kiểm toán câu nhập). */
+const runLabel = (r: CoachRunInfo) =>
+  r.task === 'verify' && r.params?.scope === 'grounded' ? '🔗 Kiểm chứng tài liệu' : r.task === 'verify' && r.params?.scope === 'audit' ? '🧾 Kiểm toán câu nhập' : taskLabel(r.task);
+
+/** One line about what a finished run did, from its outcome (empty when the run did not report one). */
+function outcomeLine(o: CoachRunOutcome | undefined): string {
+  if (!o) return '';
+  const parts: string[] = [];
+  if (o.questions) parts.push(`${o.questions} câu mới${o.families ? ` · ${o.families} họ` : ''}${o.longForm ? ` (${o.longForm} câu dài)` : ''}`);
+  if (o.updated) parts.push(`${o.updated} câu cập nhật`);
+  if (o.repaired) parts.push(`sửa lại ${o.repaired}`);
+  if (o.rejected?.length) parts.push(`loại ${o.rejected.length}`);
+  if (o.failed) parts.push(`${o.failed} lỗi áp patch`);
+  if (o.missing?.length) parts.push(`${o.missing.length} id không có`);
+  const v = o.verify;
+  if (v?.checked) {
+    const review = v.mismatch + v.ambiguous;
+    parts.push(`giải mù ${v.ok}/${v.checked} khớp${review ? ` · ${review} cần duyệt` : ''}${v.error ? ` · ${v.error} lỗi` : ''}${v.drafted.length ? ` · ${v.drafted.length} → nháp` : ''}${v.remaining ? ` · còn ${v.remaining}` : ''}`);
+  }
+  const g = o.grounded;
+  if (g?.checked) parts.push(`🔗 tài liệu: ${g.correct} đúng · ${g.wrong + g.outdated} sai/cũ · ${g.ambiguous} chưa rõ · ${g.citations} trích dẫn`);
+  if (o.local?.checked) parts.push(`🖥️ model local: ${o.local.disagree}/${o.local.checked} khác`);
+  if (o.undo) parts.push(`↩️ đã hoàn tác ${o.undo.restored.length + o.undo.retired.length} câu${o.undo.conflicts.length ? ` · ${o.undo.conflicts.length} xung đột` : ''}`);
+  return parts.join(' · ');
+}
 
 interface CoachInfo {
   claude: ClaudeStatus;
   status: { running?: CoachRunInfo; lockedBy?: { pid: number; runId: string } };
-  runs: CoachRunInfo[];
+  runs: CoachRun[];
   newSince: { attempts: number; answers: number };
   profile: string;
   coworkPrompt: string;
@@ -26,6 +59,39 @@ interface CoachInfo {
   host?: string;
   hostAllowed?: boolean; // this machine may run SCHEDULED coach runs (coach.hosts)
   blocked?: string | null; // why coach runs are refused here (TRAINER_HOME test mode)
+  sync?: { beforeAi: boolean; afterAi: boolean }; // config sync.before_ai / after_ai
+  structured?: boolean; // coach.structured_output: generate / ENRICH / long-form answer in JSON, the app writes the files
+  verify?: { auto: boolean; autoDraft: boolean; batchSize: number; model: string; grounded?: boolean; localModel?: string }; // coach.verify.* + coach.models.verify
+  idle?: { enabled: boolean; tasks: string[] }; // [v5] coach.enrich_on_idle + coach.idle_tasks
+  targets?: { twins: number; twinsPerRun: number }; // [v5] questions a twins run would pick now
+}
+
+const IDLE_LABEL: Record<string, string> = { enrich: '🧹 ENRICH', longform: '📏 câu dài (task còn thiếu)', twins: '🪞 câu song sinh', audit: '🧾 kiểm toán câu nhập', notebook: '📒 sổ lỗi' };
+
+/** [v5] "↩️ Hoàn tác" of one AI run: confirm, POST, report restored / retired / conflicts. */
+function UndoButton({ run, onDone, small }: { run: CoachRun; onDone: (r: UndoResult) => void; small?: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const u = run.undoable;
+  if (!u) return null;
+  const what = [u.changed ? `khôi phục ${u.changed} câu về bản trước lượt này` : '', u.created ? `loại (retired) ${u.created} câu lượt này tạo — id vẫn giữ cho kết quả cũ` : ''].filter(Boolean).join(' và ');
+  const go = async () => {
+    if (!window.confirm(`Hoàn tác lượt ${run.id}: ${what}?\nCâu đã bị sửa tiếp sau lượt này (tay hoặc AI) sẽ được giữ nguyên.`)) return;
+    setBusy(true);
+    try {
+      const r = await api.post<UndoResult>(`/api/coach/runs/${encodeURIComponent(run.id)}/undo`, {});
+      toast(`↩️ Đã hoàn tác: ${r.restored.length} câu khôi phục · ${r.retired.length} câu loại${r.conflicts.length ? ` · ${r.conflicts.length} câu giữ nguyên (đã sửa sau đó)` : ''}`);
+      onDone(r);
+    } catch (e) {
+      toast(`Không hoàn tác được: ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button className={`btn ${small ? 'ghost sm' : 'sm'}`} disabled={busy} onClick={go} title={`Hoàn tác: ${what}`}>
+      ↩️ Hoàn tác
+    </button>
+  );
 }
 
 const MODEL_ROWS: { id: keyof ModelMap; label: string }[] = [
@@ -33,11 +99,12 @@ const MODEL_ROWS: { id: keyof ModelMap; label: string }[] = [
   { id: 'generate', label: '✨ Sinh câu hỏi' },
   { id: 'enrich', label: '🧹 ENRICH / câu dài' },
   { id: 'ask', label: '🤖 Hỏi AI' },
+  { id: 'verify', label: '🧪 Giải mù (model thứ hai)' },
 ];
 
 /** Cost of recent coach runs and asks, in API-equivalent dollars, plus the resolved model per task. */
 function CostPanel({ costs, models }: { costs?: CostSummary; models?: ModelMap }) {
-  const rows = Object.entries(costs?.byTask ?? {}).map(([k, v]) => ({ key: k, label: COACH_TASK_LABEL[k] ?? k, runs: v.runs, cost: v.costUsd }));
+  const rows = Object.entries(costs?.byTask ?? {}).map(([k, v]) => ({ key: k, label: taskLabel(k), runs: v.runs, cost: v.costUsd }));
   if (costs?.asks?.count) rows.push({ key: 'ask', label: COACH_TASK_LABEL.ask, runs: costs.asks.count, cost: costs.asks.costUsd });
   rows.sort((a, b) => b.cost - a.cost);
   const max = Math.max(0.0001, ...rows.map((r) => r.cost));
@@ -73,7 +140,7 @@ function CostPanel({ costs, models }: { costs?: CostSummary; models?: ModelMap }
         <h2>🧠 Model theo tác vụ</h2>
         {models ? (
           <div className="stack sm small">
-            {MODEL_ROWS.map((m) => (
+            {MODEL_ROWS.filter((m) => m.id !== 'verify' || models.verify !== undefined).map((m) => (
               <KvRow key={m.id} k={m.label}>
                 {models[m.id] ? <code>{models[m.id]}</code> : <span className="muted">mặc định của Claude Code</span>}
               </KvRow>
@@ -83,8 +150,9 @@ function CostPanel({ costs, models }: { costs?: CostSummary; models?: ModelMap }
           <div className="small muted">Server chưa báo model theo tác vụ.</div>
         )}
         <div className="tiny muted">
-          Đổi trong <code>trainer/config.yaml</code> → <code>coach.model</code> (mặc định cho mọi tác vụ) và <code>coach.models.analyze | generate | enrich | ask</code> (ghi đè
-          từng tác vụ, vd <code>sonnet</code> cho việc khối lượng lớn, <code>opus</code> cho phân tích).
+          Đổi trong <code>trainer/config.yaml</code> → <code>coach.model</code> (mặc định cho mọi tác vụ) và <code>coach.models.analyze | generate | enrich | ask | verify</code> (ghi
+          đè từng tác vụ, vd <code>sonnet</code> cho việc khối lượng lớn, <code>opus</code> cho phân tích). <code>coach.models.verify</code> là model “giải mù” câu mới / vừa sửa —
+          nên khác model sinh câu để bắt lỗi đáp án.
         </div>
       </div>
     </div>
@@ -124,7 +192,7 @@ function Console({ events, live }: { events: CoachEvent[]; live?: boolean }) {
   );
 }
 
-function SessionCard({ plan, s }: { plan: Plan; s: PlanSession }) {
+function SessionCard({ plan, s }: { plan: PlanSummary; s: PlanSession }) {
   const { byId } = useData();
   const ids = s.questions ?? [];
   const missing = ids.filter((id) => !byId.has(id)).length;
@@ -245,18 +313,50 @@ function GenerateForm({ disabled, onStarted }: { disabled: boolean; onStarted: (
   );
 }
 
+const PLAN_PAGE = 30;
+
 export function Coach() {
-  const { meta, refresh } = useData();
+  const { meta, refresh, versions } = useData();
   const { data: info, reload } = useFetch<CoachInfo>('/api/coach');
-  const { data: planData } = useFetch<{ plans: Plan[]; newSince: { attempts: number } }>('/api/plans');
+  // plan list = summaries (no Markdown body), newest first: the first page follows data changes; older pages are
+  // appended by offset on demand (kept while the plan files are unchanged); the body of the shown plan alone
+  const { data: planData } = useFetch<PlansResponse>(`/api/plans?limit=${PLAN_PAGE}`, [], { keep: true });
+  const [older, setOlder] = useState<{ plans?: string; list: PlanSummary[] }>({ list: [] });
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [planId, setPlanId] = useState<string>();
   const [events, setEvents] = useState<CoachEvent[]>([]);
   const [viewRun, setViewRun] = useState<string>();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<'plan' | 'generate' | 'enrich' | 'history' | 'profile' | 'costs' | 'setup'>('plan');
+  const [tab, setTab] = useState<'plan' | 'generate' | 'enrich' | 'variants' | 'history' | 'profile' | 'costs' | 'setup'>('plan');
+  const [undone, setUndone] = useState<UndoResult>();
+  const afterUndo = (r: UndoResult) => {
+    setUndone(r);
+    reload();
+    void refresh();
+  };
   const [showPrompt, setShowPrompt] = useState(false);
-  const [planIdx, setPlanIdx] = useState(0);
   const running = info?.status.running;
+  const firstPage = planData?.plans ?? [];
+  const olderList = older.plans === versions?.plans ? older.list : []; // a new / edited plan shifts the pages: start over
+  const plans = useMemo(() => {
+    const seen = new Set<string>(); // duplicate ids: the newest wins, like GET /api/plans/:id
+    return [...firstPage, ...olderList].filter((p) => !seen.has(p.id) && !!seen.add(p.id));
+  }, [firstPage, olderList]);
+  const { data: planDetail, error: planError } = useFetch<Plan>(plans.length ? `/api/plans/${encodeURIComponent(planId ?? plans[0].id)}` : null, [planId]);
+  // the chosen plan stays shown even when its page was dropped (its detail has every summary field)
+  const plan: PlanSummary | undefined = plans.find((p) => p.id === planId) ?? (planDetail && planDetail.id === planId ? planDetail : undefined) ?? plans[0];
+  const loadOlder = async () => {
+    setLoadingOlder(true);
+    try {
+      const r = await api.get<PlansResponse>(`/api/plans?limit=${PLAN_PAGE}&offset=${firstPage.length + olderList.length}`);
+      setOlder({ plans: versions?.plans, list: [...olderList, ...r.plans] });
+    } catch (e) {
+      toast((e as Error).message);
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   useEffect(() => {
     if (running) {
@@ -286,8 +386,16 @@ export function Coach() {
   useServerEvent<CoachRunInfo>('coach-done', (r) => {
     reload();
     void refresh();
-    const what = r.task === 'enrich' ? 'ENRICH' : r.task === 'longform' ? 'Sinh câu dài' : r.task === 'generate' ? 'Sinh câu hỏi' : 'AI Coach';
-    toast(r.status === 'success' ? `✅ ${what} đã xong — ${r.task === 'analyze' ? 'kế hoạch & ' : ''}ngân hàng đã cập nhật.` : `${what} kết thúc: ${r.status}`);
+    const what = r.task === 'enrich' ? 'ENRICH' : r.task === 'longform' ? 'Sinh câu dài' : r.task === 'generate' ? 'Sinh câu hỏi' : r.task === 'verify' ? runLabel(r).replace(/^\S+ /, '') : r.task === 'twins' ? 'Câu song sinh' : r.task === 'family' ? 'Họ câu' : 'AI Coach';
+    toast(
+      r.status === 'success'
+        ? r.task === 'verify'
+          ? `✅ ${what} đã xong — kết quả ở Ngân hàng → Chất lượng.`
+          : `✅ ${what} đã xong — ${r.task === 'analyze' ? 'kế hoạch & ' : ''}ngân hàng đã cập nhật.`
+        : r.status === 'skipped'
+          ? `⏭ ${what}: ${r.summary ?? 'không còn việc để làm'}`
+          : `${what} kết thúc: ${r.status}`,
+    );
   });
 
   const analyze = async () => {
@@ -309,10 +417,10 @@ export function Coach() {
   };
 
   if (!meta) return null;
-  const plans = planData?.plans ?? [];
-  const plan = plans[planIdx];
+  const planTotal = planData?.total ?? plans.length;
+  const planMore = Math.max(0, planTotal - firstPage.length - olderList.length);
   const claude = info?.claude;
-  const viewing = info?.runs.find((r) => r.id === viewRun) ?? running;
+  const viewing: CoachRun | undefined = info?.runs.find((r) => r.id === viewRun) ?? running;
   const coachHosts = meta.coachHosts ?? [];
   const host = info?.host ?? meta.host;
   const hostExcluded = info?.hostAllowed !== undefined ? !info.hostAllowed : !hostListed(host, coachHosts);
@@ -349,7 +457,7 @@ export function Coach() {
             <div className="row">
               <span className="spinner" />{' '}
               <span className="small">
-                Đang chạy {COACH_TASK_LABEL[running.task] ?? ''} · bắt đầu {fmtRelative(running.startedAt)}…
+                Đang chạy {runLabel(running)} · bắt đầu {fmtRelative(running.startedAt)}…
               </span>
               <span className="spacer" />
               <button className="btn danger sm" onClick={cancel}>
@@ -368,6 +476,12 @@ export function Coach() {
             <div className="ins-wrap alert warn small">
               ⚠️ Máy này (<code>{host}</code>) không nằm trong <code>coach.hosts</code> ({coachHosts.join(', ')}) — lịch tự động sẽ bỏ qua AI Coach ở đây. Bấm tay vẫn chạy
               được; đổi trong <code>trainer/config.yaml</code>.
+            </div>
+          )}
+          {info?.sync && (info.sync.beforeAi || info.sync.afterAi) && (
+            <div className="tiny muted ins-wrap" title="Đổi trong trainer/config.yaml → sync.before_ai / sync.after_ai">
+              ⇅ Tự đồng bộ {info.sync.beforeAi && info.sync.afterAi ? 'trước và sau' : info.sync.beforeAi ? 'trước' : 'sau'} mỗi lượt AI (phân tích, sinh câu, ENRICH) —{' '}
+              {info.sync.beforeAi ? 'AI thấy cả bài làm của máy kia' : 'kết quả AI được đẩy lên ngay'}.
             </div>
           )}
           <div className="row">
@@ -410,6 +524,30 @@ export function Coach() {
             </div>
           )}
           {viewing?.error && <div className="ins-wrap alert bad small">Lỗi: {viewing.error}</div>}
+          {viewing && viewing.status !== 'running' && (viewing.undoable || viewing.outcome?.undo) && (
+            <div className="row small" style={{ gap: 8 }}>
+              <UndoButton run={viewing} onDone={afterUndo} />
+              {viewing.undoable ? (
+                <span className="tiny muted">
+                  {viewing.undoable.changed ? `${viewing.undoable.changed} câu sửa` : ''}
+                  {viewing.undoable.changed && viewing.undoable.created ? ' · ' : ''}
+                  {viewing.undoable.created ? `${viewing.undoable.created} câu mới` : ''} có thể hoàn tác
+                </span>
+              ) : (
+                <span className="tiny muted">↩️ Đã hoàn tác lượt này</span>
+              )}
+            </div>
+          )}
+          {undone && undone.run === viewing?.id && undone.conflicts.length > 0 && (
+            <div className="ins-wrap alert warn small">
+              Giữ nguyên {undone.conflicts.length} câu đã đổi sau lượt này:{' '}
+              {undone.conflicts.map((c) => (
+                <span key={c.id}>
+                  <code>{c.id}</code> ({c.reason}){' '}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -418,9 +556,10 @@ export function Coach() {
           value={tab}
           onChange={setTab}
           items={[
-            { id: 'plan', label: `🧭 Kế hoạch${plans.length ? ` (${plans.length})` : ''}` },
+            { id: 'plan', label: `🧭 Kế hoạch${planTotal ? ` (${planTotal})` : ''}` },
             { id: 'generate', label: '✨ Sinh câu hỏi từ tài liệu' },
             { id: 'enrich', label: `🧹 ENRICH${info?.enrich ? ` (${info.enrich.enriched}/${info.enrich.total})` : ''}` },
+            { id: 'variants', label: `🪞 Song sinh & họ câu${info?.targets?.twins ? ` (${info.targets.twins})` : ''}` },
             { id: 'profile', label: '👤 Hồ sơ người học' },
             { id: 'history', label: `🗒️ Lượt chạy (${info?.runs.length ?? 0})` },
             { id: 'costs', label: '💰 Chi phí & model' },
@@ -443,14 +582,23 @@ export function Coach() {
                     {plan.newPacks.length ? ` · pack mới: ${plan.newPacks.join(', ')}` : ''}
                   </div>
                 </div>
-                {plans.length > 1 && (
-                  <select value={planIdx} onChange={(e) => setPlanIdx(Number(e.target.value))}>
-                    {plans.map((p, i) => (
-                      <option key={p.id} value={i}>
+                {planTotal > 1 && (
+                  <select
+                    value={plan.id}
+                    aria-label="Chọn kế hoạch"
+                    disabled={loadingOlder}
+                    onChange={(e) => {
+                      if (e.target.value === '__more') void loadOlder();
+                      else setPlanId(e.target.value);
+                    }}
+                  >
+                    {(plans.some((p) => p.id === plan.id) ? plans : [...plans, plan]).map((p, i) => (
+                      <option key={p.id} value={p.id}>
                         {i === 0 ? '★ ' : ''}
                         {fmtDateTime(p.created)} — {p.id}
                       </option>
                     ))}
+                    {planMore > 0 && <option value="__more">{loadingOlder ? 'Đang tải…' : `… xem thêm kế hoạch cũ hơn (${planMore})`}</option>}
                   </select>
                 )}
               </div>
@@ -462,7 +610,13 @@ export function Coach() {
                 </div>
               )}
               <div className="card pad-lg">
-                <Markdown text={plan.body} base={`trainer/${plan.file.slice(0, plan.file.lastIndexOf('/') + 1)}`} />
+                {planDetail?.id === plan.id ? (
+                  <Markdown text={planDetail.body} base={`trainer/${plan.file.slice(0, plan.file.lastIndexOf('/') + 1)}`} />
+                ) : planError ? (
+                  <div className="small muted">Không tải được nội dung kế hoạch: {planError}</div>
+                ) : (
+                  <div className="small muted">Đang tải nội dung kế hoạch…</div>
+                )}
               </div>
             </div>
           ))}
@@ -499,6 +653,20 @@ export function Coach() {
           </div>
         )}
 
+        {tab === 'variants' && (
+          <AntiRotePanel
+            disabled={!!running || !claude?.available || !!blocked || !!info?.status.lockedBy}
+            candidates={info?.targets?.twins}
+            perRun={info?.targets?.twinsPerRun}
+            onStarted={(r) => {
+              setViewRun(r.id);
+              setEvents([]);
+              reload();
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
         {tab === 'costs' && <CostPanel costs={costs} models={info?.models} />}
 
         {tab === 'profile' && (
@@ -529,9 +697,10 @@ export function Coach() {
                       <tr key={r.id}>
                         <td className="small nowrap">{fmtDateTime(r.startedAt)}</td>
                         <td className="small">
-                          {COACH_TASK_LABEL[r.task] ?? r.task}
+                          {runLabel(r)}
                           {r.params && typeof r.params.size === 'number' ? <span className="tiny muted"> · {r.params.size} câu</span> : null}
                           {r.params && typeof r.params.count === 'number' ? <span className="tiny muted"> · {r.params.count} câu</span> : null}
+                          {outcomeLine(r.outcome) && <div className="tiny muted ins-wrap">{outcomeLine(r.outcome)}</div>}
                         </td>
                         <td className="small">{r.trigger}</td>
                         <td>
@@ -539,15 +708,18 @@ export function Coach() {
                         </td>
                         <td className="num small">{r.costUsd ? `$${r.costUsd.toFixed(3)}` : '—'}</td>
                         <td>
-                          <button
-                            className="btn ghost sm"
-                            onClick={() => {
-                              setViewRun(r.id);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                          >
-                            Xem log
-                          </button>
+                          <div className="row nowrap" style={{ gap: 4 }}>
+                            <button
+                              className="btn ghost sm"
+                              onClick={() => {
+                                setViewRun(r.id);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                            >
+                              Xem log
+                            </button>
+                            {r.status !== 'running' && <UndoButton run={r} onDone={afterUndo} small />}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -564,7 +736,7 @@ export function Coach() {
               <h2>⏰ Chạy tự động trên máy</h2>
               <div className="small dim">
                 Chạy <code>claude -p</code> headless vào các giờ cố định (macOS launchd · Linux cron · Windows Task Scheduler). Không có bài làm/báo lỗi mới → bỏ qua phân tích và
-                chạy 1 lượt ENRICH thay thế. Giờ chạy: <code>trainer/config.yaml</code> → <code>coach.schedule</code> (hiện tại: {info?.schedule?.join(', ') ?? '—'}).
+                chạy việc lúc rảnh (<code>coach.idle_tasks</code>, mặc định 1 lượt ENRICH). Giờ chạy: <code>trainer/config.yaml</code> → <code>coach.schedule</code> (hiện tại: {info?.schedule?.join(', ') ?? '—'}).
               </div>
               <pre className="console" style={{ margin: 0 }}>{`cd trainer
 npm run schedule -- install     # cài lịch
@@ -573,7 +745,12 @@ npm run schedule -- uninstall   # gỡ
 npm run coach                   # chạy 1 lần ngay (bỏ qua nếu không có dữ liệu mới)
 npm run coach -- --force        # luôn chạy
 npm run coach -- --enrich --size 20   # 1 lượt ENRICH
-npm run coach -- --longform --count 5 # sinh 5 câu dài`}</pre>
+npm run coach -- --longform --count 5 # sinh 5 câu dài
+npm run coach -- --verify --scope unverified-ai # giải mù câu AI
+npm run coach -- --verify --scope audit     # kiểm toán 10 câu nhập
+npm run coach -- --verify --scope grounded  # kiểm chứng câu nghi sai bằng tài liệu AWS
+npm run coach -- --twins --count 10         # câu song sinh cho câu sắp ôn
+npm run coach -- --family --requirement cost # họ câu đổi yêu cầu`}</pre>
               <div className="tiny muted">
                 Máy cần bật. Log: trainer/coach/runs/.{' '}
                 {coachHosts.length ? (
@@ -587,6 +764,36 @@ npm run coach -- --longform --count 5 # sinh 5 câu dài`}</pre>
                   </>
                 )}
               </div>
+              {(info?.structured !== undefined || info?.verify) && (
+                <div className="stack sm small ins-wrap">
+                  {info?.structured !== undefined && (
+                    <div>
+                      🧾 <span className="muted">Kết quả AI dạng JSON:</span> <b>{info.structured ? 'bật' : 'tắt'}</b> —{' '}
+                      {info.structured ? 'app tự kiểm tra rồi mới ghi file' : 'AI tự ghi file'} <code className="tiny">coach.structured_output</code>
+                    </div>
+                  )}
+                  {info?.idle && (
+                    <div>
+                      💤 <span className="muted">Lượt theo lịch không có bài mới:</span>{' '}
+                      <b>{info.idle.enabled && info.idle.tasks.length ? info.idle.tasks.map((t) => IDLE_LABEL[t] ?? t).join(' → ') : 'bỏ qua'}</b>{' '}
+                      <span className="tiny muted">(việc đầu tiên còn việc)</span> <code className="tiny">coach.idle_tasks</code>
+                    </div>
+                  )}
+                  {info?.verify && (
+                    <div>
+                      🔗 <span className="muted">Kiểm chứng bằng tài liệu AWS:</span> <b>{info.verify.grounded ? 'bật (chỉ khi bạn bấm)' : 'tắt'}</b>
+                      {info.verify.localModel ? ` · phiếu thứ ba: ${info.verify.localModel} (Ollama)` : ''} <code className="tiny">coach.verify.grounded</code>
+                    </div>
+                  )}
+                  {info?.verify && (
+                    <div>
+                      🧪 <span className="muted">Giải mù sau mỗi lượt:</span> <b>{info.verify.auto ? 'bật' : 'tắt'}</b>
+                      {info.verify.auto ? ` · ${info.verify.model || 'model mặc định'} · ${info.verify.batchSize} câu/lần` : ''}
+                      {info.verify.auto && info.verify.autoDraft ? ' · câu AI không khớp → nháp chờ duyệt' : ''} <code className="tiny">coach.verify</code>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="card stack">
               <h2>🧑‍💻 Claude Cowork / Claude Code</h2>

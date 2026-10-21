@@ -20,10 +20,11 @@ import {
   setQuestionMeta,
   writeMigration,
 } from '../server/lib/migrations.ts';
-import { computeQuality, correctIsLongest, findDuplicates, variantCycles } from '../server/lib/quality.ts';
+import { computeQuality, correctIsLongest, distractorReport, findDuplicates, lexicalDuplicates, optionStats, qualitySnapshotLines, scopeReport, variantCycles } from '../server/lib/quality.ts';
+import { mergeDuplicates } from '../server/lib/embeddings.ts';
 import { addRating, aggregateRatings, loadRatings, lowRatedIds, type RatingEntry } from '../server/lib/ratings.ts';
 import type { BankState } from '../server/lib/bank.ts';
-import type { Attempt, Question } from '../shared/types.ts';
+import type { AnswerRecord, Attempt, DuplicatePair, Question } from '../shared/types.ts';
 
 const tax = loadTaxonomy();
 const tmpDirs: string[] = [];
@@ -72,9 +73,11 @@ function packText(id: string, qs: Q[], origin = 'imported'): string {
 
 const opts4 = (n: number) => [`Right answer ${n}`, `Wrong one ${n}`, `Wrong two ${n}`, `Wrong three ${n}`];
 
+let bankSeq = 0;
+/** Every test bank gets its own version: the per-part caches of quality.ts / lint.ts key on it. */
 function bankOf(text: string): BankState {
   const { questions, pack, problems } = parsePack(text, 'bank/packs/imported/t.md', tax);
-  return { version: 'test', taxonomy: tax, packs: [pack], questions, byId: new Map(questions.map((q) => [q.id, q])), problems };
+  return { version: `quality-test-${++bankSeq}`, taxonomy: tax, packs: [pack], questions, byId: new Map(questions.map((q) => [q.id, q])), problems };
 }
 
 // ── answer rebalance ────────────────────────────────────────────────────────
@@ -337,4 +340,201 @@ test('ratings file: append, parse, one vote per day, resolved lines do not count
   const votes = aggregateRatings(entries);
   assert.deepEqual(votes, { x: { up: 1, down: 2 }, y: { up: 0, down: 1 } });
   assert.deepEqual(lowRatedIds(votes), ['x']);
+});
+
+// ── option analytics (distractor report) ───────────────────────────────────
+
+function attemptOf(id: string, answers: Partial<AnswerRecord>[], opts: { rushed?: boolean; day?: number } = {}): Attempt {
+  return {
+    id,
+    finished: `2026-10-${String(opts.day ?? 10).padStart(2, '0')}T10:00:00+07:00`,
+    rushed: !!opts.rushed,
+    answers: answers.map((a) => ({ pick: '', key: 'A', ok: false, t: 30, est: 60, ...a }) as AnswerRecord),
+  } as unknown as Attempt;
+}
+
+test('distractorReport: weak distractors and suspected keys from non-rushed answers to the current version', () => {
+  const text = packText('t-d', [
+    { id: 'd-1', options: opts4(1), answer: ['A'] },
+    { id: 'd-2', options: opts4(2), answer: ['A'] },
+    { id: 'd-3', options: opts4(3), answer: ['A'] },
+    { id: 'd-4', options: opts4(4), answer: ['A'] },
+    { id: 'd-5', options: opts4(5), answer: ['A'] },
+    { id: 'd-6', options: opts4(6), answer: ['A'], status: 'retired' },
+  ]);
+  const bank = bankOf(text);
+  const h = (id: string) => bank.byId.get(id)!.hash;
+  const ok = (q: string, elim = '') => ({ q, pick: 'A', key: 'A', ok: true, h: h(q), ...(elim ? { elim } : {}) });
+  const attempts = [
+    // d-1: always right, D struck out 3/4 times, C once → D is a weak distractor, C is not (struck < 2)
+    attemptOf('a1', [ok('d-1', 'D'), { q: 'd-2', pick: 'B', h: h('d-2'), why: 'Mình nghĩ B rẻ hơn' }, { q: 'd-3', pick: 'C', h: h('d-3') }], { day: 1 }),
+    attemptOf('a2', [ok('d-1', 'CD'), { q: 'd-2', pick: 'B', h: h('d-2'), unsure: true }, { q: 'd-3', pick: 'C', h: h('d-3'), hinted: true }], { day: 2 }),
+    attemptOf('a3', [ok('d-1', 'D'), { q: 'd-2', pick: 'B', h: h('d-2'), why: 'B vẫn hợp lý' }], { day: 3 }),
+    attemptOf('a4', [ok('d-1')], { day: 4 }),
+    // rushed: would make D picked
+    attemptOf('r1', [{ q: 'd-1', pick: 'D', h: h('d-1') }], { day: 5, rushed: true }),
+    // d-4 was edited after these answers: an answer with an old hash proves it, hash-less answers are older still
+    attemptOf('a5', [{ q: 'd-4', pick: 'B', h: 'oldhash001' }, { q: 'd-4', pick: 'B' }, { q: 'd-4', pick: 'B' }], { day: 6 }),
+    // d-5: legacy answers (no h) graded against an older key, or re-graded → not the current version
+    attemptOf('a6', [{ q: 'd-5', pick: 'B', key: 'B', ok: true }, { q: 'd-5', pick: 'B', key: 'A', regraded: true }, { q: 'd-5', pick: 'B', key: 'A', regraded: true }], { day: 7 }),
+    // retired question: ignored
+    attemptOf('a7', [{ q: 'd-6', pick: 'B', h: h('d-6') }, { q: 'd-6', pick: 'B', h: h('d-6') }], { day: 8 }),
+    // unanswered without strike-outs: no exposure
+    attemptOf('a8', [{ q: 'd-1', pick: '', h: h('d-1') }], { day: 9 }),
+  ];
+
+  const stats = optionStats(bank, attempts);
+  assert.deepEqual(stats.get('d-1'), {
+    id: 'd-1',
+    exposures: 4,
+    correct: 4,
+    options: { A: { picks: 4, elims: 0 }, B: { picks: 0, elims: 0 }, C: { picks: 0, elims: 1 }, D: { picks: 0, elims: 3 } },
+    wrong: {},
+  });
+  assert.equal(stats.has('d-4'), false, 'answers to an older version are skipped');
+  assert.equal(stats.has('d-5'), false, 'old key / re-graded answers are skipped');
+
+  const r = distractorReport(bank, attempts);
+  assert.equal(r.minExposures, 3);
+  assert.deepEqual(r.weakDistractors, [{ id: 'd-1', key: 'D', exposures: 4, elims: 3 }]);
+  assert.equal(r.suspectedKeys.length, 1);
+  const s = r.suspectedKeys[0];
+  assert.deepEqual({ id: s.id, key: s.key, pick: s.pick, times: s.times, confident: s.confident }, { id: 'd-2', key: 'A', pick: 'B', times: 3, confident: 2 });
+  assert.match(s.note, /^Chọn B 3\/3 lần \(2 lần chắc chắn/);
+  assert.match(s.note, /chưa lần nào chọn đúng/);
+  assert.match(s.note, /“Mình nghĩ B rẻ hơn” \| “B vẫn hợp lý”/);
+  assert.equal(r.analysed, 2); // d-1 (4 answers), d-2 (3)
+  assert.equal(r.answers, 9); // d-1 4 + d-2 3 + d-3 2 (retired d-6 not counted)
+  // one hinted + one confident wrong pick is not enough; a higher bar for exposures hides d-2 from the weak list only
+  assert.equal(distractorReport(bank, attempts, 5).weakDistractors.length, 0);
+  assert.equal(distractorReport(bank, attempts, 5).suspectedKeys.length, 1);
+  assert.deepEqual(distractorReport(bank, []), { minExposures: 3, weakDistractors: [], suspectedKeys: [], analysed: 0, answers: 0 });
+  // slips on a question answered many times: the same wrong pick must be ≥ a third of the answers
+  const many = [
+    ...Array.from({ length: 9 }, (_, i) => attemptOf(`m${i}`, [ok('d-3')], { day: 10 + i })),
+  ];
+  assert.equal(distractorReport(bank, [...attempts, ...many]).suspectedKeys.some((k) => k.id === 'd-3'), false);
+  const slips = Array.from({ length: 10 }, (_, i) => attemptOf(`s${i}`, [i < 2 ? { q: 'd-2', pick: 'B', h: h('d-2') } : ok('d-2')], { day: 10 + i }));
+  assert.equal(distractorReport(bank, slips).suspectedKeys.length, 0, '2 confident slips in 10 answers are no suspected key');
+  const stubborn = Array.from({ length: 8 }, (_, i) => attemptOf(`t${i}`, [i % 2 ? { q: 'd-2', pick: 'B', h: h('d-2') } : ok('d-2')], { day: 10 + i }));
+  assert.equal(distractorReport(bank, stubborn).suspectedKeys[0]?.times, 4, 'half of the answers on the same wrong option still counts');
+});
+
+test('computeQuality carries lint, distractors, semantic status and verification; snapshot lines list them', () => {
+  const text = packText('t-c', [
+    { id: 'c-1', options: ['Right answer that is much much longer than all others', 'short', 'tiny', 'small'], answer: ['A'] },
+    { id: 'c-2', options: opts4(2), answer: ['A'] },
+  ]);
+  const bank = bankOf(text);
+  const h = bank.byId.get('c-2')!.hash;
+  const attempts = [1, 2, 3].map((d) => attemptOf(`c${d}`, [{ q: 'c-2', pick: 'C', h, why: `lần ${d}` }], { day: d }));
+  const q = computeQuality(bank, attempts, []);
+  assert.equal(q.lint?.checked, 2);
+  assert.equal(q.lint?.byCode['longest-correct'].count, 1);
+  assert.deepEqual(q.lint?.ids?.['longest-correct'], ['c-1']);
+  assert.equal(q.distractors?.suspectedKeys[0]?.id, 'c-2');
+  assert.ok(q.semantic && ['ollama', 'lexical', 'off'].includes(q.semantic.provider));
+  // the v4 fields are always there; v5 (γ2) adds optional ones (grounded, disputed …)
+  for (const k of ['ok', 'pending', 'review', 'stale', 'verified']) assert.ok(k in (q.verification ?? {}), `verification.${k}`);
+
+  const lines = qualitySnapshotLines(bank, attempts, { background: false }).join('\n');
+  assert.match(lines, /## 14\. Chất lượng ngân hàng/);
+  assert.match(lines, /### 🩺 Lỗi viết câu hỏi/);
+  assert.match(lines, /- Nặng: 0 câu ✓/);
+  assert.match(lines, /Đáp án đúng dài nhất 1/);
+  assert.match(lines, /### 🎯 Phương án nhiễu/);
+  assert.match(lines, /`c-2` đáp án A “Right answer 2” · chọn C “Wrong two 2” 3\/3 lần/);
+});
+
+test('lexical duplicates are cached by bank version only (not recomputed when answers change)', () => {
+  const text = packText('t-dup', [
+    { id: 'u-1', stem: 'A company needs an immutable cryptographically verifiable ledger of financial transactions. Which service?', options: ['Amazon QLDB', 'Amazon DynamoDB', 'Amazon RDS', 'Amazon Neptune'], answer: ['A'] },
+    { id: 'u-2', stem: 'A company wants an immutable, cryptographically verifiable ledger of financial transactions. Which service?', options: ['Amazon DynamoDB', 'Amazon QLDB', 'Amazon RDS', 'Amazon Neptune'], answer: ['B'] },
+  ]);
+  const bank = bankOf(text);
+  const first = lexicalDuplicates(bank);
+  assert.deepEqual(first.map((p) => [p.a, p.b, p.kind]), [['u-1', 'u-2', 'lexical']]);
+  const a = computeQuality(bank, [attemptOf('x1', [{ q: 'u-1', pick: 'A' }])], undefined, { background: false });
+  const b = computeQuality(bank, [attemptOf('x1', [{ q: 'u-1', pick: 'A' }]), attemptOf('x2', [{ q: 'u-2', pick: 'A' }], { day: 11 })], undefined, { background: false });
+  assert.equal(lexicalDuplicates(bank), first, 'same array: not recomputed after new answers');
+  assert.deepEqual(a.duplicates, b.duplicates);
+  const edited = { ...bank, version: `${bank.version}-edited` };
+  assert.notEqual(lexicalDuplicates(edited), first, 'a new bank version recomputes');
+});
+
+test('mergeDuplicates: lexical pairs first-class, semantic-only pairs added, inactive ids dropped, best first', () => {
+  const lexical: DuplicatePair[] = [{ a: 'q1', b: 'q2', score: 0.9, kind: 'lexical' }];
+  const semantic: DuplicatePair[] = [
+    { a: 'q2', b: 'q1', score: 0.97, kind: 'semantic' }, // same pair found both ways → stays lexical
+    { a: 'q3', b: 'q4', score: 0.92, kind: 'semantic' },
+    { a: 'q1', b: 'qx', score: 0.99, kind: 'semantic' }, // qx is retired
+  ];
+  assert.deepEqual(mergeDuplicates(lexical, semantic, (id) => id !== 'qx'), [
+    { a: 'q3', b: 'q4', score: 0.92, kind: 'semantic' },
+    { a: 'q1', b: 'q2', score: 0.9, kind: 'lexical' },
+  ]);
+  assert.deepEqual(mergeDuplicates([{ a: 'q1', b: 'q2', score: 0.85 }], []), [{ a: 'q1', b: 'q2', score: 0.85, kind: 'lexical' }]);
+  const many = Array.from({ length: 40 }, (_, i) => ({ a: `s${i}`, b: `t${i}`, score: 0.9, kind: 'semantic' as const }));
+  assert.equal(mergeDuplicates(many.map((p) => ({ ...p, kind: 'lexical' as const })), many.map((p) => ({ ...p, a: `u${p.a}` }))).length, 50, 'merged list ≤ 50');
+});
+
+// ── [γ] exam scope + sealed questions ───────────────────────────────────────
+
+test('scopeReport: out-of-scope answers vs distractors, per-service tallies, the practice exclusion flag; snapshot §14 tells the coach', () => {
+  const bank = bankOf(
+    packText('sc-pack', [
+      { id: 'sc-ans', options: ['Use AWS CodeCommit', 'Use Amazon S3', 'Use Amazon EFS', 'Use Amazon EBS'], answer: ['A'] },
+      { id: 'sc-dis', options: ['Use Amazon S3', 'Use Amazon Lightsail', 'Use AWS CodeBuild', 'Use Amazon EBS'], answer: ['A'] },
+      { id: 'sc-ok', options: opts4(1), answer: ['A'] },
+    ]),
+  );
+  const r = scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true, today_minutes: 25, relearn: true } });
+  assert.deepEqual(r.answer, [{ id: 'sc-ans', services: ['CodeCommit'] }]);
+  assert.deepEqual(r.distractor, [{ id: 'sc-dis', options: [{ key: 'B', services: ['Lightsail'] }, { key: 'C', services: ['CodeBuild'] }] }]);
+  assert.equal(r.excluded, true);
+  const svc = Object.fromEntries(r.services.map((s) => [s.name, [s.answers, s.distractors]]));
+  assert.deepEqual([svc.CodeCommit, svc.Lightsail, svc.CodeBuild, svc.Braket], [[1, 0], [0, 1], [0, 1], [0, 0]]);
+  assert.equal(r.services[0].name, 'CodeCommit', 'services the bank uses as answers first');
+  assert.ok(r.services.length >= 30, 'every `scope: out` service of the taxonomy is listed');
+  assert.deepEqual(r.services.find((s) => s.name === 'Location Service')?.aliases, ['Amazon Location Service']);
+  assert.equal(scopeReport(bank, bank.questions, { practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: false, today_minutes: 25, relearn: true } }).excluded, false);
+  assert.deepEqual(computeQuality(bank, [], []).scope?.answer.map((x) => x.id), ['sc-ans']);
+  const lines = qualitySnapshotLines(bank, [], { background: false }).join('\n');
+  assert.match(lines, /### 🎯 Phạm vi đề thi/);
+  assert.match(lines, /1 câu có \*\*đáp án đúng\*\* là dịch vụ ngoài phạm vi[^\n]*`sc-ans` \(CodeCommit\)/);
+  assert.match(lines, /1 câu dùng dịch vụ ngoài phạm vi làm \*\*phương án nhiễu\*\*/);
+  assert.match(lines, /\*\*không\*\* dùng CodeCommit, CodeBuild, Lightsail/);
+});
+
+test('computeQuality leaves sealed questions out of every number and list; BankQuality.sealed counts them', () => {
+  const stem = 'A company stores signed invoices in a durable archive for seven years and must retrieve them rarely. Which service?';
+  const bank = bankOf(
+    packText('sl-pack', [
+      { id: 'sl-1', options: opts4(1), answer: ['A'], explanation: 'x' },
+      { id: 'sl-2', options: opts4(2), answer: ['A'], explanation: 'x' },
+      { id: 'sl-dup-a', stem, options: opts4(3), answer: ['A'] },
+      { id: 'sl-dup-b', stem, options: opts4(3), answer: ['A'] },
+      { id: 'sl-oos', options: ['Use AWS CodeCommit', 'Use Amazon S3', 'Use Amazon EFS', 'Use Amazon EBS'], answer: ['A'] },
+    ]),
+  );
+  const ratings: RatingEntry[] = [
+    { line: 1, date: '2026-10-01', qid: 'sl-2', value: 'down', note: 'mơ hồ' },
+    { line: 2, date: '2026-10-02', qid: 'sl-2', value: 'down' },
+  ];
+  const open = computeQuality(bank, [], ratings);
+  assert.equal(open.total, 5);
+  assert.equal(open.sealed, 0);
+  assert.ok(open.duplicates.some((d) => d.a === 'sl-dup-a' && d.b === 'sl-dup-b'));
+  assert.deepEqual(open.lowRated, ['sl-2']);
+  assert.deepEqual(open.scope?.answer.map((x) => x.id), ['sl-oos']);
+
+  const sealed = new Set(['sl-2', 'sl-dup-b', 'sl-oos']);
+  const q = computeQuality(bank, [], ratings, { sealed });
+  assert.equal(q.sealed, 3);
+  assert.equal(q.total, 2, 'metrics cover the visible questions only');
+  assert.deepEqual(q.duplicates, []);
+  assert.deepEqual(q.lowRated, []);
+  assert.deepEqual(q.scope?.answer, []);
+  assert.equal(q.lint?.checked, 2);
+  for (const ids of Object.values(q.lint?.ids ?? {})) for (const id of ids) assert.ok(!sealed.has(id), `${id} listed by lint`);
 });

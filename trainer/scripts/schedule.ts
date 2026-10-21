@@ -40,7 +40,7 @@ export function parseTimes(list: unknown): { times: ScheduleTime[]; invalid: str
   return { times: [...times.values()].sort((a, b) => a.hhmm.localeCompare(b.hhmm)), invalid };
 }
 
-const xml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export const xml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export interface JobSpec {
   node: string; // absolute node binary
@@ -51,39 +51,64 @@ export interface JobSpec {
   home?: string;
 }
 
-/** launchd agent — same content as the former scripts/schedule.sh. */
-export function plistXml(o: JobSpec & { label?: string; home: string }): string {
-  const entries = o.times.map((t) => `\n      <dict><key>Hour</key><integer>${t.h}</integer><key>Minute</key><integer>${t.m}</integer></dict>`).join('');
+/** A launchd agent ([v5] shared by the coach schedule and `npm run service`). */
+export interface LaunchdJob {
+  label: string;
+  args: string[]; // ProgramArguments (absolute program first)
+  cwd: string;
+  env: Record<string, string>;
+  log: string; // stdout + stderr
+  calendar?: ScheduleTime[]; // StartCalendarInterval
+  runAtLoad?: boolean; // start at login / when loaded
+  keepAlive?: boolean; // run again when it exits with an error (not after a clean exit)
+  throttleSeconds?: number;
+}
+
+export function launchdPlist(j: LaunchdJob): string {
+  const args = j.args.map((a) => `\n    <string>${xml(a)}</string>`).join('');
+  const env = Object.entries(j.env)
+    .map(([k, v]) => `\n    <key>${xml(k)}</key><string>${xml(v)}</string>`)
+    .join('');
+  const cal = j.calendar
+    ? `\n  <key>StartCalendarInterval</key>\n  <array>${j.calendar.map((t) => `\n      <dict><key>Hour</key><integer>${t.h}</integer><key>Minute</key><integer>${t.m}</integer></dict>`).join('')}\n  </array>`
+    : '';
+  const life =
+    (j.runAtLoad ? '\n  <key>RunAtLoad</key><true/>' : '') +
+    (j.keepAlive ? '\n  <key>KeepAlive</key>\n  <dict><key>SuccessfulExit</key><false/></dict>' : '') +
+    (j.throttleSeconds ? `\n  <key>ThrottleInterval</key><integer>${j.throttleSeconds}</integer>` : '');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>${xml(o.label ?? LABEL)}</string>
+  <key>Label</key><string>${xml(j.label)}</string>
   <key>ProgramArguments</key>
-  <array>
-    <string>${xml(o.node)}</string>
-    <string>${xml(o.script)}</string>
-    <string>--trigger</string>
-    <string>schedule</string>
+  <array>${args}
   </array>
-  <key>WorkingDirectory</key><string>${xml(o.repo)}</string>
+  <key>WorkingDirectory</key><string>${xml(j.cwd)}</string>
   <key>EnvironmentVariables</key>
-  <dict>
-    <key>PATH</key><string>${xml(path.posix.dirname(o.node))}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-    <key>HOME</key><string>${xml(o.home)}</string>
-  </dict>
-  <key>StartCalendarInterval</key>
-  <array>${entries}
-  </array>
-  <key>StandardOutPath</key><string>${xml(o.log)}</string>
-  <key>StandardErrorPath</key><string>${xml(o.log)}</string>
+  <dict>${env}
+  </dict>${cal}${life}
+  <key>StandardOutPath</key><string>${xml(j.log)}</string>
+  <key>StandardErrorPath</key><string>${xml(j.log)}</string>
 </dict>
 </plist>
 `;
 }
 
+/** launchd agent — same content as the former scripts/schedule.sh. */
+export function plistXml(o: JobSpec & { label?: string; home: string }): string {
+  return launchdPlist({
+    label: o.label ?? LABEL,
+    args: [o.node, o.script, '--trigger', 'schedule'],
+    cwd: o.repo,
+    env: { PATH: `${path.posix.dirname(o.node)}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`, HOME: o.home },
+    log: o.log,
+    calendar: o.times,
+  });
+}
+
 /** POSIX single-quoting, with `%` escaped for cron (cron turns an unescaped % into a newline). */
-const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`.replace(/%/g, '\\%');
+export const shq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`.replace(/%/g, '\\%');
 
 /** The crontab block (between marker lines) for Linux. */
 export function cronBlock(o: JobSpec): string {

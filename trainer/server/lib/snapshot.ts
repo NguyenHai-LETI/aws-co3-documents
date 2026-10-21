@@ -1,21 +1,34 @@
 // coach/snapshot.md — a compact, pre-computed digest of the learner's history for the AI coach.
 // The coach reads this first instead of parsing every result file (cheaper and less error-prone).
+// Written off the request path: routes call scheduleSnapshot() (debounced), GET /api/snapshot and the coach runner
+// build it right away when it is stale. Every number goes through regradeAttempts() (answer-key fixes, [L]).
+// [γ] Questions of a sealed form never appear here (no id, no stem): §16 only says how many are held back.
 import fs from 'node:fs';
-import { SNAPSHOT_FILE, type AppConfig } from '../config.ts';
-import type { BankState } from './bank.ts';
-import { detectFeatures, detectServices } from './classify.ts';
+import path from 'node:path';
+import { BANK_DIR, CONFIG_FILE, ISSUES_FILE, QA_DIR, RATINGS_FILE, SNAPSHOT_FILE, loadConfig, type AppConfig } from '../config.ts';
+import { FSRS_PARAMS_FILE, context, contextStats } from '../context.ts';
+import { loadBank, type BankState } from './bank.ts';
 import { loadIssues } from './issues.ts';
-import { loadPlans } from './plans.ts';
-import { loadAttempts } from './results.ts';
+import { loadPlans, plansVersion } from './plans.ts';
+import { attemptsVersion, loadAttempts } from './results.ts';
+import { fileSig } from './index-db.ts';
+import { regradeAttempts } from './regrade.ts';
 import { computeStates, computeStats, struckCorrect } from './stats.ts';
 import { qualitySnapshotLines } from './quality.ts';
 import { qaSnapshotLines } from './ask.ts';
+import { confusionPairs } from './insights.ts';
+import { loadSealed, sealedIds } from './sealed.ts';
 import { fmtLocal, localDateKey, localIso } from './time.ts';
 import { stringifyFrontMatter } from './frontmatter.ts';
 import { fmtDuration } from '../../shared/timing.ts';
 import { pct } from '../../shared/scoring.ts';
 import { MODE_INFO } from '../../shared/labels.ts';
-import type { AnswerRecord, Attempt, Bucket, Plan, Question } from '../../shared/types.ts';
+import { undecidedText, weakFirst } from '../../shared/evidence.ts';
+import { leeches as leechList } from './leech.ts';
+import { examPhase } from './exam-schedule.ts';
+import { loadGoal } from './progress.ts';
+import { guideCoverage, taskDeficits } from './exam-guide.ts';
+import type { AnswerRecord, Attempt, Bucket, ConfusionPair, Plan, Question, QuestionState, StatsResponse } from '../../shared/types.ts';
 
 function oneLine(s: string, max = 200): string {
   const t = s.replace(/\s+/g, ' ').trim();
@@ -23,6 +36,7 @@ function oneLine(s: string, max = 200): string {
 }
 
 const cell = (s: string) => s.replace(/\|/g, '/');
+const pct0 = (x: number) => `${Math.round(x * 100)}%`;
 
 /** New (non-rushed) attempts since the given plan was written — rushed click-throughs are noise, not new data. */
 export function newDataSince(plan: Plan | undefined, attempts: Attempt[]): { attempts: number; answers: number } {
@@ -40,13 +54,51 @@ function safeLines(fn: () => string[], label: string): string[] {
   }
 }
 
+/**
+ * Re-graded attempts, states and stats for this bank + config: the request-path context when they match (no second
+ * FSRS replay / stats pass), computed here otherwise (scripts with another config).
+ */
+function derived(bank: BankState, cfg: AppConfig): { all: Attempt[]; states: Map<string, QuestionState>; stats: StatsResponse } {
+  const ctx = context();
+  if (ctx.bank === bank && (ctx.cfg === cfg || JSON.stringify(ctx.cfg) === JSON.stringify(cfg))) {
+    return { all: ctx.attempts, states: ctx.states, stats: contextStats(ctx) };
+  }
+  const all = regradeAttempts(loadAttempts(cfg), bank, cfg);
+  const states = computeStates(all, cfg, Date.now(), undefined, { goal: loadGoal() }); // [v5] exam-aware due dates, as context()
+  return { all, states, stats: computeStats(all, bank, states, cfg) };
+}
+
+/** §9 table: confirmed confusion pairs (insights.ts, normalised by co-occurrence) with their evidence. */
+function confusionLines(pairs: ConfusionPair[]): string[] {
+  const o = ['## 9. Cặp hay nhầm (đã xác nhận — chuẩn hoá theo số lần cùng xuất hiện)', ''];
+  if (!pairs.length) {
+    o.push('_Chưa có cặp nào đủ bằng chứng (cần ≥ 4 lần chọn nhầm trên ≥ 3 câu khác nhau, và cao hơn hẳn mức nhầm nền của chính người học)._', '');
+    return o;
+  }
+  o.push(
+    '> X ⟶ Y = chọn phương án có X khi đáp án có Y. Tỉ lệ = số lần chọn nhầm / số lần gặp cặp đó; cận dưới 80 % vẫn > 2 × mức nền. “Câu luyện cặp” = câu có cả X lẫn Y (dùng cho phiên contrast).',
+    '',
+    '| Chọn ⟶ Đúng | Chọn nhầm / lần gặp | Tỉ lệ (cận dưới) | × mức nền | Số câu | Câu luyện cặp |',
+    '|---|---|---|---|---|---|',
+  );
+  for (const p of pairs.slice(0, 15)) {
+    const lift = p.base > 0 ? `×${(p.rate / p.base).toFixed(1)}` : '—';
+    const merged = p.merged?.length ? ` (gộp: ${p.merged.join('; ')})` : '';
+    o.push(
+      `| ${cell(`${p.picked} ⟶ ${p.correct}`)}${cell(merged)} | ${p.picks}/${p.exposures} | ${pct0(p.rate)} (≥ ${pct0(p.low)}) | ${lift} (nền ${pct0(p.base)}) | ${p.questions} | ${p.ids.slice(0, 8).map((x) => `\`${x}\``).join(' ')}${p.ids.length > 8 ? ' …' : ''} |`,
+    );
+  }
+  o.push('');
+  return o;
+}
+
 export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; meta: Record<string, unknown> } {
   const tax = bank.taxonomy;
-  const all = loadAttempts(cfg);
+  const { all, states, stats } = derived(bank, cfg);
   const attempts = all.filter((a) => !a.rushed);
+  const sealed = sealedIds(); // never named here: the coach must not see, vary or plan these questions
+  const open = (id: string) => !sealed.has(id);
   const rushed = all.filter((a) => a.rushed);
-  const states = computeStates(all, cfg);
-  const stats = computeStats(all, bank, states, cfg);
   const plans = loadPlans(attempts); // a rushed click-through does not complete a plan session for the coach
   const latest = plans[0];
   const fresh = newDataSince(latest, all);
@@ -58,7 +110,13 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
 
   // answer history per question (chronological, non-rushed)
   const history = new Map<string, { r: AnswerRecord; a: Attempt }[]>();
-  for (const a of attempts) for (const r of a.answers) history.set(r.q, [...(history.get(r.q) ?? []), { r, a }]);
+  for (const a of attempts) {
+    for (const r of a.answers) {
+      const h = history.get(r.q);
+      if (h) h.push({ r, a });
+      else history.set(r.q, [{ r, a }]);
+    }
+  }
 
   const meta = {
     kind: 'snapshot',
@@ -81,7 +139,8 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   o.push('# 📸 Learner snapshot — dữ liệu cho AI Coach', '');
   o.push(
     '> File tự sinh bởi trainer app (`npm run snapshot`) — **không sửa tay**. Mọi số liệu tính từ `trainer/results/**/*.md` (bài “làm vội” đã bị loại).',
-    '> Thứ tự ưu tiên khi phân tích: §7 câu sai (kèm ghi chú “vì sao chọn” của người học) → §9 nhầm lẫn lặp lại → §2b/§3–5 điểm yếu → §8 chưa chắc/chậm → §10 tiến độ kế hoạch.',
+    '> Thứ tự ưu tiên khi phân tích: §7 câu sai (kèm ghi chú “vì sao chọn” của người học) → §9 cặp hay nhầm → §2b/§2c/§3–5 điểm yếu → §8 chưa chắc/chậm → §10 tiến độ kế hoạch.',
+    '> Câu đang niêm phong (§16) không bao giờ xuất hiện trong file này — không dùng chúng làm câu gốc, không đưa vào kế hoạch.',
     '',
   );
 
@@ -116,10 +175,19 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   }
   o.push('');
 
+  // [v5 γ1] evidence columns (shared/evidence.ts via computeStats): shrunk rate + 80 % interval, verdict vs the learner's own
+  // base rate — "yếu" only when the interval says so, otherwise how many more answers would settle it
+  const VERDICT_VI: Record<string, string> = { below: '⬇️ yếu hơn mức chung', above: '⬆️ mạnh hơn mức chung', same: '≈ như mức chung' };
+  const evidenceCell = (b: Bucket) => {
+    if (!b.attempts) return '—';
+    const band = b.shrunk !== undefined && b.lo !== undefined && b.hi !== undefined ? `${b.shrunk}% (${b.lo}–${b.hi}%)` : `${b.accuracy}%`;
+    const v = b.verdict && b.verdict !== 'unknown' ? VERDICT_VI[b.verdict] : b.needMore ? undecidedText(b.needMore) : 'chưa đủ dữ liệu';
+    return `${band} · ${v}`;
+  };
   const table = (rows: Bucket[], head: string, minAttempts = 1) => {
-    o.push(`| ${head} | Lượt | Đúng | Tỉ lệ | Đã gặp/Ngân hàng | TG TB / chuẩn |`, '|---|---|---|---|---|---|');
+    o.push(`| ${head} | Lượt | Đúng | Tỉ lệ | Đã co (khoảng 80 %) · kết luận | Đã gặp/Ngân hàng | TG TB / chuẩn |`, '|---|---|---|---|---|---|---|');
     for (const b of rows.filter((x) => x.attempts >= minAttempts)) {
-      o.push(`| ${cell(b.label)} | ${b.attempts} | ${b.correct} | ${b.accuracy}% | ${b.questions}/${b.bank} | ${b.avgTime}s / ${b.avgEst}s |`);
+      o.push(`| ${cell(b.label)} | ${b.attempts} | ${b.correct} | ${b.accuracy}% | ${cell(evidenceCell(b))} | ${b.questions}/${b.bank} | ${b.avgTime}s / ${b.avgEst}s |`);
     }
     o.push('');
   };
@@ -134,12 +202,21 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
     const thin = stats.byTask.filter((b) => b.bank < 10).map((b) => b.key);
     if (thin.length) o.push(`- Task có < 10 câu trong ngân hàng: ${thin.join(', ')}`, '');
   }
-  o.push('## 3. Theo chủ đề (yếu → mạnh, có ≥ 1 lượt)', '');
-  table([...stats.byTopic].filter((b) => b.attempts).sort((a, b) => a.accuracy - b.accuracy), 'Topic');
-  o.push('## 4. Service yếu nhất (≥ 3 lượt)', '');
-  table([...stats.byService].filter((b) => b.attempts >= 3).sort((a, b) => a.accuracy - b.accuracy).slice(0, 20), 'Service', 3);
-  o.push('## 5. Khái niệm/tag yếu nhất (≥ 3 lượt)', '');
-  table([...stats.byTag].filter((b) => b.attempts >= 3).sort((a, b) => a.accuracy - b.accuracy).slice(0, 20), 'Tag', 3);
+  // what the stem asks to optimise (Question.requirements: taxonomy.keywords groups + NOT/EXCEPT questions)
+  o.push('## 2c. Theo tiêu chí đề (từ khoá yêu cầu trong đề: chi phí, vận hành, sẵn sàng cao, hiệu năng, bảo mật, phủ định)', '');
+  const req = stats.byRequirement ?? [];
+  if (!req.some((b) => b.bank > 0)) o.push('_Chưa có số liệu theo tiêu chí đề._', '');
+  else {
+    table(req, 'Tiêu chí', 0);
+    o.push('- Tiêu chí tỉ lệ thấp → biến thể giữ khái niệm nhưng đổi tiêu chí (vd cùng kiến trúc, hỏi *LEAST operational overhead* thay vì *MOST cost-effective*).', '');
+  }
+  // weak lists: pessimistic bound first (weakFirst), n shown; a bucket is "yếu" only with verdict below
+  o.push('## 3. Theo chủ đề (yếu → mạnh theo cận dưới khoảng 80 %, có ≥ 1 lượt)', '');
+  table([...stats.byTopic].filter((b) => b.attempts).sort(weakFirst), 'Topic');
+  o.push('## 4. Service yếu nhất (xếp theo cận dưới — chỉ dòng “⬇️ yếu hơn mức chung” là kết luận chắc)', '');
+  table([...stats.byService].filter((b) => b.attempts >= 2).sort(weakFirst).slice(0, 20), 'Service', 2);
+  o.push('## 5. Khái niệm/tag yếu nhất (xếp theo cận dưới — chỉ dòng “⬇️ yếu hơn mức chung” là kết luận chắc)', '');
+  table([...stats.byTag].filter((b) => b.attempts >= 2).sort(weakFirst).slice(0, 20), 'Tag', 2);
 
   o.push('## 6. Bài làm gần đây', '', '| Kết thúc | Chế độ | Tiêu đề | Điểm | Thời gian | Kế hoạch |', '|---|---|---|---|---|---|');
   for (const a of [...attempts].reverse().slice(0, 12)) {
@@ -152,9 +229,15 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
 
   // ── wrong answers (latest first), with option texts so the coach can spot misconceptions
   const variantsOf = new Map<string, string[]>();
-  for (const q of bank.questions) for (const v of q.variantOf) variantsOf.set(v, [...(variantsOf.get(v) ?? []), q.id]);
+  for (const q of bank.questions) {
+    for (const v of q.variantOf) {
+      const l = variantsOf.get(v);
+      if (l) l.push(q.id);
+      else variantsOf.set(v, [q.id]);
+    }
+  }
   const wrongQs = [...states.values()]
-    .filter((s) => s.lastOk === false && bank.byId.has(s.id))
+    .filter((s) => s.lastOk === false && bank.byId.has(s.id) && open(s.id))
     .sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''))
     .slice(0, 40);
   o.push(`## 7. Câu đang sai (lần làm gần nhất sai) — ${wrongQs.length} câu mới nhất`, '');
@@ -188,7 +271,7 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   // why-notes on questions that are no longer wrong — still evidence of a misconception
   const wrongSet = new Set(wrongQs.map((s) => s.id));
   const otherWhys = [...history.entries()]
-    .flatMap(([qid, h]) => h.filter((x) => x.r.why && !wrongSet.has(qid)).map((x) => ({ qid, ...x })))
+    .flatMap(([qid, h]) => h.filter((x) => x.r.why && !wrongSet.has(qid) && open(qid)).map((x) => ({ qid, ...x })))
     .sort((x, y) => y.a.finished.localeCompare(x.a.finished))
     .slice(0, 20);
   if (otherWhys.length) {
@@ -201,7 +284,7 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   }
 
   const shaky = [...states.values()]
-    .filter((s) => bank.byId.has(s.id) && s.lastOk && (s.lastUnsure || s.lastFlag || s.slowCount > 0 || s.lastGrade === 2))
+    .filter((s) => bank.byId.has(s.id) && open(s.id) && s.lastOk && (s.lastUnsure || s.lastFlag || s.slowCount > 0 || s.lastGrade === 2))
     .sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''))
     .slice(0, 30);
   o.push(`## 8. Đúng nhưng chưa chắc / cắm cờ / dùng gợi ý / làm chậm (${shaky.length})`, '');
@@ -220,38 +303,8 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   }
   o.push('');
 
-  // ── confusion pairs: services/features of the chosen wrong option vs the correct option
-  const pairs = new Map<string, { n: number; qs: Set<string> }>();
-  for (const a of attempts) {
-    for (const r of a.answers) {
-      if (r.ok || !r.pick) continue;
-      const q = bank.byId.get(r.q);
-      if (!q) continue;
-      const text = (keys: string) => q.options.filter((x) => keys.includes(x.key)).map((x) => x.text).join(' ');
-      const wrongKeys = [...r.pick].filter((k) => !q.answer.includes(k)).join('');
-      const pickedAll = [...detectServices(text(wrongKeys), tax), ...detectFeatures(text(wrongKeys), tax)];
-      const rightAll = [...detectServices(text(q.answer.join('')), tax), ...detectFeatures(text(q.answer.join('')), tax)];
-      // keep only what differs between the chosen and the correct option(s)
-      const picked = pickedAll.filter((x) => !rightAll.includes(x));
-      const right = rightAll.filter((x) => !pickedAll.includes(x));
-      const label =
-        picked.length && right.length
-          ? `${picked.slice(0, 2).join(' + ')} ⟶ ${right.slice(0, 2).join(' + ')}`
-          : `${oneLine(text(wrongKeys), 50)} ⟶ ${oneLine(text(q.answer.join('')), 50)}`;
-      const e = pairs.get(label) ?? { n: 0, qs: new Set<string>() };
-      e.n++;
-      e.qs.add(q.id);
-      pairs.set(label, e);
-    }
-  }
-  const topPairs = [...pairs].sort((a, b) => b[1].n - a[1].n).slice(0, 25);
-  o.push('## 9. Nhầm lẫn lặp lại (đáp án đã chọn ⟶ đáp án đúng)', '');
-  if (!topPairs.length) o.push('_Chưa có dữ liệu._');
-  else {
-    o.push('| Đã chọn ⟶ Đúng | Số lần | Câu |', '|---|---|---|');
-    for (const [label, e] of topPairs) o.push(`| ${cell(label)} | ${e.n} | ${[...e.qs].slice(0, 6).map((x) => `\`${x}\``).join(' ')} |`);
-  }
-  o.push('');
+  // ── confusion pairs (B3): only pairs confirmed against the learner's own base rate, drill sets without sealed questions
+  o.push(...safeLines(() => confusionLines(confusionPairs(attempts, bank, { sealed })), 'cặp hay nhầm'));
 
   o.push('## 10. Kế hoạch gần nhất & mức hoàn thành', '');
   if (!latest) o.push('_Chưa có kế hoạch nào (lần chạy đầu tiên)._');
@@ -264,12 +317,14 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   }
   o.push('');
 
-  o.push(`## 11. Issues đang mở (${openIssues.length}) — \`trainer/bank/issues.md\``, '');
-  if (!openIssues.length) o.push('_Không có._');
-  for (const i of openIssues) {
+  const shownIssues = openIssues.filter((i) => open(i.qid));
+  o.push(`## 11. Issues đang mở (${shownIssues.length}) — \`trainer/bank/issues.md\``, '');
+  if (!shownIssues.length) o.push('_Không có._');
+  for (const i of shownIssues) {
     const q = bank.byId.get(i.qid);
     o.push(`- dòng ${i.line}: \`${i.qid}\` · ${i.type} · ${i.note}${q ? ` · file: \`${q.file}\`` : ' · ⚠️ id không tồn tại'}`);
   }
+  if (shownIssues.length < openIssues.length) o.push(`- (${openIssues.length - shownIssues.length} issue thuộc câu đang niêm phong — để lại tới khi đề được làm hoặc mở sớm)`);
   o.push('');
 
   const isAi = (q: Question | undefined) => q?.origin === 'ai' || q?.origin === 'doc';
@@ -289,19 +344,159 @@ export function buildSnapshot(bank: BankState, cfg: AppConfig): { text: string; 
   o.push('## 13. Bank health', '');
   const errors = bank.problems.filter((p) => p.level === 'error');
   o.push(`- ${bank.questions.length} câu trong ${bank.packs.length} pack · ${errors.length} lỗi · ${bank.problems.length - errors.length} cảnh báo`);
-  for (const p of errors.slice(0, 15)) o.push(`  - ❗ ${p.file}:${p.line} ${p.qid ? `\`${p.qid}\` ` : ''}${p.message}`);
+  for (const p of errors.filter((x) => !x.qid || open(x.qid)).slice(0, 15)) o.push(`  - ❗ ${p.file}:${p.line} ${p.qid ? `\`${p.qid}\` ` : ''}${p.message}`);
   o.push('');
 
   o.push(...safeLines(() => qualitySnapshotLines(bank, attempts), 'chất lượng ngân hàng'));
   o.push(...safeLines(() => qaSnapshotLines(bank), 'câu hỏi AI'));
+  o.push(...safeLines(() => sealedLines(all), 'đề niêm phong'));
+  o.push(...safeLines(() => learningSignalLines(bank, all, states, stats, cfg), 'tín hiệu học v5'));
+  o.push(...safeLines(() => guideLines(bank, attempts), 'đề cương'));
 
   return { text: stringifyFrontMatter(meta) + '\n' + o.join('\n'), meta };
 }
 
+/** [v5 γ1] §17: exam phase, transfer (memorising vs understanding), leeches — λ's engine, shown with the evidence shield. */
+function learningSignalLines(bank: BankState, all: Attempt[], states: Map<string, QuestionState>, stats: StatsResponse, cfg: AppConfig): string[] {
+  const o = ['## 17. Giai đoạn ôn, chuyển giao, câu dai dẳng', ''];
+  const goal = loadGoal();
+  const phase = examPhase(goal, localDateKey(new Date()), cfg);
+  if (phase) o.push(`- Giai đoạn: **${phase.label}** (${phase.id}, còn ${phase.daysLeft} ngày tới ngày thi)${phase.rules.length ? ` — ${phase.rules.join(' · ')}` : ''}${phase.newQuestions ? '' : ' — không thêm câu mới'}`);
+  else o.push('- Giai đoạn: chưa có ngày thi trong results/goal.md (không áp dụng lịch bám ngày thi).');
+  const t = stats.transfer;
+  if (t && (t.transfer.answers || t.repeat.answers)) {
+    const rate = (x: { answers: number; correct: number }) => (x.answers ? `${pct(x.correct, x.answers)}% (${x.correct}/${x.answers})` : '—');
+    o.push(`- Chuyển giao (${t.days} ngày): lần đầu gặp câu anh em ${rate(t.transfer)} vs làm lại câu cũ ${rate(t.repeat)}${t.warnings.length ? ` — ⚠️ ${t.warnings.join(' · ')}` : ' — chưa có cảnh báo đủ bằng chứng'}`);
+    const gaps = t.byTopic.filter((x) => x.gap !== undefined).slice(0, 5);
+    if (gaps.length) o.push(`  - Theo chủ đề: ${gaps.map((x) => `${x.label} ${rate(x.transfer)} vs ${rate(x.repeat)}`).join(' · ')} — chủ đề thuộc mặt chữ → viết câu tương phản / anh em (twins), đừng thêm câu lặp.`);
+  } else o.push('- Chuyển giao: chưa có lượt nào trên câu anh em (cụm câu: clusters.ts).');
+  const ls = leechList({ bank, attempts: all, states }).filter((l) => !sealedIds().has(l.id));
+  if (ls.length) {
+    o.push(`- Câu dai dẳng (leech): **${ls.length}** — mỗi câu cần cách trình bày khác (câu tương phản, giải thích theo góc khác), không phải lặp lại:`);
+    for (const l of ls.slice(0, 10)) o.push(`  - \`${l.id}\` · ${l.topic} · sai ${l.wrong} lần / ${l.wrongDays} ngày${l.pair?.length ? ` · nhầm ${l.pair.join(' ⟶ ')}` : ''}${l.pausedUntil ? ` · tạm gác tới ${l.pausedUntil}` : ''}${l.note ? ` · mẹo: ${oneLine(l.note, 100)}` : ''}`);
+  } else o.push('- Câu dai dẳng (leech): không có.');
+  o.push('');
+  return o;
+}
+
+/** [v5 γ1] §18: the official exam guide coverage (bank/exam-guide/SAA-C03.yaml) — what longform / generate should target. */
+function guideLines(bank: BankState, attempts: Attempt[]): string[] {
+  const g = guideCoverage(bank, attempts);
+  const o = ['## 18. Độ phủ đề cương chính thức (189 mục Knowledge / Skills — Ngân hàng → Chất lượng → 🗺️ Đề cương)', ''];
+  if (!g.bullets.length) {
+    o.push('_Chưa có bank/exam-guide/SAA-C03.yaml._', '');
+    return o;
+  }
+  const empty = g.bullets.filter((b) => !b.questions);
+  const longOk = g.bullets.filter((b) => !b.need).length;
+  o.push(
+    `- ${g.bullets.length - empty.length}/${g.bullets.length} mục có ít nhất 1 câu · ${longOk} mục đủ ≥ 2 câu chuẩn thi (câu dài) · câu nhiều đáp án ${Math.round(g.multi.share * 100)}% (mục tiêu 20–30 %) · “Choose THREE”: ${g.chooseThree} · ${g.guessed} câu gắn mục bằng đoán từ khoá (ENRICH classify ghi \`skills:\` để chắc hơn)`,
+  );
+  const deficits = taskDeficits(bank).filter((d) => d.need > 0);
+  if (deficits.length) o.push(`- Câu chuẩn thi còn thiếu theo task (mục tiêu ${deficits[0].target}/task): ${deficits.slice(0, 8).map((d) => `${d.task} cần ${d.need}`).join(' · ')}`);
+  if (empty.length) {
+    o.push(`- Mục chưa có câu nào (${empty.length}) — sinh câu dài nhắm thẳng vào mục, \`skills: [<id>]\`:`);
+    for (const b of empty.slice(0, 15)) o.push(`  - ${b.id} — ${oneLine(b.text, 140)}`);
+    if (empty.length > 15) o.push(`  - … và ${empty.length - 15} mục nữa`);
+  }
+  const weak = g.bullets.filter((b) => (b.answers ?? 0) >= 3).map((b) => ({ b, rate: (b.correct ?? 0) / (b.answers ?? 1) })).sort((x, y) => x.rate - y.rate).slice(0, 8);
+  if (weak.length) o.push(`- Đúng ngay lần đầu thấp nhất (≥ 3 câu đã gặp): ${weak.map(({ b, rate }) => `${b.id} ${Math.round(rate * 100)}% (${b.correct}/${b.answers})`).join(' · ')}`);
+  o.push('');
+  return o;
+}
+
+/** §16: the sealed forms (status, size, the internal "điểm trên câu mới" of a used form) — never a question id. */
+function sealedLines(all: Attempt[]): string[] {
+  const s = loadSealed();
+  const o = ['## 16. Đề niêm phong (đo điểm trên câu chưa từng gặp)', ''];
+  if (!s.forms.length) {
+    o.push('_Chưa có đề niêm phong._', '');
+    return o;
+  }
+  for (const f of s.forms) {
+    // only the sitting sealed.md recorded (form.attempt) is official — a retake or a sitting after a release has no score
+    const used = f.status === 'used' && f.attempt ? all.find((a) => a.id === f.attempt) : undefined;
+    const what =
+      f.status === 'sealed'
+        ? '🔒 đang niêm phong'
+        : f.status === 'used'
+          ? `✅ đã làm ${f.usedAt ? fmtLocal(f.usedAt) : ''}${used ? ` · điểm trên câu mới **${used.score}%** ≈ ${used.scaled}/1000 (${used.correct}/${used.total})` : ''}`
+          : `🔓 đã mở sớm ${f.releasedAt ? fmtLocal(f.releasedAt) : ''} (không có điểm)`;
+    o.push(`- ${f.id}: ${what} · ${f.ids.length} câu`);
+  }
+  const held = s.forms.filter((f) => f.status === 'sealed').reduce((n, f) => n + f.ids.length, 0);
+  if (held) {
+    o.push(
+      `- ${held} câu đang được giữ riêng: **không** dùng làm câu gốc cho biến thể / contrast / câu dài, **không** đưa vào kế hoạch, không sửa đề hay đáp án.`,
+      '  Danh sách id chỉ có trong `trainer/results/sealed.md` — chỉ đọc file đó để kiểm tra một id trước khi chọn câu gốc ngoài snapshot.',
+    );
+  }
+  o.push('- Điểm đề niêm phong là điểm hiệu chỉnh nội bộ (giống điểm thi thử bên ngoài) — so với mức sẵn sàng §1 để biết độ “học vẹt”.', '');
+  return o;
+}
+
+// ── writing: debounced, off the request path ─────────────────────────────────
+
+const SNAPSHOT_DEBOUNCE_MS = 3000;
+let timer: NodeJS.Timeout | undefined;
+let writtenFor = ''; // inputs key of the last snapshot this process wrote
+
+const sig = (file: string) => fileSig(file) || '-';
+
+/** Everything the snapshot is computed from (data versions, FSRS parameters, issue / rating / Q&A / verify files, config, date). */
+function inputsKey(): string {
+  let qa = '';
+  try {
+    qa = fs.readdirSync(QA_DIR).sort().map((f) => `${f}:${sig(path.join(QA_DIR, f))}`).join(',');
+  } catch {
+    // no Q&A yet
+  }
+  return [loadBank().version, attemptsVersion(), plansVersion(), sig(FSRS_PARAMS_FILE), sig(ISSUES_FILE), sig(RATINGS_FILE), sig(path.join(BANK_DIR, 'verify.md')), sig(CONFIG_FILE), qa, localDateKey(new Date())].join('|');
+}
+
 export function writeSnapshot(bank: BankState, cfg: AppConfig): Record<string, unknown> {
+  const key = inputsKey();
   const { text, meta } = buildSnapshot(bank, cfg);
-  fs.writeFileSync(SNAPSHOT_FILE, text);
+  const tmp = `${SNAPSHOT_FILE}.tmp-${process.pid}`; // the coach never reads a half-written file
+  fs.mkdirSync(path.dirname(SNAPSHOT_FILE), { recursive: true });
+  fs.writeFileSync(tmp, text);
+  fs.renameSync(tmp, SNAPSHOT_FILE);
+  writtenFor = key;
   return meta;
+}
+
+function writeNow(): void {
+  if (timer) clearTimeout(timer);
+  timer = undefined;
+  try {
+    writeSnapshot(loadBank(), loadConfig());
+  } catch (e) {
+    console.error('snapshot failed', e);
+  }
+}
+
+/** Rewrites the snapshot ~3 s after the last call (submit, why-note, issue…) — never inside the request. */
+export function scheduleSnapshot(delayMs = SNAPSHOT_DEBOUNCE_MS): void {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(writeNow, delayMs);
+  timer.unref(); // never keeps a script / test process alive
+}
+
+/** A scheduled write is pending, or the data changed since this process last wrote the file. */
+export function snapshotStale(): boolean {
+  return !!timer || !fs.existsSync(SNAPSHOT_FILE) || writtenFor !== inputsKey();
+}
+
+/** Builds the snapshot now when it is stale (GET /api/snapshot); returns whether it was rewritten. */
+export function ensureSnapshot(): boolean {
+  if (!snapshotStale()) return false;
+  writeNow();
+  return true;
+}
+
+/** Writes a pending scheduled snapshot immediately (server shutdown). */
+export function flushSnapshot(): void {
+  if (timer) writeNow();
 }
 
 export function questionsFor(bank: BankState, ids: string[]): Question[] {

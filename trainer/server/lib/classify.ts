@@ -6,7 +6,11 @@ interface Matcher {
   name: string;
   topic?: string;
   re: RegExp;
+  needle: string; // [v5] lower-case literal the text must contain (whitespace collapsed) — skips the regex for most texts
 }
+
+/** The literal core of a match pattern, lower case, single spaces: a text without it can never match. */
+const needleOf = (pattern: string) => pattern.replace(/\*$/, '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -29,7 +33,7 @@ function matchers(tax: Taxonomy) {
   for (const [name, def] of Object.entries(tax.services)) {
     for (const p of def.match ?? []) {
       // single-word service names are proper nouns → case-sensitive; phrases are not
-      services.push({ name, topic: def.topic, re: buildRegex(p, !/\s/.test(p.replace(/\*$/, ''))) });
+      services.push({ name, topic: def.topic, re: buildRegex(p, !/\s/.test(p.replace(/\*$/, ''))), needle: needleOf(p) });
     }
   }
   const features: Matcher[] = [];
@@ -37,7 +41,7 @@ function matchers(tax: Taxonomy) {
     for (const p of patterns ?? []) {
       const core = p.replace(/\*$/, '');
       const acronym = /^[A-Z0-9-]+$/.test(core) && /[A-Z]/.test(core);
-      features.push({ name, re: buildRegex(p, acronym) });
+      features.push({ name, re: buildRegex(p, acronym), needle: needleOf(p) });
     }
   }
   m = { services, features };
@@ -54,7 +58,9 @@ interface Hit {
 /** Return matcher names found in `text`, longest match wins on overlaps, ordered by position. */
 function detect(text: string, list: Matcher[]): string[] {
   const hits: Hit[] = [];
+  const folded = text.toLowerCase().replace(/\s+/g, ' ');
   for (const m of list) {
+    if (!folded.includes(m.needle)) continue;
     m.re.lastIndex = 0;
     for (const x of text.matchAll(m.re)) {
       hits.push({ name: m.name, start: x.index ?? 0, end: (x.index ?? 0) + x[0].length });

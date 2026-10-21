@@ -35,6 +35,10 @@ interface Props {
   beforeOptions?: ReactNode;
   /** Show the exam-guide task badge in the meta row. */
   showTask?: boolean;
+  /** [v5] Extra badge after "Câu N / M" (e.g. "🔁 Học lại" for an in-session relearn retry). */
+  tag?: ReactNode;
+  /** [v5] Question id to show (a relearn slot shows the id of the question it repeats). */
+  idText?: string;
 }
 
 export function QuestionMeta({ q, extra, task }: { q: Question; extra?: React.ReactNode; task?: boolean }) {
@@ -78,6 +82,8 @@ export function QuestionView({
   hideOptions,
   beforeOptions,
   showTask,
+  tag,
+  idText,
 }: Props) {
   const { topic } = useData();
   const keys = order && order.length === q.options.length ? order : q.options.map((o) => o.key);
@@ -91,7 +97,7 @@ export function QuestionView({
 
   return (
     <div className="qv">
-      {(index !== undefined || showMeta) && (
+      {(index !== undefined || showMeta || tag) && (
         <div className="row between" style={{ marginBottom: 10 }}>
           <div className="row" style={{ gap: 8 }}>
             {index !== undefined && (
@@ -100,7 +106,8 @@ export function QuestionView({
                 {total ? ` / ${total}` : ''}
               </span>
             )}
-            <span className="tiny muted mono">{q.id}</span>
+            {tag}
+            <span className="tiny muted mono">{idText ?? q.id}</span>
           </div>
           {showMeta && <QuestionMeta q={q} task={showTask} />}
         </div>

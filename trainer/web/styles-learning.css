@@ -1,0 +1,1179 @@
+/* [L] styles for this workstream (imported by web/main.tsx): exam goal & forecast, review workload, external scores,
+   FSRS parameters. Tokens from styles.css; class names are prefixed `lrn-`. Forecast marks use one hue in two
+   validated shades: --seq-2 (if study stops now, hollow) and --seq-4 (on schedule, filled). */
+
+.lrn-section .split-l {
+  align-items: stretch;
+}
+.lrn-gap {
+  margin-top: 16px;
+}
+.lrn-method {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.lrn-align-start {
+  align-items: start;
+}
+
+/* ── forecast track: band between the two forecasts, target hairline, two dots ── */
+.lrn-track {
+  position: relative;
+  height: 10px;
+  margin: 6px 7px 2px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+}
+.lrn-track-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--seq-3) 35%, transparent);
+}
+.lrn-track-target {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text-2);
+}
+.lrn-dot {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.lrn-dot.stop {
+  background: var(--surface);
+  border: 3px solid var(--seq-2);
+}
+.lrn-dot.sched {
+  background: var(--seq-4);
+  z-index: 1;
+}
+.lrn-legend {
+  margin-top: 8px;
+}
+.lrn-key-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: -1px;
+}
+.lrn-key-dot.stop {
+  border: 2px solid var(--seq-2);
+}
+.lrn-key-dot.sched {
+  background: var(--seq-4);
+}
+
+/* ── per-domain rows ── */
+.lrn-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lrn-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) minmax(0, 1fr) 86px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px;
+  border-radius: 8px;
+  outline: none;
+}
+.lrn-row:hover,
+.lrn-row.on {
+  background: var(--surface-2);
+}
+.lrn-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.lrn-row-label {
+  font-size: 13px;
+  line-height: 1.3;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lrn-row .lrn-track {
+  margin: 0 7px;
+}
+.lrn-row-value {
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.lrn-row-tip {
+  left: 50%;
+  top: 0;
+}
+
+/* ── review workload columns ── */
+.lrn-wl {
+  position: relative;
+}
+.lrn-wl-plot {
+  position: relative;
+  height: 130px;
+  margin-top: 20px;
+  border-bottom: 1px solid var(--axis);
+}
+.lrn-wl-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--text-2);
+  z-index: 1;
+  pointer-events: none;
+}
+.lrn-wl-cap span {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface);
+  padding: 0 3px;
+  border-radius: 4px;
+}
+.lrn-wl-cols {
+  position: absolute;
+  inset: 0;
+  display: grid;
+}
+.lrn-wl-band {
+  position: relative;
+  height: 100%;
+  border-radius: 4px 4px 0 0;
+  outline: none;
+}
+.lrn-wl-band:hover,
+.lrn-wl-band.on {
+  background: var(--surface-2);
+}
+.lrn-wl-band:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.lrn-wl-bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 70%;
+  max-width: min(24px, calc(100% - 2px));
+  transform: translateX(-50%);
+  border-radius: 4px 4px 0 0;
+  background: var(--series-1);
+}
+.lrn-wl-val {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text-1);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--surface);
+  line-height: 1.35;
+  pointer-events: none;
+}
+.lrn-wl-band .tooltip {
+  z-index: 6;
+}
+.lrn-wl-x {
+  display: grid;
+  margin-top: 6px;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+/* labels wider than their column stay centred on it (flex overflows both ways); the ends hug the plot edges */
+.lrn-wl-x > span {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.lrn-wl-x > span:first-child {
+  justify-content: flex-start;
+}
+.lrn-wl-x > span:last-child {
+  justify-content: flex-end;
+}
+
+/* ── forms (goal, external score) ── */
+.lrn-goal-form,
+.lrn-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+}
+.lrn-goal-form label,
+.lrn-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.lrn-goal-form input,
+.lrn-form input {
+  min-width: 0;
+  max-width: 100%;
+}
+.lrn-goal-form input[type='number'],
+.lrn-form input[type='number'] {
+  width: 110px;
+}
+.lrn-form {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.lrn-form-wide {
+  flex: 1 1 220px;
+}
+.lrn-form-wide input {
+  width: 100%;
+}
+.lrn-form-actions,
+.lrn-goal-actions {
+  gap: 6px;
+}
+
+/* ── external scores, calibration, FSRS card ── */
+.lrn-ext-list {
+  display: flex;
+  flex-direction: column;
+}
+.lrn-ext-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.lrn-ext-item:first-child {
+  border-top: 0;
+}
+.lrn-ext-main {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lrn-ext-nums {
+  text-align: right;
+}
+.lrn-calib {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+.lrn-metrics td,
+.lrn-metrics th {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.lrn-weights summary {
+  cursor: pointer;
+}
+.lrn-weights code {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .lrn-ext-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .lrn-ext-nums {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: left;
+  }
+  .lrn-ext-item > .btn {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .lrn-row {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    gap: 4px 10px;
+  }
+  .lrn-row-label {
+    grid-column: 1 / -1;
+  }
+  .lrn-row .lrn-track {
+    grid-column: 1;
+  }
+  .lrn-wl-plot {
+    height: 110px;
+  }
+  .lrn-goal-form input[type='date'],
+  .lrn-form input[type='date'] {
+    width: 150px;
+  }
+}
+
+/* ═══ [β2] v4 learning UI: onboarding wizard, starting map, exam-day checklist, sealed forms, honest-measurement cards ═══ */
+
+/* ── shared form bits ── */
+.lrn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lrn-chips {
+  gap: 6px;
+}
+.lrn-week .chip {
+  min-width: 42px;
+  justify-content: center;
+}
+.lrn-num {
+  width: 120px;
+}
+.lrn-num-sm {
+  width: 84px;
+}
+.lrn-field input[type='date'],
+.lrn-field input[type='time'],
+.lrn-booking input[type='time'] {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  min-width: 0;
+  max-width: 100%;
+}
+.lrn-field input:disabled {
+  opacity: 0.5;
+}
+.lrn-check-line {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.lrn-field > input[type='time'],
+.lrn-field > input[type='number'] {
+  align-self: flex-start;
+}
+.lrn-check-line input {
+  margin-top: 3px;
+  flex: none;
+}
+
+/* ── Dashboard action cards: long plan-session titles stay compact (full text in the tooltip) ── */
+.lrn-action .t,
+.lrn-action .d {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lrn-action .t {
+  -webkit-line-clamp: 2;
+}
+.lrn-action .d {
+  -webkit-line-clamp: 3;
+}
+
+/* ── onboarding wizard (Dashboard, first day) ── */
+.lrn-onb h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.lrn-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  list-style: none;
+  margin: 16px 0 18px;
+  padding: 0;
+}
+.lrn-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 5px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 550;
+}
+.lrn-steps li.on {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.lrn-steps li.done {
+  background: var(--good-soft);
+  color: var(--good-ink);
+}
+.lrn-step-n {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+.lrn-steps li.on .lrn-step-n {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.lrn-onb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 28px;
+  align-items: start;
+}
+.lrn-onb-done {
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: var(--good-soft);
+  overflow-wrap: anywhere;
+}
+.lrn-onb-next {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── starting map (diagnostic result): one row per exam-guide task, grouped by domain ── */
+.lrn-map {
+  gap: 16px 28px;
+}
+.lrn-map-domain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.lrn-map-dhead {
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 6px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+.lrn-map-dhead > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lrn-map-row {
+  display: grid;
+  grid-template-columns: 22px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lrn-map-row:hover {
+  background: var(--surface-2);
+}
+.lrn-map-label {
+  font-size: 13px;
+  line-height: 1.3;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lrn-st {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+.lrn-st.ok {
+  background: var(--good-soft);
+  color: var(--good-ink);
+}
+.lrn-st.partial {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+.lrn-st.weak {
+  background: var(--bad-soft);
+  color: var(--bad-ink);
+}
+.lrn-st.untested {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+.lrn-map-legend .lrn-st,
+.lrn-map-fix .lrn-st {
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  border-radius: 5px;
+}
+.lrn-map-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lrn-map-fix {
+  gap: 6px;
+  margin-top: 12px;
+}
+.lrn-map-fix .chip {
+  max-width: 100%;
+}
+.lrn-chip-label {
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lrn-map-cta {
+  gap: 12px;
+}
+.lrn-map-cta-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+/* ── exam-day checklist ── */
+.lrn-booking {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.lrn-booking-row {
+  gap: 10px 16px;
+}
+.lrn-ck-list {
+  display: flex;
+  flex-direction: column;
+}
+.lrn-ck-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--border);
+}
+.lrn-ck-item:first-child {
+  border-top: 0;
+}
+.lrn-ck-item > input {
+  margin-top: 3px;
+}
+.lrn-ck-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.lrn-ck-item.done .lrn-ck-main > .small {
+  color: var(--text-3);
+}
+.lrn-ck-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+/* ── next steps on the countdown card (checklist item, sealed form) ── */
+.lrn-next-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.lrn-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: inherit;
+}
+a.lrn-next:hover {
+  text-decoration: none;
+}
+a.lrn-next:hover .lrn-next-label {
+  text-decoration: underline;
+}
+.lrn-next-main {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── sealed forms ── */
+.lrn-sealed-list {
+  display: flex;
+  flex-direction: column;
+}
+.lrn-sealed-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.lrn-sealed-item:first-child {
+  border-top: 0;
+}
+.lrn-sealed-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.lrn-sealed-actions {
+  gap: 6px;
+}
+
+/* ── study budget (Stats → 🎯 Ngày thi) ── */
+.lrn-budget {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.lrn-budget summary {
+  cursor: pointer;
+  color: var(--text-2);
+}
+.lrn-budget-form {
+  margin-top: 10px;
+}
+
+/* ── external scores: sealed calibration points ── */
+.lrn-ext-spacer {
+  width: 34px;
+}
+
+/* ── confusion pairs: rate bar (single hue) + the learner's base rate as a hairline ── */
+.lrn-cf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lrn-cf-row {
+  display: grid;
+  /* fixed trailing columns: every rate bar starts and ends at the same x */
+  grid-template-columns: minmax(0, 1.3fr) minmax(80px, 1fr) 8rem 10.5rem;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 8px 6px;
+  border-radius: 8px;
+}
+.lrn-cf-row:hover {
+  background: var(--surface-2);
+}
+.lrn-cf-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.lrn-cf-val {
+  text-align: right;
+}
+.lrn-cf-btn {
+  justify-self: end;
+}
+.lrn-cf-bar {
+  position: relative;
+  height: 14px;
+}
+.lrn-cf-bar .bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--series-1);
+}
+.lrn-cf-bar .bar-target {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--text-2);
+}
+
+@media (max-width: 760px) {
+  .lrn-onb-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .lrn-ck-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .lrn-ck-side {
+    grid-column: 2;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    text-align: left;
+  }
+  .lrn-ext-spacer {
+    display: none;
+  }
+  .lrn-cf-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .lrn-cf-text,
+  .lrn-cf-btn {
+    grid-column: 1 / -1;
+  }
+  .lrn-cf-btn {
+    justify-self: start;
+  }
+  .lrn-map-row {
+    gap: 8px;
+  }
+}
+
+/* ═══ [μ v5] learning UI: "Học hôm nay" hero, exam phase banner, Dashboard order, correction stepper, evidence,
+   transfer / go-no-go / leeches, pair page. Same tokens; status colour always with an icon + text. ═══ */
+
+/* ── Dashboard: readiness + countdown | today; one column ≤ 960 px with the primary action first ── */
+.lrn-resume {
+  margin-bottom: 16px;
+}
+.lrn-dash {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  align-items: start;
+}
+.lrn-dash-side,
+.lrn-dash-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (max-width: 960px) {
+  .lrn-dash {
+    display: flex;
+    flex-direction: column;
+  }
+  .lrn-dash-side,
+  .lrn-dash-main {
+    display: contents;
+  }
+  .lrn-o-steps {
+    order: 0;
+  }
+  .lrn-o-hero {
+    order: 1;
+  }
+  .lrn-o-count {
+    order: 2;
+  }
+  .lrn-o-ready {
+    order: 3;
+  }
+  .lrn-o-quests {
+    order: 4;
+  }
+  .lrn-o-more {
+    order: 5;
+  }
+}
+
+/* ── "▶ Học hôm nay" hero ── */
+.lrn-today {
+  border: 1.5px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lrn-today-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.lrn-today-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.lrn-today-chips {
+  gap: 6px;
+}
+.lrn-today-chips .chip {
+  min-width: 46px;
+  justify-content: center;
+}
+.lrn-today-figure {
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.lrn-today-figure > b {
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  margin-right: 4px;
+}
+.lrn-today-wait {
+  min-height: 72px;
+}
+.lrn-today-met {
+  color: var(--good-ink);
+  font-size: 15px;
+}
+.lrn-today-met .muted {
+  color: var(--text-3);
+}
+.lrn-today-coach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.lrn-today-actions {
+  gap: 10px 16px;
+  align-items: center;
+}
+.lrn-today-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px;
+  min-width: 0;
+  max-width: 360px;
+}
+.lrn-today-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.lrn-today-catchup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.lrn-today-after {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+
+/* ── exam phase banner ── */
+.lrn-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px;
+  border-color: transparent;
+  background: var(--accent-soft);
+}
+.lrn-phase.quiet {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.lrn-phase-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.lrn-phase-title {
+  font-size: 15px;
+}
+.lrn-phase-head .btn {
+  margin-left: auto;
+}
+.lrn-phase-rules {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 26px;
+}
+.lrn-phase-rules li {
+  flex: 0 1 auto;
+}
+
+/* ── side quests, "Tự chọn khác…" ── */
+.lrn-more > summary {
+  cursor: pointer;
+  padding: 6px 2px;
+  list-style-position: inside;
+}
+.lrn-more[open] > summary {
+  margin-bottom: 10px;
+}
+.lrn-more > summary .muted {
+  margin-left: 4px;
+}
+
+/* ── result page: "🩹 Chữa N câu" stepper, "đính chính" card ── */
+.lrn-fix {
+  border: 1.5px solid var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-margin-top: 16px;
+}
+.lrn-fix-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.lrn-fix-head h2 {
+  margin: 0;
+}
+.lrn-fix-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.lrn-fix-dot {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  cursor: pointer;
+}
+.lrn-fix-dot.seen {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.lrn-fix-dot.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.lrn-fix-nav {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.lrn-erratum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.lrn-erratum > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+/* ── confusion pairs: "So sánh ⟷" + "Luyện cặp này" share the trailing column ── */
+.lrn-cf-row {
+  grid-template-columns: minmax(0, 1.3fr) minmax(80px, 1fr) 8rem 17rem;
+}
+div.lrn-cf-btn {
+  gap: 6px;
+  justify-content: flex-end;
+}
+@media (max-width: 640px) {
+  .lrn-cf-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  div.lrn-cf-btn {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+.lrn-ci {
+  white-space: nowrap;
+}
+
+/* ── Stats: "Câu dai dẳng" ── */
+.lrn-leech-list {
+  display: flex;
+  flex-direction: column;
+}
+.lrn-leech {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.lrn-leech:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.lrn-leech.paused {
+  opacity: 0.75;
+}
+.lrn-leech-stem {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.lrn-leech-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  overflow-wrap: anywhere;
+}
+.lrn-leech-why {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.lrn-leech-actions {
+  gap: 6px;
+}
+.lrn-leech-actions input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* ── exam section: go / no-go, forecast lines ── */
+.lrn-gonogo-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lrn-gonogo-checks li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  overflow-wrap: anywhere;
+}
+.lrn-check {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 13px;
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+.lrn-check.ok {
+  background: var(--good-soft);
+  color: var(--good-ink);
+}
+.lrn-check.no {
+  background: var(--bad-soft);
+  color: var(--bad-ink);
+}
+.lrn-cap-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+/* ── pair page ── */
+.lrn-pair-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.lrn-pair-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.lrn-pair-group .chip {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+.lrn-pair-group .chip:hover {
+  text-decoration: none;
+}
+.lrn-pair-excerpt {
+  min-width: 0;
+}
+.lrn-pair-excerpt .md table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.lrn-pair-excerpt .md th,
+.lrn-pair-excerpt .md td {
+  min-width: 7.5em;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.lrn-pair-excerpt .md pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.lrn-pair-grid > .sticky-side {
+  position: sticky;
+  top: 16px;
+}

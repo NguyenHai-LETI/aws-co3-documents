@@ -9,12 +9,14 @@
   },
   "scripts": {
     "start": "node server/index.ts",
-    "dev": "node --watch-path=server --watch-path=shared server/index.ts",
+    "dev": "node --watch-path=server --watch-path=shared server/index.ts --dev",
     "import": "node scripts/import-practice-exams.ts",
     "validate": "node scripts/validate.ts",
     "snapshot": "node scripts/snapshot.ts",
     "coach": "node scripts/coach-run.ts",
     "schedule": "node scripts/schedule.ts",
+    "service": "node scripts/service.ts",
+    "mcp": "node scripts/mcp-server.ts",
     "typecheck": "tsc --noEmit -p .",
     "build": "vite build",
     "test": "node --test \"tests/*.test.ts\"",
@@ -25,22 +27,32 @@
     "coverage": "node scripts/coverage.ts",
     "sync": "node scripts/sync.ts",
     "test:e2e": "node --test \"tests/e2e/*.test.ts\"",
-    "test:ui": "node tests/ui/smoke.mjs"
+    "test:ui": "node tests/ui/smoke.mjs",
+    "check": "npm run validate && npm run typecheck && npm test && npm run test:e2e",
+    "check:fast": "npm run typecheck && npm test",
+    "hooks:install": "node -e \"const {execFileSync:x}=require('node:child_process');const p=x('git',['rev-parse','--show-prefix']).toString().trim()+'.githooks';require('node:fs').chmodSync('.githooks/pre-push',0o755);x('git',['config','core.hooksPath',p]);console.log('git core.hooksPath = '+p+' (pre-push: npm run check:fast khi push co thay doi code)')\"",
+    "seal": "node scripts/seal.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.1.2",
     "dompurify": "^3.4.17",
     "marked": "^18.1.1",
+    "qrcode": "1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "ts-fsrs": "5.4.2",
     "vite": "^8.3.4",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/qrcode": "1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "playwright": "^1.64.1",
     "typescript": "~5.9.3"
+  },
+  "optionalDependencies": {
+    "@open-spaced-repetition/binding": "0.5.0"
   }
 }

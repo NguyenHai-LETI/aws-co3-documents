@@ -11,6 +11,14 @@
 #   • services : pattern 1 từ → phân biệt hoa/thường; pattern nhiều từ → không phân biệt
 #   • features : không phân biệt hoa/thường, TRỪ pattern viết HOA toàn bộ (acronym như SCP, RTO)
 #   • kết thúc bằng `*` = khớp tiền tố (vd `decoupl*` khớp decouple/decoupled/decoupling)
+# Phạm vi đề thi (service):
+#   • scope: out  = nằm trong danh sách NGOÀI PHẠM VI chính thức của SAA-C03 (saa-03-out-of-scope-services, đối chiếu
+#     2026-10-20) — đề thật không hỏi. Câu có đáp án đúng nêu service này = "ngoài phạm vi" (lint oos-answer, bị loại khỏi
+#     các chế độ luyện khi practice.exclude_out_of_scope); nêu ở phương án nhiễu = lint oos-distractor.
+#     Không ghi scope = trong phạm vi hoặc chưa được liệt kê (danh sách chính thức không đầy đủ) — không bị loại.
+#     "AWS Tools and SDKs" cũng ngoài phạm vi nhưng không đưa vào đây: đáp án đúng hay *dùng* SDK như một phần giải pháp.
+#   • aliases     = tên chính thức hiện tại / tên mới trong exam guide (vd QuickSight → Amazon Quick). Chỉ để hiển thị và để AI
+#     viết đúng tên — muốn nhận diện tên đó trong câu hỏi thì phải có trong `match`.
 # AI coach được phép BỔ SUNG service/feature mới vào đây (không xoá/đổi tên cái cũ).
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -100,7 +108,7 @@ services:
   ECR:                   { topic: compute, match: [ECR, Elastic Container Registry] }
   AWS Batch:             { topic: compute, match: [AWS Batch] }
   Elastic Beanstalk:     { topic: compute, match: [Elastic Beanstalk, Beanstalk] }
-  Lightsail:             { topic: compute, match: [Lightsail] }
+  Lightsail:             { topic: compute, match: [Lightsail], scope: out }
   App Runner:            { topic: compute, match: [App Runner] }
   EC2 Auto Scaling:      { topic: compute, match: [EC2 Auto Scaling, Auto Scaling group*, Auto Scaling, ASG] }
   # ── Storage
@@ -124,6 +132,7 @@ services:
   Timestream:            { topic: database, match: [Timestream] }
   QLDB:                  { topic: database, match: [QLDB, Quantum Ledger Database] }
   Redshift:              { topic: database, match: [Redshift] }
+  RDS on VMware:         { topic: database, match: [RDS on VMware], scope: out }
   # ── Networking & Content Delivery
   VPC:                   { topic: networking, match: [VPC, Virtual Private Cloud] }
   NAT Gateway:           { topic: networking, match: [NAT Gateway, NAT instance] }
@@ -146,6 +155,7 @@ services:
   Network Firewall:      { topic: networking, match: [Network Firewall] }
   VPC Flow Logs:         { topic: networking, match: [Flow Logs] }
   VPC Lattice:           { topic: networking, match: [VPC Lattice] }
+  Cloud Map:             { topic: networking, match: [Cloud Map], scope: out }
   # ── Security, Identity & Compliance
   IAM:                   { topic: security, match: [IAM, Identity and Access Management] }
   IAM Identity Center:   { topic: security, match: [IAM Identity Center, AWS SSO, Single Sign-On] }
@@ -180,6 +190,8 @@ services:
   Health Dashboard:      { topic: management, match: [Health Dashboard, AWS Health] }
   License Manager:       { topic: management, match: [License Manager] }
   Proton:                { topic: management, match: [Proton] }
+  Console Mobile App:    { topic: management, match: [Console Mobile Application, Console Mobile App], scope: out, aliases: [AWS Console Mobile Application] }
+  Distro for OpenTelemetry: { topic: management, match: [Distro for OpenTelemetry, ADOT], scope: out, aliases: [AWS Distro for OpenTelemetry] }
   # ── Application Integration
   SQS:                   { topic: integration, match: [SQS, Simple Queue Service] }
   SNS:                   { topic: integration, match: [SNS, Simple Notification Service] }
@@ -188,27 +200,31 @@ services:
   Amazon MQ:             { topic: integration, match: [Amazon MQ, ActiveMQ, RabbitMQ] }
   AppFlow:               { topic: integration, match: [AppFlow] }
   SWF:                   { topic: integration, match: [SWF, Simple Workflow] }
+  MWAA:                  { topic: integration, match: [MWAA, Managed Workflows for Apache Airflow], scope: out, aliases: [Amazon Managed Workflows for Apache Airflow] }
   # ── Developer Tools
-  CodeCommit:            { topic: devtools, match: [CodeCommit] }
-  CodeBuild:             { topic: devtools, match: [CodeBuild] }
-  CodeDeploy:            { topic: devtools, match: [CodeDeploy] }
+  CodeCommit:            { topic: devtools, match: [CodeCommit], scope: out }
+  CodeBuild:             { topic: devtools, match: [CodeBuild], scope: out }
+  CodeDeploy:            { topic: devtools, match: [CodeDeploy], scope: out }
   CodePipeline:          { topic: devtools, match: [CodePipeline] }
-  CodeArtifact:          { topic: devtools, match: [CodeArtifact] }
+  CodeArtifact:          { topic: devtools, match: [CodeArtifact], scope: out }
   Cloud9:                { topic: devtools, match: [Cloud9] }
   X-Ray:                 { topic: devtools, match: [X-Ray] }
-  CDK:                   { topic: devtools, match: [CDK, Cloud Development Kit] }
+  CDK:                   { topic: devtools, match: [CDK, Cloud Development Kit], scope: out }
   SAM:                   { topic: devtools, match: [SAM, Serverless Application Model] }
+  CloudShell:            { topic: devtools, match: [CloudShell], scope: out }
+  Corretto:              { topic: devtools, match: [Corretto], scope: out }
+  Fault Injection Service: { topic: devtools, match: [Fault Injection Service, Fault Injection Simulator, AWS FIS], scope: out, aliases: [AWS Fault Injection Simulator] }
   # ── Analytics & Big Data
   Kinesis:               { topic: analytics, match: [Kinesis] }
   Kinesis Data Streams:  { topic: analytics, match: [Kinesis Data Streams, KDS] }
-  Data Firehose:         { topic: analytics, match: [Kinesis Data Firehose, Data Firehose, Firehose] }
-  Managed Apache Flink:  { topic: analytics, match: [Kinesis Data Analytics, Managed Service for Apache Flink, Apache Flink] }
+  Data Firehose:         { topic: analytics, match: [Kinesis Data Firehose, Data Firehose, Firehose], aliases: [Amazon Data Firehose] }
+  Managed Apache Flink:  { topic: analytics, match: [Kinesis Data Analytics, Managed Service for Apache Flink, Apache Flink], aliases: [Amazon Managed Service for Apache Flink] }
   Kinesis Video Streams: { topic: analytics, match: [Kinesis Video Streams] }
   Athena:                { topic: analytics, match: [Athena] }
   Glue:                  { topic: analytics, match: [Glue, Glue Data Catalog, Glue crawler] }
   EMR:                   { topic: analytics, match: [EMR, Elastic MapReduce] }
-  OpenSearch:            { topic: analytics, match: [OpenSearch, Elasticsearch] }
-  QuickSight:            { topic: analytics, match: [QuickSight] }
+  OpenSearch:            { topic: analytics, match: [OpenSearch, Elasticsearch], aliases: [Amazon OpenSearch Service] }
+  QuickSight:            { topic: analytics, match: [QuickSight, Amazon Quick], aliases: [Amazon Quick] }
   Lake Formation:        { topic: analytics, match: [Lake Formation] }
   MSK:                   { topic: analytics, match: [MSK, Managed Streaming for Apache Kafka, Kafka] }
   Data Pipeline:         { topic: analytics, match: [Data Pipeline] }
@@ -221,7 +237,7 @@ services:
   Snow Family:           { topic: migration, match: [Snowball, Snowcone, Snowmobile, Snow Family] }
   Migration Hub:         { topic: migration, match: [Migration Hub] }
   Application Discovery Service: { topic: migration, match: [Application Discovery Service, Discovery Agent] }
-  Migration Evaluator:   { topic: migration, match: [Migration Evaluator] }
+  Migration Evaluator:   { topic: migration, match: [Migration Evaluator], scope: out }
   # ── API & Front-end
   API Gateway:           { topic: api, match: [API Gateway] }
   AppSync:               { topic: api, match: [AppSync, GraphQL] }
@@ -229,7 +245,7 @@ services:
   Pinpoint:              { topic: api, match: [Pinpoint] }
   Amplify:               { topic: api, match: [Amplify] }
   # ── ML / AI
-  SageMaker:             { topic: ml, match: [SageMaker] }
+  SageMaker:             { topic: ml, match: [SageMaker], aliases: [Amazon SageMaker AI] }
   Rekognition:           { topic: ml, match: [Rekognition] }
   Comprehend:            { topic: ml, match: [Comprehend] }
   Translate:             { topic: ml, match: [Amazon Translate] }
@@ -238,11 +254,19 @@ services:
   Lex:                   { topic: ml, match: [Lex] }
   Textract:              { topic: ml, match: [Textract] }
   Kendra:                { topic: ml, match: [Kendra] }
-  Personalize:           { topic: ml, match: [Amazon Personalize] }
+  Personalize:           { topic: ml, match: [Amazon Personalize], scope: out }
   Forecast:              { topic: ml, match: [Amazon Forecast] }
   Fraud Detector:        { topic: ml, match: [Fraud Detector] }
   Bedrock:               { topic: ml, match: [Bedrock] }
   Amazon Q:              { topic: ml, match: [Amazon Q] }
+  DevOps Guru:           { topic: ml, match: [DevOps Guru], scope: out }
+  HealthLake:            { topic: ml, match: [HealthLake], scope: out }
+  Inferentia:            { topic: ml, match: [Inferentia], scope: out, aliases: [AWS Inferentia] }
+  Elastic Inference:     { topic: ml, match: [Elastic Inference], scope: out }
+  Deep Learning AMIs:    { topic: ml, match: [Deep Learning AMI*, DLAMI], scope: out }
+  Deep Learning Containers: { topic: ml, match: [Deep Learning Containers], scope: out }
+  DeepComposer:          { topic: ml, match: [DeepComposer], scope: out }
+  ML frameworks on AWS:  { topic: ml, match: [TensorFlow on AWS, PyTorch on AWS, MXNet on AWS, Apache MXNet], scope: out, aliases: [TensorFlow on AWS, PyTorch on AWS, Apache MXNet on AWS] }
   # ── Other services
   WorkSpaces:            { topic: other, match: [WorkSpaces] }
   AppStream 2.0:         { topic: other, match: [AppStream] }
@@ -251,8 +275,16 @@ services:
   Wavelength:            { topic: other, match: [Wavelength] }
   AWS Backup:            { topic: other, match: [AWS Backup, Backup plan, backup vault] }
   Elastic Disaster Recovery: { topic: other, match: [Elastic Disaster Recovery, DRS, CloudEndure] }
-  IoT Core:              { topic: other, match: [IoT Core, IoT Greengrass, Greengrass] }
+  IoT Core:              { topic: other, match: [IoT Core, IoT Greengrass, Greengrass, AWS IoT, IoT Analytics, IoT SiteWise, IoT Events, IoT Device Defender, IoT Device Management, IoT TwinMaker, IoT FleetWise], scope: out, aliases: [AWS IoT (mọi service IoT)] }
   Amazon Connect:        { topic: other, match: [Amazon Connect] }
+  Sumerian:              { topic: other, match: [Sumerian], scope: out }
+  Managed Blockchain:    { topic: other, match: [Managed Blockchain], scope: out }
+  GameLift:              { topic: other, match: [GameLift], scope: out }
+  Location Service:      { topic: other, match: [Location Service], scope: out, aliases: [Amazon Location Service] }
+  Elemental Media Services: { topic: other, match: [Elemental, MediaConnect, MediaConvert, MediaLive, MediaPackage, MediaTailor], scope: out, aliases: [AWS Elemental MediaConvert, AWS Elemental MediaLive] }
+  Interactive Video Service: { topic: other, match: [Interactive Video Service, Amazon IVS], scope: out, aliases: [Amazon IVS] }
+  Braket:                { topic: other, match: [Braket], scope: out }
+  Ground Station:        { topic: other, match: [Ground Station], scope: out }
   # ── Cost management
   Cost Explorer:         { topic: cost, match: [Cost Explorer] }
   AWS Budgets:           { topic: cost, match: [AWS Budgets, Budgets] }
@@ -406,3 +438,71 @@ features:
   right-sizing:          [right-siz*, rightsiz*, underutilized, over-provisioned]
   data-transfer-cost:    [data transfer cost*, data transfer charge*, egress cost*, egress charge*]
   serverless-cost:       [pay only for, pay-per-use, pay per request, scale to zero]
+
+# ── Kiến thức đã thay đổi (lint `stale-fact`, mức vừa) ─────────────────────────────────────────────────────────────
+# Mỗi mục đã đối chiếu trên trang chính thức của AWS (url) ngày 2026-10-20 — KHÔNG thêm mục chỉ dựa vào trí nhớ.
+# pattern = regex (không phân biệt hoa thường) trên đề + phương án + giải thích, nói kiến thức cũ; unless = câu đã dùng cách
+# viết hiện hành (vd tên mới) thì bỏ qua. Sửa câu: viết "tên mới (tên cũ)" / giới hạn mới, đừng xoá kiến thức cũ khỏi giải thích.
+# Chưa đưa vào vì không mở được trang chính thức nào của AWS để đối chiếu: Snowmobile, QLDB, OpsWorks. Cố ý không đưa vào: Snowball
+# Edge chỉ còn cho khách cũ từ 2025-11-07, ngừng hỗ trợ 2026-12-31 (aws.amazon.com/snowball) — đề cương SAA-C03 (2026-10-20) vẫn ghi
+# "AWS Snow Family" trong phạm vi nên đáp án Snowball vẫn đúng cho đề thi; CodeCommit đã mở lại cho khách mới (2025-11-24).
+currency:
+  - id: sqs-max-message-1mib
+    pattern: '(SQS|queue|message)[^.\n]{0,80}256\s?(KB|KiB)|256\s?(KB|KiB)[^.\n]{0,80}(SQS|queue|messag)'
+    fact: 'Amazon SQS cho phép message tối đa 1 MiB (trước đó 256 KiB)'
+    since: '2025-08-04'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/08/amazon-sqs-max-payload-size-1mib/'
+  - id: data-firehose-rename
+    pattern: 'Kinesis (Data )?Firehose'
+    unless: 'Amazon Data Firehose'
+    fact: 'Amazon Kinesis Data Firehose đã đổi tên thành Amazon Data Firehose'
+    since: '2024-02-09'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2024/02/amazon-data-firehose-formerly-kinesis-data-firehose'
+  - id: managed-flink-rename
+    pattern: 'Kinesis Data Analytics'
+    unless: 'Managed Service for Apache Flink'
+    fact: 'Amazon Kinesis Data Analytics đã đổi tên thành Amazon Managed Service for Apache Flink'
+    since: '2023-08-30'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2023/08/amazon-managed-service-apache-flink/'
+  - id: snowcone-discontinued
+    pattern: 'Snowcone'
+    fact: 'AWS Snowcone đã ngừng (không đặt được thiết bị mới; hỗ trợ khách cũ tới 2025-11-12)'
+    since: '2024-11-12'
+    url: 'https://aws.amazon.com/blogs/storage/aws-snow-device-updates/'
+  - id: cloud9-closed
+    pattern: 'Cloud9'
+    fact: 'AWS Cloud9 không nhận khách hàng mới (khách cũ dùng tiếp)'
+    since: '2024-07-25'
+    url: 'https://aws.amazon.com/blogs/devops/how-to-migrate-from-aws-cloud9-to-aws-ide-toolkits-or-aws-cloudshell/'
+  - id: s3-select-closed
+    pattern: 'S3 Select|Glacier Select'
+    fact: 'Amazon S3 Select và S3 Glacier Select không nhận khách hàng mới — truy vấn dữ liệu trên S3 nên dùng Athena'
+    since: '2024-07-25'
+    url: 'https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/'
+  - id: forecast-closed
+    pattern: 'Amazon Forecast'
+    fact: 'Amazon Forecast không nhận khách hàng mới (AWS gợi ý SageMaker Canvas)'
+    since: '2024-07-29'
+    url: 'https://aws.amazon.com/blogs/machine-learning/transition-your-amazon-forecast-usage-to-amazon-sagemaker-canvas/'
+  - id: data-pipeline-closed
+    pattern: 'AWS Data Pipeline|\bData Pipeline\b'
+    fact: 'AWS Data Pipeline không nhận khách hàng mới, ở chế độ bảo trì (không thêm tính năng)'
+    since: '2024-07-25'
+    url: 'https://aws.amazon.com/blogs/big-data/migrate-workloads-from-aws-data-pipeline/'
+  - id: pinpoint-end-of-support
+    pattern: 'Pinpoint'
+    fact: 'Amazon Pinpoint không nhận khách mới từ 2025-05-20 và ngừng hỗ trợ ngày 2026-10-30 (SMS / voice / push: AWS End User Messaging; email: Amazon SES)'
+    since: '2025-05-20'
+    url: 'https://docs.aws.amazon.com/pinpoint/latest/userguide/migrate.html'
+  - id: sagemaker-ai-rename
+    pattern: 'SageMaker'
+    unless: 'SageMaker AI|SageMaker (Unified Studio|Lakehouse|Catalog|Canvas)'
+    fact: 'Amazon SageMaker (dịch vụ ML) đã đổi tên thành Amazon SageMaker AI — tên dùng trong đề cương SAA-C03'
+    since: '2024-12-03'
+    url: 'https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html'
+  - id: quicksight-quick
+    pattern: 'QuickSight'
+    unless: 'Amazon Quick\b'
+    fact: 'Amazon QuickSight đã thành Amazon Quick Suite (2025-10-09); đề cương SAA-C03 hiện ghi “Amazon Quick”'
+    since: '2025-10-09'
+    url: 'https://aws.amazon.com/blogs/business-intelligence/reimagine-business-intelligence-amazon-quicksight-evolves-to-amazon-quick-suite · https://docs.aws.amazon.com/aws-certification/latest/solutions-architect-associate-03/saa-03-in-scope-services.html'

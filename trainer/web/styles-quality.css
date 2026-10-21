@@ -1,0 +1,336 @@
+/* [Q] Bank → 📐 Chất lượng: lint rules, distractor lists, semantic duplicates, blind-solve review (imported by web/main.tsx).
+   Reuses the tokens of styles.css: one hue (--series-1) for magnitudes, status colour only next to an icon + label. */
+
+/* section switcher + "việc cần làm" tiles */
+.qq-nav {
+  gap: 8px;
+}
+.qq-todo,
+.ins-qkpis.qq-vkpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.qq-todo {
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* [γ] + 🎯 Phạm vi đề thi */
+}
+@media (max-width: 1180px) {
+  .qq-todo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 960px) {
+  .qq-todo,
+  .ins-qkpis.qq-vkpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .qq-todo {
+    gap: 8px;
+  }
+  .qq-todo .kpi {
+    padding: 12px;
+  }
+  .qq-todo .kpi .value {
+    font-size: 22px;
+  }
+}
+.card-head.qq-head {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.qq-head > * {
+  min-width: 0;
+}
+
+/* 🩺 lint: one row per rule — severity · name · share bar · count */
+.qq-sevrow {
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.qq-rules {
+  display: grid;
+  gap: 2px;
+}
+.qq-rule {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) minmax(60px, 170px) 52px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.qq-rule:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.qq-rule.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.qq-rule:disabled {
+  cursor: default;
+}
+.qq-rule.zero {
+  color: var(--text-3);
+}
+.qq-rule-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.qq-rule-name code {
+  white-space: nowrap;
+}
+.qq-rule-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.qq-rule-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--series-1);
+}
+.qq-rule-n {
+  text-align: right;
+  font-weight: 650;
+}
+.qq-rule.zero .qq-rule-n {
+  font-weight: 500;
+  color: var(--good-ink);
+}
+@media (max-width: 560px) {
+  .qq-rule {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 7px 6px;
+  }
+  .qq-rule-bar {
+    display: none;
+  }
+}
+
+/* question lists (lint drill-down, distractors, review queue) */
+.qq-list {
+  display: flex;
+  flex-direction: column;
+}
+.qq-item {
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+.qq-item:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+.qq-list > .btn {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.qq-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.qq-check > input {
+  margin-top: 3px;
+}
+.qq-ref {
+  min-width: 0;
+}
+.qq-ref .ins-clamp {
+  overflow-wrap: anywhere;
+}
+.qq-flaw {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 5px;
+  color: var(--text-2);
+  min-width: 0;
+}
+.qq-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-2);
+  background: var(--surface);
+}
+.qq-opt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.qq-opt-text {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.qq-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+/* 👯 duplicate pairs: score + how found, then both questions side by side (stacked on phones) */
+.qq-pair {
+  cursor: pointer;
+}
+.qq-pair:hover .qq-pair-cols {
+  border-color: var(--border-strong);
+}
+.qq-pair-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.qq-pair-cols > div {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .qq-pair-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.qq-stem {
+  overflow-wrap: anywhere;
+}
+.qq-stem p {
+  margin: 0 0 6px;
+}
+
+/* 👯 semantic provider status + copyable install commands */
+.qq-sem {
+  padding: 10px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.qq-sem.ok {
+  border-style: solid;
+  border-color: var(--border);
+  background: transparent;
+}
+.qq-sem > .row > span {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+.qq-cmds {
+  gap: 6px;
+}
+.qq-cmd {
+  padding: 3px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text-1);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.qq-cmd:hover {
+  border-color: var(--accent);
+}
+
+/* 🧪 blind-solve: pack picker */
+.qq-pack {
+  flex: 0 1 420px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* question drawer: flaws of one question */
+.qq-dflaw {
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+/* [γ] 🎯 exam scope: out-of-scope services as compact chips (name · answers · distractors) */
+.sc-services {
+  gap: 6px;
+  margin-top: 10px;
+}
+.sc-service {
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* [γ] 🔒 sealed questions: Bank header note and the locked question drawer */
+.sc-sealed-note {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+.sc-locked {
+  padding: 18px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  text-align: center;
+}
+.sc-locked .sc-lock-icon {
+  font-size: 34px;
+  line-height: 1;
+}
+
+/* ── [v5 γ1] 🗺️ Đề cương (GuideSection) + question relations (QuestionRelations) ── */
+.gd-kpis .kpi { min-width: 0; }
+.gd-legend { display: inline-block; padding: 1px 6px; border-radius: var(--radius-sm); border-left: 4px solid var(--border-strong); }
+.gd-none { border-left-color: var(--bad-ink); background: var(--bad-soft); }
+.gd-thin { border-left-color: var(--warn-ink); background: var(--warn-soft); }
+.gd-ok { border-left-color: var(--good-ink); background: var(--good-soft); }
+.gd-task summary { cursor: pointer; list-style: revert; }
+.gd-task-title { min-width: 0; overflow-wrap: anywhere; }
+.gd-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.gd-bullet { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: start; padding: 6px 8px; border-radius: var(--radius-sm); border-left: 4px solid var(--border-strong); }
+.gd-pick { padding-top: 2px; }
+.gd-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
+.gd-id { font-family: var(--mono); }
+.gd-nums { display: flex; gap: 10px; white-space: nowrap; color: var(--text-2); }
+.gd-gen select { max-width: 100%; }
+.qr-list { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.qr-list li { overflow-wrap: anywhere; }
+.qr-link { margin-right: 4px; }
+.qr-undo { gap: 8px; flex-wrap: wrap; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 8px; }
+@media (max-width: 640px) {
+  .gd-bullet { grid-template-columns: auto 1fr; }
+  .gd-nums { grid-column: 2; flex-wrap: wrap; white-space: normal; }
+  .gd-kpis { grid-template-columns: 1fr 1fr; }
+}
+.gd-why { overflow-wrap: anywhere; min-width: 0; }

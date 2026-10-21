@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useData, useFetch } from '../lib/store.tsx';
-import { href, navigate } from '../lib/router.ts';
+import { href, navigate, useRoute } from '../lib/router.ts';
 import { startTest } from '../lib/start.ts';
 import { compact, fmtDateTime, fmtDuration } from '../lib/format.ts';
 import { BarList, ChartCard, Heatmap, Kpi, LineChart, Meter, StackBar } from '../components/charts.tsx';
 import { ReadinessCard, pctOf } from '../components/insights.tsx';
 import { Empty, ErrorBox, Loading, Seg } from '../components/ui.tsx';
+import { ExamSection } from '../components/progress/ExamSection.tsx';
+import { FsrsCard } from '../components/progress/FsrsCard.tsx';
+import { ConfusionCard, ExposureCard, RequirementCard, TransferCard } from '../components/progress/LearningInsights.tsx';
+import { LeechSection } from '../components/learning/Leeches.tsx';
+import { useProgress } from '../components/progress/useProgress.ts';
+import { calibrationNote, evidenceNote, intervalText, lengthNote, weakSort } from '../components/learning/rules.ts';
 import type { Bucket, StatsResponse } from '../../shared/types.ts';
 
 const FSRS_LABELS = ['Chưa học', 'Mức 1 · < 1 ngày', 'Mức 2 · 1–7 ngày', 'Mức 3 · 7–21 ngày', 'Mức 4 · 21–60 ngày', 'Mức 5 · ≥ 60 ngày'];
@@ -14,6 +20,7 @@ const BOX_COLORS = ['var(--seq-0)', 'var(--seq-1)', 'var(--seq-2)', 'var(--seq-3
 
 function WeakTable({ rows, kind }: { rows: Bucket[]; kind: 'services' | 'tags' }) {
   if (!rows.length) return <div className="small muted">Cần ít nhất 3 lượt trả lời cho mỗi mục.</div>;
+  const shield = rows.some((b) => b.verdict !== undefined);
   return (
     <div className="table-wrap">
       <table className="table">
@@ -26,30 +33,47 @@ function WeakTable({ rows, kind }: { rows: Bucket[]; kind: 'services' | 'tags' }
           </tr>
         </thead>
         <tbody>
-          {rows.map((b) => (
-            <tr key={b.key}>
-              <td className="small">{b.label}</td>
-              <td className="num small">{b.attempts}</td>
-              <td>
-                <div className="row nowrap" style={{ gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <Meter value={b.accuracy} target={72} />
+          {rows.map((b) => {
+            const ev = evidenceNote(b);
+            const ci = intervalText(b);
+            return (
+              <tr key={b.key}>
+                <td className="small">
+                  {b.label}
+                  {ev && <div className={`tiny ${ev.tone === 'bad' ? 'bad' : ev.tone === 'good' ? 'good' : 'muted'}`}>{ev.tone === 'bad' ? '⚠ ' : ev.tone === 'good' ? '✓ ' : ''}{ev.text}</div>}
+                </td>
+                <td className="num small">{b.attempts}</td>
+                <td>
+                  <div className="row nowrap" style={{ gap: 8 }} title={ci ? `Khoảng 80%: ${ci} (đã co về mức chung của bạn: ${Math.round(b.shrunk ?? b.accuracy)}%)` : undefined}>
+                    <div style={{ flex: 1 }}>
+                      <Meter value={b.accuracy} target={72} />
+                    </div>
+                    <span className="num small">
+                      {b.accuracy}%{ci && <span className="tiny muted lrn-ci"> {ci}</span>}
+                    </span>
                   </div>
-                  <span className="num small">{b.accuracy}%</span>
-                </div>
-              </td>
-              <td>
-                <button className="btn ghost sm" onClick={() => navigate(`/new?mode=custom&${kind}=${encodeURIComponent(b.key)}`)}>
-                  Luyện →
-                </button>
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td>
+                  <button className="btn ghost sm" onClick={() => navigate(`/new?mode=custom&${kind}=${encodeURIComponent(b.key)}`)}>
+                    Luyện →
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      {shield && <div className="tiny muted" style={{ marginTop: 6 }}>Xếp theo cận bi quan (khoảng 80%) — mục ít câu không bị coi là yếu chỉ vì vài câu sai.</div>}
     </div>
   );
 }
+
+/** [v5] Tooltip tail: the bucket's 80 % interval and its verdict against the learner's base rate (statistical shield). */
+const evidenceTitle = (b: Bucket) => {
+  const ci = intervalText(b);
+  const ev = evidenceNote(b);
+  return `${ci ? `\nkhoảng 80%: ${ci}` : ''}${ev ? ` · ${ev.text}` : ''}`;
+};
 
 type Pair = { answers: number; correct: number };
 const acc = (x?: Pair) => (x ? pctOf(x.correct, x.answers) : 0);
@@ -60,15 +84,7 @@ function Calibration({ c }: { c: StatsResponse['calibration'] }) {
     { key: 'unsure', label: '🤔 Chưa chắc', v: c.unsure, title: 'Câu bạn đánh dấu “chưa chắc”' },
     { key: 'hinted', label: '💡 Dùng gợi ý', v: c.hinted, title: 'Câu bạn mở gợi ý (chế độ luyện tập)' },
   ];
-  const sure = acc(c.sure);
-  const unsure = acc(c.unsure);
-  let note: { cls: string; text: string } | undefined;
-  if (c.sure.answers >= 15 && sure < 80)
-    note = { cls: 'warn', text: `⚠ Tự tin quá mức: khi “chắc chắn” bạn chỉ đúng ${sure}%. Đề thật hay có phương án gần đúng — khi còn phân vân giữa 2 phương án, đánh dấu 🤔 để được ôn lại sớm.` };
-  else if (c.unsure.answers >= 10 && unsure >= sure - 5)
-    note = { cls: '', text: `ℹ️ Câu “chưa chắc” bạn vẫn đúng ${unsure}% — gần bằng lúc chắc chắn. Bạn đang đánh giá thấp mình; tin vào phương pháp loại trừ hơn.` };
-  else if (c.sure.answers >= 15 && c.unsure.answers >= 5)
-    note = { cls: 'good', text: `✓ Bạn tự đánh giá khá chuẩn: chắc chắn → đúng ${sure}%, chưa chắc → đúng ${unsure}%.` };
+  const note = calibrationNote(c);
   return (
     <ChartCard
       title="🎯 Độ tự tin vs kết quả"
@@ -171,8 +187,7 @@ function Recall({ r }: { r: StatsResponse['recall'] }) {
 }
 
 function LengthSplit({ l, share, minWords, passPct }: { l: StatsResponse['lengthSplit']; share: number; minWords: number; passPct: number }) {
-  const long = acc(l.long);
-  const short = acc(l.short);
+  const note = lengthNote(l, share);
   const rows = [
     { key: 'long', label: `📜 Câu dài (≥ ${minWords} từ)`, v: l.long },
     { key: 'short', label: '📝 Câu ngắn', v: l.short },
@@ -187,28 +202,49 @@ function LengthSplit({ l, share, minWords, passPct }: { l: StatsResponse['length
         target={passPct}
         items={rows.map((r) => ({ key: r.key, label: r.label, value: acc(r.v), muted: !r.v.answers, valueText: r.v.answers ? `${acc(r.v)}% · ${r.v.answers}` : 'chưa có' }))}
       />
-      {l.long.answers >= 10 && l.short.answers >= 10 && short - long >= 10 ? (
-        <div className="small warn" style={{ marginTop: 10 }}>
-          ⚠ Câu dài kéo điểm xuống {Math.round(short - long)} điểm — đọc câu hỏi cuối đề trước để biết cần tìm gì, rồi mới đọc bối cảnh.
+      {note && (
+        <div className={`small ${note.cls}`} style={{ marginTop: 10 }}>
+          {note.text}
+          {note.examLink && (
+            <>
+              {' '}
+              Chế độ <a href={href('/new?mode=exam')}>🎯 Thi thử</a> ưu tiên câu dài như đề thật.
+            </>
+          )}
         </div>
-      ) : share < 30 ? (
-        <div className="small dim" style={{ marginTop: 10 }}>
-          ℹ️ Bạn mới làm {share}% câu dài. Chế độ <a href={href('/new?mode=exam')}>🎯 Thi thử</a> ưu tiên câu dài như đề thật.
-        </div>
-      ) : null}
+      )}
     </ChartCard>
   );
 }
 
 export function Stats() {
-  const { meta } = useData();
-  const { data: s, error, loading } = useFetch<StatsResponse>('/api/stats');
+  const { meta, refresh } = useData();
+  const route = useRoute();
+  const { data: s, error, loading, reload } = useFetch<StatsResponse>('/api/stats');
+  const { data: progress } = useProgress();
   const [topicSort, setTopicSort] = useState<'weak' | 'bank'>('weak');
+  const focus = route.query.get('focus');
+  // Dashboard links: "Đặt ngày thi →" #/stats?focus=exam · next checklist item ?focus=checklist · sealed form ?focus=sealed
+  useEffect(() => {
+    const target = { exam: 'exam-goal', checklist: 'exam-checklist', sealed: 'sealed-forms', leeches: 'leeches', gonogo: 'exam-gonogo' }[focus ?? ''];
+    if (target && progress) document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focus, !!progress, !!s]); // eslint-disable-line react-hooks/exhaustive-deps
   if (loading && !s) return <Loading />;
   if (error && !s) return <ErrorBox error={error} />;
   if (!s || !meta) return null;
   const T = s.totals;
   const rushed = s.rushed ?? [];
+  // new personal FSRS parameters → memory levels, due dates and review counts change
+  const paramsChanged = () => {
+    reload();
+    void refresh();
+  };
+  const regraded = s.regraded ?? progress?.regraded ?? 0;
+  const unviewedNote = !!s.unviewed && (
+    <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
+      👁️ <b>{s.unviewed} câu bỏ trống chưa xem</b> (không chọn, 0 giây) không được tính vào thống kê, mức sẵn sàng và lịch ôn — trong điểm từng bài chúng vẫn tính là sai.
+    </div>
+  );
   const rushedNote = rushed.length > 0 && (
     <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
       ⚡ <b>{rushed.length} bài làm vội</b> không được tính vào thống kê, mức sẵn sàng và lịch ôn (thời gian trung vị mỗi câu quá ngắn):{' '}
@@ -231,9 +267,11 @@ export function Stats() {
           <h1>📊 Thống kê</h1>
         </div>
         {rushedNote}
+        {unviewedNote}
         <Empty icon="📈" title="Chưa có dữ liệu">
           Làm vài bài test để thấy thống kê theo domain, task, chủ đề, service, tốc độ và lịch ôn tập.
         </Empty>
+        {progress && <ExamSection progress={progress} />}
       </div>
     );
   }
@@ -241,9 +279,10 @@ export function Stats() {
   const fsrs = meta.srs.algorithm !== 'leitner';
   const v2 = typeof T.dueToday === 'number';
   const dueToday = v2 ? T.dueToday : T.due;
-  const topics = [...s.byTopic].filter((b) => b.bank > 0).sort((a, b) => (topicSort === 'weak' ? (a.attempts ? a.accuracy : 101) - (b.attempts ? b.accuracy : 101) : b.bank - a.bank));
-  const weakServices = [...s.byService].filter((b) => b.attempts >= 3).sort((a, b) => a.accuracy - b.accuracy).slice(0, 12);
-  const weakTags = [...s.byTag].filter((b) => b.attempts >= 3).sort((a, b) => a.accuracy - b.accuracy).slice(0, 12);
+  const topics = [...s.byTopic].filter((b) => b.bank > 0).sort((a, b) => (topicSort === 'weak' ? (a.attempts ? (a.lo ?? a.accuracy) : 101) - (b.attempts ? (b.lo ?? b.accuracy) : 101) : b.bank - a.bank));
+  // [v5] weak lists by the pessimistic bound (statistical shield), n shown
+  const weakServices = weakSort(s.byService.filter((b) => b.attempts >= 3)).slice(0, 12);
+  const weakTags = weakSort(s.byTag.filter((b) => b.attempts >= 3)).slice(0, 12);
   const boxLabels = s.boxLabels?.length === s.boxes.length ? s.boxLabels : fsrs ? FSRS_LABELS : LEITNER_LABELS;
   const speed = [...s.byTopic].filter((b) => b.attempts >= 3).sort((a, b) => b.avgTime / Math.max(1, b.avgEst) - a.avgTime / Math.max(1, a.avgEst));
   const tasks = meta.tasks ?? [];
@@ -263,6 +302,13 @@ export function Stats() {
         </div>
       </div>
       {rushedNote}
+      {unviewedNote}
+      {regraded > 0 && (
+        <div className="ins-wrap alert info small" style={{ marginBottom: 16 }}>
+          ↻ <b>{regraded} câu trả lời được chấm lại</b> theo đáp án đã sửa trong ngân hàng (file kết quả giữ nguyên) — thống kê, mức sẵn sàng và lịch ôn tính theo đáp án hiện
+          tại.
+        </div>
+      )}
 
       <section className="split-l">
         <ReadinessCard totals={T} />
@@ -288,6 +334,8 @@ export function Stats() {
           <Kpi label="Thời gian học" value={fmtDuration(T.studySeconds, { long: true })} sub="tổng thời gian làm bài" />
         </div>
       </section>
+
+      {progress && <ExamSection progress={progress} readiness={T.readiness} />}
 
       <section className="grid c2">
         <ChartCard
@@ -351,19 +399,29 @@ export function Stats() {
                 muted: !b?.attempts,
                 valueText: b?.attempts ? `${b.accuracy}% · ${b.attempts}` : `0/${b?.bank ?? 0}`,
                 onClick: () => navigate(`/new?mode=custom&tasks=${encodeURIComponent(t.id)}`),
-                title: `${t.id} ${t.label}\n${t.label_vi}\n${b ? `${b.correct}/${b.attempts} đúng · đã gặp ${b.questions}/${b.bank} câu` : 'chưa có câu nào'} — bấm để luyện`,
+                title: `${t.id} ${t.label}\n${t.label_vi}\n${b ? `${b.correct}/${b.attempts} đúng · đã gặp ${b.questions}/${b.bank} câu${evidenceTitle(b)}` : 'chưa có câu nào'} — bấm để luyện`,
               }))}
             />
           </ChartCard>
         </section>
       )}
 
+      {(s.byRequirement || s.exposure) && (
+        <section className={s.byRequirement && s.exposure ? 'grid c2 lrn-align-start' : undefined}>
+          {s.byRequirement && <RequirementCard buckets={s.byRequirement} passPct={passPct} />}
+          {s.exposure && <ExposureCard e={s.exposure} passPct={passPct} />}
+        </section>
+      )}
+
       <section>
         <ChartCard
           title="Theo chủ đề"
-          subtitle="Tỉ lệ đúng và độ phủ — bấm 1 dòng để luyện chủ đề đó"
+          subtitle={`Tỉ lệ đúng và độ phủ — bấm 1 dòng để luyện chủ đề đó${topicSort === 'weak' && s.byTopic.some((b) => b.lo !== undefined) ? ' · “Yếu trước” xếp theo cận bi quan (khoảng 80%), không theo tỉ lệ thô' : ''}`}
           actions={<Seg value={topicSort} onChange={setTopicSort} items={[{ id: 'weak', label: 'Yếu trước' }, { id: 'bank', label: 'Nhiều câu' }]} />}
-          table={{ head: ['Chủ đề', 'Lượt', '%', 'Đã gặp/Ngân hàng', 'TG TB/chuẩn'], rows: topics.map((b) => [b.label, b.attempts, b.accuracy, `${b.questions}/${b.bank}`, `${b.avgTime}s/${b.avgEst}s`]) }}
+          table={{
+            head: ['Chủ đề', 'Lượt', '%', 'Khoảng 80%', 'Nhận định', 'Đã gặp/Ngân hàng', 'TG TB/chuẩn'],
+            rows: topics.map((b) => [b.label, b.attempts, b.accuracy, intervalText(b) ?? '', evidenceNote(b)?.text ?? '', `${b.questions}/${b.bank}`, `${b.avgTime}s/${b.avgEst}s`]),
+          }}
         >
           <BarList
             target={passPct}
@@ -374,49 +432,61 @@ export function Stats() {
               muted: !b.attempts,
               valueText: b.attempts ? `${b.accuracy}% · ${b.questions}/${b.bank}` : `0/${b.bank}`,
               onClick: () => navigate(`/new?mode=topic&topics=${b.key}`),
-              title: `${b.correct}/${b.attempts} đúng · đã gặp ${b.questions}/${b.bank} câu`,
+              title: `${b.correct}/${b.attempts} đúng · đã gặp ${b.questions}/${b.bank} câu${evidenceTitle(b)}`,
             }))}
           />
         </ChartCard>
       </section>
 
-      <section className="grid c2">
-        <div className="card stack">
-          <div className="card-head" style={{ marginBottom: 0 }}>
-            <h2>🧠 Mức ghi nhớ {fsrs ? '(FSRS)' : '(Leitner)'}</h2>
-            {dueToday > 0 && (
-              <button className="btn primary sm" onClick={() => startTest({ mode: 'srs', count: Math.min(dueToday, meta.srs.daily_limit || dueToday) })}>
-                Ôn {dueToday} câu
-              </button>
-            )}
-          </div>
-          <StackBar segments={s.boxes.map((v, i) => ({ label: boxLabels[i] ?? `Mức ${i}`, value: v, color: BOX_COLORS[i] ?? 'var(--seq-5)' }))} />
-          <div className="row ins-stat-row">
-            <div>
-              <div className="ins-stat">{dueToday}</div>
-              <div className="tiny muted">ôn hôm nay</div>
+      <section className="grid c2 lrn-align-start">
+        <div className="stack">
+          <div className="card stack">
+            <div className="card-head" style={{ marginBottom: 0 }}>
+              <h2>🧠 Mức ghi nhớ {fsrs ? '(FSRS)' : '(Leitner)'}</h2>
+              {dueToday > 0 && (
+                <button className="btn primary sm" onClick={() => startTest({ mode: 'srs', count: Math.min(dueToday, meta.srs.daily_limit || dueToday) })}>
+                  Ôn {dueToday} câu
+                </button>
+              )}
             </div>
-            {v2 && (
+            <StackBar segments={s.boxes.map((v, i) => ({ label: boxLabels[i] ?? `Mức ${i}`, value: v, color: BOX_COLORS[i] ?? 'var(--seq-5)' }))} />
+            <div className="row ins-stat-row">
               <div>
-                <div className="ins-stat">{T.backlog}</div>
-                <div className="tiny muted">tồn đọng</div>
+                <div className="ins-stat">{dueToday}</div>
+                <div className="tiny muted">ôn hôm nay</div>
               </div>
-            )}
-            <div>
-              <div className="ins-stat">{T.mastered}</div>
-              <div className="tiny muted">đã thuộc</div>
+              {v2 && (
+                <div>
+                  <div className="ins-stat">{T.backlog}</div>
+                  <div className="tiny muted">tồn đọng</div>
+                </div>
+              )}
+              <div>
+                <div className="ins-stat">{T.mastered}</div>
+                <div className="tiny muted">đã thuộc</div>
+              </div>
+            </div>
+            <div className="small muted">
+              {fsrs
+                ? `FSRS-6 ước lượng độ bền trí nhớ của từng câu và hẹn ôn khi xác suất còn nhớ xuống ~${Math.round((meta.srs.desired_retention || 0.9) * 100)}% (tính theo ngày: câu đến hạn từ đầu ngày). Sai → độ bền giảm mạnh; đúng nhanh & chắc → tăng nhiều; chưa chắc, dùng gợi ý hay gạch nhầm → tăng ít; làm lại trong cùng ngày → thay đổi ít. Mỗi ngày tối đa ${meta.srs.daily_limit} câu (câu dễ quên nhất trước), phần dư thành tồn đọng.`
+                : `Sai → về box 1 (ôn ngày mai). Đúng chắc chắn → lên 1 box (khoảng cách ${meta.srs.intervals_days.join(' → ')} ngày). “Chưa chắc” không được lên box.`}
             </div>
           </div>
-          <div className="small muted">
-            {fsrs
-              ? `FSRS ước lượng độ bền trí nhớ của từng câu và hẹn ôn khi xác suất còn nhớ xuống ~${Math.round((meta.srs.desired_retention || 0.9) * 100)}%. Sai → độ bền giảm mạnh; đúng nhanh & chắc → tăng nhiều; chưa chắc, dùng gợi ý hay gạch nhầm → tăng ít. Mỗi ngày tối đa ${meta.srs.daily_limit} câu (câu dễ quên nhất trước), phần dư thành tồn đọng.`
-              : `Sai → về box 1 (ôn ngày mai). Đúng chắc chắn → lên 1 box (khoảng cách ${meta.srs.intervals_days.join(' → ')} ngày). “Chưa chắc” không được lên box.`}
+          {progress?.fsrs && (
+            <div className="card">
+              <h2>📅 Hoạt động 18 tuần</h2>
+              <Heatmap days={s.daily} />
+            </div>
+          )}
+        </div>
+        {progress?.fsrs ? (
+          <FsrsCard info={progress.fsrs} onParamsChanged={paramsChanged} />
+        ) : (
+          <div className="card">
+            <h2>📅 Hoạt động 18 tuần</h2>
+            <Heatmap days={s.daily} />
           </div>
-        </div>
-        <div className="card">
-          <h2>📅 Hoạt động 18 tuần</h2>
-          <Heatmap days={s.daily} />
-        </div>
+        )}
       </section>
 
       {(s.calibration || s.elimination || s.recall || s.lengthSplit) && (
@@ -430,6 +500,20 @@ export function Stats() {
           </div>
         </section>
       )}
+
+      {s.confusions && (
+        <section>
+          <ConfusionCard pairs={s.confusions} />
+        </section>
+      )}
+
+      {s.transfer && (
+        <section>
+          <TransferCard t={s.transfer} passPct={passPct} />
+        </section>
+      )}
+
+      <LeechSection />
 
       <section className="grid c2">
         <div className="card">

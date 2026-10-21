@@ -9,3 +9,7 @@ coach/snapshot.md
 
 # regenerated for each ENRICH run (patches in coach/patches/ are kept as an audit trail)
 coach/enrich/
+
+# rebuildable local caches (SQLite index, embeddings) and per-machine secrets (LAN access token)
+.cache/
+.local/

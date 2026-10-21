@@ -1,0 +1,1842 @@
+{
+ "note": "Written by GOLDEN_UPDATE=1 node --test tests/golden.test.ts — review `git diff` before committing a refresh.",
+ "questions": 754,
+ "packs": [
+  {
+   "id": "ai-2026-10-16-1757-longform",
+   "title": "AI · Câu dài chuẩn đề thi · Secure (Dedicated Hosts, SSE-KMS, Permissions boundary)",
+   "file": "bank/packs/ai/2026-10-16-1757-longform-secure-access-encryption.md",
+   "origin": "ai",
+   "exam": "SAA-C03",
+   "description": "Biến thể dài (60–120 từ) của các câu ngắn hay gặp/hay sai",
+   "source": "trainer/coach/enrich/2026-10-16_175724_longform-batch.md",
+   "created": "2026-10-16",
+   "generatedBy": "2026-10-16_175724_longform",
+   "count": 3,
+   "activeCount": 3
+  },
+  {
+   "id": "saa-01-compute-services-v1",
+   "title": "01 · Compute Services · V1",
+   "file": "bank/packs/imported/01-compute-services-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/01-compute-services-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-01-compute-services-v2",
+   "title": "01 · Compute Services · V2",
+   "file": "bank/packs/imported/01-compute-services-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/01-compute-services-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-02-storage-services-v1",
+   "title": "02 · Storage Services · V1",
+   "file": "bank/packs/imported/02-storage-services-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/02-storage-services-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-02-storage-services-v2",
+   "title": "02 · Storage Services · V2",
+   "file": "bank/packs/imported/02-storage-services-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/02-storage-services-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-03-database-services-v1",
+   "title": "03 · Database Services · V1",
+   "file": "bank/packs/imported/03-database-services-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/03-database-services-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-03-database-services-v2",
+   "title": "03 · Database Services · V2",
+   "file": "bank/packs/imported/03-database-services-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/03-database-services-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-04-networking-services-v1",
+   "title": "04 · Networking & Content Delivery · V1",
+   "file": "bank/packs/imported/04-networking-services-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/04-networking-services-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-04-networking-services-v2",
+   "title": "04 · Networking Services · V2",
+   "file": "bank/packs/imported/04-networking-services-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/04-networking-services-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-05-security-services-v1",
+   "title": "05 · Security, Identity & Compliance · V1",
+   "file": "bank/packs/imported/05-security-services-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/05-security-services-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-05-security-services-v2",
+   "title": "05 · Security Services · V2",
+   "file": "bank/packs/imported/05-security-services-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/05-security-services-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-06-management-governance-v1",
+   "title": "06 · Management & Governance · V1",
+   "file": "bank/packs/imported/06-management-governance-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/06-management-governance-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-06-management-governance-v2",
+   "title": "06 · Management & Governance · V2",
+   "file": "bank/packs/imported/06-management-governance-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/06-management-governance-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-07-application-integration-v1",
+   "title": "07 · Application Integration · V1",
+   "file": "bank/packs/imported/07-application-integration-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/07-application-integration-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-07-application-integration-v2",
+   "title": "07 · Application Integration · V2",
+   "file": "bank/packs/imported/07-application-integration-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/07-application-integration-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-08-developer-tools-v1",
+   "title": "08 · Developer Tools / CI-CD · V1",
+   "file": "bank/packs/imported/08-developer-tools-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/08-developer-tools-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-08-developer-tools-v2",
+   "title": "08 · Developer Tools · V2",
+   "file": "bank/packs/imported/08-developer-tools-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/08-developer-tools-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 15,
+   "activeCount": 15
+  },
+  {
+   "id": "saa-09-analytics-bigdata-v1",
+   "title": "09 · Analytics & Big Data · V1",
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/09-analytics-bigdata-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-09-analytics-bigdata-v2",
+   "title": "09 · Analytics & Big Data · V2",
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/09-analytics-bigdata-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-10-migration-transfer-v1",
+   "title": "10 · Migration & Transfer · V1",
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/10-migration-transfer-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-10-migration-transfer-v2",
+   "title": "10 · Migration & Transfer · V2",
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/10-migration-transfer-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 15,
+   "activeCount": 15
+  },
+  {
+   "id": "saa-11-api-integration-v1",
+   "title": "11 · API & Integration · V1",
+   "file": "bank/packs/imported/11-api-integration-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/11-api-integration-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-11-api-integration-v2",
+   "title": "11 · API & Integration · V2",
+   "file": "bank/packs/imported/11-api-integration-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/11-api-integration-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 15,
+   "activeCount": 15
+  },
+  {
+   "id": "saa-12-ml-ai-v1",
+   "title": "12 · Machine Learning & AI · V1",
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/12-ml-ai-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-12-ml-ai-v2",
+   "title": "12 · Machine Learning / AI · V2",
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/12-ml-ai-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 15,
+   "activeCount": 15
+  },
+  {
+   "id": "saa-13-other-services-v1",
+   "title": "13 · Other Services · V1",
+   "file": "bank/packs/imported/13-other-services-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/13-other-services-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-13-other-services-v2",
+   "title": "13 · Other Services · V2",
+   "file": "bank/packs/imported/13-other-services-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/13-other-services-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 15,
+   "activeCount": 15
+  },
+  {
+   "id": "saa-14-service-comparisons-v1",
+   "title": "14 · Service Comparisons / Decision · V1",
+   "file": "bank/packs/imported/14-service-comparisons-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/14-service-comparisons-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-14-service-comparisons-v2",
+   "title": "14 · Service Comparisons · V2",
+   "file": "bank/packs/imported/14-service-comparisons-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/14-service-comparisons-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 15,
+   "activeCount": 15
+  },
+  {
+   "id": "saa-15-resilience-disaster-recovery-v1",
+   "title": "15 · Resilience & Disaster Recovery (GAP topic · Domain 2 = 26%) · V1",
+   "file": "bank/packs/imported/15-resilience-disaster-recovery-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/15-resilience-disaster-recovery-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-15-resilience-disaster-recovery-v2",
+   "title": "15 · Resilience & Disaster Recovery · V2",
+   "file": "bank/packs/imported/15-resilience-disaster-recovery-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/15-resilience-disaster-recovery-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-16-cost-optimization-v1",
+   "title": "16 · Cost-Optimized Architectures (GAP topic · Domain 4 = 20%) · V1",
+   "file": "bank/packs/imported/16-cost-optimization-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/16-cost-optimization-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-16-cost-optimization-v2",
+   "title": "16 · Cost Optimization · V2",
+   "file": "bank/packs/imported/16-cost-optimization-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/16-cost-optimization-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 30,
+   "activeCount": 30
+  },
+  {
+   "id": "saa-17-gap-services-v1",
+   "title": "17 · Gap Services (frequently-tested but under-covered) · V1",
+   "file": "bank/packs/imported/17-gap-services-v1.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/17-gap-services-exam.md",
+   "created": "2026-10-16",
+   "count": 20,
+   "activeCount": 20
+  },
+  {
+   "id": "saa-17-gap-services-v2",
+   "title": "17 · Gap Services · V2",
+   "file": "bank/packs/imported/17-gap-services-v2.md",
+   "origin": "imported",
+   "exam": "SAA-C03",
+   "source": "practice-exams/17-gap-services-exam-v2.md",
+   "created": "2026-10-16",
+   "count": 15,
+   "activeCount": 15
+  },
+  {
+   "id": "golden-edge-cases",
+   "title": "Golden · format edge cases",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "origin": "manual",
+   "exam": "SAA-C03",
+   "description": "Hand-written variations of the pack format (tests/golden.test.ts) — never edit without regenerating the golden files",
+   "created": "2026-10-20",
+   "count": 6,
+   "activeCount": 4
+  }
+ ],
+ "problems": [
+  {
+   "level": "warning",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 67,
+   "qid": "golden-viet-03",
+   "message": "Missing \"time\" — estimated 50s by the rubric"
+  },
+  {
+   "level": "warning",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 91,
+   "qid": "golden-warnings-04",
+   "message": "Unknown metadata key \"foo\""
+  },
+  {
+   "level": "warning",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 99,
+   "qid": "golden-warnings-04",
+   "message": "Unexpected text between options and the answer line (line 99) — check option format \"- A. text\""
+  },
+  {
+   "level": "warning",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 87,
+   "qid": "golden-warnings-04",
+   "message": "Missing \"time\" — estimated 50s by the rubric"
+  },
+  {
+   "level": "warning",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 87,
+   "qid": "golden-warnings-04",
+   "message": "Explanation refers to option letters (A/B/…) — options can be shuffled; refer to the option content instead"
+  },
+  {
+   "level": "error",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 120,
+   "qid": "golden-choose-mismatch-05",
+   "message": "Stem says \"(Choose TWO.)\" but the answer has 1 key(s): A"
+  },
+  {
+   "level": "error",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 126,
+   "qid": "golden-no-answer-06",
+   "message": "Missing answer line \"**Answer:** B\""
+  },
+  {
+   "level": "error",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 141,
+   "qid": "Golden_Bad_ID",
+   "message": "Invalid question id \"Golden_Bad_ID\" (kebab-case a-z0-9, 3–60 chars)"
+  },
+  {
+   "level": "error",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 141,
+   "qid": "Golden_Bad_ID",
+   "message": "Option keys must be consecutive A, B, C…: got \"D\" at position 3"
+  },
+  {
+   "level": "error",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 157,
+   "qid": "golden-checkbox-01",
+   "message": "Duplicate question id (first defined in bank/packs/manual/golden-edge-cases.md:18) — this copy is ignored"
+  }
+ ],
+ "samples": {
+  "golden-checkbox-01": {
+   "id": "golden-checkbox-01",
+   "pack": "golden-edge-cases",
+   "stem": "A company keeps **monthly** reports in Amazon S3. Reports are read often for 30 days and almost never after that,\nbut they must stay available within milliseconds for audits. Which storage approach is the MOST cost-effective?",
+   "options": [
+    {
+     "key": "A",
+     "text": "Keep every report in S3 Standard and rely on S3 Intelligent-Tiering monitoring fees to stay low over time"
+    },
+    {
+     "key": "B",
+     "text": "Add a lifecycle rule that transitions objects to S3 Standard-Infrequent Access 30 days after creation"
+    },
+    {
+     "key": "C",
+     "text": "Move the reports to S3 Glacier Deep Archive after 30 days and restore them in bulk when an audit starts"
+    },
+    {
+     "key": "D",
+     "text": "Copy the reports to an Amazon EBS Cold HDD volume attached to a small EC2 instance"
+    }
+   ],
+   "answer": [
+    "B"
+   ],
+   "explanation": "Standard-IA keeps millisecond access at a lower storage price once access drops.\n- Deep Archive restores take hours.\n- EBS adds an instance to run.",
+   "domain": "cost",
+   "topic": "storage",
+   "services": [
+    "S3"
+   ],
+   "tags": [
+    "storage-classes",
+    "lifecycle"
+   ],
+   "difficulty": "easy",
+   "time": 90,
+   "timeEstimated": false,
+   "status": "active",
+   "origin": "manual",
+   "variantOf": [],
+   "refs": [],
+   "words": 36,
+   "longForm": false,
+   "hash": "85286f5d46",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 18
+  },
+  "golden-multi-02": {
+   "id": "golden-multi-02",
+   "pack": "golden-edge-cases",
+   "stem": "A relational database must keep serving reads when one Availability Zone fails and must scale read traffic during\nmonthly reporting. Which TWO actions meet these requirements? (Choose TWO.)",
+   "options": [
+    {
+     "key": "A",
+     "text": "Enable automated backups with a 35-day retention period"
+    },
+    {
+     "key": "B",
+     "text": "Deploy the DB instance as a Multi-AZ deployment"
+    },
+    {
+     "key": "C",
+     "text": "Increase the instance size before every reporting window"
+    },
+    {
+     "key": "D",
+     "text": "Add read replicas and point the reporting tool at the reader endpoint"
+    },
+    {
+     "key": "E",
+     "text": "Turn on Performance Insights for the database"
+    }
+   ],
+   "answer": [
+    "B",
+    "D"
+   ],
+   "explanation": "Multi-AZ provides automatic failover; read replicas absorb the reporting reads.",
+   "domain": "resilient",
+   "topic": "database",
+   "services": [
+    "RDS",
+    "Aurora"
+   ],
+   "tags": [],
+   "difficulty": "hard",
+   "time": 105,
+   "timeEstimated": false,
+   "status": "draft",
+   "origin": "manual",
+   "variantOf": [
+    "03-v1-01"
+   ],
+   "concept": "read scaling vs automatic failover",
+   "refs": [
+    "03-database-services.md",
+    "E-kien-truc-database.md"
+   ],
+   "created": "2026-10-20",
+   "task": "2.2",
+   "hint": "Một lựa chọn lo phần đọc, một lựa chọn lo phần chuyển đổi dự phòng.",
+   "words": 28,
+   "longForm": false,
+   "hash": "b59deb2fe7",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 38
+  },
+  "golden-viet-03": {
+   "id": "golden-viet-03",
+   "pack": "golden-edge-cases",
+   "stem": "Một công ty muốn giảm chi phí lưu trữ log cũ trên Amazon S3 mà không cần truy cập nhanh. Chọn giải pháp nào?",
+   "options": [
+    {
+     "key": "A",
+     "text": "S3 Standard"
+    },
+    {
+     "key": "B",
+     "text": "S3 One Zone-IA cho log cần đọc mỗi ngày"
+    },
+    {
+     "key": "C",
+     "text": "S3 Glacier Flexible Retrieval với lifecycle rule"
+    },
+    {
+     "key": "D",
+     "text": "Amazon EFS Standard"
+    }
+   ],
+   "answer": [
+    "C"
+   ],
+   "explanation": "Glacier Flexible Retrieval rẻ nhất trong các lựa chọn cho dữ liệu hiếm khi đọc.",
+   "domain": "cost",
+   "topic": "storage",
+   "services": [
+    "S3"
+   ],
+   "tags": [],
+   "difficulty": "easy",
+   "time": 50,
+   "timeEstimated": true,
+   "status": "retired",
+   "origin": "manual",
+   "variantOf": [],
+   "refs": [],
+   "task": "4.1",
+   "enriched": "2026-10-19",
+   "words": 24,
+   "longForm": false,
+   "hash": "459bc8f9a7",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 67
+  },
+  "golden-warnings-04": {
+   "id": "golden-warnings-04",
+   "pack": "golden-edge-cases",
+   "stem": "An application needs more CPU only during business hours. What should the architect do?",
+   "options": [
+    {
+     "key": "A",
+     "text": "Use a scheduled scaling action for the Auto Scaling group"
+    },
+    {
+     "key": "B",
+     "text": "Buy a three-year Reserved Instance for the peak capacity"
+    },
+    {
+     "key": "C",
+     "text": "Run the largest instance type all the time"
+    }
+   ],
+   "answer": [
+    "A"
+   ],
+   "explanation": "Option A matches a predictable schedule; B and C pay for idle capacity.",
+   "domain": "performance",
+   "topic": "compute",
+   "services": [],
+   "tags": [],
+   "difficulty": "easy",
+   "time": 50,
+   "timeEstimated": true,
+   "status": "active",
+   "origin": "manual",
+   "variantOf": [],
+   "refs": [],
+   "task": "3.1",
+   "words": 14,
+   "longForm": false,
+   "hash": "6aee0c19a3",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 87
+  },
+  "golden-choose-mismatch-05": {
+   "id": "golden-choose-mismatch-05",
+   "pack": "golden-edge-cases",
+   "stem": "Which service should store database credentials and rotate them automatically? (Choose TWO.)",
+   "options": [
+    {
+     "key": "A",
+     "text": "AWS Secrets Manager"
+    },
+    {
+     "key": "B",
+     "text": "Amazon S3 with versioning"
+    },
+    {
+     "key": "C",
+     "text": "AWS Config"
+    },
+    {
+     "key": "D",
+     "text": "Amazon Inspector"
+    }
+   ],
+   "answer": [
+    "A"
+   ],
+   "explanation": "Secrets Manager stores secrets and rotates them on a schedule.",
+   "domain": "secure",
+   "topic": "security",
+   "services": [],
+   "tags": [],
+   "difficulty": "easy",
+   "time": 60,
+   "timeEstimated": false,
+   "status": "active",
+   "origin": "manual",
+   "variantOf": [],
+   "refs": [],
+   "task": "1.1",
+   "words": 12,
+   "longForm": false,
+   "hash": "8154abfa7c",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 107
+  },
+  "Golden_Bad_ID": {
+   "id": "Golden_Bad_ID",
+   "pack": "golden-edge-cases",
+   "stem": "Invalid id and option keys that skip a letter.",
+   "options": [
+    {
+     "key": "A",
+     "text": "One"
+    },
+    {
+     "key": "B",
+     "text": "Two"
+    },
+    {
+     "key": "D",
+     "text": "Four"
+    }
+   ],
+   "answer": [
+    "B"
+   ],
+   "explanation": "Kept as an error case.",
+   "domain": "cost",
+   "topic": "storage",
+   "services": [],
+   "tags": [],
+   "difficulty": "easy",
+   "time": 50,
+   "timeEstimated": false,
+   "status": "active",
+   "origin": "manual",
+   "variantOf": [],
+   "refs": [],
+   "words": 9,
+   "longForm": false,
+   "hash": "cc4f8f46a4",
+   "file": "bank/packs/manual/golden-edge-cases.md",
+   "line": 141
+  },
+  "01-v1-01": {
+   "id": "01-v1-01",
+   "pack": "saa-01-compute-services-v1",
+   "stem": "A company runs a production web application on Amazon EC2 24/7. The workload is steady and predictable for the next 3 years. Which purchasing option is the MOST cost-effective?",
+   "options": [
+    {
+     "key": "A",
+     "text": "Standard Reserved Instances (3-year, All Upfront)"
+    },
+    {
+     "key": "B",
+     "text": "Spot Instances"
+    },
+    {
+     "key": "C",
+     "text": "On-Demand Instances"
+    },
+    {
+     "key": "D",
+     "text": "Dedicated Hosts"
+    }
+   ],
+   "answer": [
+    "A"
+   ],
+   "explanation": "Steady, predictable 24/7 for 3 years = Standard RI 3-year All Upfront (highest discount).",
+   "domain": "cost",
+   "topic": "compute",
+   "services": [
+    "EC2"
+   ],
+   "tags": [
+    "reserved-instances"
+   ],
+   "difficulty": "easy",
+   "time": 50,
+   "timeEstimated": false,
+   "status": "active",
+   "origin": "imported",
+   "variantOf": [],
+   "refs": [],
+   "source": "practice-exams/01-compute-services-exam.md#Q1",
+   "task": "4.2",
+   "words": 29,
+   "longForm": false,
+   "hash": "81840cace6",
+   "file": "bank/packs/imported/01-compute-services-v1.md",
+   "line": 16
+  },
+  "01-v2-01": {
+   "id": "01-v2-01",
+   "pack": "saa-01-compute-services-v2",
+   "stem": "A batch-processing workload runs nightly, can be interrupted and restarted safely, and must be as cheap as possible. Which EC2 purchasing option is BEST?",
+   "options": [
+    {
+     "key": "A",
+     "text": "Spot Instances"
+    },
+    {
+     "key": "B",
+     "text": "On-Demand Instances"
+    },
+    {
+     "key": "C",
+     "text": "Dedicated Hosts"
+    },
+    {
+     "key": "D",
+     "text": "Reserved Instances (3-year, All Upfront)"
+    }
+   ],
+   "answer": [
+    "A"
+   ],
+   "explanation": "Interruptible, restartable, cheapest = Spot Instances.",
+   "domain": "cost",
+   "topic": "compute",
+   "services": [
+    "EC2"
+   ],
+   "tags": [
+    "spot-instances"
+   ],
+   "difficulty": "medium",
+   "time": 55,
+   "timeEstimated": false,
+   "status": "active",
+   "origin": "imported",
+   "variantOf": [],
+   "refs": [],
+   "source": "practice-exams/01-compute-services-exam-v2.md#Q1",
+   "task": "4.2",
+   "words": 24,
+   "longForm": false,
+   "hash": "ad52e2b4c7",
+   "file": "bank/packs/imported/01-compute-services-v2.md",
+   "line": 16
+  },
+  "ai-20261016-1757-lf01": {
+   "id": "ai-20261016-1757-lf01",
+   "pack": "ai-2026-10-16-1757-longform",
+   "stem": "A financial services company is migrating a legacy database application to AWS. The software vendor licenses the product per physical socket and core under a bring-your-own-license model, and auditors require proof that each licensed instance stays on the same physical server over time. The operations team also needs visibility into the physical sockets and cores in use. The security team requires that no other customer's workloads share the underlying hardware. Which solution will meet these requirements?",
+   "options": [
+    {
+     "key": "A",
+     "text": "Launch the instances as Dedicated Instances in a dedicated-tenancy VPC and report the physical core count from instance metadata"
+    },
+    {
+     "key": "B",
+     "text": "Launch Spot Instances in a cluster placement group and tag each instance with its license details to document placement over time"
+    },
+    {
+     "key": "C",
+     "text": "Launch On-Demand Instances with default tenancy in a partition placement group and map each partition to a licensed server"
+    },
+    {
+     "key": "D",
+     "text": "Allocate Dedicated Hosts, launch the instances onto them with host affinity set to Host, and track sockets and cores per host"
+    }
+   ],
+   "answer": [
+    "D"
+   ],
+   "explanation": "Dedicated Hosts expose the physical sockets and cores, and host affinity set to Host keeps an instance on the same physical server after stop/start, which is what a per-socket BYOL audit needs.\n- Dedicated Instances: single-tenant hardware, but no host affinity and no visibility into sockets or cores.\n- Spot Instances in a cluster placement group: placement groups control network locality, not which physical host is used, and Spot can be reclaimed.\n- Partition placement group on default tenancy: partitions isolate failure domains on shared hardware and give no socket or core visibility.\n> 🇻🇳 BYOL theo socket/core + cùng máy vật lý → Dedicated Hosts với host affinity = Host.",
+   "domain": "secure",
+   "topic": "compute",
+   "services": [
+    "EC2"
+   ],
+   "tags": [
+    "dedicated-hosts",
+    "host-affinity"
+   ],
+   "difficulty": "hard",
+   "time": 125,
+   "timeEstimated": false,
+   "status": "active",
+   "origin": "ai",
+   "variantOf": [
+    "01-v2-28"
+   ],
+   "concept": "Dedicated Hosts with host affinity (same physical host over time, socket/core visibility) vs Dedicated Instances",
+   "refs": [
+    "01-compute-services.md",
+    "C-kien-truc-web-app.md"
+   ],
+   "created": "2026-10-16",
+   "task": "1.2",
+   "hint": "Giấy phép tính theo socket/core và phải chứng minh cùng một máy vật lý theo thời gian — loại tenancy nào cho thấy phần cứng?",
+   "enriched": "2026-10-16",
+   "words": 76,
+   "longForm": true,
+   "hash": "7611415ae8",
+   "file": "bank/packs/ai/2026-10-16-1757-longform-secure-access-encryption.md",
+   "line": 14
+  },
+  "01-v1-19": {
+   "id": "01-v1-19",
+   "pack": "saa-01-compute-services-v1",
+   "stem": "An EC2-based web tier must remain highly available across failures of a single Availability Zone. Which design achieves this? (Choose TWO)",
+   "options": [
+    {
+     "key": "A",
+     "text": "Place all instances in a single AZ cluster placement group"
+    },
+    {
+     "key": "B",
+     "text": "Deploy an Auto Scaling group spanning multiple AZs"
+    },
+    {
+     "key": "C",
+     "text": "Use an Application Load Balancer across multiple AZs"
+    },
+    {
+     "key": "D",
+     "text": "Use a larger instance type"
+    },
+    {
+     "key": "E",
+     "text": "Enable detailed monitoring"
+    }
+   ],
+   "answer": [
+    "B",
+    "C"
+   ],
+   "explanation": "HA across AZ failure = multi-AZ Auto Scaling group + multi-AZ ALB.",
+   "domain": "resilient",
+   "topic": "compute",
+   "services": [
+    "EC2 Auto Scaling",
+    "ALB",
+    "EC2"
+   ],
+   "tags": [
+    "high-availability"
+   ],
+   "difficulty": "medium",
+   "time": 85,
+   "timeEstimated": false,
+   "status": "active",
+   "origin": "imported",
+   "variantOf": [],
+   "refs": [],
+   "source": "practice-exams/01-compute-services-exam.md#Q19",
+   "task": "2.2",
+   "words": 21,
+   "longForm": false,
+   "hash": "6f15c10f60",
+   "file": "bank/packs/imported/01-compute-services-v1.md",
+   "line": 422
+  }
+ },
+ "attempts": [
+  {
+   "id": "20261015-091000-quick",
+   "mode": "quick",
+   "title": "Luyện nhanh 10 câu",
+   "feedback": "practice",
+   "started": "2026-10-15T09:05:00+07:00",
+   "finished": "2026-10-15T09:10:00+07:00",
+   "timeLimit": 0,
+   "timeUsed": 300,
+   "timedOut": false,
+   "total": 3,
+   "answered": 3,
+   "correct": 2,
+   "score": 66.7,
+   "scaled": 667,
+   "passed": false,
+   "selection": {
+    "mode": "quick"
+   },
+   "answers": [
+    {
+     "q": "05-v1-01",
+     "pick": "A",
+     "key": "A",
+     "ok": true,
+     "t": 30,
+     "est": 50
+    },
+    {
+     "q": "05-v1-02",
+     "pick": "C",
+     "key": "B",
+     "ok": false,
+     "t": 40,
+     "est": 45,
+     "elim": "CD"
+    },
+    {
+     "q": "05-v1-03",
+     "pick": "D",
+     "key": "D",
+     "ok": true,
+     "t": 36,
+     "est": 45,
+     "recall": "KMS key policy",
+     "recallHit": true
+    }
+   ],
+   "file": "results/2026/10/2026-10-15_091000_quick.md",
+   "medianTime": 36,
+   "rushed": false
+  },
+  {
+   "id": "20261016-120000-weak",
+   "mode": "coach",
+   "title": "Phiên kế hoạch: RDS HA",
+   "feedback": "exam",
+   "started": "2026-10-16T11:55:00+07:00",
+   "finished": "2026-10-16T12:00:00+07:00",
+   "timeLimit": 600,
+   "timeUsed": 290,
+   "timedOut": false,
+   "total": 3,
+   "answered": 2,
+   "correct": 1,
+   "score": 33.3,
+   "scaled": 333,
+   "passed": false,
+   "plan": "2026-10-16-1536#s1",
+   "selection": {
+    "mode": "coach",
+    "plan": "2026-10-16-1536#s1"
+   },
+   "answers": [
+    {
+     "q": "03-v1-01",
+     "pick": "D",
+     "key": "D",
+     "ok": true,
+     "t": 44,
+     "est": 45,
+     "h": "1466062e8f"
+    },
+    {
+     "q": "03-v1-02",
+     "pick": "A",
+     "key": "B",
+     "ok": false,
+     "t": 61,
+     "est": 45,
+     "unsure": true
+    },
+    {
+     "q": "03-v1-03",
+     "pick": "",
+     "key": "A",
+     "ok": false,
+     "t": 0,
+     "est": 45
+    }
+   ],
+   "file": "results/2026/10/2026-10-16_120000_weak.md",
+   "layout": 2,
+   "medianTime": 52.5,
+   "rushed": false
+  },
+  {
+   "id": "20261018-093000-ids",
+   "mode": "ids",
+   "title": "Danh sách chọn sẵn",
+   "feedback": "practice",
+   "started": "2026-10-18T09:23:20+07:00",
+   "finished": "2026-10-18T09:30:00+07:00",
+   "timeLimit": 390,
+   "timeUsed": 400,
+   "timedOut": false,
+   "total": 6,
+   "answered": 5,
+   "correct": 3,
+   "score": 50,
+   "scaled": 500,
+   "passed": false,
+   "sessionId": "fc8f705d-8329-490d-aedd-193bac646587",
+   "realism": {
+    "items": 1,
+    "total": 6,
+    "words": 347,
+    "referenceWords": 690
+   },
+   "selection": {
+    "mode": "ids",
+    "feedback": "practice",
+    "shuffleQuestions": false
+   },
+   "answers": [
+    {
+     "q": "03-v1-01",
+     "pick": "D",
+     "key": "D",
+     "ok": true,
+     "t": 41,
+     "est": 45,
+     "recall": "DynamoDB global tables",
+     "recallHit": false,
+     "hinted": true,
+     "h": "1466062e8f",
+     "rt": 17
+    },
+    {
+     "q": "03-v1-02",
+     "pick": "A",
+     "key": "B",
+     "ok": false,
+     "t": 63,
+     "est": 45,
+     "unsure": true,
+     "elim": "BC",
+     "why": "Nhầm Multi-AZ với read replica",
+     "h": "8610a69e4d",
+     "rt": 4
+    },
+    {
+     "q": "03-v1-03",
+     "pick": "A",
+     "key": "A",
+     "ok": true,
+     "t": 38,
+     "est": 45,
+     "flag": true,
+     "h": "0f6a785c44"
+    },
+    {
+     "q": "03-v1-04",
+     "pick": "",
+     "key": "D",
+     "ok": false,
+     "t": 0,
+     "est": 45,
+     "h": "a8028ca4e6"
+    },
+    {
+     "q": "01-v1-19",
+     "pick": "AB",
+     "key": "BC",
+     "ok": false,
+     "t": 90,
+     "est": 85,
+     "h": "6f15c10f60",
+     "rt": 25
+    },
+    {
+     "q": "ai-20261016-1757-lf01",
+     "pick": "D",
+     "key": "D",
+     "ok": true,
+     "t": 118,
+     "est": 125,
+     "h": "7611415ae8"
+    }
+   ],
+   "file": "results/2026/10/2026-10-18_093000_ids.md",
+   "layout": 2,
+   "medianTime": 63,
+   "rushed": false
+  },
+  {
+   "id": "20261018-103000-ids",
+   "mode": "ids",
+   "title": "Danh sách chọn sẵn",
+   "feedback": "exam",
+   "started": "2026-10-18T10:25:00+07:00",
+   "finished": "2026-10-18T10:30:00+07:00",
+   "timeLimit": 150,
+   "timeUsed": 300,
+   "timedOut": true,
+   "total": 4,
+   "answered": 4,
+   "correct": 2,
+   "score": 50,
+   "scaled": 500,
+   "passed": false,
+   "sessionId": "8d99174b-9474-443c-8396-ef9e4981b7eb",
+   "realism": {
+    "items": 0,
+    "total": 4,
+    "words": 126,
+    "referenceWords": 460
+   },
+   "selection": {
+    "mode": "ids",
+    "timing": {
+     "preset": "strict"
+    }
+   },
+   "answers": [
+    {
+     "q": "05-v1-01",
+     "pick": "B",
+     "key": "A",
+     "ok": false,
+     "t": 50,
+     "est": 50,
+     "h": "5c2b508455"
+    },
+    {
+     "q": "05-v1-02",
+     "pick": "B",
+     "key": "B",
+     "ok": true,
+     "t": 51,
+     "est": 45,
+     "h": "ce8bbbaf57"
+    },
+    {
+     "q": "05-v1-03",
+     "pick": "A",
+     "key": "D",
+     "ok": false,
+     "t": 52,
+     "est": 45,
+     "h": "ff40e71864"
+    },
+    {
+     "q": "05-v1-04",
+     "pick": "D",
+     "key": "D",
+     "ok": true,
+     "t": 53,
+     "est": 45,
+     "h": "7dffd14b19"
+    }
+   ],
+   "file": "results/2026/10/2026-10-18_103000_ids.md",
+   "layout": 2,
+   "medianTime": 51.5,
+   "rushed": false
+  },
+  {
+   "id": "20261019-080000-sealed",
+   "mode": "sealed",
+   "title": "Đề niêm phong S1 (mô phỏng Pearson VUE)",
+   "feedback": "exam",
+   "started": "2026-10-19T06:00:00+07:00",
+   "finished": "2026-10-19T08:00:00+07:00",
+   "timeLimit": 7800,
+   "timeUsed": 7200,
+   "timedOut": false,
+   "total": 4,
+   "answered": 4,
+   "correct": 3,
+   "score": 75,
+   "scaled": 750,
+   "passed": true,
+   "sessionId": "0b6e2f7c-sealed-golden",
+   "sealedForm": "S1",
+   "realism": {
+    "items": 3,
+    "total": 6,
+    "words": 702,
+    "referenceWords": 690
+   },
+   "selection": {
+    "mode": "sealed",
+    "form": "S1",
+    "pearson": true
+   },
+   "answers": [
+    {
+     "q": "01-v1-01",
+     "pick": "A",
+     "key": "A",
+     "ok": true,
+     "t": 95,
+     "est": 60,
+     "h": "aaaaaaaaaa"
+    },
+    {
+     "q": "01-v1-02",
+     "pick": "BD",
+     "key": "BD",
+     "ok": true,
+     "t": 120,
+     "est": 85,
+     "h": "bbbbbbbbbb"
+    },
+    {
+     "q": "01-v1-03",
+     "pick": "C",
+     "key": "C",
+     "ok": true,
+     "t": 80,
+     "est": 50,
+     "flag": true,
+     "h": "cccccccccc"
+    },
+    {
+     "q": "01-v1-04",
+     "pick": "A",
+     "key": "B",
+     "ok": false,
+     "t": 110,
+     "est": 50,
+     "h": "dddddddddd"
+    },
+    {
+     "q": "01-v1-05",
+     "pick": "D",
+     "key": "D",
+     "ok": true,
+     "t": 70,
+     "est": 45,
+     "scored": false,
+     "h": "eeeeeeeeee"
+    },
+    {
+     "q": "01-v1-06",
+     "pick": "A",
+     "key": "C",
+     "ok": false,
+     "t": 66,
+     "est": 45,
+     "scored": false,
+     "h": "ffffffffff"
+    }
+   ],
+   "file": "results/2026/10/2026-10-19_080000_sealed.md",
+   "layout": 2,
+   "pearson": true,
+   "pilotTotal": 2,
+   "pilotCorrect": 1,
+   "medianTime": 87.5,
+   "rushed": false
+  },
+  {
+   "id": "20261019-200000-diagnostic",
+   "mode": "diagnostic",
+   "title": "Chẩn đoán đầu vào (28 câu)",
+   "feedback": "exam",
+   "started": "2026-10-19T19:59:00+07:00",
+   "finished": "2026-10-19T20:00:00+07:00",
+   "timeLimit": 0,
+   "timeUsed": 12,
+   "timedOut": false,
+   "total": 3,
+   "answered": 3,
+   "correct": 1,
+   "score": 33.3,
+   "scaled": 333,
+   "passed": false,
+   "sessionId": "d1a6-golden",
+   "diagnostic": true,
+   "selection": {
+    "mode": "diagnostic"
+   },
+   "answers": [
+    {
+     "q": "02-v1-01",
+     "pick": "A",
+     "key": "B",
+     "ok": false,
+     "t": 2,
+     "est": 45
+    },
+    {
+     "q": "02-v1-02",
+     "pick": "A",
+     "key": "A",
+     "ok": true,
+     "t": 3,
+     "est": 45
+    },
+    {
+     "q": "02-v1-03",
+     "pick": "B",
+     "key": "C",
+     "ok": false,
+     "t": 4,
+     "est": 45,
+     "rt": 9
+    }
+   ],
+   "file": "results/2026/10/2026-10-19_200000_diagnostic.md",
+   "layout": 2,
+   "medianTime": 3,
+   "rushed": true
+  }
+ ],
+ "roundtrip": {
+  "results/2026/10/2026-10-15_091000_quick.md": {
+   "data": {
+    "id": "20261015-091000-quick",
+    "kind": "attempt",
+    "mode": "quick",
+    "title": "Luyện nhanh 10 câu",
+    "feedback": "practice",
+    "started": "2026-10-15T09:05:00+07:00",
+    "finished": "2026-10-15T09:10:00+07:00",
+    "time_limit": 0,
+    "time_used": 300,
+    "timed_out": false,
+    "total": 3,
+    "answered": 3,
+    "correct": 2,
+    "score": 66.7,
+    "scaled": 667,
+    "passed": false,
+    "selection": {
+     "mode": "quick"
+    },
+    "device": "phone-safari",
+    "answers": [
+     {
+      "q": "05-v1-01",
+      "pick": "A",
+      "key": "A",
+      "ok": true,
+      "t": 30,
+      "est": 50
+     },
+     {
+      "q": "05-v1-02",
+      "pick": "C",
+      "key": "B",
+      "ok": false,
+      "t": 40,
+      "est": 45,
+      "elim": "CD",
+      "note": "legacy-extra"
+     },
+     {
+      "q": "05-v1-03",
+      "pick": "D",
+      "key": "D",
+      "ok": true,
+      "t": 36,
+      "est": 45,
+      "recall": "KMS key policy",
+      "recallHit": true
+     }
+    ]
+   },
+   "notes": []
+  },
+  "results/2026/10/2026-10-16_120000_weak.md": {
+   "data": {
+    "id": "20261016-120000-weak",
+    "kind": "attempt",
+    "layout": 2,
+    "mode": "coach",
+    "title": "Phiên kế hoạch: RDS HA",
+    "feedback": "exam",
+    "started": "2026-10-16T11:55:00+07:00",
+    "finished": "2026-10-16T12:00:00+07:00",
+    "time_limit": 600,
+    "time_used": 290,
+    "timed_out": false,
+    "estimate_total": 410,
+    "timing": "standard",
+    "total": 3,
+    "answered": 2,
+    "correct": 1,
+    "score": 33.3,
+    "scaled": 333,
+    "passed": false,
+    "plan": "2026-10-16-1536#s1",
+    "selection": {
+     "mode": "coach",
+     "plan": "2026-10-16-1536#s1"
+    },
+    "answers": [
+     {
+      "q": "03-v1-01",
+      "pick": "D",
+      "key": "D",
+      "ok": true,
+      "t": 44,
+      "est": 45,
+      "h": "1466062e8f"
+     },
+     {
+      "q": "03-v1-02",
+      "pick": "A",
+      "key": "B",
+      "ok": false,
+      "t": 61,
+      "est": 45,
+      "unsure": true
+     },
+     {
+      "q": "03-v1-03",
+      "pick": "",
+      "key": "A",
+      "ok": false,
+      "t": 0,
+      "est": 45
+     }
+    ]
+   },
+   "notes": [
+    "> ℹ️ Ký tự đáp án đã chuyển theo bản cân lại vị trí đáp án (bank/migrations/2026-10-16-rebalance-answers.json)."
+   ]
+  },
+  "results/2026/10/2026-10-18_093000_ids.md": {
+   "data": {
+    "id": "20261018-093000-ids",
+    "kind": "attempt",
+    "layout": 2,
+    "mode": "ids",
+    "title": "Danh sách chọn sẵn",
+    "feedback": "practice",
+    "started": "2026-10-18T09:23:20+07:00",
+    "finished": "2026-10-18T09:30:00+07:00",
+    "time_limit": 390,
+    "time_used": 400,
+    "timed_out": false,
+    "estimate_total": 390,
+    "timing": "standard",
+    "total": 6,
+    "answered": 5,
+    "correct": 3,
+    "score": 50,
+    "scaled": 500,
+    "passed": false,
+    "session": "fc8f705d-8329-490d-aedd-193bac646587",
+    "realism": {
+     "items": 1,
+     "total": 6,
+     "words": 347,
+     "referenceWords": 690
+    },
+    "selection": {
+     "mode": "ids",
+     "feedback": "practice",
+     "shuffleQuestions": false
+    },
+    "answers": [
+     {
+      "q": "03-v1-01",
+      "pick": "D",
+      "key": "D",
+      "ok": true,
+      "t": 41,
+      "est": 45,
+      "recall": "DynamoDB global tables",
+      "recallHit": false,
+      "hinted": true,
+      "h": "1466062e8f",
+      "rt": 17
+     },
+     {
+      "q": "03-v1-02",
+      "pick": "A",
+      "key": "B",
+      "ok": false,
+      "t": 63,
+      "est": 45,
+      "unsure": true,
+      "elim": "BC",
+      "why": "Nhầm Multi-AZ với read replica",
+      "h": "8610a69e4d",
+      "rt": 4
+     },
+     {
+      "q": "03-v1-03",
+      "pick": "A",
+      "key": "A",
+      "ok": true,
+      "t": 38,
+      "est": 45,
+      "flag": true,
+      "h": "0f6a785c44"
+     },
+     {
+      "q": "03-v1-04",
+      "pick": "",
+      "key": "D",
+      "ok": false,
+      "t": 0,
+      "est": 45,
+      "h": "a8028ca4e6"
+     },
+     {
+      "q": "01-v1-19",
+      "pick": "AB",
+      "key": "BC",
+      "ok": false,
+      "t": 90,
+      "est": 85,
+      "h": "6f15c10f60",
+      "rt": 25
+     },
+     {
+      "q": "ai-20261016-1757-lf01",
+      "pick": "D",
+      "key": "D",
+      "ok": true,
+      "t": 118,
+      "est": 125,
+      "h": "7611415ae8"
+     }
+    ]
+   },
+   "notes": []
+  },
+  "results/2026/10/2026-10-18_103000_ids.md": {
+   "data": {
+    "id": "20261018-103000-ids",
+    "kind": "attempt",
+    "layout": 2,
+    "mode": "ids",
+    "title": "Danh sách chọn sẵn",
+    "feedback": "exam",
+    "started": "2026-10-18T10:25:00+07:00",
+    "finished": "2026-10-18T10:30:00+07:00",
+    "time_limit": 150,
+    "time_used": 300,
+    "timed_out": true,
+    "estimate_total": 185,
+    "timing": "strict",
+    "total": 4,
+    "answered": 4,
+    "correct": 2,
+    "score": 50,
+    "scaled": 500,
+    "passed": false,
+    "session": "8d99174b-9474-443c-8396-ef9e4981b7eb",
+    "realism": {
+     "items": 0,
+     "total": 4,
+     "words": 126,
+     "referenceWords": 460
+    },
+    "selection": {
+     "mode": "ids",
+     "timing": {
+      "preset": "strict"
+     }
+    },
+    "answers": [
+     {
+      "q": "05-v1-01",
+      "pick": "B",
+      "key": "A",
+      "ok": false,
+      "t": 50,
+      "est": 50,
+      "h": "5c2b508455"
+     },
+     {
+      "q": "05-v1-02",
+      "pick": "B",
+      "key": "B",
+      "ok": true,
+      "t": 51,
+      "est": 45,
+      "h": "ce8bbbaf57"
+     },
+     {
+      "q": "05-v1-03",
+      "pick": "A",
+      "key": "D",
+      "ok": false,
+      "t": 52,
+      "est": 45,
+      "h": "ff40e71864"
+     },
+     {
+      "q": "05-v1-04",
+      "pick": "D",
+      "key": "D",
+      "ok": true,
+      "t": 53,
+      "est": 45,
+      "h": "7dffd14b19"
+     }
+    ]
+   },
+   "notes": []
+  },
+  "results/2026/10/2026-10-19_080000_sealed.md": {
+   "data": {
+    "id": "20261019-080000-sealed",
+    "kind": "attempt",
+    "layout": 2,
+    "mode": "sealed",
+    "title": "Đề niêm phong S1 (mô phỏng Pearson VUE)",
+    "feedback": "exam",
+    "started": "2026-10-19T06:00:00+07:00",
+    "finished": "2026-10-19T08:00:00+07:00",
+    "time_limit": 7800,
+    "time_used": 7200,
+    "timed_out": false,
+    "estimate_total": 6500,
+    "timing": "realistic",
+    "total": 4,
+    "answered": 4,
+    "correct": 3,
+    "score": 75,
+    "scaled": 750,
+    "passed": true,
+    "pearson": true,
+    "pilot_total": 2,
+    "pilot_correct": 1,
+    "session": "0b6e2f7c-sealed-golden",
+    "sealed_form": "S1",
+    "realism": {
+     "items": 3,
+     "total": 6,
+     "words": 702,
+     "referenceWords": 690
+    },
+    "selection": {
+     "mode": "sealed",
+     "form": "S1",
+     "pearson": true
+    },
+    "answers": [
+     {
+      "q": "01-v1-01",
+      "pick": "A",
+      "key": "A",
+      "ok": true,
+      "t": 95,
+      "est": 60,
+      "h": "aaaaaaaaaa"
+     },
+     {
+      "q": "01-v1-02",
+      "pick": "BD",
+      "key": "BD",
+      "ok": true,
+      "t": 120,
+      "est": 85,
+      "h": "bbbbbbbbbb"
+     },
+     {
+      "q": "01-v1-03",
+      "pick": "C",
+      "key": "C",
+      "ok": true,
+      "t": 80,
+      "est": 50,
+      "flag": true,
+      "h": "cccccccccc"
+     },
+     {
+      "q": "01-v1-04",
+      "pick": "A",
+      "key": "B",
+      "ok": false,
+      "t": 110,
+      "est": 50,
+      "h": "dddddddddd"
+     },
+     {
+      "q": "01-v1-05",
+      "pick": "D",
+      "key": "D",
+      "ok": true,
+      "t": 70,
+      "est": 45,
+      "scored": false,
+      "h": "eeeeeeeeee"
+     },
+     {
+      "q": "01-v1-06",
+      "pick": "A",
+      "key": "C",
+      "ok": false,
+      "t": 66,
+      "est": 45,
+      "scored": false,
+      "h": "ffffffffff"
+     }
+    ]
+   },
+   "notes": []
+  },
+  "results/2026/10/2026-10-19_200000_diagnostic.md": {
+   "data": {
+    "id": "20261019-200000-diagnostic",
+    "kind": "attempt",
+    "layout": 2,
+    "mode": "diagnostic",
+    "title": "Chẩn đoán đầu vào (28 câu)",
+    "feedback": "exam",
+    "started": "2026-10-19T19:59:00+07:00",
+    "finished": "2026-10-19T20:00:00+07:00",
+    "time_limit": 0,
+    "time_used": 12,
+    "timed_out": false,
+    "total": 3,
+    "answered": 3,
+    "correct": 1,
+    "score": 33.3,
+    "scaled": 333,
+    "passed": false,
+    "session": "d1a6-golden",
+    "diagnostic": true,
+    "selection": {
+     "mode": "diagnostic"
+    },
+    "answers": [
+     {
+      "q": "02-v1-01",
+      "pick": "A",
+      "key": "B",
+      "ok": false,
+      "t": 2,
+      "est": 45
+     },
+     {
+      "q": "02-v1-02",
+      "pick": "A",
+      "key": "A",
+      "ok": true,
+      "t": 3,
+      "est": 45
+     },
+     {
+      "q": "02-v1-03",
+      "pick": "B",
+      "key": "C",
+      "ok": false,
+      "t": 4,
+      "est": 45,
+      "rt": 9
+     }
+    ]
+   },
+   "notes": []
+  }
+ }
+}

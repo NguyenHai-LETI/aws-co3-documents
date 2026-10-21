@@ -547,3 +547,118 @@ mark.kw-secure {
     padding-top: 0;
   }
 }
+
+/* ── [v5 ρ] stop early, today budget, relearn, why chips, family table, resume on another device ── */
+.timer .timer-budget {
+  font-size: 0.68em;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.btn.stop-btn {
+  white-space: nowrap;
+}
+.budget-warn {
+  flex-wrap: wrap;
+}
+.budget-actions {
+  gap: 6px;
+}
+.stop-alt {
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+.why-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.why-chips .chip {
+  white-space: normal;
+  text-align: left;
+}
+.relearn-badge {
+  white-space: nowrap;
+}
+.qnav button.relearn {
+  border-style: dashed;
+  font-size: 11.5px;
+}
+.after-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.after-note {
+  font-size: 13.5px;
+  padding: 7px 11px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+}
+.after-note.relearn-note {
+  background: var(--warn-soft);
+}
+.after-note:has(.pair-link) {
+  background: none;
+  padding: 0;
+}
+.family-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+}
+.family-table td {
+  vertical-align: top;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.family-table tr.current td {
+  background: var(--accent-soft);
+}
+.paused-cover .resume-note {
+  max-width: 420px;
+  text-align: center;
+}
+.remote-resume h2 {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .family-table td,
+  .family-table th {
+    padding: 6px;
+  }
+}
+
+/* ── [v5 σ] NewTest: "▶ Học hôm nay" preview, discriminate group picker ── */
+.nt-today {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+}
+.nt-groups .nt-group {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+.nt-groups .nt-group.on {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+.nt-groups .chip,
+.nt-pairs .chip {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+.nt-pairs {
+  margin-top: 6px;
+  flex-wrap: wrap;
+}

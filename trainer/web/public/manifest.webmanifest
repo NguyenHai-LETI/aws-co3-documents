@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "SAA-C03 Trainer",
+  "short_name": "SAA Trainer",
+  "description": "Luyện thi AWS Solutions Architect – Associate (SAA-C03): ôn theo lịch FSRS, đề thi thử, AI coach.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f4f1",
+  "theme_color": "#2a78d6",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

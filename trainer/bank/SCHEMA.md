@@ -6,6 +6,10 @@
 >
 > v2: metadata `task` (exam guide 1.1–4.4), `hint`, `enriched`; giải thích **không nhắc chữ cái đáp án**; độ dài lựa chọn cân bằng;
 > câu dài chuẩn đề thi (§4); patch YAML cho chỉnh sửa hàng loạt bằng AI (§8).
+> v3: AI trả kết quả bằng JSON (structured output) và app tự ghi patch / pack (§8); lint lỗi viết câu sau mỗi chỉnh sửa (§8);
+> giải mù bằng model thứ hai — `bank/verify.md` (§9).
+> v4: app tự tính `requirements` (tiêu chí đề) và `outOfScope` (§3); service có `scope: out` / `aliases` trong taxonomy;
+> lint `oos-answer` / `oos-distractor`; đề niêm phong — `results/sealed.md` (§10).
 
 ---
 
@@ -17,6 +21,7 @@ trainer/bank/
 ├── taxonomy.yaml        ← domain, task (exam guide), topic, service, tag hợp lệ + rubric thời gian + từ khoá tô sáng
 ├── issues.md            ← lỗi câu hỏi người học báo (AI Coach xử lý)
 ├── ratings.md           ← 👍/👎 của người học cho từng câu
+├── verify.md            ← kết quả giải mù của model thứ hai + quyết định duyệt/loại (§9, tự sinh)
 ├── migrations/          ← bản ghi chuyển đổi dữ liệu (vd đổi vị trí đáp án)
 └── packs/               ← mỗi file .md = 1 "pack" (bộ câu hỏi)
     ├── imported/        ← import từ practice-exams/ (V1, V2) — origin: imported
@@ -143,8 +148,8 @@ Which TWO actions should a solutions architect take? (Choose TWO)
 
 **Giải thích không dùng chữ cái.** App xáo thứ tự lựa chọn khi hiển thị, nên “A sai vì…” sẽ trỏ nhầm. Gọi lựa chọn bằng
 **nội dung** (“Read Replicas: …”). Validator cảnh báo (và `apply-patch` từ chối) các mẫu: dòng bắt đầu bằng một chữ cái đơn +
-`:`/`.`/`)`/`-` (`- A: …`), `option B` / `answer C` / `choice D` / `đáp án A` (không phân biệt hoa thường — cả “answer a question”),
-`= A` (cả “= a few”), `(B)`.
+`:`/`.`/`)`/`-` (`- A: …`), `option B` / `answer C` / `choice D` / `đáp án A` / `phương án B` / `lựa chọn C` (cả “đáp án đúng là B”),
+`= A`, `(B)` — chữ cái viết hoa A–H (“answer a few”, “RPO = a few minutes” là văn xuôi, không bị bắt).
 
 **Định dạng giải thích khuyến nghị** (ENRICH dùng định dạng này): 1–2 câu tiếng Anh vì sao đáp án đúng thoả yêu cầu + mỗi
 distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuối `> 🇻🇳 <tóm tắt tiếng Việt>`; 35–90 từ.
@@ -158,9 +163,11 @@ distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuố
 | `difficulty` | ✅ | `easy` (1 khái niệm, nhận diện trực tiếp) · `medium` (tình huống áp dụng, 2 đáp án gần đúng) · `hard` (kết hợp nhiều khái niệm, bẫy, multi-response) |
 | `time` | ✅ | giây, số nguyên — tính theo rubric §4 |
 | `task` | khuyến nghị | task statement của exam guide trong `taxonomy.yaml → tasks`: `1.1`–`1.3` (secure), `2.1`–`2.2` (resilient), `3.1`–`3.5` (performance), `4.1`–`4.4` (cost) — **phải cùng domain** (ghi trong ngoặc kép nếu viết trong YAML: `"2.2"`) |
-| `services` | khuyến nghị | tên chuẩn trong `taxonomy.yaml → services` (vd `RDS Proxy`, `S3`, `Transit Gateway`). Service mới → thêm vào taxonomy |
+| `services` | khuyến nghị | tên chuẩn trong `taxonomy.yaml → services` (vd `RDS Proxy`, `S3`, `Transit Gateway`). Service mới → thêm vào taxonomy. Service có `scope: out` (danh sách **ngoài phạm vi** chính thức của SAA-C03) không dùng cho câu mới — kể cả làm phương án nhiễu |
 | `tags` | khuyến nghị | khái niệm kebab-case, ưu tiên tag có sẵn trong `taxonomy.yaml → features` (vd `multi-az`, `s3-lifecycle`) |
 | `variant_of` | khi là biến thể | id câu gốc (có thể nhiều, phân tách dấu phẩy) |
+| `skills` | khuyến nghị (AI) | [v5] mục đề cương chính thức mà câu kiểm tra: `<task>.k<n>` (Knowledge of) / `<task>.s<n>` (Skills in) theo `bank/exam-guide/SAA-C03.yaml`, vd `3.5.s7, 3.5.k4` (ENRICH classify ghi). Không ghi → app **đoán** bằng từ khoá (`SAA-C03-cues.yaml`, chỉ trong `task` của câu) và không bao giờ ghi lại bản đoán vào file |
+| `family` | khi là họ câu | [v5] id họ câu “cùng tình huống, đổi yêu cầu” (kebab-case): các câu cùng họ dùng **y nguyên một bộ phương án** và chỉ khác câu hỏi cuối (MOST cost-effective / LEAST operational overhead …) — lint `family-options` |
 | `concept` | khuyến nghị (AI) | 1 câu ngắn mô tả khái niệm được kiểm tra — AI Coach dùng để gom nhóm điểm yếu |
 | `hint` | khuyến nghị | **một dòng** tiếng Việt (≤ 140 ký tự) hiện khi người học bấm “💡 Gợi ý” ở chế độ luyện tập: hướng tới yêu cầu/từ khoá quyết định, **không lộ đáp án** (không nêu tên đáp án đúng, không chữ cái) |
 | `refs` | tuỳ chọn | file notes liên quan, vd `03-database-services.md` hoặc `03-database-services.md#rds-proxy` |
@@ -169,8 +176,35 @@ distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuố
 | `enriched` | tự động | `YYYY-MM-DD` lần cuối ENRICH (patch AI) cải thiện/duyệt câu — app dùng để biết câu nào còn cần bảo trì |
 | `source` | tuỳ chọn | nguồn gốc (file + vị trí) |
 
-App tự tính thêm (không ghi vào file): `words` (số từ của đề), `longForm` (đề ≥ `timing.long_form_min_words` = 55 từ) và `hash`
-(mã 10 ký tự của đề + lựa chọn + đáp án — dùng làm `base` trong patch §8).
+App tự tính thêm (không ghi vào file): `words` (số từ của đề), `longForm` (đề ≥ `timing.long_form_min_words` = 55 từ), `hash`
+(mã 10 ký tự của đề + lựa chọn + đáp án — dùng làm `base` trong patch §8) và:
+
+- `requirements` — **tiêu chí đề** mà đề bài yêu cầu tối ưu: các nhóm `taxonomy.yaml → keywords` tìm thấy trong đề (`cost`, `ops`,
+  `resilient`, `performance`, `secure`; nguyên từ, từ VIẾT HOA phân biệt hoa/thường — cùng quy tắc với tô sáng từ khoá) + `negative`
+  cho câu hỏi phủ định (NOT/EXCEPT viết hoa trong câu hỏi, “LEAST likely/suitable…”; “LEAST operational overhead” là `ops`, không
+  phải phủ định). Không có tiêu chí nào → `[]`. Dùng cho bộ lọc “tiêu chí đề” và thống kê “Theo tiêu chí đề”.
+- `outOfScope` — `true` khi một phương án **đúng** nêu service có `scope: out` trong taxonomy (danh sách ngoài phạm vi chính thức
+  của SAA-C03, đối chiếu 2026-10-20). `practice.exclude_out_of_scope: true` (mặc định) loại các câu này khỏi mọi chế độ luyện trừ
+  “Theo bộ đề” và danh sách id; đề niêm phong không bao giờ chọn chúng. Lint: `oos-answer` (mức vừa) cho đáp án,
+  `oos-distractor` (mức nhẹ) cho phương án nhiễu nêu service ngoài phạm vi.
+
+- `cluster` — [v5] nhóm **câu anh em** (`server/lib/clusters.ts`, chỉ có khi nhóm ≥ 2 câu, id nhóm = id nhỏ nhất): `variant_of` hai
+  chiều ∪ câu gần trùng chữ / theo nghĩa ∪ cùng chủ đề + cùng đáp án đúng + đề giống ≥ 0,25 ∪ đề giống ≥ 0,5 khi cùng chủ đề hoặc cùng
+  đáp án. Chống “dây chuyền”: câu giống hơn 8 câu khác là văn mẫu (không tính), nhóm theo chữ tối đa 6 câu. Một phiên chỉ ra một câu
+  mỗi nhóm; làm một câu thì các câu cùng nhóm để sang hôm sau.
+- `skills` (khi không ghi trong file) + `skillsGuessed: true` — mục đề cương đoán bằng từ khoá (xem bảng trên).
+
+**Taxonomy — kiến thức đã thay đổi (`currency:`, [v5]):** mỗi mục `{id, pattern, unless?, fact, since, url}` — `pattern` (regex,
+không phân biệt hoa thường) trên đề + phương án + giải thích nói kiến thức cũ, `unless` = câu đã dùng cách viết hiện hành thì bỏ qua.
+Lint `stale-fact` (mức vừa) báo câu cần cập nhật kèm URL. **Chỉ thêm mục đã đối chiếu trên trang chính thức của AWS** (docs / blog /
+What's New), ghi URL — không thêm từ trí nhớ. Sửa câu: viết “tên mới (tên cũ)” hoặc giới hạn mới.
+
+**Đề cương (`bank/exam-guide/`, [v5]):** `SAA-C03.yaml` = đề cương chính thức chép **nguyên văn** (189 mục, URL + ngày lấy) — không
+sửa tay, muốn cập nhật thì lấy lại trang và chép lại cả file; `SAA-C03-cues.yaml` = từ khoá đoán mục (của app, được sửa).
+
+**Taxonomy — phạm vi đề thi:** mỗi service có thể ghi `scope: out` (ngoài phạm vi) và `aliases: [...]` (tên chính thức hiện tại /
+tên mới, vd `QuickSight` → `Amazon Quick`; chỉ để hiển thị — muốn nhận diện tên đó trong câu hỏi thì thêm vào `match`). Không ghi
+`scope` = trong phạm vi hoặc chưa được liệt kê (danh sách chính thức không đầy đủ) — không bị loại.
 
 ## 4. Rubric thời gian (`time`) & câu dài chuẩn đề thi
 
@@ -238,13 +272,13 @@ ENRICH (và AI Coach khi cần) **không sửa trực tiếp** file pack khi c�
 run_id: 2026-10-16_190000_enrich
 items:
   - id: 03-v2-01
-    base: 1a2b3c4d5e          # hash câu lúc tạo lô (file batch ghi sẵn) — khác hash hiện tại → item bị bỏ qua
+    base: "1a2b3c4d5e"        # hash câu lúc tạo lô (file batch ghi sẵn), LUÔN trong ngoặc kép — khác hash hiện tại → item bị bỏ qua
     set: { domain: resilient, task: "2.2", tags: [multi-az], services: [RDS], concept: "…", hint: "…" }
     explanation: |
       …
     options: { A: "…", C: "…" }   # thay nội dung lựa chọn; khoá và đáp án giữ nguyên
   - id: 05-v1-12              # chỉ id + base = đã duyệt, không cần đổi (ghi enriched)
-    base: 9f8e7d6c5b
+    base: "9f8e7d6c5b"
   # hiếm: stem: | …   ·   answer: [B] + reason: "bằng chứng"   ·   status: retired
 ```
 
@@ -254,6 +288,102 @@ items:
   phải có `reason`, hint không lộ đáp án, giải thích không chữ cái), rồi block câu hỏi được viết lại bằng serializer và **parse lại**;
   item gây lỗi bị hoàn tác và báo `❌`, các item khác vẫn được ghi. Exit code 1 khi còn item lỗi.
 - Item áp dụng được → app ghi `enriched: <hôm nay>` (trừ item chỉ đổi `status`); `time` tính theo rubric được tính lại khi đề/lựa chọn đổi.
-- Chạy lại cùng patch là an toàn: item đã áp dụng được nhận ra (`➖`, nhờ `<run_id>.applied.json`), chỉ item còn lỗi được thử lại.
+- `base` (và `id`) phải là **chuỗi trong ngoặc kép**: YAML đọc hash không có ngoặc như `46794516e3` hay `9e114` thành số → item bị từ chối
+  với thông báo rõ ràng (file batch đã ghi sẵn dạng `base: "…"`).
+- Chạy lại cùng patch là an toàn: item đã áp dụng được nhận ra (`➖`, nhờ `<run_id>.applied.json`) và **không bao giờ được áp lại**
+  (kể cả khi chữ cái của item theo bố cục đáp án cũ đã được đổi khoá ở lần đầu), chỉ item còn lỗi được thử lại. Muốn sửa tiếp một câu
+  đã áp dụng → tạo item mới trong patch khác với `base` = hash hiện tại.
 - `base` lệch vì câu chỉ bị **đổi vị trí đáp án** (có bản ghi trong `bank/migrations/`) → apply-patch tự đổi khoá trong `options`/`answer`
   sang bố cục mới (báo ⚠️); lệch vì lý do khác → item bị bỏ qua (`⏭`).
+- **Lint sau mỗi item** (`server/lib/lint.ts`, cùng bộ luật với `npm run validate -- --lint`): câu sau khi sửa được kiểm lại lỗi viết
+  câu; lỗi **mới** (câu cũ chưa có) mức cao — `duplicate-options`, `all-none-above`, `choose-count`, `letter-ref` — → item bị từ chối
+  và hoàn tác (`❌ lint (mức cao): … [mã]`); lỗi mới mức vừa/thấp (vd `longest-correct`, `absolute-terms`, `stem-echo`,
+  `short-explanation`) → `⚠️ lint: …`. Áp dụng cho mọi đường: ENRICH, patch của coach, `apply-patch` CLI, quyết định giải mù.
+
+### Chế độ app (JSON) — structured output
+
+Với `config.yaml → coach.structured_output: true` (mặc định), nút trong app / lịch / `npm run coach` chạy **sinh câu**, **ENRICH** và
+**câu dài** bằng `claude -p --json-schema …` với công cụ **chỉ đọc** (`--tools Read,Glob,Grep`, không quyền Edit/Write/Bash):
+
+| Tác vụ | AI trả về (JSON) | App làm |
+|--------|------------------|---------|
+| ENRICH (phần A) | `items`: mỗi câu trong lô một item với các khoá ở trên **trừ `base`** (app điền hash của lô) + `summary` | ghi `coach/patches/<run_id>.yaml` (audit trail, cùng định dạng §8) → apply như trên |
+| Sinh câu / câu dài | `pack {slug, title, description?}` + `questions[]` (`domain, task, topic, services, tags, difficulty, variant_of?, concept, refs, hint, stem, options[]` theo thứ tự A, B…, `answer[]`, `explanation`) + `summary` | gán id (`doc-<slug>-NN` · `<tiền tố lượt>-lfNN`), tính `time` theo rubric, `created`/`enriched` = hôm nay, kiểm tra từng câu (schema, task cùng domain, parse, chữ cái trong giải thích, hint lộ đáp án, “Choose N”, lint mức cao, id trùng) rồi ghi pack bằng serializer |
+
+Item / câu bị từ chối được gửi lại **một lần** trong cùng phiên (`--resume <session_id>`) kèm danh sách lỗi theo id; AI trả lại chỉ những
+item / câu đã sửa (cùng schema, giữ `id`) và app **chỉ áp dụng các item đã sửa đó** (item đã được chấp nhận ở vòng đầu không bị áp lại).
+Còn lỗi → bỏ qua (không ghi) và báo trong log / `outcome.rejected` của lượt chạy. Bấm dừng trong vòng sửa lỗi → không ghi thêm gì.
+`coach.structured_output: false`, `/trainer-enrich`, `/trainer-generate` và Cowork dùng **chế độ tương tác (file)**: AI tự ghi patch /
+pack rồi chạy `apply-patch.ts` / `validate.ts` như trên.
+
+## 9. Giải mù (blind-solve) — `bank/verify.md`
+
+Một **model thứ hai** (`coach.models.verify`, mặc định `opus`, dự phòng `sonnet`) giải câu hỏi chỉ với **đề + các lựa chọn + số đáp án
+cần chọn** — không thấy đáp án, giải thích, gợi ý hay metadata, không có công cụ nào (`--tools ""`). App so câu trả lời với đáp án:
+
+| Kết quả | Nghĩa |
+|---------|-------|
+| ✅ `ok` | model chọn đúng đáp án trong ngân hàng |
+| ❌ `mismatch` | model chọn khác — đáp án có thể sai, hoặc đề thiếu dữ kiện quyết định |
+| ⚠️ `ambiguous` | model cho là ≥ 2 lựa chọn cùng đúng / đề thiếu dữ kiện / không lựa chọn nào đúng (tính cả khi chọn trùng đáp án) |
+| 💥 `error` | model không trả lời câu đó (thiếu id / chữ cái không hợp lệ) — **không** tính là đã giải: câu vẫn được chọn lại ở lượt sau |
+
+- **Khi nào chạy**: tự động sau mỗi lượt AI có câu mới hoặc câu bị đổi đề / lựa chọn / đáp án (hash đổi) — sinh câu, câu dài, ENRICH,
+  phân tích — như pha thứ hai của cùng lượt chạy (chung khoá, log, chi phí; `coach.verify.auto`); hoặc khi bấm “🧪 Giải mù” ở *Ngân hàng →
+  Chất lượng* / `npm run coach -- --verify [--ids a,b | --pack <id> | --scope unverified-ai|new|changed]` (tối đa 60 câu/lượt, mỗi lần
+  gọi `coach.verify.batch_size` câu).
+- **Tự chuyển draft** (`coach.verify.auto_draft`): câu `mismatch`/`ambiguous` do AI viết (`origin: ai | doc`) hoặc vừa bị lượt AI sửa →
+  `status: draft` qua một patch item (`coach/patches/<run_id>-verify.yaml`) + dòng quyết định `drafted`. Câu **imported** (đề gốc) không
+  bao giờ bị tự chuyển draft — chỉ vào hàng chờ duyệt.
+- **Tự dùng lại**: câu đang `draft` vì giải mù mà phiên bản hiện tại được giải **khớp** (sau khi sửa bằng ENRICH, hoặc giải lại) → tự trở
+  lại `active` + dòng quyết định `approved` tự động (“✅ tự dùng lại”). Câu đã được bạn 👍 duyệt ở một phiên bản thì không bị tự chuyển
+  draft lại cho chính phiên bản đó.
+- **Duyệt**: *Ngân hàng → Chất lượng* (👍 Duyệt = giữ nguyên, câu đang draft vì giải mù — ở bất kỳ phiên bản nào — trở lại `active`;
+  🗑️ Loại = `status: retired`; 🧹 Sửa bằng ENRICH = lô ENRICH cho câu đó, file batch kèm nhận xét của model giải mù). Câu bị giải mù
+  chuyển draft **ở lại hàng chờ** cho tới khi bạn quyết định, kể cả khi đã sửa hoặc giải lại. Quyết định gửi kèm `hash` của phiên bản
+  bạn đang xem: câu đã đổi trong lúc đó → app từ chối (409) để bạn xem lại.
+- **Định dạng**: mỗi dòng một lần giải hoặc một quyết định, chỉ ghi thêm (append-only, `merge=union` giữa hai máy — không conflict):
+
+  ```markdown
+  - 2026-10-19 · `doc-rds-proxy-03` · ❌ lệch đáp án (model C · đáp án B) · claude-opus-… · tin cậy cao — Lý do ngắn <!-- verify {"at":"…","hash":"…","outcome":"mismatch","picked":"C","key":"B",…} -->
+  - 2026-10-19 · `doc-rds-proxy-03` · 📝 tự chuyển draft <!-- verify {…,"decision":"drafted"} -->
+  ```
+
+  Phần `<!-- verify {…} -->` là dữ liệu cho app (đừng sửa tay). Kết quả gắn với **hash** của câu (§3): sửa đề / lựa chọn / đáp án → kết
+  quả cũ thành “cũ” (stale) và câu được giải mù lại ở lượt sau (`--scope changed`).
+
+## 10. Đề niêm phong — `results/sealed.md`
+
+Một số câu **chưa từng gặp** được giữ riêng thành *đề niêm phong* (mặc định `config.yaml → exam.sealed_forms: 2` đề ×
+`exam.sealed_size: 50` câu), tạo một lần khi mở app (trước buổi luyện đầu tiên) hoặc bằng `npm run seal`. Câu đang niêm phong
+không xuất hiện ở bất kỳ chế độ luyện, tìm kiếm, xuất Anki, danh sách Ngân hàng / Chất lượng, snapshot hay kế hoạch AI Coach;
+“Đề niêm phong” = mô phỏng Pearson với 50 câu của đề làm câu tính điểm + 15 câu thử nghiệm từ ngân hàng thường → **điểm trên
+câu mới** (điểm hiệu chỉnh nội bộ, như điểm thi thử bên ngoài). Nộp bài → đề thành `used`, câu trở lại ngân hàng; “Mở sớm” →
+`released` (không có điểm).
+
+```markdown
+---
+kind: sealed
+size: 50
+forms:
+  - id: S1
+    status: sealed                 # sealed | used | released
+    ids: [ 06-v1-03, 16-v2-19, … ]
+  - id: S2
+    status: used
+    used_at: 2026-11-01T10:00:00+07:00
+    attempt_id: 2026-11-01_100000_sealed
+    ids: [ … ]
+---
+```
+
+- **Do app quản lý — đừng sửa tay** (và đừng đọc danh sách id nếu muốn điểm trung thực). Nội dung lúc tạo **tất định** (không có
+  thời điểm, thứ tự theo hash): hai máy tạo độc lập từ cùng ngân hàng + lịch sử ra cùng một file, đồng bộ không xung đột.
+- Cách chọn: câu `active`, trong phạm vi đề thi, **không có câu anh em** ([v5] theo nhóm `cluster` ở §3 — áp dụng cho đề tạo từ nay;
+  file đề cũ không bị chọn lại), không có issue mở / 👎 nhiều / lỗi lint
+  nặng, chưa từng thuộc đề trước; chia theo trọng số domain 30/26/24/20 (50 câu → 15/13/12/10) và xoay vòng các task 1.1–4.4;
+  ưu tiên câu **chưa gặp**, rồi đề dài hơn; số câu nhiều đáp án chia đều giữa các đề.
+- AI (COACH, ENRICH) **không bao giờ** dùng câu niêm phong làm câu gốc cho biến thể / câu dài, không đưa vào kế hoạch.
+- Lệnh: `npm run seal` (trạng thái, không in id) · `-- --forms 2 --size 50` (tạo khi không còn đề nào đang niêm phong) ·
+  `-- --release S1` (mở sớm) · `-- --reset [--forms N --size M]` (bỏ mọi đề rồi tạo lại; `--forms 0` = chỉ bỏ). Đề mới đánh số
+  tiếp (S3, S4…) để không trùng `sealed_form` của bài làm cũ.

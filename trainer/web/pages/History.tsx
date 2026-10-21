@@ -1,38 +1,70 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFetch } from '../lib/store.tsx';
-import { navigate } from '../lib/router.ts';
+import { navigate, useRoute } from '../lib/router.ts';
 import { fmtDateTime, fmtDuration } from '../lib/format.ts';
 import { ChartCard, LineChart, Meter } from '../components/charts.tsx';
 import { AttemptBadges } from '../components/insights.tsx';
+import { attemptBadges } from '../components/learning/rules.ts';
 import { Empty, ErrorBox, Loading } from '../components/ui.tsx';
 import { MODE_INFO } from '../../shared/labels.ts';
-import type { AttemptSummary, TestMode } from '../../shared/types.ts';
+import { noVerdict } from '../components/onboarding/rules.ts';
+import { useStudyStart } from '../components/onboarding/useStudyStart.ts';
+import type { ResultsPage, TestMode } from '../../shared/types.ts';
+
+const PAGE = 50;
+
+/** History filters live in the URL (#/history?page=2&mode=srs&q=…&hide=1): back from a result returns to the same page. */
+function setQuery(patch: Record<string, string | number | undefined>, current: URLSearchParams) {
+  const p = new URLSearchParams(current);
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined || v === '' || v === 0) p.delete(k);
+    else p.set(k, String(v));
+  }
+  const qs = p.toString();
+  navigate(`/history${qs ? `?${qs}` : ''}`, { replace: true });
+}
 
 export function History() {
-  const { data, error, loading } = useFetch<AttemptSummary[]>('/api/results');
-  const [mode, setMode] = useState<string>('');
-  const [q, setQ] = useState('');
-  const [hideRushed, setHideRushed] = useState(false);
-  const list = useMemo(
-    () =>
-      (data ?? []).filter((a) => {
-        if (mode === 'pearson') {
-          if (!a.pearson) return false;
-        } else if (mode && a.mode !== mode) return false;
-        if (hideRushed && a.rushed) return false;
-        return !q || a.title.toLowerCase().includes(q.toLowerCase());
-      }),
-    [data, mode, q, hideRushed],
-  );
+  const studyStart = useStudyStart(); // diagnostic / first-week short tests get no pass-fail verdict (same rule as Dashboard)
+  const { query } = useRoute();
+  const page = Math.max(0, Number(query.get('page') ?? 1) - 1) || 0;
+  const mode = query.get('mode') ?? '';
+  const q = query.get('q') ?? '';
+  const hideRushed = query.get('hide') === '1';
+  const [typed, setTyped] = useState(q);
+  useEffect(() => setTyped(q), [q]);
+  // title search: update the URL (→ refetch) once typing pauses
+  useEffect(() => {
+    if (typed === q) return;
+    const t = setTimeout(() => setQuery({ q: typed.trim() || undefined, page: undefined }, query), 300);
+    return () => clearTimeout(t);
+  }, [typed, q, query]);
+
+  const params = new URLSearchParams({ limit: String(PAGE), offset: String(page * PAGE) });
+  if (mode) params.set('mode', mode);
+  if (q) params.set('q', q);
+  if (hideRushed) params.set('rushed', '0');
+  const { data, error, loading } = useFetch<ResultsPage>(`/api/results?${params}`, [], { keep: true });
+
   if (loading && !data) return <Loading />;
-  const modes = [...new Set((data ?? []).map((a) => a.mode))];
-  const hasPearson = (data ?? []).some((a) => a.pearson);
-  const rushedCount = (data ?? []).filter((a) => a.rushed).length;
-  const counted = list.filter((a) => !a.rushed);
-  const trend = [...counted].reverse().slice(-40);
-  const skipped = list.length - counted.length;
-  const totalTime = list.reduce((s, a) => s + a.timeUsed, 0);
-  const avg = counted.length ? Math.round((counted.reduce((s, a) => s + a.score, 0) / counted.length) * 10) / 10 : 0;
+  const total = data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  const skipped = total - (data?.counted ?? 0);
+  const trend = data?.trend ?? [];
+  const filtered = !!(mode || q || hideRushed);
+  const pager = pages > 1 && (
+    <div className="row" style={{ justifyContent: 'center' }}>
+      <button className="btn sm" disabled={page === 0} onClick={() => setQuery({ page: page }, query)}>
+        ← Mới hơn
+      </button>
+      <span className="small muted">
+        Trang {page + 1}/{pages} · bài {page * PAGE + 1}–{Math.min(total, page * PAGE + PAGE)} / {total}
+      </span>
+      <button className="btn sm" disabled={page >= pages - 1} onClick={() => setQuery({ page: page + 2 }, query)}>
+        Cũ hơn →
+      </button>
+    </div>
+  );
 
   return (
     <div>
@@ -40,33 +72,39 @@ export function History() {
         <div>
           <h1>🕘 Lịch sử làm bài</h1>
           <p>
-            Mỗi bài là 1 file Markdown trong <code>trainer/results/</code>. {list.length} bài · điểm TB {avg}%{skipped ? ' (không tính bài làm vội)' : ''} · tổng{' '}
-            {fmtDuration(totalTime, { long: true })}.
+            Mỗi bài là 1 file Markdown trong <code>trainer/results/</code>. {total} bài · điểm TB {data?.avgScore ?? 0}%{skipped ? ' (không tính bài làm vội)' : ''} · tổng{' '}
+            {fmtDuration(data?.timeUsed ?? 0, { long: true })}.
           </p>
         </div>
         <div className="row">
-          <select value={mode} onChange={(e) => setMode(e.target.value)}>
+          <select value={mode} onChange={(e) => setQuery({ mode: e.target.value || undefined, page: undefined }, query)} aria-label="Lọc theo chế độ">
             <option value="">Mọi chế độ</option>
-            {modes.map((m) => (
+            {(data?.modes ?? []).map((m) => (
               <option key={m} value={m}>
                 {MODE_INFO[m as TestMode]?.label ?? m}
               </option>
             ))}
-            {hasPearson && <option value="pearson">🎓 Mô phỏng Pearson VUE</option>}
+            {(data?.pearson ?? 0) > 0 && <option value="pearson">🎓 Mô phỏng Pearson VUE</option>}
           </select>
-          <input type="search" placeholder="Tìm theo tiêu đề…" value={q} onChange={(e) => setQ(e.target.value)} />
-          {rushedCount > 0 && (
+          <input type="search" placeholder="Tìm theo tiêu đề…" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Tìm theo tiêu đề" />
+          {(data?.rushed ?? 0) > 0 && (
             <label className="row small nowrap" style={{ gap: 6 }}>
-              <input type="checkbox" checked={hideRushed} onChange={(e) => setHideRushed(e.target.checked)} /> Ẩn {rushedCount} bài làm vội
+              <input type="checkbox" checked={hideRushed} onChange={(e) => setQuery({ hide: e.target.checked ? 1 : undefined, page: undefined }, query)} /> Ẩn {data?.rushed} bài làm vội
             </label>
           )}
         </div>
       </div>
       <ErrorBox error={error} />
-      {!list.length ? (
-        <Empty icon="📭" title="Chưa có bài làm nào">
-          Bắt đầu ở mục <a href="#/new">Tạo bài test</a>.
-        </Empty>
+      {!total ? (
+        filtered ? (
+          <Empty icon="🔎" title="Không có bài nào khớp bộ lọc">
+            <a href="#/history">Bỏ lọc</a>
+          </Empty>
+        ) : (
+          <Empty icon="📭" title="Chưa có bài làm nào">
+            Bắt đầu ở mục <a href="#/new">Tạo bài test</a>.
+          </Empty>
+        )
       ) : (
         <div className="stack">
           {trend.length > 1 && (
@@ -86,7 +124,8 @@ export function History() {
               />
             </ChartCard>
           )}
-          <div className="card" style={{ padding: 6 }}>
+          {pager}
+          <div className="card" style={{ padding: 6, opacity: loading ? 0.6 : 1 }} aria-busy={loading}>
             <div className="table-wrap">
               <table className="table">
                 <thead>
@@ -101,7 +140,7 @@ export function History() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((a) => (
+                  {(data?.items ?? []).map((a) => (
                     <tr key={a.id} className={`click ${a.rushed ? 'ins-row-dim' : ''}`} onClick={() => navigate(`/result/${encodeURIComponent(a.id)}`)}>
                       <td className="nowrap small">{fmtDateTime(a.finished)}</td>
                       <td className="nowrap small">
@@ -109,7 +148,7 @@ export function History() {
                       </td>
                       <td>
                         {a.title}
-                        {(a.pearson || a.rushed) && (
+                        {attemptBadges(a).length > 0 && (
                           <div className="row" style={{ gap: 4, marginTop: 2 }}>
                             <AttemptBadges a={a} />
                           </div>
@@ -136,7 +175,11 @@ export function History() {
                         {a.timedOut ? ' ⏰' : ''}
                       </td>
                       <td>
-                        <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.passed ? '✓ Đạt' : '✗'}</span>
+                        {noVerdict(a, studyStart) ? (
+                          <span className="badge" title="Không xét đạt/chưa đạt: bài chẩn đoán, bài ngắn trong tuần đầu, bài kiểm tra lại sau khi chữa hoặc câu tự chấm (Anki, nghe, câu hỏi nhanh)">—</span>
+                        ) : (
+                          <span className={`badge ${a.passed ? 'good' : 'bad'}`}>{a.passed ? '✓ Đạt' : '✗'}</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -144,6 +187,7 @@ export function History() {
               </table>
             </div>
           </div>
+          {pager}
         </div>
       )}
     </div>

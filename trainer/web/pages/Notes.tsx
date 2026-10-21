@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useFetch } from '../lib/store.tsx';
-import { href } from '../lib/router.ts';
+import { href, navigate } from '../lib/router.ts';
 import { Markdown } from '../lib/markdown.tsx';
-import { Empty, ErrorBox, Loading, copyText, toast } from '../components/ui.tsx';
+import { Empty, ErrorBox, Loading, Tabs, copyText, toast } from '../components/ui.tsx';
+import { NotebookPanel } from '../components/NotebookPanel.tsx';
 
 interface NoteInfo {
   file: string;
@@ -11,7 +12,31 @@ interface NoteInfo {
   group: string;
 }
 
+/** #/notes — study notes (📖 Tài liệu) and [v5 τ] the mistake notebook (📒 Sổ lỗi, `?tab=notebook`, `&k=<entry key>`). */
 export function Notes({ query }: { query: URLSearchParams }) {
+  const tab = query.get('tab') === 'notebook' ? 'notebook' : 'docs';
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <h1>{tab === 'notebook' ? '📒 Sổ lỗi' : '📖 Tài liệu'}</h1>
+          <p>{tab === 'notebook' ? 'Những hiểu nhầm của riêng bạn, gom từ câu sai / chưa chắc — tài liệu ôn 48 giờ cuối.' : 'Các file lý thuyết trong repo.'}</p>
+        </div>
+      </div>
+      <Tabs
+        value={tab}
+        onChange={(t) => navigate(t === 'notebook' ? '/notes?tab=notebook' : '/notes')}
+        items={[
+          { id: 'docs', label: '📖 Tài liệu' },
+          { id: 'notebook', label: '📒 Sổ lỗi' },
+        ]}
+      />
+      {tab === 'notebook' ? <NotebookPanel focus={query.get('k') ?? undefined} /> : <Docs query={query} />}
+    </div>
+  );
+}
+
+function Docs({ query }: { query: URLSearchParams }) {
   const file = query.get('f') ?? '';
   const { data: notes } = useFetch<NoteInfo[]>('/api/notes');
   const { data, error, loading } = useFetch<{ path: string; content: string }>(file ? `/api/note?path=${encodeURIComponent(file)}` : null, [file]);
