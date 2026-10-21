@@ -57,20 +57,23 @@ function useAppBadge(due: number | undefined) {
   }, [due]);
 }
 
-type Theme = 'system' | 'light' | 'dark';
+type Theme = 'light' | 'dark';
 
+/**
+ * Dark by default; the sidebar button switches to light and back (stored per browser). Anything but an explicit 'light' —
+ * nothing stored yet, or the old 'system' value — is dark. index.html applies the same rule before React loads (no flash).
+ */
 function useTheme(): [Theme, (t: Theme) => void] {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      const t = localStorage.getItem('trainer.theme');
-      return t === 'light' || t === 'dark' ? t : 'system';
+      return localStorage.getItem('trainer.theme') === 'light' ? 'light' : 'dark';
     } catch {
-      return 'system';
+      return 'dark';
     }
   });
   useEffect(() => {
-    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#1a1a19' : '#2a78d6');
     try {
       localStorage.setItem('trainer.theme', theme);
     } catch {
@@ -299,11 +302,15 @@ export function App() {
         <div className="sidebar-foot ins-foot">
           {!practiceOnly && <SyncButton />}
           <div className="row nowrap ins-foot-row">
-            <select value={theme} onChange={(e) => setTheme(e.target.value as Theme)} aria-label="Giao diện sáng/tối" title="Giao diện: theo hệ thống, sáng hoặc tối" style={{ padding: '3px 6px', fontSize: 12 }}>
-              <option value="system">🖥 Hệ thống</option>
-              <option value="light">☀️ Sáng</option>
-              <option value="dark">🌙 Tối</option>
-            </select>
+            <button
+              type="button"
+              className="btn ghost sm theme-toggle"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label={theme === 'dark' ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'}
+              title={theme === 'dark' ? 'Đang dùng giao diện tối — bấm để chuyển sang sáng' : 'Đang dùng giao diện sáng — bấm để chuyển sang tối'}
+            >
+              {theme === 'dark' ? '☀️ Sáng' : '🌙 Tối'}
+            </button>
             <span className="spacer" />
             <LanBadge host={meta?.host} />
           </div>

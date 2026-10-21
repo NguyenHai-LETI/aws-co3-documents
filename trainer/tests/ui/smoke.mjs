@@ -251,6 +251,7 @@ try {
 
   // desktop, light
   const desk = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
+  await desk.addInitScript(() => localStorage.setItem('trainer.theme', 'light')); // the app is dark by default: keep light covered here
   const p = await desk.newPage();
   watch(p);
   for (const [hash, name] of PAGES) {
@@ -381,6 +382,7 @@ try {
 
   // mobile 390 px: no horizontal overflow
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: 'light' });
+  await mob.addInitScript(() => localStorage.setItem('trainer.theme', 'light'));
   const m = await mob.newPage();
   watch(m);
   for (const [hash, name] of PAGES) {
@@ -420,16 +422,36 @@ try {
     });
   }
 
-  // dark theme
-  const dark = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'dark' });
+  // dark theme: the default even when the OS asks for light; the sidebar button switches and is remembered
+  const dark = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' });
   const d = await dark.newPage();
   watch(d);
+  const themeOf = () => d.evaluate(() => ({ attr: document.documentElement.dataset.theme, bg: getComputedStyle(document.body).backgroundColor, stored: localStorage.getItem('trainer.theme') }));
+  const isDarkBg = (bg) => {
+    const [r, g, b] = (bg.match(/\d+/g) ?? []).map(Number);
+    return r + g + b < 120;
+  };
   for (const [hash, name] of [PAGES[0], PAGES[2], PAGES[4]]) {
     await step(`dark ${name}`, d, async () => {
       await open(d, srv.base, hash);
       await rendered(d);
+      const t = await themeOf();
+      if (t.attr !== 'dark' || !isDarkBg(t.bg)) throw new Error(`expected the dark theme by default, got ${JSON.stringify(t)}`);
     });
   }
+  await step('theme toggle: dark → light → reload → dark', d, async () => {
+    const toggle = d.locator('.theme-toggle');
+    await toggle.click();
+    let t = await themeOf();
+    if (t.attr !== 'light' || t.stored !== 'light' || isDarkBg(t.bg)) throw new Error(`toggle to light failed: ${JSON.stringify(t)}`);
+    await d.reload();
+    await rendered(d);
+    t = await themeOf();
+    if (t.attr !== 'light') throw new Error(`light not remembered after reload: ${JSON.stringify(t)}`);
+    await d.locator('.theme-toggle').click();
+    t = await themeOf();
+    if (t.attr !== 'dark' || t.stored !== 'dark') throw new Error(`toggle back to dark failed: ${JSON.stringify(t)}`);
+  });
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${failed.length ? '✗' : '✓'} UI smoke: ${results.length - failed.length}/${results.length} bước ổn · ảnh chụp: ${OUT}`);

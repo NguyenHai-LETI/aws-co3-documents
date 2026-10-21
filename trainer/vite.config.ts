@@ -13,7 +13,7 @@ function pwa(): Plugin {
     transformIndexHtml: () => [
       { tag: 'link', attrs: { rel: 'manifest', href: '/manifest.webmanifest' }, injectTo: 'head' },
       { tag: 'link', attrs: { rel: 'apple-touch-icon', href: '/icon-192.png' }, injectTo: 'head' },
-      { tag: 'meta', attrs: { name: 'theme-color', content: '#2a78d6' }, injectTo: 'head' },
+      { tag: 'meta', attrs: { name: 'theme-color', content: '#1a1a19' }, injectTo: 'head' }, // dark by default; App.tsx updates it on toggle
     ],
   };
 }

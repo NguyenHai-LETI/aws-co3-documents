@@ -39,6 +39,8 @@ npm start          # → http://localhost:3003   (OPEN=1 npm start: tự mở tr
 Hoặc **double-click** `trainer/start.command` (macOS) · `trainer/start.bat` (Windows) · `sh trainer/start.sh` (Linux):
 tự `npm install` lần đầu, chạy server và mở trình duyệt (`--lan` để mở cho điện thoại).
 
+Giao diện **tối** là mặc định; nút **☀️ Sáng / 🌙 Tối** ở cuối thanh bên (trên điện thoại: cuối thanh điều hướng) chuyển qua lại, lựa chọn được nhớ theo từng trình duyệt.
+
 Yêu cầu: **Node.js ≥ 22.18** (chạy TypeScript trực tiếp, không cần build). AI cần **Claude Code** đã đăng nhập —
 app tự tìm CLI trong `PATH`, `~/.local/bin`, `~/.claude/local`, hoặc bản CLI đi kèm extension VS Code (macOS/Linux/Windows).
 Đổi cổng: `PORT=4000 npm start`. Tuỳ chọn: **Ollama** (tìm câu trùng theo nghĩa), **Anki + AnkiConnect** (đẩy thẻ thẳng vào Anki).

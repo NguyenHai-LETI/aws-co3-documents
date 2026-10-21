@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SAA-C03 Trainer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>" />
+    <meta name="color-scheme" content="dark light" />
     <script>
+      // dark by default; only an explicit "light" (sidebar button) switches — same rule as useTheme() in web/App.tsx
+      var t = 'dark';
       try {
-        var t = localStorage.getItem('trainer.theme');
-        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        if (localStorage.getItem('trainer.theme') === 'light') t = 'light';
       } catch (e) {}
+      document.documentElement.setAttribute('data-theme', t);
     </script>
   </head>
   <body>

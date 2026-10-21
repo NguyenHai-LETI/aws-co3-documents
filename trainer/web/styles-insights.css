@@ -392,8 +392,16 @@
     margin: 0 0 0 4px;
     padding: 0;
   }
+  /* phones / narrow windows: the nav is one row — keep the light/dark button, hide the spacer and the LAN badge */
   .ins-foot .ins-foot-row {
+    display: flex;
+    flex: none;
+  }
+  .ins-foot .ins-foot-row > :not(.theme-toggle) {
     display: none;
+  }
+  .theme-toggle {
+    white-space: nowrap;
   }
   .ins-sync-btn {
     width: auto;

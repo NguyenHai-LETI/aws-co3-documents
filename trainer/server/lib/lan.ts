@@ -583,13 +583,13 @@ export function renameLanDevice(id: string, name: string): boolean {
 // ── request gate ────────────────────────────────────────────────────────────
 
 const PAGE_STYLE =
-  ":root{color-scheme:light dark;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}" +
-  'body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f4f1;color:#0b0b0b}' +
-  'main{box-sizing:border-box;width:calc(100% - 32px);max-width:400px;margin:24px 16px;padding:24px;border-radius:14px;background:#fcfcfb;border:1px solid rgba(11,11,11,.1)}' +
-  'h1{font-size:20px;margin:0 0 8px}p{color:#52514e;line-height:1.5;margin:8px 0}form{display:flex;gap:8px;margin-top:16px}' +
-  'input{flex:1;min-width:0;font:15px ui-monospace,Menlo,Consolas,monospace;padding:10px 12px;border-radius:9px;border:1px solid rgba(11,11,11,.2);background:#fff;color:inherit}' +
-  'button{font:inherit;font-weight:600;padding:10px 16px;border-radius:9px;border:0;background:#2a78d6;color:#fff}.err{color:#b3261e}' +
-  '@media (prefers-color-scheme:dark){body{background:#0d0d0d;color:#f0efec}main{background:#1a1a19;border-color:rgba(255,255,255,.1)}p{color:#c3c2b7}input{background:#232321;border-color:rgba(255,255,255,.2)}.err{color:#ef7d7d}}';
+  // dark like the app's default theme (the phone has no stored theme before it is paired)
+  ":root{color-scheme:dark;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}" +
+  'body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0d0d0d;color:#f0efec}' +
+  'main{box-sizing:border-box;width:calc(100% - 32px);max-width:400px;margin:24px 16px;padding:24px;border-radius:14px;background:#1a1a19;border:1px solid rgba(255,255,255,.1)}' +
+  'h1{font-size:20px;margin:0 0 8px}p{color:#c3c2b7;line-height:1.5;margin:8px 0}form{display:flex;gap:8px;margin-top:16px}' +
+  'input{flex:1;min-width:0;font:15px ui-monospace,Menlo,Consolas,monospace;padding:10px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.2);background:#232321;color:inherit}' +
+  'button{font:inherit;font-weight:600;padding:10px 16px;border-radius:9px;border:0;background:#2a78d6;color:#fff}.err{color:#ef7d7d}';
 
 function shell(title: string, body: string, head = ''): string {
   return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>${title}</title>${head}<style>${PAGE_STYLE}</style></head><body><main>${body}</main></body></html>`;
