@@ -175,6 +175,7 @@ A data science team needs to build, train, tune, and deploy custom ML models wit
 - tags: streaming-ingestion
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q8
 
 An e-commerce site wants real-time personalized product recommendations without building ML from scratch. Which service?
@@ -182,7 +183,7 @@ An e-commerce site wants real-time personalized product recommendations without 
 - A. Amazon Personalize
 - B. Amazon Comprehend
 - C. Amazon Kendra
-- D. Amazon Forecast
+- D. Build a custom personalization model on Amazon SageMaker
 
 **Answer:** A
 

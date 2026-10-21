@@ -133,14 +133,15 @@ A data science team must run Apache Spark and Hadoop jobs on large datasets usin
 - services: OpenSearch
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam.md#Q6
 
 A company needs full-text search and log analytics with dashboards (Kibana/OpenSearch Dashboards). Which service?
 
 - A. Amazon Redshift
-- B. Amazon QuickSight
+- B. Amazon Quick (formerly Amazon QuickSight)
 - C. Amazon OpenSearch Service
-- D. Amazon Athena
+- D. Self-managed OpenSearch cluster on EC2 instances
 
 **Answer:** C
 

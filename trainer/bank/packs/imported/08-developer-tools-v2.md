@@ -319,14 +319,15 @@ An EC2 deployment must avoid downtime by shifting traffic to a new fleet and rol
 - services: EventBridge, CodePipeline
 - difficulty: hard
 - time: 75
+- enriched: 2026-10-22
 - source: practice-exams/08-developer-tools-exam-v2.md#Q14
 
 A CodePipeline must be triggered automatically on every commit to the main branch with the lowest latency. Which integration is BEST?
 
-- A. Periodic polling only
+- A. Periodic polling for new commits
 - B. EventBridge (CloudWatch Events) rule on the repository/commit
-- C. SNS to email then manual
-- D. Manual start
+- C. SNS email alert, then a manual pipeline start
+- D. Manually starting the pipeline from the console
 
 **Answer:** B
 

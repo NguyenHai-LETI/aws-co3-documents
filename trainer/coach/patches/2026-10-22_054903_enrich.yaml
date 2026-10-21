@@ -1,0 +1,121 @@
+# Patch do app ghi từ kết quả JSON của lượt 2026-10-22_054903_enrich (coach.structured_output) — định dạng SCHEMA.md §8.
+run_id: 2026-10-22_054903_enrich
+items:
+  - id: 06-v2-10
+    base: 6a07c8adf7
+    options:
+      A: Amazon S3 for raw log storage
+      C: AWS Config resource inventory
+      D: AWS CloudTrail management event logs
+  - id: 06-v2-21
+    base: b7cc9f6d54
+    options:
+      A: StackSets for automatic cross-account updates
+      C: Manual stack deletion after a failed update
+      D: Drift detection for manual configuration review
+  - id: 06-v2-26
+    base: 463fdc897f
+    options:
+      A: CloudWatch Logs subscription filter to Amazon Data Firehose
+      B: CloudWatch Logs Insights ad-hoc queries
+      C: Config aggregator for application logs
+      E: CloudTrail data events (S3 object API calls)
+    explanation: Logs to CloudWatch + data lake = CloudWatch agent + subscription filter to Amazon Data Firehose (formerly Kinesis Data Firehose).
+  - id: 06-v2-28
+    base: 939ac63fa3
+    options:
+      A: AWS Config conformance packs
+      B: AWS Organizations tag policies
+      D: IAM identity policies in each member account
+  - id: 07-v1-15
+    base: 194f0ec5fa
+    stem: A producer must send messages larger than 1 MiB through SQS. What is the recommended approach?
+    options:
+      B: Publish through Amazon SNS instead of SQS
+      C: Use an SQS FIFO queue (same size limit)
+      D: Compress message bodies to fit the limit
+    explanation: Messages over SQS's native payload limit (1 MiB) = SQS Extended Client Library + S3.
+  - id: 08-v1-16
+    base: 0be0c09853
+    options:
+      A: Build stage with manual test scripts
+      C: A test stage running automated test suites
+      D: Source stage triggered by a commit
+  - id: 08-v2-14
+    base: 38724302b1
+    options:
+      A: Periodic polling for new commits
+      C: SNS email alert, then a manual pipeline start
+      D: Manually starting the pipeline from the console
+  - id: 09-v1-06
+    base: bfe59c327e
+    options:
+      B: Amazon Quick (formerly Amazon QuickSight)
+      D: Self-managed OpenSearch cluster on EC2 instances
+  - id: 09-v2-11
+    base: 76315f9367
+    options:
+      A: AWS Glue for batch ETL jobs
+      B: Amazon Data Firehose
+      D: Self-managed Apache Flink cluster on EC2
+  - id: 09-v2-20
+    base: d75c403121
+    options:
+      A: Redshift Spectrum for ad-hoc SQL
+      C: EMR Serverless for transient Spark workloads
+  - id: 09-v2-22
+    base: 9bdfd536d8
+    options:
+      A: Standard iterator sharing the 2 MB/s per shard
+      B: A single consumer reading every shard via KCL
+      D: Amazon Data Firehose (single delivery stream)
+  - id: 09-v2-24
+    base: 69bf4ab050
+    options:
+      A: Store one file per date without partitioning
+  - id: 09-v2-27
+    base: f43525c201
+    options:
+      A: Athena federated query connector
+      B: Amazon Data Firehose (to OpenSearch)
+      C: Kinesis Data Streams with a custom consumer writing to OpenSearch
+      D: AWS Glue crawler cataloging S3 data
+    explanation: Buffered transform delivery to OpenSearch = Amazon Data Firehose (formerly Kinesis Data Firehose).
+  - id: 10-v1-02
+    base: 88eb1b566b
+    options:
+      A: AWS Glue, a schema cataloging tool
+      B: AWS DMS replicates data without converting the schema
+      C: AWS DataSync for file and object transfer
+  - id: 10-v1-12
+    base: 0cb3295c50
+    options:
+      A: AWS Config resource discovery for AWS compliance
+      C: AWS Migration Hub for tracking migration progress
+      D: Amazon Inspector vulnerability scans
+  - id: 10-v1-14
+    base: 220b841e3c
+    options:
+      A: Snowball Edge Storage Optimized for bulk storage
+      B: Storage capacity without onboard compute
+      D: Continuous DB replication to the cloud
+  - id: 10-v2-14
+    base: d6cc949a9a
+    options:
+      B: AWS Migration Hub for migration tracking
+      C: AWS DMS for live database replication
+      D: AWS Compute Optimizer for existing resources
+  - id: 11-v2-14
+    base: 4287b7f9e1
+    options:
+      C: No need for API Gateway WAF integration
+      D: Native OIDC/JWT authorizers for the API
+      E: Lowest cost and latency for a simple API
+  - id: 12-v1-08
+    base: 8c6caaab61
+    options:
+      D: Build a custom personalization model on Amazon SageMaker
+  - id: 12-v2-09
+    base: ab5d849e42
+    options:
+      C: Build a custom personalized-recommendation model on SageMaker

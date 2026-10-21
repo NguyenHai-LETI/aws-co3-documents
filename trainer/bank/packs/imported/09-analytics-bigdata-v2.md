@@ -247,15 +247,16 @@ Redshift must query data in S3 without loading it into the cluster. Which featur
 - services: Managed Apache Flink
 - tags: streaming-ingestion
 - difficulty: medium
-- time: 55
+- time: 60
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q11
 
 A streaming pipeline must transform and enrich records in real time using SQL/Apache Flink. Which service?
 
-- A. Glue
-- B. Kinesis Data Firehose
+- A. AWS Glue for batch ETL jobs
+- B. Amazon Data Firehose
 - C. Kinesis Data Analytics (Managed Service for Apache Flink)
-- D. Athena
+- D. Self-managed Apache Flink cluster on EC2
 
 **Answer:** C
 
@@ -457,14 +458,15 @@ A pipeline must load transformed data into Redshift daily and support complex jo
 - topic: analytics
 - services: EMR
 - difficulty: medium
-- time: 55
+- time: 60
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q20
 
 A team needs to run Spark jobs on transient clusters that spin up, process, and terminate to save cost. Which service + option?
 
-- A. Redshift Spectrum
+- A. Redshift Spectrum for ad-hoc SQL
 - B. EMR always-on cluster
-- C. Glue crawler only
+- C. EMR Serverless for transient Spark workloads
 - D. EMR with transient clusters (auto-terminate)
 
 **Answer:** D
@@ -502,15 +504,16 @@ A Kinesis Data Stream must ingest 5,000 records/sec, each 2 KB. Each shard suppo
 - topic: analytics
 - tags: sharding, fan-out
 - difficulty: hard
-- time: 75
+- time: 80
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q22
 
 Multiple independent consumers must each read the full stream at full throughput without contending for the 2 MB/s per-shard read limit. Which feature?
 
-- A. Standard iterator only
-- B. More visibility timeout
+- A. Standard iterator sharing the 2 MB/s per shard
+- B. A single consumer reading every shard via KCL
 - C. Enhanced fan-out (dedicated 2 MB/s per consumer)
-- D. Firehose delivery
+- D. Amazon Data Firehose (single delivery stream)
 
 **Answer:** C
 
@@ -549,11 +552,12 @@ An analytics platform must guarantee ordering of events per user while scaling a
 - tags: columnar-formats
 - difficulty: hard
 - time: 95
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q24
 
 A company must minimize Athena cost on a multi-TB dataset queried by date. Which two design choices help MOST? (Choose TWO)
 
-- A. Always SELECT *
+- A. Store one file per date without partitioning
 - B. Partition by date (e.g., year/month/day prefixes)
 - C. Store as one giant JSON file
 - D. Use columnar compressed formats (Parquet)
@@ -618,19 +622,20 @@ A company compares MSK vs Kinesis Data Streams. Which two are advantages of MSK?
 - services: Data Firehose, OpenSearch
 - tags: streaming-ingestion
 - difficulty: hard
-- time: 75
+- time: 80
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q27
 
 A near-real-time dashboard must be fed from a stream, buffering and delivering to OpenSearch with transformation. Which service handles delivery with format conversion and buffering?
 
-- A. Athena federation
-- B. Kinesis Data Firehose (to OpenSearch)
-- C. Kinesis Data Streams alone
-- D. Glue crawler
+- A. Athena federated query connector
+- B. Amazon Data Firehose (to OpenSearch)
+- C. Kinesis Data Streams with a custom consumer writing to OpenSearch
+- D. AWS Glue crawler cataloging S3 data
 
 **Answer:** B
 
-**Explanation:** Buffered transform delivery to OpenSearch = Kinesis Data Firehose.
+**Explanation:** Buffered transform delivery to OpenSearch = Amazon Data Firehose (formerly Kinesis Data Firehose).
 
 ---
 

@@ -323,16 +323,17 @@ An edge-optimized REST API serving global users must reduce latency for clients 
 - task: 3.3
 - topic: api
 - difficulty: hard
-- time: 95
+- time: 100
+- enriched: 2026-10-22
 - source: practice-exams/11-api-integration-exam-v2.md#Q14
 
 Choosing between REST API and HTTP API — which two are reasons to pick REST API? (Choose TWO)
 
 - A. Need API caching
 - B. Need request/response mapping templates and usage plans/API keys
-- C. No need for WAF integration
-- D. Native OIDC/JWT only with no advanced features
-- E. Lowest cost and latency with minimal features
+- C. No need for API Gateway WAF integration
+- D. Native OIDC/JWT authorizers for the API
+- E. Lowest cost and latency for a simple API
 
 **Answer:** A, B
 

@@ -42,14 +42,15 @@ A company migrates an on-premises MySQL database to Amazon RDS MySQL with minima
 - topic: migration
 - services: SCT, Aurora
 - difficulty: easy
-- time: 45
+- time: 50
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q2
 
 An Oracle database must be migrated to Amazon Aurora PostgreSQL (different engine). Which tool converts the schema?
 
-- A. AWS Glue
-- B. AWS DMS only
-- C. AWS DataSync
+- A. AWS Glue, a schema cataloging tool
+- B. AWS DMS replicates data without converting the schema
+- C. AWS DataSync for file and object transfer
 - D. AWS Schema Conversion Tool (SCT)
 
 **Answer:** D
@@ -265,15 +266,16 @@ Which DMS migration is "homogeneous" and does NOT require SCT?
 - services: Application Discovery Service, Migration Evaluator
 - tags: right-sizing
 - difficulty: easy
-- time: 45
+- time: 50
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q12
 
 A company wants to discover on-premises server dependencies and right-size before migrating. Which tool helps plan the migration?
 
-- A. AWS Config
+- A. AWS Config resource discovery for AWS compliance
 - B. AWS Application Discovery Service / Migration Evaluator
-- C. AWS Budgets
-- D. Amazon Inspector
+- C. AWS Migration Hub for tracking migration progress
+- D. Amazon Inspector vulnerability scans
 
 **Answer:** B
 
@@ -310,15 +312,16 @@ Which is the BEST reason to choose Snowball Edge over network transfer (DataSync
 - topic: migration
 - services: Snow Family
 - difficulty: easy
-- time: 45
+- time: 50
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q14
 
 A Snowball Edge Compute Optimized device is chosen primarily because the use case also needs:
 
-- A. Petabyte-scale capacity
-- B. Only storage capacity
+- A. Snowball Edge Storage Optimized for bulk storage
+- B. Storage capacity without onboard compute
 - C. Local compute/edge processing during the transfer
-- D. Continuous DB replication
+- D. Continuous DB replication to the cloud
 
 **Answer:** C
 

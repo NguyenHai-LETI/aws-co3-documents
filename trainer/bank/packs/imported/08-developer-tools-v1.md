@@ -357,14 +357,15 @@ Which is a valid reason to choose CodeBuild over self-managed build servers on E
 - services: CodePipeline
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/08-developer-tools-exam.md#Q16
 
 A release process must require manual sign-off before deploying to production. Which CodePipeline feature?
 
-- A. Build stage
+- A. Build stage with manual test scripts
 - B. Manual approval action
-- C. Test stage only
-- D. Source stage
+- C. A test stage running automated test suites
+- D. Source stage triggered by a commit
 
 **Answer:** B
 

@@ -1,0 +1,150 @@
+{
+ "run": "2026-10-22_054903_enrich",
+ "task": "enrich",
+ "created": "2026-10-22T06:03:13+07:00",
+ "updated": "2026-10-22T06:03:13+07:00",
+ "questions": {
+  "06-v2-10": {
+   "file": "bank/packs/imported/06-management-governance-v2.md",
+   "before": "## Q 06-v2-10\n- domain: secure\n- task: 1.3\n- topic: management\n- services: CloudWatch, EC2\n- difficulty: medium\n- time: 50\n- source: practice-exams/06-management-governance-exam-v2.md#Q10\n\nApplication logs from EC2 must be centralized, searchable, and retained. Which service?\n\n- A. S3 only\n- B. CloudWatch Logs\n- C. AWS Config\n- D. CloudTrail\n\n**Answer:** B\n\n**Explanation:** Centralized searchable app logs = CloudWatch Logs.",
+   "beforeSig": "33d41fc51f0e",
+   "afterSig": "3aa1bb84bd13",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "06-v2-21": {
+   "file": "bank/packs/imported/06-management-governance-v2.md",
+   "before": "## Q 06-v2-21\n- domain: secure\n- task: 1.2\n- topic: management\n- services: CloudFormation\n- difficulty: hard\n- time: 70\n- source: practice-exams/06-management-governance-exam-v2.md#Q21\n\nA CloudFormation update fails midway. The team wants automatic return to the last known good state. Which behavior/feature applies?\n\n- A. StackSets\n- B. Manual deletion only\n- C. Automatic rollback on stack update failure\n- D. Drift detection\n\n**Answer:** C\n\n**Explanation:** Return to last good state on failed update = automatic rollback.",
+   "beforeSig": "e62445b6eb16",
+   "afterSig": "a4b12021eb1e",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "06-v2-26": {
+   "file": "bank/packs/imported/06-management-governance-v2.md",
+   "before": "## Q 06-v2-26\n- domain: performance\n- task: 3.5\n- topic: management\n- services: CloudWatch, Data Firehose, EC2\n- tags: streaming-ingestion, data-lake\n- difficulty: hard\n- time: 100\n- source: practice-exams/06-management-governance-exam-v2.md#Q26\n\nA company needs to forward EC2 application logs to CloudWatch Logs and also stream them in near real-time to a data lake for analytics. Which two? (Choose TWO)\n\n- A. CloudWatch Logs subscription filter to Kinesis Data Firehose\n- B. Trusted Advisor export\n- C. Config aggregator\n- D. CloudWatch agent on the instances\n- E. CloudTrail data events\n\n**Answer:** A, D\n\n**Explanation:** Logs to CloudWatch + data lake = CloudWatch agent + subscription filter to Kinesis Firehose.",
+   "beforeSig": "05b8b6251096",
+   "afterSig": "1644fab2c157",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "06-v2-28": {
+   "file": "bank/packs/imported/06-management-governance-v2.md",
+   "before": "## Q 06-v2-28\n- domain: secure\n- task: 1.1\n- topic: management\n- services: Organizations, CloudTrail\n- tags: scp\n- difficulty: hard\n- time: 70\n- source: practice-exams/06-management-governance-exam-v2.md#Q28\n\nA company must enforce that member accounts cannot disable CloudTrail or leave the Organization. Which service enforces this guardrail?\n\n- A. Config rules only\n- B. Security Groups\n- C. Service Control Policies (SCPs) via AWS Organizations\n- D. IAM policies per user\n\n**Answer:** C\n\n**Explanation:** Prevent disabling CloudTrail / leaving org = SCPs via Organizations.",
+   "beforeSig": "84bd0a90857c",
+   "afterSig": "177f305259ce",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "07-v1-15": {
+   "file": "bank/packs/imported/07-application-integration-v1.md",
+   "before": "## Q 07-v1-15\n- domain: resilient\n- task: 2.1\n- topic: integration\n- services: SQS, S3\n- tags: sqs-large-messages\n- difficulty: easy\n- time: 50\n- source: practice-exams/07-application-integration-exam.md#Q15\n\nA producer must send messages larger than 256 KB through SQS. What is the recommended approach?\n\n- A. Use the SQS Extended Client Library with payloads stored in S3\n- B. Switch to SNS\n- C. Use a FIFO queue\n- D. Compress and hope it fits\n\n**Answer:** A\n\n**Explanation:** >256 KB messages = SQS Extended Client + S3.",
+   "beforeSig": "6bc3a36adf38",
+   "afterSig": "b0eb1f98eba5",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "08-v1-16": {
+   "file": "bank/packs/imported/08-developer-tools-v1.md",
+   "before": "## Q 08-v1-16\n- domain: resilient\n- task: 2.2\n- topic: devtools\n- services: CodePipeline\n- difficulty: easy\n- time: 45\n- source: practice-exams/08-developer-tools-exam.md#Q16\n\nA release process must require manual sign-off before deploying to production. Which CodePipeline feature?\n\n- A. Build stage\n- B. Manual approval action\n- C. Test stage only\n- D. Source stage\n\n**Answer:** B\n\n**Explanation:** Production sign-off = Manual approval action.",
+   "beforeSig": "3e04c45a8318",
+   "afterSig": "116f0d0ec3b1",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "08-v2-14": {
+   "file": "bank/packs/imported/08-developer-tools-v2.md",
+   "before": "## Q 08-v2-14\n- domain: performance\n- task: 3.2\n- topic: devtools\n- services: EventBridge, CodePipeline\n- difficulty: hard\n- time: 75\n- source: practice-exams/08-developer-tools-exam-v2.md#Q14\n\nA CodePipeline must be triggered automatically on every commit to the main branch with the lowest latency. Which integration is BEST?\n\n- A. Periodic polling only\n- B. EventBridge (CloudWatch Events) rule on the repository/commit\n- C. SNS to email then manual\n- D. Manual start\n\n**Answer:** B\n\n**Explanation:** Low-latency pipeline trigger on commit = EventBridge rule on the repo.",
+   "beforeSig": "754cb7dd6ef2",
+   "afterSig": "06c92b6b0872",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "09-v1-06": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-06\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: OpenSearch\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q6\n\nA company needs full-text search and log analytics with dashboards (Kibana/OpenSearch Dashboards). Which service?\n\n- A. Amazon Redshift\n- B. Amazon QuickSight\n- C. Amazon OpenSearch Service\n- D. Amazon Athena\n\n**Answer:** C\n\n**Explanation:** Full-text search + log dashboards = OpenSearch Service.",
+   "beforeSig": "6bce2049996a",
+   "afterSig": "d92b38d373f5",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "09-v2-11": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-11\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Managed Apache Flink\n- tags: streaming-ingestion\n- difficulty: medium\n- time: 55\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q11\n\nA streaming pipeline must transform and enrich records in real time using SQL/Apache Flink. Which service?\n\n- A. Glue\n- B. Kinesis Data Firehose\n- C. Kinesis Data Analytics (Managed Service for Apache Flink)\n- D. Athena\n\n**Answer:** C\n\n**Explanation:** Real-time SQL/Flink stream processing = Kinesis Data Analytics (Managed Flink).",
+   "beforeSig": "20b069966641",
+   "afterSig": "3d846074c2d7",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "09-v2-20": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-20\n- domain: cost\n- task: 4.2\n- topic: analytics\n- services: EMR\n- difficulty: medium\n- time: 55\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q20\n\nA team needs to run Spark jobs on transient clusters that spin up, process, and terminate to save cost. Which service + option?\n\n- A. Redshift Spectrum\n- B. EMR always-on cluster\n- C. Glue crawler only\n- D. EMR with transient clusters (auto-terminate)\n\n**Answer:** D\n\n**Explanation:** Cost-saving Spark = EMR transient auto-terminating clusters.",
+   "beforeSig": "9620ef5486f0",
+   "afterSig": "acad6450a5b1",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "09-v2-22": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-22\n- domain: performance\n- task: 3.2\n- topic: analytics\n- tags: sharding, fan-out\n- difficulty: hard\n- time: 75\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q22\n\nMultiple independent consumers must each read the full stream at full throughput without contending for the 2 MB/s per-shard read limit. Which feature?\n\n- A. Standard iterator only\n- B. More visibility timeout\n- C. Enhanced fan-out (dedicated 2 MB/s per consumer)\n- D. Firehose delivery\n\n**Answer:** C\n\n**Explanation:** Multiple full-throughput consumers = enhanced fan-out.",
+   "beforeSig": "e2b971239562",
+   "afterSig": "939d679502be",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "09-v2-24": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-24\n- domain: cost\n- task: 4.1\n- topic: analytics\n- services: Athena\n- tags: columnar-formats\n- difficulty: hard\n- time: 95\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q24\n\nA company must minimize Athena cost on a multi-TB dataset queried by date. Which two design choices help MOST? (Choose TWO)\n\n- A. Always SELECT *\n- B. Partition by date (e.g., year/month/day prefixes)\n- C. Store as one giant JSON file\n- D. Use columnar compressed formats (Parquet)\n- E. Disable partition projection\n\n**Answer:** B, D\n\n**Explanation:** Minimize Athena cost = partition by date + Parquet columnar.",
+   "beforeSig": "4ea1fc6f7661",
+   "afterSig": "9dc84f4c02ba",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "09-v2-27": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-27\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Data Firehose, OpenSearch\n- tags: streaming-ingestion\n- difficulty: hard\n- time: 75\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q27\n\nA near-real-time dashboard must be fed from a stream, buffering and delivering to OpenSearch with transformation. Which service handles delivery with format conversion and buffering?\n\n- A. Athena federation\n- B. Kinesis Data Firehose (to OpenSearch)\n- C. Kinesis Data Streams alone\n- D. Glue crawler\n\n**Answer:** B\n\n**Explanation:** Buffered transform delivery to OpenSearch = Kinesis Data Firehose.",
+   "beforeSig": "e3e26cf224cb",
+   "afterSig": "3a4d2b469cb4",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "10-v1-02": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-02\n- domain: performance\n- task: 3.3\n- topic: migration\n- services: SCT, Aurora\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q2\n\nAn Oracle database must be migrated to Amazon Aurora PostgreSQL (different engine). Which tool converts the schema?\n\n- A. AWS Glue\n- B. AWS DMS only\n- C. AWS DataSync\n- D. AWS Schema Conversion Tool (SCT)\n\n**Answer:** D\n\n**Explanation:** Convert different-engine schema = Schema Conversion Tool (SCT).",
+   "beforeSig": "aeedcbd6209f",
+   "afterSig": "9e892ace9930",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "10-v1-12": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-12\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Application Discovery Service, Migration Evaluator\n- tags: right-sizing\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q12\n\nA company wants to discover on-premises server dependencies and right-size before migrating. Which tool helps plan the migration?\n\n- A. AWS Config\n- B. AWS Application Discovery Service / Migration Evaluator\n- C. AWS Budgets\n- D. Amazon Inspector\n\n**Answer:** B\n\n**Explanation:** Discover dependencies/right-size = Application Discovery Service/Migration Evaluator.",
+   "beforeSig": "08ab62c368bb",
+   "afterSig": "4bc2a0d1215d",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "10-v1-14": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-14\n- domain: performance\n- task: 3.2\n- topic: migration\n- services: Snow Family\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q14\n\nA Snowball Edge Compute Optimized device is chosen primarily because the use case also needs:\n\n- A. Petabyte-scale capacity\n- B. Only storage capacity\n- C. Local compute/edge processing during the transfer\n- D. Continuous DB replication\n\n**Answer:** C\n\n**Explanation:** Compute Optimized = local/edge compute during transfer.",
+   "beforeSig": "2f46977eb427",
+   "afterSig": "b4f65714bcec",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "10-v2-14": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-14\n- domain: cost\n- task: 4.4\n- topic: migration\n- services: Migration Evaluator\n- difficulty: hard\n- time: 65\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q14\n\nA company wants recommendations on the cost of running on-premises workloads in AWS before migrating. Which service?\n\n- A. AWS Migration Evaluator\n- B. AWS Config\n- C. AWS DMS\n- D. Compute Optimizer\n\n**Answer:** A\n\n**Explanation:** Pre-migration cost recommendations = Migration Evaluator.",
+   "beforeSig": "e716fcd32992",
+   "afterSig": "438127d9c3ac",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "11-v2-14": {
+   "file": "bank/packs/imported/11-api-integration-v2.md",
+   "before": "## Q 11-v2-14\n- domain: performance\n- task: 3.3\n- topic: api\n- difficulty: hard\n- time: 95\n- source: practice-exams/11-api-integration-exam-v2.md#Q14\n\nChoosing between REST API and HTTP API — which two are reasons to pick REST API? (Choose TWO)\n\n- A. Need API caching\n- B. Need request/response mapping templates and usage plans/API keys\n- C. No need for WAF integration\n- D. Native OIDC/JWT only with no advanced features\n- E. Lowest cost and latency with minimal features\n\n**Answer:** A, B\n\n**Explanation:** REST API reasons = caching + mapping templates/usage plans/API keys.",
+   "beforeSig": "9f248b286aec",
+   "afterSig": "b8c7516ae387",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "12-v1-08": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-08\n- domain: performance\n- task: 3.5\n- topic: ml\n- services: Personalize\n- tags: streaming-ingestion\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q8\n\nAn e-commerce site wants real-time personalized product recommendations without building ML from scratch. Which service?\n\n- A. Amazon Personalize\n- B. Amazon Comprehend\n- C. Amazon Kendra\n- D. Amazon Forecast\n\n**Answer:** A\n\n**Explanation:** Real-time recommendations = Personalize.",
+   "beforeSig": "9d90ba3651d6",
+   "afterSig": "7265bae842cc",
+   "at": "2026-10-22T06:03:13+07:00"
+  },
+  "12-v2-09": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-09\n- domain: performance\n- task: 3.5\n- topic: ml\n- services: Personalize\n- tags: streaming-ingestion\n- difficulty: medium\n- time: 50\n- source: practice-exams/12-ml-ai-exam-v2.md#Q9\n\nAn e-commerce site wants real-time personalized product recommendations. Which service?\n\n- A. Amazon Personalize\n- B. Amazon Rekognition\n- C. Amazon Forecast\n- D. Amazon Kendra\n\n**Answer:** A\n\n**Explanation:** Real-time personalized recommendations = Amazon Personalize.",
+   "beforeSig": "99ef84a7a90b",
+   "afterSig": "99eec289238a",
+   "at": "2026-10-22T06:03:13+07:00"
+  }
+ },
+ "createdIds": [],
+ "packs": []
+}

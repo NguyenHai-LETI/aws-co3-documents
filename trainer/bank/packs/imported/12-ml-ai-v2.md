@@ -198,13 +198,14 @@ A company wants an intelligent enterprise search service over internal documents
 - tags: streaming-ingestion
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam-v2.md#Q9
 
 An e-commerce site wants real-time personalized product recommendations. Which service?
 
 - A. Amazon Personalize
 - B. Amazon Rekognition
-- C. Amazon Forecast
+- C. Build a custom personalized-recommendation model on SageMaker
 - D. Amazon Kendra
 
 **Answer:** A

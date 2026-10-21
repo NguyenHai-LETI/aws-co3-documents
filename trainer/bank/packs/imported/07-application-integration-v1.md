@@ -336,19 +336,20 @@ A retail app must send order confirmations via email and SMS to customers. Which
 - services: SQS, S3
 - tags: sqs-large-messages
 - difficulty: easy
-- time: 50
+- time: 55
+- enriched: 2026-10-22
 - source: practice-exams/07-application-integration-exam.md#Q15
 
-A producer must send messages larger than 256 KB through SQS. What is the recommended approach?
+A producer must send messages larger than 1 MiB through SQS. What is the recommended approach?
 
 - A. Use the SQS Extended Client Library with payloads stored in S3
-- B. Switch to SNS
-- C. Use a FIFO queue
-- D. Compress and hope it fits
+- B. Publish through Amazon SNS instead of SQS
+- C. Use an SQS FIFO queue (same size limit)
+- D. Compress message bodies to fit the limit
 
 **Answer:** A
 
-**Explanation:** >256 KB messages = SQS Extended Client + S3.
+**Explanation:** Messages over SQS's native payload limit (1 MiB) = SQS Extended Client Library + S3.
 
 ---
 

@@ -321,15 +321,16 @@ DataSync vs Storage Gateway vs Transfer Family — which statement is TRUE?
 - topic: migration
 - services: Migration Evaluator
 - difficulty: hard
-- time: 65
+- time: 75
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q14
 
 A company wants recommendations on the cost of running on-premises workloads in AWS before migrating. Which service?
 
 - A. AWS Migration Evaluator
-- B. AWS Config
-- C. AWS DMS
-- D. Compute Optimizer
+- B. AWS Migration Hub for migration tracking
+- C. AWS DMS for live database replication
+- D. AWS Compute Optimizer for existing resources
 
 **Answer:** A
 

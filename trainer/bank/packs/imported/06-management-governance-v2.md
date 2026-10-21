@@ -221,15 +221,16 @@ A company must evaluate whether S3 buckets are ever public and auto-remediate. W
 - topic: management
 - services: CloudWatch, EC2
 - difficulty: medium
-- time: 50
+- time: 55
+- enriched: 2026-10-22
 - source: practice-exams/06-management-governance-exam-v2.md#Q10
 
 Application logs from EC2 must be centralized, searchable, and retained. Which service?
 
-- A. S3 only
+- A. Amazon S3 for raw log storage
 - B. CloudWatch Logs
-- C. AWS Config
-- D. CloudTrail
+- C. AWS Config resource inventory
+- D. AWS CloudTrail management event logs
 
 **Answer:** B
 
@@ -466,15 +467,16 @@ A company must ensure CloudTrail logs cannot be tampered with and are retained c
 - topic: management
 - services: CloudFormation
 - difficulty: hard
-- time: 70
+- time: 75
+- enriched: 2026-10-22
 - source: practice-exams/06-management-governance-exam-v2.md#Q21
 
 A CloudFormation update fails midway. The team wants automatic return to the last known good state. Which behavior/feature applies?
 
-- A. StackSets
+- A. StackSets for automatic cross-account updates
 - B. Manual deletion only
-- C. Automatic rollback on stack update failure
-- D. Drift detection
+- C. Manual stack deletion after a failed update
+- D. Drift detection for manual configuration review
 
 **Answer:** C
 
@@ -581,19 +583,20 @@ A CloudFormation deployment across 500 accounts in an Organization must be autom
 - tags: streaming-ingestion, data-lake
 - difficulty: hard
 - time: 100
+- enriched: 2026-10-22
 - source: practice-exams/06-management-governance-exam-v2.md#Q26
 
 A company needs to forward EC2 application logs to CloudWatch Logs and also stream them in near real-time to a data lake for analytics. Which two? (Choose TWO)
 
-- A. CloudWatch Logs subscription filter to Kinesis Data Firehose
-- B. Trusted Advisor export
-- C. Config aggregator
+- A. CloudWatch Logs subscription filter to Amazon Data Firehose
+- B. CloudWatch Logs Insights ad-hoc queries
+- C. Config aggregator for application logs
 - D. CloudWatch agent on the instances
-- E. CloudTrail data events
+- E. CloudTrail data events (S3 object API calls)
 
 **Answer:** A, D
 
-**Explanation:** Logs to CloudWatch + data lake = CloudWatch agent + subscription filter to Kinesis Firehose.
+**Explanation:** Logs to CloudWatch + data lake = CloudWatch agent + subscription filter to Amazon Data Firehose (formerly Kinesis Data Firehose).
 
 ---
 
@@ -627,15 +630,16 @@ A stateful resource in a stack must be preserved on delete AND a snapshot taken 
 - services: Organizations, CloudTrail
 - tags: scp
 - difficulty: hard
-- time: 70
+- time: 75
+- enriched: 2026-10-22
 - source: practice-exams/06-management-governance-exam-v2.md#Q28
 
 A company must enforce that member accounts cannot disable CloudTrail or leave the Organization. Which service enforces this guardrail?
 
-- A. Config rules only
-- B. Security Groups
+- A. AWS Config conformance packs
+- B. AWS Organizations tag policies
 - C. Service Control Policies (SCPs) via AWS Organizations
-- D. IAM policies per user
+- D. IAM identity policies in each member account
 
 **Answer:** C
 
