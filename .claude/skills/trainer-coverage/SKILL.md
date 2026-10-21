@@ -2,14 +2,16 @@
 name: trainer-coverage
 description: Đo độ phủ ngân hàng câu hỏi AWS SAA-C03 (trainer/) so với exam guide — tỉ lệ domain so với trọng số đề, số câu theo task 1.1–4.4, service chưa có câu, câu nghi bị phân loại sai — rồi lập kế hoạch bổ sung và (khi được yêu cầu) sinh câu đúng chỗ thiếu. Dùng khi người dùng hỏi "ngân hàng đủ chưa", "thiếu câu phần nào", "độ phủ", "coverage", "domain nào ít câu".
 argument-hint: "[trống = báo cáo + kế hoạch | sinh = sinh luôn câu cho chỗ thiếu]"
-allowed-tools: Bash(node trainer/scripts/coverage.ts), Bash(node trainer/scripts/coverage.ts *), Bash(node trainer/scripts/enrich-batch.ts *), Edit(trainer/coach/coverage.md)
+allowed-tools: Bash(node trainer/scripts/coverage.ts), Bash(node trainer/scripts/coverage.ts *), Bash(node trainer/scripts/enrich-batch.ts *), Bash(node trainer/scripts/coach-run.ts --generate *), Bash(node trainer/scripts/coach-run.ts --longform *), Edit(trainer/coach/coverage.md)
 ---
 
 Working directory = gốc repo. Skill này đo và lập kế hoạch; chỉ ghi `trainer/coach/coverage.md` (và pack mới khi chạy bước 6).
 Không sửa `practice-exams/`, notes hay pack có sẵn.
 
 1. **Số liệu:** `node trainer/scripts/coverage.ts` — domain so với trọng số đề, task statement (⚠️ = dưới 50 % kỳ vọng), service trong taxonomy
-   chưa có/có ít câu, câu có qualifier lệch domain. Dùng đúng các con số này, không tự đếm lại.
+   chưa có/có ít câu, câu có qualifier lệch domain, và **mục 5: đề cương chính thức** (189 mục Knowledge/Skills trong `trainer/bank/exam-guide/`,
+   cùng số liệu với app → Ngân hàng → Chất lượng → 🗺️ Đề cương): câu / câu dài theo task, mục chưa có câu nào, tỉ lệ câu nhiều đáp án.
+   Dùng đúng các con số này, không tự đếm lại. Báo cáo không bao giờ liệt kê câu đang niêm phong — đừng tìm hay nêu id của chúng.
 2. **Tách “phân loại sai” khỏi “thiếu thật”** trước khi kết luận:
    - Cột *Chưa ENRICH*: domain/task của câu chưa qua ENRICH được gán bằng từ khoá với mặc định theo chương (chương 01, 02, 04, 09–12, 14 mặc định
      *performance*) — D3 bị thổi phồng, D1/D4 bị thiếu. Nói rõ con số còn tạm thời khi phần lớn câu chưa ENRICH.
@@ -36,7 +38,9 @@ Không sửa `practice-exams/`, notes hay pack có sẵn.
    *Cách bổ sung*: `/trainer-generate` (sources = notes, count, topic, focus) · `/trainer-enrich ids: …` (phân loại lại) ·
    `/trainer-enrich câu dài` (task có câu nhưng không có câu dài). Mục tiêu hợp lý: đưa task ⚠️ lên ≥ 50 % kỳ vọng trước; 10–20 câu mỗi lượt sinh;
    câu `medium`/`hard` dạng câu dài.
-6. **Sinh câu** — chỉ khi `$ARGUMENTS` có “sinh” hoặc người dùng đồng ý sau khi xem kế hoạch: chạy tối đa 3 lượt skill `trainer-generate`, mỗi lượt
+6. **Sinh câu** — chỉ khi `$ARGUMENTS` có “sinh” hoặc người dùng đồng ý sau khi xem kế hoạch. Ưu tiên nhắm thẳng mục đề cương trống:
+   `node trainer/scripts/coach-run.ts --generate --skills <id,…> --count 6` (câu mới phải gắn đúng mục đó; qua lint + giải mù như mọi câu AI),
+   hoặc `--longform --skills <id,…>` cho task thiếu câu dài; tối đa 3 lượt. Hoặc chạy tối đa 3 lượt skill `trainer-generate`, mỗi lượt
    một dòng của kế hoạch, truyền `sources` (notes), `count`, `topic`, và `focus` = task statement + khái niệm cụ thể
    (vd “4.3 — DynamoDB on-demand vs provisioned, Aurora Serverless v2, caching để giảm chi phí đọc”). Xong thì chạy lại
    `node trainer/scripts/coverage.ts` và cập nhật mục 4 của `coverage.md`.

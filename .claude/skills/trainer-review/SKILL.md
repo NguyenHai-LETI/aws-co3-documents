@@ -23,7 +23,11 @@ Skill này **chỉ soát**: không sửa pack, không retire câu, không sửa 
    b. Câu có `- created:` từ mốc trở đi trong `trainer/bank/packs/**` (pack của coach, pack từ tài liệu, câu dài, câu mới nhập từ practice-exams).
    c. Câu có `- enriched:` từ mốc trở đi (giải thích / gợi ý vừa viết lại).
    Tìm bằng Grep `^- (created|enriched): ` trong `trainer/bank/packs` rồi lọc theo ngày; pack mới chưa commit: `git ls-files --others --exclude-standard trainer/bank/packs`.
+   Gồm cả pack câu song sinh / họ câu (`*-twins-*`, câu có `- family:`) và patch `*_twins*` / `*_family*` của v5.
 3. Tối đa ~40 câu mỗi lượt (a → b → c). Phần còn lại ghi vào báo cáo, mục *Để lượt sau*.
+4. **Bỏ qua câu đang niêm phong**: id nằm trong một form `status: sealed` của `trainer/results/sealed.md`. Đừng soát, đừng ghi issue,
+   **không bao giờ nêu id hay nội dung** các câu đó ở issues.md hay báo cáo (cả hai được đồng bộ và người học đọc được) — báo cáo chỉ ghi
+   *"N câu niêm phong bỏ qua"*. Chúng được soát sau khi form được dùng hoặc mở sớm.
 
 ## 2. Soát từng câu (block `## Q <id>` trong pack)
 
@@ -33,7 +37,8 @@ Skill này **chỉ soát**: không sửa pack, không retire câu, không sửa 
 2. **So với `**Answer:**`** và phân loại lỗi (loại = mã app hiểu):
    - `wrong-key`: đáp án ghi nhận không phải đáp án tốt nhất.
    - `ambiguous`: từ 2 lựa chọn cùng đúng, đề thiếu ràng buộc để phân định, hoặc câu `(Choose TWO)` mà số đáp án ≠ 2.
-   - `outdated`: dựa trên giới hạn / hành vi / tên dịch vụ AWS đã thay đổi.
+   - `outdated`: dựa trên giới hạn / hành vi / tên dịch vụ AWS đã thay đổi (đối chiếu danh sách `currency:` trong `trainer/bank/taxonomy.yaml`;
+     câu có lint `stale-fact` thì xác nhận và ghi tên mới kiểu "tên mới (tên cũ)").
    - `explanation`: giải thích sai sự thật, con số sai, lý do loại distractor không đúng, hoặc gọi lựa chọn bằng chữ cái (app xáo thứ tự đáp án).
    - `other`: `hint` lộ đáp án (nêu tên service/tính năng của đáp án đúng), distractor là dịch vụ không tồn tại, đáp án đúng dài hơn hẳn mọi distractor.
    - `metadata`: domain/task sai rõ ràng (ENRICH vẫn sẽ phân loại lại — chỉ ghi khi sai nặng).

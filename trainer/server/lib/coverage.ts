@@ -2,9 +2,14 @@
 // weight, questions per task statement, taxonomy services without (or with few) questions, and questions
 // whose qualifier points at another domain — likely misclassified; ENRICH `classify` re-checks those
 // (scripts/enrich-batch.ts --ids). Counts use active questions only.
+// [v5] Questions held back in sealed forms are never listed by id (the report is synced and read by the coach), and the
+// official exam guide (bank/exam-guide, 189 Knowledge/Skills bullets) adds per-task / per-bullet coverage — the same numbers as
+// Ngân hàng → Chất lượng → 🗺️ Đề cương.
 import type { BankState } from './bank.ts';
 import { localDateKey } from './time.ts';
-import type { DomainId, Question } from '../../shared/types.ts';
+import { sealedIds } from './sealed.ts';
+import { guideCoverage } from './exam-guide.ts';
+import type { DomainId, GuideTaskCoverage, Question } from '../../shared/types.ts';
 
 /** A task is "thin" below this share of its expected count (bank total × domain weight ÷ tasks of the domain). */
 export const THIN_TASK_RATIO = 0.5;
@@ -51,6 +56,23 @@ export interface Coverage {
   services: { none: Record<string, string[]>; thin: { name: string; count: number }[] };
   misfits: Misfit[];
   misfitsTotal: number;
+  sealedHidden: number; // [v5] misfits left out because the question is held back in a sealed form
+  guide?: {
+    // [v5] official exam guide coverage (practice pool: active, not sealed, in scope)
+    fetched?: string;
+    bullets: number;
+    uncovered: { id: string; task: string; text: string }[]; // bullets without any question
+    needLong: number; // bullets that still want exam-like (long) questions
+    tasks: GuideTaskCoverage[];
+    multi: { count: number; share: number; target: [number, number] };
+    chooseThree: number;
+    guessed: number;
+  };
+}
+
+export interface CoverageOptions {
+  sealed?: ReadonlySet<string>; // default: the forms still sealed (sealed.ts)
+  guide?: boolean; // default true: include the exam-guide section
 }
 
 // ENRICH.md A4: the qualifier the question asks for decides the domain.
@@ -72,7 +94,8 @@ function misfit(q: Question): Misfit | undefined {
 
 const pct = (n: number, d: number) => (d ? Math.round((1000 * n) / d) / 10 : 0);
 
-export function computeCoverage(bank: BankState, today: string = localDateKey(new Date())): Coverage {
+export function computeCoverage(bank: BankState, today: string = localDateKey(new Date()), opts: CoverageOptions = {}): Coverage {
+  const sealed = opts.sealed ?? sealedIds();
   const { taxonomy: tax } = bank;
   const active = bank.questions.filter((q) => q.status === 'active');
   const total = active.length;
@@ -120,7 +143,23 @@ export function computeCoverage(bank: BankState, today: string = localDateKey(ne
   }
   thin.sort((a, b) => a.count - b.count || a.name.localeCompare(b.name));
 
-  const misfits = active.map(misfit).filter((m): m is Misfit => !!m);
+  const allMisfits = active.map(misfit).filter((m): m is Misfit => !!m);
+  const misfits = allMisfits.filter((m) => !sealed.has(m.id));
+  let guide: Coverage['guide'];
+  if (opts.guide !== false) {
+    const g = guideCoverage(bank);
+    if (g.bullets.length)
+      guide = {
+        fetched: g.fetched,
+        bullets: g.bullets.length,
+        uncovered: g.bullets.filter((b) => !b.questions).map((b) => ({ id: b.id, task: b.task, text: b.text })),
+        needLong: g.bullets.filter((b) => b.need > 0).length,
+        tasks: g.tasks,
+        multi: g.multi,
+        chooseThree: g.chooseThree,
+        guessed: g.guessed,
+      };
+  }
   return {
     date: today,
     total,
@@ -131,6 +170,8 @@ export function computeCoverage(bank: BankState, today: string = localDateKey(ne
     services: { none, thin },
     misfits: misfits.slice(0, MAX_MISFITS),
     misfitsTotal: misfits.length,
+    sealedHidden: allMisfits.length - misfits.length,
+    ...(guide ? { guide } : {}),
   };
 }
 
@@ -176,6 +217,30 @@ export function coverageMarkdown(c: Coverage): string {
       '| Câu | Domain → gợi ý | Qualifier | base |',
       '|---|---|---|---|',
       ...c.misfits.map((m) => `| \`${m.id}\` | ${code(m.from)} → ${code(m.to)} | ${m.qualifier} | ${m.hash} |`),
+    );
+  }
+  if (c.sealedHidden) out.push('', `(${c.sealedHidden} câu đang niêm phong không được liệt kê.)`);
+  const g = c.guide;
+  if (g) {
+    const pctOf = (x: number) => Math.round(x * 100);
+    out.push(
+      '',
+      `## 5. Đề cương chính thức (${g.bullets} mục Knowledge/Skills${g.fetched ? `, lấy ngày ${g.fetched}` : ''})`,
+      '',
+      'Tính trên các câu luyện được (active, không niêm phong, trong phạm vi đề). Cùng số liệu với Ngân hàng → Chất lượng → 🗺️ Đề cương.',
+      '',
+      '| Task | Số câu | Câu dài / mục tiêu | Nhiều đáp án | Mục chưa có câu |',
+      '|---|---:|---:|---:|---:|',
+      ...g.tasks.map((t) => `| ${t.id} | ${t.questions} | ${t.longForm} / ${t.target}${t.need ? ' ⚠️' : ''} | ${t.multi} | ${t.uncovered} / ${t.bullets} |`),
+      '',
+      `Câu nhiều đáp án: ${g.multi.count} (${pctOf(g.multi.share)} %, mục tiêu ${pctOf(g.multi.target[0])}–${pctOf(g.multi.target[1])} %) · "Choose THREE": ${g.chooseThree} · ` +
+        `${g.needLong} mục còn thiếu câu dài · ${g.guessed} câu có \`skills\` chỉ là đoán theo từ khoá (ENRICH \`classify\` ghi chính thức).`,
+      '',
+      `**Mục chưa có câu nào (${g.uncovered.length}):**`,
+      '',
+      ...(g.uncovered.length ? g.uncovered.map((b) => `- \`${b.id}\` ${b.text.length > 140 ? `${b.text.slice(0, 139)}…` : b.text}`) : ['- —']),
+      '',
+      'Sinh câu nhắm đúng mục: `npm run coach -- --generate --skills <id,…> --count 6` (hoặc `--longform --skills …` cho câu dài), hoặc nút "✨ Sinh cho ô trống" ở 🗺️ Đề cương.',
     );
   }
   return out.join('\n') + '\n';

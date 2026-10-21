@@ -311,7 +311,7 @@ câu do AI viết bị **lệch đáp án / mơ hồ** tự chuyển `draft` (`c
 | Lịch tự động (macOS/Linux/Windows) | `npm run schedule -- install` (giờ trong `config.yaml → coach.schedule`; `status`, `run`, `uninstall`). Không có dữ liệu mới → chạy 1 lô ENRICH thay vì phân tích (`coach.enrich_on_idle`) |
 | Terminal | `npm run coach` · `-- --force` · `-- --enrich --size 20 --batches 3` · `-- --enrich --ids a,b --tasks distractors --note "…"` · `-- --longform --count 5` · `-- --generate --sources 03-database-services.md --count 15` · `-- --verify [--ids a,b \| --pack <id> \| --scope unverified-ai\|new\|changed]` |
 | Claude Cowork | dán prompt từ nút **📋 Prompt cho Claude Cowork**; định kỳ: **Scheduled → New task → Set up manually** (task dùng file local chỉ chạy khi máy bật, Claude Desktop mở) |
-| Claude Code | `/trainer-coach` · `/trainer-generate <tham số>` · `/trainer-enrich` — vận hành: `/trainer [start\|stop\|restart\|status]` · `/trainer-import` (đề mới trong practice-exams/) · `/trainer-review` (soát độc lập câu AI → issues.md) · `/trainer-coverage` (độ phủ so với exam guide) |
+| Claude Code | `/trainer-coach` · `/trainer-generate <tham số>` · `/trainer-enrich` — vận hành: `/trainer [start\|stop\|restart\|status]` · `/trainer-import` (đề mới trong practice-exams/) · `/trainer-review` (soát độc lập câu AI → issues.md) · `/trainer-coverage` (độ phủ so với exam guide) · `/trainer-quiz` (hỏi bài qua MCP) |
 
 **Model & chi phí**: `config.yaml → coach.models` chọn model theo tác vụ (mặc định sonnet cho sinh câu/ENRICH/Hỏi AI, opus cho giải mù);
 trang AI Coach hiển thị số lượt, chi phí quy đổi 30 ngày và tóm tắt kết quả từng lượt. **Quyền của AI** (`--permission-mode dontAsk`):
@@ -389,7 +389,7 @@ App tự nạp lại khi file thay đổi. Câu lỗi định dạng bị loại
 | `npm run rebalance [-- --apply]` · `npm run classify-tasks [-- --apply]` | migration: cân vị trí đáp án · gắn mục exam guide |
 | `npm run apply-patch -- <patch.yaml> [--dry-run]` · `npm run enrich-batch [-- --status \| --longform \| --ids a,b --tasks distractors]` | áp patch AI · xem lô ENRICH kế tiếp / tiến độ / ứng viên câu dài |
 | `npm run import -- --merge [--dry-run] [--only <chương>]` | thêm câu mới từ `practice-exams/` vào pack imported (không ghi đè; báo câu cũ khác nguồn) |
-| `npm run coverage [-- --json]` | độ phủ ngân hàng: domain so với trọng số đề, task 1.1–4.4, service chưa có câu, câu nghi phân loại sai |
+| `npm run coverage [-- --json]` | độ phủ ngân hàng: domain so với trọng số đề, task 1.1–4.4, service chưa có câu, câu nghi phân loại sai, mục đề cương chính thức chưa có câu |
 | `npm run snapshot` | cập nhật `coach/snapshot.md` |
 | `npm run coach [-- …]` | chạy AI 1 lần (xem bảng trên, gồm `--verify`) |
 | `npm run schedule -- install\|status\|run\|uninstall` | lịch chạy tự động (launchd / crontab / Task Scheduler) |

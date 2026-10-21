@@ -696,3 +696,96 @@ An ElastiCache for Redis deployment must survive an AZ failure with automatic fa
 **Answer:** C
 
 **Explanation:** Redis AZ failover with minimal loss = Multi-AZ replication group with automatic failover.
+
+---
+
+## Q 03-v2-31
+- domain: performance
+- task: 3.3
+- topic: database
+- services: Aurora
+- difficulty: hard
+- time: 75
+- created: 2026-10-21
+- source: practice-exams/03-database-services-exam-v2.md#Q31
+
+A read-heavy reporting workload must offload reads off a busy relational primary, but reports must reflect just-written data with only millisecond staleness. Which offers the BEST read offloading?
+
+- A. Migrate to Aurora and use Aurora Replicas
+- B. RDS Read Replica (asynchronous)
+- C. RDS Multi-AZ standby
+- D. RDS Proxy
+
+**Answer:** A
+
+**Explanation:** Bẫy: RDS Read Replica là ASYNC → có lag, không đảm bảo "millisecond staleness". Aurora Replicas dùng shared storage, lag ~ms → offload read gần real-time. (Cần strong-consistency tuyệt đối thì đọc thẳng primary.)
+
+---
+
+## Q 03-v2-32
+- domain: performance
+- task: 3.3
+- topic: database
+- services: RDS Proxy, Lambda, RDS
+- difficulty: hard
+- time: 70
+- created: 2026-10-21
+- source: practice-exams/03-database-services-exam-v2.md#Q32
+
+A Lambda-based application opens too many concurrent connections and exhausts the RDS PostgreSQL connection limit, causing errors. What fixes this?
+
+- A. Add Read Replicas
+- B. Increase instance size
+- C. Enable Multi-AZ
+- D. Enable RDS Proxy
+
+**Answer:** D
+
+**Explanation:** Bẫy: vấn đề là connection exhaustion, KHÔNG phải read scaling → RDS Proxy (connection pooling), chuẩn cho Lambda+RDS. Read Replica/Multi-AZ/scale up đều không giải quyết gốc.
+
+---
+
+## Q 03-v2-33
+- domain: resilient
+- task: 2.2
+- topic: database
+- tags: high-availability, multi-az
+- difficulty: hard
+- time: 75
+- created: 2026-10-21
+- source: practice-exams/03-database-services-exam-v2.md#Q33
+
+An application needs automatic failover for high availability AND wants the standby to also serve read queries to avoid paying for separate replicas. Which deployment?
+
+- A. Single cross-AZ Read Replica
+- B. Multi-AZ DB Cluster
+- C. Multi-AZ Instance (classic)
+- D. Aurora Global Database
+
+**Answer:** B
+
+**Explanation:** Bẫy: Multi-AZ Instance cổ điển standby KHÔNG đọc được. Cần HA tự động + standby đọc được = RDS Multi-AZ DB Cluster (1 writer + 2 readable standby / 3 AZ, failover ~35s).
+
+---
+
+## Q 03-v2-34
+- domain: resilient
+- task: 2.2
+- topic: database
+- services: Aurora
+- tags: rto-rpo, aurora-global-database
+- difficulty: hard
+- time: 70
+- created: 2026-10-21
+- source: practice-exams/03-database-services-exam-v2.md#Q34
+
+A MySQL-based workload on AWS must survive an entire Region outage with RTO under one minute and provide low-latency reads to users worldwide. Which is BEST?
+
+- A. Cross-Region Read Replica
+- B. Aurora Global Database
+- C. Cross-Region snapshot copy
+- D. Multi-AZ deployment
+
+**Answer:** B
+
+**Explanation:** Bẫy: Multi-AZ chỉ chống AZ sập (trong 1 Region). Region sập + RTO<1 phút + đọc gần user toàn cầu = Aurora Global Database (RPO~1s). Cross-Region Read Replica failover thủ công; snapshot copy khôi phục chậm.

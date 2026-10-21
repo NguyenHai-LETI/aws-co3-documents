@@ -36,8 +36,10 @@ Lệnh: `$ARGUMENTS` (trống = `start`). Server = `trainer/server/index.ts`, ch
 
 ## restart
 
-`stop` rồi `start`. Chỉ cần sau khi sửa code `trainer/server/` hoặc `trainer/shared/`: giao diện (Vite) tự nạp lại; `config.yaml`, ngân hàng
-câu hỏi, kết quả được đọc lại khi thay đổi. Người dùng đang sửa code server nhiều → gợi ý `npm run dev` trong `trainer/` (tự khởi động lại).
+`stop` rồi `start`. Cần sau khi sửa code `trainer/server/`, `trainer/shared/` **hoặc `trainer/web/`**: từ v5 `node server/index.ts` phục vụ
+giao diện đã build (tự build lại khi khởi động nếu code giao diện đổi), không còn tự nạp lại. `config.yaml`, ngân hàng câu hỏi, kết quả vẫn được
+đọc lại khi thay đổi. Người dùng đang sửa code → gợi ý `npm run dev` trong `trainer/` (Vite HMR + tự khởi động lại server).
+Muốn app luôn chạy nền và tự khởi động lại khi cập nhật → `npm run service -- install` (gỡ: `uninstall`).
 
 ## status — kiểm tra sức khoẻ
 
@@ -52,6 +54,7 @@ Chạy lần lượt (từ gốc repo; lệnh nào lỗi thì ghi nhận rồi c
 | Độ phủ | `node trainer/scripts/coverage.ts` (chỉ lấy bảng domain và các task ⚠️) |
 | Lịch coach | `node trainer/scripts/schedule.ts status` |
 | Đồng bộ 2 máy | `node trainer/scripts/sync.ts --status` |
+| Đề niêm phong | `node trainer/scripts/seal.ts --status` (không in id câu; lỗi file → báo người dùng, đừng tự sửa) |
 | Lượt AI gần nhất | file `trainer/coach/runs/*.json` mới nhất theo tên (task, status, error) |
 | Issue mở | dòng `- [ ]` trong `trainer/bank/issues.md` |
 | Kế hoạch hiện hành | file mới nhất trong `trainer/coach/plans/` |

@@ -173,3 +173,21 @@ test('coverage: domain share vs exam weight, thin tasks, services without questi
     ['p1', 'r1'],
   );
 });
+
+test('[v5] coverage: misfits held back in a sealed form are never listed; the exam-guide section uses the official bullets', () => {
+  const bank = bankOf([
+    block('c1', 'cost', '4.1', 'S3', 'Which storage class is the MOST cost-effective for rarely read logs?'),
+    block('r1', 'resilient', '2.2', 'RDS', 'Which design keeps the database available after an AZ failure at the LOWEST cost?'),
+    block('r2', 'resilient', '2.2', 'RDS', 'Which backup approach restores the database fastest at the LOWEST cost?'),
+  ]);
+  const c = computeCoverage(bank, '2026-10-21', { sealed: new Set(['r2']) });
+  assert.deepEqual(c.misfits.map((m) => m.id), ['r1']);
+  assert.equal(c.misfitsTotal, 1);
+  assert.equal(c.sealedHidden, 1);
+  const md = coverageMarkdown(c);
+  assert.doesNotMatch(md, /`r2`/, 'a sealed id never appears in the synced report');
+  assert.match(md, /1 câu đang niêm phong không được liệt kê/);
+  assert.ok(c.guide && c.guide.bullets >= 180, 'official guide loaded (189 bullets)');
+  assert.match(md, /## 5\. Đề cương chính thức/);
+  assert.equal(computeCoverage(bank, '2026-10-21', { sealed: new Set(), guide: false }).guide, undefined);
+});
