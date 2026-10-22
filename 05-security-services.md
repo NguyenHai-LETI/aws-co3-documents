@@ -121,12 +121,13 @@ Security chiếm **30% câu hỏi** (Domain 1) trong kỳ thi SAA-C03. Đây là
 #### 1. **AWS Managed Keys**
 - **Created by AWS** (aws/service-name)
 - **Free**
-- **Automatic rotation**: Every year
+- **Automatic rotation**: Every year — **mandatory**, cannot disable or change
 
 #### 2. **Customer Managed Keys (CMK)**
+- **Naming**: AWS now calls it **KMS key / customer managed key**; "CMK" is the old term (still seen in exams)
 - **Created by customer**
 - **$1/month** + usage
-- **Rotation**: Optional (every year)
+- **Rotation**: Optional — default 365 days, configurable **90–2560 days**, plus **on-demand** rotation
 - **Full control**: Policies, grants, deletion
 
 #### 3. **AWS Owned Keys**
@@ -149,9 +150,9 @@ Security chiếm **30% câu hỏi** (Domain 1) trong kỳ thi SAA-C03. Đây là
 - **Use case**: Temporary permissions
 
 #### 4. **Automatic Rotation**
-- **Every year** (365 days)
-- **Keeps old versions** for decryption
-- **Only for Customer Managed Keys**
+- **AWS Managed Keys**: Every year, automatic & mandatory
+- **Customer Managed Keys**: Optional — you enable/disable, set period (90–2560 days, default 365), or rotate on-demand
+- **Keeps old versions** for decryption — key ID unchanged, no app changes needed
 
 #### 5. **Multi-Region Keys**
 - **Replicate keys** across regions
