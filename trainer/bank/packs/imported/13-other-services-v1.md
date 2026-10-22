@@ -131,18 +131,23 @@ A regulated workload must run AWS compute and services ON-PREMISES in the compan
 - services: Local Zones
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam.md#Q6
 
 A gaming company needs single-digit millisecond latency to end users in a metro area not near a Region. Which service?
 
 - A. AWS Outposts
-- B. AWS Snowcone
+- B. AWS Global Accelerator
 - C. AWS Local Zones
 - D. AWS Ground Station
 
 **Answer:** C
 
-**Explanation:** Low latency metro near users = Local Zones.
+**Explanation:** Local Zones place AWS compute, storage and database services in large metro areas close to users, giving single-digit millisecond latency where no Region is nearby.
+- AWS Outposts: AWS racks in your own data center, for on-premises needs rather than players across a city.
+- AWS Global Accelerator: improves routing over the AWS network, but traffic is still served from distant Regional endpoints.
+- AWS Ground Station: satellite communications, unrelated to player latency.
+> 🇻🇳 Độ trễ vài ms cho người dùng ở đô thị xa Region → AWS Local Zones.
 
 ---
 
@@ -174,6 +179,7 @@ An application needs ultra-low latency to mobile users over 5G carrier networks.
 - topic: other
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam.md#Q8
 
 A research team needs to schedule and downlink data from satellites without owning ground-station infrastructure. Which service?
@@ -185,7 +191,11 @@ A research team needs to schedule and downlink data from satellites without owni
 
 **Answer:** B
 
-**Explanation:** Satellite downlink as a service = Ground Station.
+**Explanation:** AWS Ground Station is a managed network of antennas: teams schedule satellite contacts and downlink data directly into AWS without building ground stations.
+- AWS Snowmobile: retired (full shutdown in 2024), and it was a truck for offline data transfer.
+- AWS IoT Core: connects IoT devices over MQTT, not satellites.
+- AWS Outposts: AWS infrastructure on premises, with no satellite antennas.
+> 🇻🇳 Điều khiển/tải dữ liệu vệ tinh mà không cần trạm mặt đất riêng → AWS Ground Station.
 
 ---
 
@@ -196,18 +206,23 @@ A research team needs to schedule and downlink data from satellites without owni
 - services: Amazon Connect
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam.md#Q9
 
 Which service provides a fully managed, omnichannel cloud contact center?
 
 - A. Amazon Connect
-- B. Amazon Chime
-- C. Amazon Pinpoint
+- B. Amazon WorkSpaces
+- C. Amazon Lex
 - D. Amazon SES
 
 **Answer:** A
 
-**Explanation:** Managed omnichannel contact center = Amazon Connect.
+**Explanation:** Amazon Connect is a fully managed omnichannel cloud contact center (voice, chat, tasks) with pay-per-use pricing and no telephony hardware.
+- Amazon WorkSpaces: virtual desktops for staff, not a contact center.
+- Amazon Lex: builds chatbots that can plug into Connect, but it is not a contact center by itself.
+- Amazon SES: sends email only.
+> 🇻🇳 Contact center đa kênh được quản lý hoàn toàn → Amazon Connect.
 
 ---
 
@@ -263,18 +278,23 @@ Which service is BEST for centrally managing backup retention to meet a 7-year c
 - topic: other
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam.md#Q12
 
 A team needs human workers to perform small tasks (data labeling, content moderation) at scale (crowdsourcing). Which service?
 
 - A. Amazon Connect
-- B. Amazon SageMaker endpoints
+- B. Amazon SageMaker AI endpoints
 - C. AWS Lambda
 - D. Amazon Mechanical Turk
 
 **Answer:** D
 
-**Explanation:** Crowdsourced human tasks = Mechanical Turk.
+**Explanation:** Amazon Mechanical Turk is a crowdsourcing marketplace where human workers complete small tasks such as data labeling or content moderation at scale.
+- Amazon Connect: cloud contact center.
+- Amazon SageMaker AI endpoints: host trained models for inference; no human workers.
+- AWS Lambda: runs code, not human tasks.
+> 🇻🇳 Thuê người làm việc nhỏ quy mô lớn (crowdsourcing) → Amazon Mechanical Turk.
 
 ---
 
@@ -353,18 +373,23 @@ Which service is appropriate for streaming GPU-accelerated 3D applications to re
 - services: Outposts
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam.md#Q16
 
 A hybrid setup needs consistent AWS APIs both in-Region and on-premises for a low-latency manufacturing app. Which is BEST?
 
-- A. AWS Snowmobile
+- A. AWS Local Zones
 - B. AWS Outposts
 - C. AWS Ground Station
 - D. CloudFront
 
 **Answer:** B
 
-**Explanation:** Consistent AWS APIs on-prem, low latency = Outposts.
+**Explanation:** AWS Outposts installs AWS-managed racks or servers on premises that run the same AWS APIs, tools and services as the Region, for low-latency local processing.
+- AWS Local Zones: extend a Region into a metro area, but the infrastructure runs in AWS facilities, not inside the factory.
+- AWS Ground Station: satellite communications.
+- CloudFront: caches content at edge locations; it does not run the application on premises.
+> 🇻🇳 API AWS giống Region nhưng chạy tại chỗ, độ trễ thấp → AWS Outposts.
 
 ---
 

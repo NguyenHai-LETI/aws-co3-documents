@@ -269,6 +269,7 @@ Which DynamoDB index allows querying on a completely different partition key and
 - services: QLDB
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/03-database-services-exam.md#Q12
 
 A company wants an immutable, cryptographically verifiable ledger of financial transactions. Which service?
@@ -359,18 +360,23 @@ An RDS database must encrypt data at rest, but it was created unencrypted. What 
 - services: Timestream
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/03-database-services-exam.md#Q16
 
 A workload ingests IoT sensor metrics and needs efficient storage and time-based analytics at scale. Which purpose-built database?
 
 - A. Amazon RDS
 - B. Amazon Neptune
-- C. Amazon Timestream
-- D. Amazon QLDB
+- C. Amazon Timestream for InfluxDB
+- D. Amazon DocumentDB (with MongoDB compatibility)
 
 **Answer:** C
 
-**Explanation:** Time-series IoT metrics = Amazon Timestream.
+**Explanation:** Timestream for InfluxDB is a managed time-series database: it stores time-stamped sensor metrics efficiently and supports time-window queries and aggregations at scale. The original Timestream for LiveAnalytics accepts no new customers since 2025-06-20, so new time-series workloads use Timestream for InfluxDB.
+- Amazon RDS: general relational engine, not optimized for high-volume time-series ingest and retention.
+- Amazon Neptune: graph database for relationships, not metrics over time.
+- Amazon DocumentDB: JSON document store without native time-series functions.
+> 🇻🇳 Dữ liệu time-series (IoT metrics) → Amazon Timestream for InfluxDB (bản LiveAnalytics không nhận khách mới từ 2025-06-20).
 
 ---
 

@@ -67,6 +67,7 @@ An Oracle database must be migrated to Amazon Aurora PostgreSQL (different engin
 - tags: offline-transfer
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q3
 
 A company must move 80 TB to AWS but has limited bandwidth and a tight deadline. Which service?
@@ -78,7 +79,12 @@ A company must move 80 TB to AWS but has limited bandwidth and a tight deadline.
 
 **Answer:** C
 
-**Explanation:** 80 TB, limited bandwidth, deadline = Snowball Edge.
+**Explanation:** With limited bandwidth and a tight deadline, shipping 80 TB on a Snowball Edge device is faster than pushing it over the network.
+- AWS DataSync: online transfer, still limited by the slow link.
+- S3 Transfer Acceleration: optimizes the path, not the link capacity.
+- AWS Storage Gateway: hybrid access that uploads over the same link.
+Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+> 🇻🇳 Băng thông thấp + hạn gấp → chuyển offline bằng Snowball Edge (chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
 
 ---
 
@@ -89,6 +95,7 @@ A company must move 80 TB to AWS but has limited bandwidth and a tight deadline.
 - services: Application Migration Service, EC2
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q4
 
 A data center needs to migrate hundreds of physical and virtual servers to EC2 with continuous block-level replication and minimal downtime (lift-and-shift). Which service?
@@ -100,7 +107,11 @@ A data center needs to migrate hundreds of physical and virtual servers to EC2 w
 
 **Answer:** D
 
-**Explanation:** Lift-and-shift servers w/ continuous replication = MGN.
+**Explanation:** Application Migration Service (MGN) installs a replication agent that continuously copies block-level data from physical and virtual servers to AWS, then launches EC2 instances at cutover with minimal downtime.
+- AWS Snowmobile: retired (full shutdown in 2024); it only moved data offline, never running servers.
+- AWS DMS: migrates databases, not whole servers.
+- AWS DataSync: copies files and objects, not bootable server volumes.
+> 🇻🇳 Lift-and-shift hàng trăm server, sao chép block liên tục, downtime thấp → Application Migration Service (MGN).
 
 ---
 
@@ -111,18 +122,23 @@ A data center needs to migrate hundreds of physical and virtual servers to EC2 w
 - services: DataSync, EFS
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q5
 
 A company needs automated, scheduled, incremental file transfers from on-premises NFS to Amazon EFS. Which service?
 
 - A. AWS DataSync
 - B. AWS Transfer Family
-- C. AWS Snowcone
+- C. Amazon S3 File Gateway
 - D. AWS Backup
 
 **Answer:** A
 
-**Explanation:** Scheduled incremental NFS->EFS = DataSync.
+**Explanation:** DataSync connects to the on-premises NFS share through an agent and runs scheduled, incremental, verified transfers directly into Amazon EFS.
+- AWS Transfer Family: managed SFTP/FTPS/FTP endpoints for partners, not NFS-to-EFS sync.
+- Amazon S3 File Gateway: presents S3 storage to on-premises clients; it does not write into EFS.
+- AWS Backup: backs up AWS resources; it does not migrate on-premises file shares.
+> 🇻🇳 Đồng bộ NFS on-prem → EFS theo lịch, incremental → AWS DataSync.
 
 ---
 
@@ -178,6 +194,7 @@ A company needs ongoing change data capture (CDC) to keep a target database cont
 - services: Migration Hub, DMS, Application Migration Service
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/10-migration-transfer-exam.md#Q8
 
 Which service provides a central dashboard to track the status of migrations across DMS, MGN, and discovery tools?
@@ -200,6 +217,7 @@ Which service provides a central dashboard to track the status of migrations acr
 - services: Snow Family
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/10-migration-transfer-exam.md#Q9
 
 An exabyte-scale (100 PB) data-center migration must move data physically. Which device?
@@ -222,6 +240,7 @@ An exabyte-scale (100 PB) data-center migration must move data physically. Which
 - services: Snow Family
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/10-migration-transfer-exam.md#Q10
 
 A remote edge site with intermittent connectivity needs a small, rugged, portable device to collect and ship a few terabytes of data. Which device?
@@ -267,6 +286,7 @@ Which DMS migration is "homogeneous" and does NOT require SCT?
 - tags: right-sizing
 - difficulty: easy
 - time: 50
+- status: retired
 - enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q12
 
@@ -291,6 +311,7 @@ A company wants to discover on-premises server dependencies and right-size befor
 - tags: offline-transfer
 - difficulty: easy
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q13
 
 Which is the BEST reason to choose Snowball Edge over network transfer (DataSync)?
@@ -302,7 +323,12 @@ Which is the BEST reason to choose Snowball Edge over network transfer (DataSync
 
 **Answer:** C
 
-**Explanation:** Network would take weeks = use Snowball Edge.
+**Explanation:** An offline Snowball Edge device makes sense when moving the data over the available network would take weeks; otherwise DataSync over the network is simpler and continuous.
+- The data is already in AWS: there is nothing to import.
+- Small dataset and high bandwidth: a network transfer finishes faster than shipping a device.
+- Real-time continuous replication: needs an online service such as DataSync or DMS, not a shipped device.
+Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new large transfers use DataSync over Direct Connect or AWS Data Transfer Terminal.
+> 🇻🇳 Chọn thiết bị offline khi truyền qua mạng mất hàng tuần (Snowball Edge chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
 
 ---
 
@@ -405,6 +431,7 @@ During a heterogeneous database migration, what is the recommended sequence?
 - services: Storage Gateway
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q18
 
 A workload needs to continuously replicate an on-premises file share to AWS and serve it locally with low latency using a cached gateway. Which service?
@@ -416,7 +443,11 @@ A workload needs to continuously replicate an on-premises file share to AWS and 
 
 **Answer:** B
 
-**Explanation:** On-prem file share cached locally + replicate to AWS = Storage Gateway.
+**Explanation:** Storage Gateway (File Gateway, or Volume Gateway in cached mode) keeps frequently used data in a local cache for low-latency access while continuously storing the full data set in AWS.
+- AWS Transfer Family: SFTP/FTP endpoints into S3 or EFS, with no local cache.
+- AWS Snowmobile: retired (full shutdown in 2024), and only ever a one-time offline transfer.
+- AWS DMS: replicates databases, not file shares.
+> 🇻🇳 File share on-prem cần cache cục bộ + lưu trên AWS → Storage Gateway (File/Volume Gateway).
 
 ---
 
@@ -449,6 +480,7 @@ Which factor MOST determines whether to use Snow Family vs online transfer?
 - services: Application Migration Service
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam.md#Q20
 
 A company must migrate a large VMware-based estate to AWS with minimal refactoring and cutover risk. Which approach is BEST?
@@ -460,4 +492,8 @@ A company must migrate a large VMware-based estate to AWS with minimal refactori
 
 **Answer:** A
 
-**Explanation:** Large VMware lift-and-shift, low risk = MGN.
+**Explanation:** Application Migration Service (MGN) rehosts VMware VMs by continuously replicating them to AWS and launching them as EC2 instances, so applications move without refactoring and cutover can be tested first.
+- Snowmobile: retired (full shutdown in 2024); it only moved data offline.
+- AWS Glue ETL: transforms data; it does not migrate servers.
+- Rebuild every app manually on EC2: maximum effort and cutover risk.
+> 🇻🇳 Di chuyển VMware quy mô lớn, ít sửa ứng dụng → Application Migration Service (lift-and-shift).

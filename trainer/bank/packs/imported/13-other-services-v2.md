@@ -175,18 +175,23 @@ A company needs disaster recovery that continuously replicates on-premises serve
 - services: Amazon Connect
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam-v2.md#Q8
 
 A company wants a managed cloud contact center for customer service. Which service?
 
-- A. Amazon Pinpoint
+- A. Amazon Lex
 - B. Amazon Connect
 - C. WorkMail
-- D. Amazon Chime
+- D. Amazon WorkSpaces
 
 **Answer:** B
 
-**Explanation:** Managed cloud contact center = Amazon Connect.
+**Explanation:** Amazon Connect is a fully managed cloud contact center for customer service, with voice and chat channels and pay-per-use pricing.
+- Amazon Lex: chatbots that can be added to Connect, not a contact center by itself.
+- WorkMail: business email and calendars.
+- Amazon WorkSpaces: virtual desktops.
+> 🇻🇳 Contact center trên cloud được quản lý → Amazon Connect.
 
 ---
 
@@ -218,6 +223,7 @@ A company must connect and manage millions of IoT devices sending telemetry. Whi
 - topic: other
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam-v2.md#Q10
 
 A company wants managed business email and calendaring. Which service?
@@ -225,11 +231,15 @@ A company wants managed business email and calendaring. Which service?
 - A. SES
 - B. Amazon Connect
 - C. Amazon WorkMail
-- D. Amazon WorkDocs
+- D. Amazon WorkSpaces
 
 **Answer:** C
 
-**Explanation:** Managed email + calendaring = Amazon WorkMail.
+**Explanation:** Amazon WorkMail is a managed business email and calendaring service that works with Microsoft Outlook and mobile clients.
+- SES: sends application email (transactional/marketing); no user mailboxes or calendars.
+- Amazon Connect: cloud contact center.
+- Amazon WorkSpaces: virtual desktops, not an email service.
+> 🇻🇳 Email + lịch làm việc được quản lý → Amazon WorkMail.
 
 ---
 
@@ -239,20 +249,25 @@ A company wants managed business email and calendaring. Which service?
 - topic: other
 - services: Outposts, Local Zones
 - difficulty: hard
-- time: 95
+- time: 130
+- enriched: 2026-10-22
 - source: practice-exams/13-other-services-exam-v2.md#Q11
 
-A regulated workload must keep data on-premises for residency but use AWS APIs/services locally, with a consistent hybrid experience. Which two are appropriate? (Choose TWO)
+A company must keep a regulated workload and its data inside its own data center while using the same AWS APIs and tools as in the Region. It also runs latency-sensitive game servers that need single-digit millisecond latency for players in a large city far from any AWS Region. Which TWO services should a solutions architect use? (Choose TWO)
 
-- A. Local Zones for metro low latency
-- B. AWS Outposts (rack/servers)
-- C. CloudFront
-- D. Snowmobile
-- E. Global Accelerator
+- A. AWS Local Zones close to the end users for the game servers
+- B. AWS Outposts racks installed on premises for the compliance workload
+- C. Amazon CloudFront in front of the game servers in the Region
+- D. AWS Direct Connect from the data center to the nearest Region
+- E. AWS Global Accelerator in front of the game servers in the Region
 
 **Answer:** A, B
 
-**Explanation:** On-prem residency + metro low latency = Outposts + Local Zones.
+**Explanation:** Outposts racks run AWS infrastructure and APIs inside the company's data center, so regulated data never leaves the premises, and Local Zones place compute in a large metro area far from a Region, giving nearby players single-digit millisecond latency.
+- CloudFront: caches content at the edge; the game servers still run in the distant Region.
+- Direct Connect: a private link to the Region; the regulated workload would then run outside the data center.
+- Global Accelerator: optimizes the path to Regional endpoints but cannot remove the distance to the Region.
+> 🇻🇳 Dữ liệu phải nằm on-prem → Outposts; người chơi ở đô thị xa Region cần độ trễ vài ms → Local Zones.
 
 ---
 

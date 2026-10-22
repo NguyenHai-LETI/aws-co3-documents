@@ -232,19 +232,24 @@ A serverless internal app is idle most of the time but bursts during the day; th
 - services: S3, Lambda
 - tags: s3-object-lambda
 - difficulty: easy
-- time: 45
+- time: 65
+- enriched: 2026-10-22
 - source: practice-exams/17-gap-services-exam.md#Q10
 
-Which feature lets you transform and modify objects retrieved from S3 on the fly (e.g., redact PII) using a Lambda without storing copies?
+A company must return objects from Amazon S3 with PII redacted on the fly when they are retrieved, using AWS Lambda and without storing redacted copies. Which design meets this requirement?
 
-- A. S3 Select
-- B. S3 Object Lambda
-- C. S3 Inventory
-- D. S3 Batch Operations
+- A. S3 Cross-Region Replication that copies each object to a redacted bucket
+- B. Amazon API Gateway calling a Lambda function that redacts each object on read
+- C. S3 Inventory report that lists every object containing PII for review
+- D. S3 Batch Operations job that writes a redacted copy of every object
 
 **Answer:** B
 
-**Explanation:** Modify S3 objects on retrieval via Lambda = S3 Object Lambda.
+**Explanation:** Routing reads through API Gateway to a Lambda function lets the function fetch the object from S3, redact PII and return the result per request, so no redacted copies are stored. This is the pattern AWS recommends now that S3 Object Lambda accepts only existing customers (since 2025-11-07): https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html
+- Cross-Region Replication: copies objects unchanged and stores a second copy.
+- S3 Inventory: lists objects and metadata; it transforms nothing.
+- S3 Batch Operations: processes objects in bulk ahead of time and stores the results.
+> 🇻🇳 Che PII khi đọc, không lưu bản sao → Lambda gọi qua API Gateway (S3 Object Lambda chỉ còn cho khách hàng hiện có).
 
 ---
 

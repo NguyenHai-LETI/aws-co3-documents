@@ -270,18 +270,23 @@ A workload stores highly connected data for a recommendation/fraud engine using 
 - services: Timestream
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/03-database-services-exam-v2.md#Q12
 
 IoT sensors send time-stamped metrics needing efficient storage and time-series analytics at scale. Which service?
 
-- A. QLDB
-- B. Timestream
+- A. DocumentDB (with MongoDB compatibility)
+- B. Timestream for InfluxDB
 - C. RDS
 - D. Neptune
 
 **Answer:** B
 
-**Explanation:** Time-series IoT metrics = Amazon Timestream.
+**Explanation:** Timestream for InfluxDB is the managed time-series database for time-stamped metrics: efficient storage plus time-window queries and aggregations at scale. The original Timestream for LiveAnalytics accepts no new customers since 2025-06-20.
+- DocumentDB: JSON document store without native time-series functions.
+- RDS: general relational engine, not built for high-volume time-series ingest.
+- Neptune: graph database for relationships.
+> 🇻🇳 Metrics IoT theo thời gian → Timestream for InfluxDB (bản LiveAnalytics không nhận khách mới).
 
 ---
 

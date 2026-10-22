@@ -179,18 +179,23 @@ A stateless application behind an ALB needs automatic replacement of unhealthy i
 - tags: s3-versioning, mfa
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/15-resilience-disaster-recovery-exam.md#Q8
 
 To protect against accidental deletion of critical S3 data and enable recovery of prior versions, enable:
 
-- A. S3 Select
+- A. S3 Intelligent-Tiering
 - B. Requester Pays
 - C. S3 Transfer Acceleration
 - D. S3 Versioning (optionally with MFA Delete)
 
 **Answer:** D
 
-**Explanation:** Protect/recover S3 data = Versioning (+ MFA Delete).
+**Explanation:** S3 Versioning keeps every version of an object, so an overwritten or deleted object can be restored from a previous version; MFA Delete additionally requires MFA to permanently delete versions or change the versioning state.
+- S3 Intelligent-Tiering: moves objects between access tiers to save cost; no protection from deletion.
+- Requester Pays: shifts request and transfer charges to the requester.
+- S3 Transfer Acceleration: speeds up long-distance uploads.
+> 🇻🇳 Chống xoá nhầm, khôi phục phiên bản cũ → S3 Versioning (+ MFA Delete).
 
 ---
 

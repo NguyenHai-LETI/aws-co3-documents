@@ -66,6 +66,7 @@ A heterogeneous migration from SQL Server to Aurora PostgreSQL requires converti
 - services: Snow Family, S3
 - difficulty: medium
 - time: 55
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q3
 
 A company must transfer 200 TB to S3 over a limited-bandwidth link within a tight deadline. Which service?
@@ -77,7 +78,12 @@ A company must transfer 200 TB to S3 over a limited-bandwidth link within a tigh
 
 **Answer:** D
 
-**Explanation:** 200 TB, limited bandwidth, deadline = Snowball Edge.
+**Explanation:** 200 TB over a limited-bandwidth link cannot meet a tight deadline; Snowball Edge devices move the data offline and import it into S3.
+- DataSync over the internet: still limited by the slow link.
+- AWS Transfer Family: SFTP/FTP endpoints for file exchange, not bulk migration.
+- Direct upload via CLI: same bandwidth limit, plus manual retries.
+Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+> 🇻🇳 200 TB + băng thông hạn chế + hạn gấp → Snowball Edge (chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
 
 ---
 
@@ -87,19 +93,24 @@ A company must transfer 200 TB to S3 over a limited-bandwidth link within a tigh
 - topic: migration
 - services: Transfer Family, S3
 - difficulty: medium
-- time: 50
+- time: 55
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q4
 
 Partners upload files daily using SFTP; the company wants a managed SFTP endpoint storing files in S3. Which service?
 
 - A. AWS Transfer Family
-- B. Snowcone
+- B. S3 Transfer Acceleration
 - C. AWS DataSync
 - D. Storage Gateway
 
 **Answer:** A
 
-**Explanation:** Managed SFTP to S3 = AWS Transfer Family.
+**Explanation:** AWS Transfer Family provides a fully managed SFTP endpoint that stores uploaded files directly in Amazon S3, so partners keep using their existing SFTP clients.
+- S3 Transfer Acceleration: speeds up HTTPS uploads to S3; it offers no SFTP endpoint.
+- AWS DataSync: moves data from storage you run; partners cannot push files to it over SFTP.
+- Storage Gateway: on-premises hybrid storage access, not an internet-facing SFTP service.
+> 🇻🇳 Đối tác upload qua SFTP, lưu vào S3 → AWS Transfer Family.
 
 ---
 
@@ -132,6 +143,7 @@ A company must continuously replicate on-premises NFS files to EFS on a schedule
 - services: Application Discovery Service
 - difficulty: medium
 - time: 50
+- status: retired
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q6
 
 A company needs to discover on-premises server inventory and dependencies before migrating. Which service?
@@ -176,6 +188,7 @@ A company wants to lift-and-shift (rehost) hundreds of on-premises VMs to EC2 wi
 - services: Migration Hub
 - difficulty: medium
 - time: 50
+- status: retired
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q8
 
 A single dashboard must track migration progress across multiple tools and accounts. Which service?
@@ -221,6 +234,7 @@ DataSync vs Snowball: which factor MOST favors Snowball?
 - tags: cdc-replication
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/10-migration-transfer-exam-v2.md#Q10
 
 A company must migrate an Oracle database to RDS Oracle (same engine) with minimal downtime. Which service?
@@ -232,7 +246,11 @@ A company must migrate an Oracle database to RDS Oracle (same engine) with minim
 
 **Answer:** C
 
-**Explanation:** Homogeneous Oracle->RDS Oracle minimal downtime = DMS with CDC.
+**Explanation:** AWS DMS performs a homogeneous Oracle-to-RDS-for-Oracle migration with a full load followed by change data capture (CDC), keeping the source live until a short cutover.
+- DataSync: copies files and objects, not live database changes.
+- Snowmobile: retired (full shutdown in 2024); an offline transfer could not keep changes in sync anyway.
+- Storage Gateway: hybrid file/volume/tape storage, not database replication.
+> 🇻🇳 Oracle → RDS Oracle, downtime thấp → AWS DMS (full load + CDC).
 
 ---
 
@@ -334,7 +352,11 @@ A company wants recommendations on the cost of running on-premises workloads in 
 
 **Answer:** A
 
-**Explanation:** Pre-migration cost recommendations = Migration Evaluator.
+**Explanation:** Migration Evaluator analyzes on-premises utilization data and produces a business case with projected AWS costs before any migration starts.
+- AWS Migration Hub: tracks migration progress and is no longer open to new customers (since 2025-11-07); it does not build cost estimates.
+- AWS DMS: replicates databases during the migration, not pre-migration cost analysis.
+- Compute Optimizer: right-sizes resources that already run in AWS.
+> 🇻🇳 Ước tính chi phí chạy workload on-prem trên AWS trước khi di chuyển → Migration Evaluator.
 
 ---
 

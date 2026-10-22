@@ -65,18 +65,23 @@ A managed service must compile source code and run unit tests on demand without 
 - services: CodeCommit, IAM
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/08-developer-tools-exam-v2.md#Q3
 
 A company needs a private, managed Git repository integrated with AWS IAM. Which service?
 
 - A. CodeGuru
-- B. Cloud9
+- B. Amazon ECR
 - C. CodeArtifact
 - D. CodeCommit
 
 **Answer:** D
 
-**Explanation:** Private managed Git with IAM = AWS CodeCommit.
+**Explanation:** CodeCommit hosts private Git repositories managed by AWS, with access controlled through IAM policies and credentials. It returned to general availability for new customers on 2025-11-24 but is outside the SAA-C03 service list.
+- CodeGuru: reviews code and profiles performance; it does not host repositories.
+- Amazon ECR: private registry for container images, not Git source code.
+- CodeArtifact: stores build packages (npm, Maven, PyPI), not Git history.
+> 🇻🇳 Git riêng tư do AWS quản lý, phân quyền bằng IAM → CodeCommit.
 
 ---
 
@@ -181,18 +186,23 @@ A Lambda deployment must shift traffic gradually (canary 10% then 90%) with auto
 - services: CDK, CloudFormation
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/08-developer-tools-exam-v2.md#Q8
 
 A team defines infrastructure using familiar programming languages (TypeScript/Python) that synthesizes CloudFormation. Which tool?
 
 - A. CodeBuild
-- B. Cloud9
+- B. AWS SAM
 - C. CodePipeline
 - D. AWS CDK
 
 **Answer:** D
 
-**Explanation:** IaC in programming languages -> CloudFormation = AWS CDK.
+**Explanation:** The AWS CDK lets teams define infrastructure in TypeScript, Python, Java and other languages; synthesizing the app produces CloudFormation templates that deploy as stacks.
+- AWS SAM: shorthand YAML/JSON templates for serverless resources, not general-purpose programming languages.
+- CodeBuild: runs builds and tests; it does not define infrastructure.
+- CodePipeline: orchestrates release stages; it does not model resources.
+> 🇻🇳 Viết hạ tầng bằng ngôn ngữ lập trình quen thuộc rồi sinh CloudFormation → AWS CDK.
 
 ---
 

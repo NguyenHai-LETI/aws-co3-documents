@@ -64,6 +64,7 @@ A company wants sentiment analysis and key-phrase/entity extraction from custome
 - services: Transcribe
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q3
 
 Which service converts speech in audio files into text (e.g., for call-center transcripts)?
@@ -71,11 +72,15 @@ Which service converts speech in audio files into text (e.g., for call-center tr
 - A. Amazon Polly
 - B. Amazon Transcribe
 - C. Amazon Comprehend
-- D. Amazon Kendra
+- D. Amazon Translate
 
 **Answer:** B
 
-**Explanation:** Speech-to-text = Transcribe.
+**Explanation:** Amazon Transcribe uses automatic speech recognition to convert speech in audio files or streams into text, such as call-center transcripts.
+- Amazon Polly: the reverse direction, text to speech.
+- Amazon Comprehend: analyzes existing text (sentiment, entities); it does not transcribe audio.
+- Amazon Translate: translates text between languages; it needs text input.
+> 🇻🇳 Giọng nói → văn bản → Amazon Transcribe (Polly là chiều ngược lại).
 
 ---
 
@@ -152,18 +157,23 @@ A team must build a conversational chatbot with automatic speech recognition and
 - services: SageMaker
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q7
 
 A data science team needs to build, train, tune, and deploy custom ML models with notebooks and managed infrastructure. Which service?
 
 - A. Amazon Rekognition
 - B. Amazon Comprehend
-- C. Amazon SageMaker
+- C. Amazon SageMaker AI
 - D. AWS Glue
 
 **Answer:** C
 
-**Explanation:** Build/train/deploy custom models = SageMaker.
+**Explanation:** Amazon SageMaker AI (formerly Amazon SageMaker) provides managed notebooks, training jobs, automatic model tuning and hosted endpoints, covering the full build-train-deploy lifecycle for custom models.
+- Amazon Rekognition: pre-trained image and video analysis API.
+- Amazon Comprehend: pre-trained NLP API.
+- AWS Glue: ETL for data preparation, not model training or hosting.
+> 🇻🇳 Tự xây, huấn luyện, tinh chỉnh, triển khai model riêng → Amazon SageMaker AI.
 
 ---
 
@@ -182,12 +192,16 @@ An e-commerce site wants real-time personalized product recommendations without 
 
 - A. Amazon Personalize
 - B. Amazon Comprehend
-- C. Amazon Kendra
-- D. Build a custom personalization model on Amazon SageMaker
+- C. Amazon Lex
+- D. Build a custom personalization model on Amazon SageMaker AI
 
 **Answer:** A
 
-**Explanation:** Real-time recommendations = Personalize.
+**Explanation:** Amazon Personalize is a managed recommendation service: it trains on your interaction data and serves real-time recommendations through an API without in-house ML development.
+- Amazon Comprehend: NLP on text, no recommendations.
+- Amazon Lex: builds conversational chatbots.
+- Custom model on SageMaker AI: possible, but you build, train and operate it yourself, which the scenario wants to avoid.
+> 🇻🇳 Gợi ý sản phẩm real-time, không tự xây ML → Amazon Personalize.
 
 ---
 
@@ -198,6 +212,7 @@ An e-commerce site wants real-time personalized product recommendations without 
 - services: Forecast
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/12-ml-ai-exam.md#Q9
 
 A retailer needs accurate time-series demand forecasting using ML. Which service?
@@ -242,6 +257,7 @@ A company must extract text, forms, and tables from scanned documents (e.g., inv
 - services: Kendra
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/12-ml-ai-exam.md#Q11
 
 An enterprise needs an intelligent, ML-powered internal search engine over documents with natural-language queries. Which service?
@@ -264,6 +280,7 @@ An enterprise needs an intelligent, ML-powered internal search engine over docum
 - services: Bedrock
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q12
 
 A company wants to add generative AI (foundation models) to an app via a managed API without managing infrastructure. Which service?
@@ -275,7 +292,11 @@ A company wants to add generative AI (foundation models) to an app via a managed
 
 **Answer:** B
 
-**Explanation:** Generative AI foundation models via API = Bedrock.
+**Explanation:** Amazon Bedrock offers foundation models from Amazon and other providers through a single managed API, so the app gains generative AI without hosting any model infrastructure.
+- Amazon Rekognition: pre-trained image and video analysis, not generative.
+- Amazon Lex: builds chatbots with intents; it is not general access to foundation models.
+- SageMaker Ground Truth (part of Amazon SageMaker AI): labels training data with human workers.
+> 🇻🇳 Dùng foundation model qua API, không quản lý hạ tầng → Amazon Bedrock.
 
 ---
 
@@ -308,6 +329,7 @@ A healthcare app must extract medical entities (medications, conditions) from cl
 - services: Fraud Detector
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/12-ml-ai-exam.md#Q14
 
 A bank wants to detect potentially fraudulent online transactions using ML with minimal data science effort. Which service?
@@ -330,6 +352,7 @@ A bank wants to detect potentially fraudulent online transactions using ML with 
 - services: SageMaker
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q15
 
 Which service would you use to label/annotate training datasets with human reviewers?
@@ -341,7 +364,11 @@ Which service would you use to label/annotate training datasets with human revie
 
 **Answer:** D
 
-**Explanation:** Human-labeled training data = SageMaker Ground Truth.
+**Explanation:** SageMaker Ground Truth (a feature of Amazon SageMaker AI) builds labeled training datasets using human reviewers (your own team, vendors or Mechanical Turk), with optional automated labeling.
+- Amazon Rekognition: detects objects with pre-trained models; it does not manage human labeling jobs.
+- Amazon Mechanical Turk only: a crowd workforce without a managed labeling workflow, tools or data integration.
+- Amazon Comprehend: NLP analysis, no human annotation.
+> 🇻🇳 Gán nhãn dữ liệu huấn luyện bằng người → SageMaker Ground Truth (thuộc SageMaker AI).
 
 ---
 
@@ -353,18 +380,23 @@ Which service would you use to label/annotate training datasets with human revie
 - tags: streaming-ingestion
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q16
 
 A live streaming platform must automatically caption audio to text in real time. Which service?
 
-- A. Amazon Kendra
+- A. Amazon Comprehend
 - B. Amazon Polly
 - C. Amazon Translate
 - D. Amazon Transcribe (streaming)
 
 **Answer:** D
 
-**Explanation:** Real-time captions = Transcribe streaming.
+**Explanation:** Amazon Transcribe streaming converts live audio to text in real time, which is what automatic captions require.
+- Amazon Comprehend: analyzes text that already exists; it does not convert speech.
+- Amazon Polly: text to speech, the opposite direction.
+- Amazon Translate: translates text between languages; it needs text input first.
+> 🇻🇳 Phụ đề real-time từ âm thanh → Amazon Transcribe (streaming).
 
 ---
 
@@ -397,18 +429,23 @@ Which AI service pairing would convert a foreign-language article to English spe
 - services: SageMaker
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q18
 
 Which is the BEST choice when a fully custom model and full control of training are required?
 
 - A. Amazon Personalize
-- B. Amazon SageMaker
+- B. Amazon SageMaker AI
 - C. Amazon Comprehend
 - D. Amazon Rekognition
 
 **Answer:** B
 
-**Explanation:** Full custom model/control = SageMaker.
+**Explanation:** Amazon SageMaker AI (formerly Amazon SageMaker) gives full control over algorithms, training code, infrastructure and hyperparameters for a fully custom model.
+- Amazon Personalize: managed recommendations with limited control over the model.
+- Amazon Comprehend: pre-trained NLP API.
+- Amazon Rekognition: pre-trained image and video API.
+> 🇻🇳 Cần model hoàn toàn tuỳ biến, toàn quyền huấn luyện → Amazon SageMaker AI.
 
 ---
 
@@ -419,6 +456,7 @@ Which is the BEST choice when a fully custom model and full control of training 
 - services: Rekognition, Comprehend
 - difficulty: medium
 - time: 75
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q19
 
 Which two are managed AI services that require NO ML expertise to use via API? (Choose TWO)
@@ -426,12 +464,16 @@ Which two are managed AI services that require NO ML expertise to use via API? (
 - A. Amazon Rekognition
 - B. Amazon Comprehend
 - C. Amazon Redshift
-- D. Amazon SageMaker (training your own model)
+- D. Amazon SageMaker AI (training your own model)
 - E. Amazon EMR
 
 **Answer:** A, B
 
-**Explanation:** Pre-trained API AI services = Rekognition and Comprehend.
+**Explanation:** Amazon Rekognition and Amazon Comprehend are pre-trained AI services: you call an API for image/video or text analysis without any ML expertise.
+- Amazon Redshift: data warehouse, not an AI service.
+- Amazon SageMaker AI (training your own model): requires ML skills to build and train models.
+- Amazon EMR: big-data processing clusters.
+> 🇻🇳 Dịch vụ AI dùng sẵn qua API, không cần chuyên môn ML → Rekognition + Comprehend.
 
 ---
 
@@ -442,15 +484,20 @@ Which two are managed AI services that require NO ML expertise to use via API? (
 - services: Transcribe, Comprehend
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam.md#Q20
 
 A contact center wants to transcribe calls, then analyze sentiment and redact PII. Which combination is BEST?
 
-- A. Amazon Rekognition + Amazon Kendra
+- A. Amazon Rekognition + Amazon Textract
 - B. Amazon Polly + Amazon Translate
 - C. Amazon Transcribe + Amazon Comprehend
-- D. Amazon Lex + Amazon Forecast
+- D. Amazon Lex + Amazon Polly
 
 **Answer:** C
 
-**Explanation:** Transcribe calls + analyze/redact = Transcribe + Comprehend.
+**Explanation:** Amazon Transcribe converts the call audio to text (and can redact PII in transcripts), and Amazon Comprehend detects sentiment and PII entities in that text.
+- Rekognition + Textract: analyze images, video and scanned documents, not call audio.
+- Polly + Translate: synthesize speech and translate text; no transcription or sentiment analysis.
+- Lex + Polly: build voice chatbots; they do not analyze recorded calls.
+> 🇻🇳 Cuộc gọi → văn bản → phân tích cảm xúc/PII → Transcribe + Comprehend.

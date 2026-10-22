@@ -536,13 +536,14 @@ A company wants maximum Spot savings for a stateless fleet while minimizing inte
 - domain: cost
 - task: 4.1
 - topic: cost
-- services: S3 Glacier, S3, Data Pipeline
+- services: S3 Glacier, S3
 - tags: s3-storage-classes
 - difficulty: hard
 - time: 105
+- enriched: 2026-10-22
 - source: practice-exams/16-cost-optimization-exam-v2.md#Q24
 
-A data pipeline writes to S3 and immediately transitions objects to Glacier, but small objects incur high per-object and minimum-duration charges. Which two considerations apply? (Choose TWO)
+An ingestion job writes objects to S3 and immediately transitions them to Glacier, but small objects incur high per-object and minimum-duration charges. Which two considerations apply? (Choose TWO)
 
 - A. IA/Glacier classes have minimum storage durations (30/90 days) and per-object overhead
 - B. Very small/short-lived objects may be cheaper in S3 Standard
@@ -552,7 +553,11 @@ A data pipeline writes to S3 and immediately transitions objects to Glacier, but
 
 **Answer:** A, B
 
-**Explanation:** IA/Glacier have min durations + per-object overhead; tiny/short objects cheaper in Standard.
+**Explanation:** S3 Standard-IA and the Glacier storage classes bill a minimum storage duration (30, 90 or 180 days) and per-object overhead (a minimum billable size for IA, extra metadata for each archived object), so very small or short-lived objects are often cheaper left in S3 Standard.
+- One Zone-IA has no minimum duration: false, it also bills at least 30 days.
+- Lifecycle transitions are free of minimums: transitions are charged per request and the target class minimums still apply.
+- Glacier is always cheapest: false for tiny or short-lived objects.
+> 🇻🇳 Object nhỏ/ngắn hạn đưa sang IA/Glacier bị tính thời gian tối thiểu + overhead → để ở S3 Standard rẻ hơn.
 
 ---
 

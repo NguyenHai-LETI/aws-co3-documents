@@ -286,6 +286,7 @@ A team needs to trace requests across microservices to find latency bottlenecks.
 - services: SAM, CloudFormation
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/08-developer-tools-exam.md#Q13
 
 Which service helps deploy a serverless application defined with a simplified template (transforms to CloudFormation)?
@@ -297,7 +298,11 @@ Which service helps deploy a serverless application defined with a simplified te
 
 **Answer:** D
 
-**Explanation:** Simplified serverless template -> CFN = AWS SAM.
+**Explanation:** AWS SAM extends CloudFormation with a shorthand syntax for functions, APIs and tables; the SAM transform expands the template into a full CloudFormation stack during deployment.
+- AWS CodeArtifact: stores software packages; it does not define infrastructure.
+- AWS OpsWorks: Chef/Puppet configuration management, discontinued in 2024 (full shutdown).
+- AWS CodeDeploy: shifts traffic to new code versions but does not define serverless resources.
+> 🇻🇳 Template rút gọn cho serverless, chuyển thành CloudFormation → AWS SAM (OpsWorks đã ngừng hẳn).
 
 ---
 

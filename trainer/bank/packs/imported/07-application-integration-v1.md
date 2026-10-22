@@ -67,18 +67,23 @@ An order-processing system must process messages in EXACT order and guarantee no
 - tags: fan-out
 - difficulty: easy
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/07-application-integration-exam.md#Q3
 
 When an S3 object is uploaded, three independent pipelines must each receive the event and process it in parallel. Which pattern is BEST?
 
 - A. S3 → single SQS queue
 - B. S3 → SNS topic → three SQS queues (fan-out)
-- C. S3 → Kinesis Firehose
+- C. S3 → Amazon Data Firehose
 - D. S3 → Lambda only
 
 **Answer:** B
 
-**Explanation:** Parallel fan-out = S3 -> SNS -> multiple SQS queues.
+**Explanation:** Publishing the S3 event notification to an SNS topic that fans out to three SQS queues gives each pipeline its own durable copy of every event, so the pipelines process in parallel and independently.
+- S3 → single SQS queue: consumers compete for the same messages, so each event reaches only one pipeline.
+- S3 → Amazon Data Firehose (formerly Kinesis Data Firehose): not an S3 event notification target, and it delivers to storage/analytics destinations rather than three processors.
+- S3 → Lambda only: one function per event; the other pipelines would need custom fan-out code.
+> 🇻🇳 Một sự kiện, nhiều pipeline xử lý song song → fan-out S3 → SNS → nhiều SQS.
 
 ---
 

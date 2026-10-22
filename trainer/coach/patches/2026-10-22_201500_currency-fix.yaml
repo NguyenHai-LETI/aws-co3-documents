@@ -88,7 +88,7 @@ items:
   - id: "03-v1-16"
     base: "2dce5582c2"
     reason: "Timestream for LiveAnalytics closed to new customers 2025-06-20 (use Timestream for InfluxDB); QLDB end of support 2025-07-31 — https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html · https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
-    options: { C: "Amazon Timestream for InfluxDB", D: "Amazon DocumentDB" }
+    options: { C: "Amazon Timestream for InfluxDB", D: "Amazon DocumentDB (with MongoDB compatibility)" }
     explanation: |
       Timestream for InfluxDB is a managed time-series database: it stores time-stamped sensor metrics efficiently and supports time-window queries and aggregations at scale. The original Timestream for LiveAnalytics accepts no new customers since 2025-06-20, so new time-series workloads use Timestream for InfluxDB.
       - Amazon RDS: general relational engine, not optimized for high-volume time-series ingest and retention.
@@ -98,7 +98,7 @@ items:
   - id: "03-v2-12"
     base: "047073f6d5"
     reason: "Timestream for LiveAnalytics closed to new customers 2025-06-20 (use Timestream for InfluxDB); QLDB end of support 2025-07-31 — https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html · https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
-    options: { A: "DocumentDB", B: "Timestream for InfluxDB" }
+    options: { A: "DocumentDB (with MongoDB compatibility)", B: "Timestream for InfluxDB" }
     explanation: |
       Timestream for InfluxDB is the managed time-series database for time-stamped metrics: efficient storage plus time-window queries and aggregations at scale. The original Timestream for LiveAnalytics accepts no new customers since 2025-06-20.
       - DocumentDB: JSON document store without native time-series functions.
@@ -125,8 +125,8 @@ items:
     stem: |
       A company must keep a regulated workload and its data inside its own data center while using the same AWS APIs and tools as in the Region. It also runs latency-sensitive game servers that need single-digit millisecond latency for players in a large city far from any AWS Region. Which TWO services should a solutions architect use? (Choose TWO)
     options:
-      A: "AWS Local Zones in the players' metro area for the game servers"
-      B: "AWS Outposts racks in the company's data center for the regulated workload"
+      A: "AWS Local Zones close to the end users for the game servers"
+      B: "AWS Outposts racks installed on premises for the compliance workload"
       C: "Amazon CloudFront in front of the game servers in the Region"
       D: "AWS Direct Connect from the data center to the nearest Region"
       E: "AWS Global Accelerator in front of the game servers in the Region"
@@ -169,13 +169,13 @@ items:
     stem: |
       Objects in Amazon S3 must be transformed (for example, PII redacted) as they are retrieved via a GET request, without changing the stored object. Which design meets this requirement?
     options:
-      A: "Byte-range fetch of only the non-sensitive part of each object"
+      A: "Byte-range fetch that skips the sensitive part of each object"
       B: "S3 Batch Operations job that redacts every object in place"
       C: "Lambda function URL that fetches the object and returns a redacted version"
       D: "S3 Lifecycle rule that transitions objects to a cheaper storage class"
     explanation: |
       A Lambda function URL (or API Gateway, or CloudFront in front of Lambda) receives the GET, reads the object from S3, redacts it and returns the result, leaving the stored object untouched. This is AWS's recommended replacement now that S3 Object Lambda accepts only existing customers (since 2025-11-07): https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html
-      - Byte-range fetch: returns raw bytes of a range; sensitive data inside it is not redacted.
+      - Byte-range fetch that skips the sensitive part: returns raw bytes only, and PII is mixed into the content, so nothing is actually redacted.
       - S3 Batch Operations redacting in place: changes the stored object, which is not allowed.
       - S3 Lifecycle rule: transitions or expires objects; it never transforms content.
       > 🇻🇳 Biến đổi dữ liệu khi GET mà không sửa object gốc → Lambda (function URL / API Gateway) đọc S3 rồi trả bản đã che.
@@ -192,7 +192,7 @@ items:
       > 🇻🇳 Người dùng toàn cầu upload chậm vào một bucket → S3 Transfer Acceleration (edge + backbone AWS).
   - id: "02-v2-15"
     base: "7ca0833f1a"
-    options: { A: "S3 Requester Pays" }
+    options: { A: "S3 Requester Pays bucket setting" }
     explanation: |
       S3 Transfer Acceleration sends uploads to the nearest CloudFront edge location and then across the AWS backbone to the bucket, which helps most when global users upload large files to one bucket.
       - S3 Requester Pays: changes who pays for requests and data transfer, not speed.
@@ -208,5 +208,538 @@ items:
       - Requester Pays: shifts request and transfer charges to the requester.
       - S3 Transfer Acceleration: speeds up long-distance uploads.
       > 🇻🇳 Chống xoá nhầm, khôi phục phiên bản cũ → S3 Versioning (+ MFA Delete).
-  - id: "03-v2-12-placeholder-never"   # (no-op guard removed below)
-    base: "0000000000"
+  - id: "09-v1-04"
+    base: "df6eb434fa"
+    options: { D: "AWS Step Functions" }
+    explanation: |
+      AWS Glue is serverless ETL: crawlers infer schemas into the Glue Data Catalog, and Glue jobs (Spark or Python) transform the data for analytics.
+      - Amazon Athena: queries data that is already cataloged; it does not crawl sources or run ETL jobs.
+      - Amazon Kinesis: ingests streaming data; no crawler or catalog.
+      - AWS Step Functions: orchestrates workflow steps (it can call Glue jobs) but does not infer schemas or transform data itself.
+      > 🇻🇳 ETL serverless + crawler + Data Catalog → AWS Glue.
+  - id: "05-v2-10"
+    base: "a69e34f08e"
+    options: { B: "IAM Identity Center (AWS SSO) only" }
+    explanation: |
+      Cognito user pools provide a managed user directory with sign-up and sign-in, federation with social identity providers such as Google and Facebook, and JWT tokens for the mobile app.
+      - IAM Identity Center (formerly AWS SSO): workforce single sign-on to AWS accounts and business apps, not end-user sign-up for a consumer app.
+      - IAM users: long-term credentials inside your AWS account, not built for millions of app users.
+      - AWS Directory Service: managed Microsoft AD for enterprise workloads, no social federation.
+      > 🇻🇳 Đăng ký/đăng nhập người dùng app + federation Google/Facebook + token → Cognito User Pools (IAM Identity Center dành cho nhân viên).
+  - id: "07-v1-03"
+    base: "e6b677c12c"
+    options: { C: "S3 → Amazon Data Firehose" }
+    explanation: |
+      Publishing the S3 event notification to an SNS topic that fans out to three SQS queues gives each pipeline its own durable copy of every event, so the pipelines process in parallel and independently.
+      - S3 → single SQS queue: consumers compete for the same messages, so each event reaches only one pipeline.
+      - S3 → Amazon Data Firehose (formerly Kinesis Data Firehose): not an S3 event notification target, and it delivers to storage/analytics destinations rather than three processors.
+      - S3 → Lambda only: one function per event; the other pipelines would need custom fan-out code.
+      > 🇻🇳 Một sự kiện, nhiều pipeline xử lý song song → fan-out S3 → SNS → nhiều SQS.
+  - id: "08-v2-03"
+    base: "a43c0253c4"
+    options: { B: "Amazon ECR" }
+    explanation: |
+      CodeCommit hosts private Git repositories managed by AWS, with access controlled through IAM policies and credentials. It returned to general availability for new customers on 2025-11-24 but is outside the SAA-C03 service list.
+      - CodeGuru: reviews code and profiles performance; it does not host repositories.
+      - Amazon ECR: private registry for container images, not Git source code.
+      - CodeArtifact: stores build packages (npm, Maven, PyPI), not Git history.
+      > 🇻🇳 Git riêng tư do AWS quản lý, phân quyền bằng IAM → CodeCommit.
+  - id: "08-v2-08"
+    base: "16943911d8"
+    options: { B: "AWS SAM" }
+    explanation: |
+      The AWS CDK lets teams define infrastructure in TypeScript, Python, Java and other languages; synthesizing the app produces CloudFormation templates that deploy as stacks.
+      - AWS SAM: shorthand YAML/JSON templates for serverless resources, not general-purpose programming languages.
+      - CodeBuild: runs builds and tests; it does not define infrastructure.
+      - CodePipeline: orchestrates release stages; it does not model resources.
+      > 🇻🇳 Viết hạ tầng bằng ngôn ngữ lập trình quen thuộc rồi sinh CloudFormation → AWS CDK.
+  - id: "10-v1-05"
+    base: "3ed003f70e"
+    options: { C: "Amazon S3 File Gateway" }
+    explanation: |
+      DataSync connects to the on-premises NFS share through an agent and runs scheduled, incremental, verified transfers directly into Amazon EFS.
+      - AWS Transfer Family: managed SFTP/FTPS/FTP endpoints for partners, not NFS-to-EFS sync.
+      - Amazon S3 File Gateway: presents S3 storage to on-premises clients; it does not write into EFS.
+      - AWS Backup: backs up AWS resources; it does not migrate on-premises file shares.
+      > 🇻🇳 Đồng bộ NFS on-prem → EFS theo lịch, incremental → AWS DataSync.
+  - id: "10-v2-04"
+    base: "f4816164a6"
+    options: { B: "S3 Transfer Acceleration" }
+    explanation: |
+      AWS Transfer Family provides a fully managed SFTP endpoint that stores uploaded files directly in Amazon S3, so partners keep using their existing SFTP clients.
+      - S3 Transfer Acceleration: speeds up HTTPS uploads to S3; it offers no SFTP endpoint.
+      - AWS DataSync: moves data from storage you run; partners cannot push files to it over SFTP.
+      - Storage Gateway: on-premises hybrid storage access, not an internet-facing SFTP service.
+      > 🇻🇳 Đối tác upload qua SFTP, lưu vào S3 → AWS Transfer Family.
+  - id: "11-v1-10"
+    base: "948402e109"
+    options: { B: "AWS End User Messaging SMS only" }
+    explanation: |
+      Amazon SES is a scalable, pay-as-you-go email service built for high-volume transactional and marketing email such as receipts.
+      - AWS End User Messaging SMS: sends SMS and voice messages, not email.
+      - Amazon Connect: cloud contact center, not bulk email.
+      - Amazon SNS: pub/sub notifications; its email protocol suits plain alerts to subscribers, not branded transactional email at scale.
+      > 🇻🇳 Gửi email giao dịch số lượng lớn, rẻ → Amazon SES.
+  - id: "11-v2-03"
+    base: "4b8890f1df"
+    options: { C: "AWS End User Messaging only" }
+    explanation: |
+      Amazon SES sends transactional and marketing email at scale with high deliverability, pay-as-you-go pricing and no mail servers to run.
+      - API Gateway: exposes APIs; it does not send email.
+      - AWS End User Messaging: SMS, voice and push channels, not email.
+      - Amazon SNS: pub/sub notifications to subscribers, not full transactional or marketing email.
+      > 🇻🇳 Email giao dịch + marketing quy mô lớn → Amazon SES.
+  - id: "12-v1-03"
+    base: "d706931e89"
+    options: { D: "Amazon Translate" }
+    explanation: |
+      Amazon Transcribe uses automatic speech recognition to convert speech in audio files or streams into text, such as call-center transcripts.
+      - Amazon Polly: the reverse direction, text to speech.
+      - Amazon Comprehend: analyzes existing text (sentiment, entities); it does not transcribe audio.
+      - Amazon Translate: translates text between languages; it needs text input.
+      > 🇻🇳 Giọng nói → văn bản → Amazon Transcribe (Polly là chiều ngược lại).
+  - id: "12-v1-16"
+    base: "4cd0f4319c"
+    options: { A: "Amazon Comprehend" }
+    explanation: |
+      Amazon Transcribe streaming converts live audio to text in real time, which is what automatic captions require.
+      - Amazon Comprehend: analyzes text that already exists; it does not convert speech.
+      - Amazon Polly: text to speech, the opposite direction.
+      - Amazon Translate: translates text between languages; it needs text input first.
+      > 🇻🇳 Phụ đề real-time từ âm thanh → Amazon Transcribe (streaming).
+  - id: "12-v1-20"
+    base: "98eed2f5f3"
+    options: { A: "Amazon Rekognition + Amazon Textract", D: "Amazon Lex + Amazon Polly" }
+    explanation: |
+      Amazon Transcribe converts the call audio to text (and can redact PII in transcripts), and Amazon Comprehend detects sentiment and PII entities in that text.
+      - Rekognition + Textract: analyze images, video and scanned documents, not call audio.
+      - Polly + Translate: synthesize speech and translate text; no transcription or sentiment analysis.
+      - Lex + Polly: build voice chatbots; they do not analyze recorded calls.
+      > 🇻🇳 Cuộc gọi → văn bản → phân tích cảm xúc/PII → Transcribe + Comprehend.
+  - id: "12-v2-06"
+    base: "37d18b1889"
+    options: { A: "Amazon Translate" }
+    explanation: |
+      Amazon Comprehend is the managed NLP service that detects sentiment, key phrases, entities and language in text such as customer feedback.
+      - Amazon Translate: converts text between languages; no sentiment analysis.
+      - Amazon Personalize: product recommendations from interaction data.
+      - Amazon Rekognition: analyzes images and video, not text.
+      > 🇻🇳 Phân tích cảm xúc, cụm từ khoá trong văn bản → Amazon Comprehend.
+  - id: "12-v2-13"
+    base: "84dfd49dc7"
+    options: { B: "Amazon Rekognition" }
+    explanation: |
+      Amazon Bedrock gives access to foundation models from Amazon and other providers through one managed API, so teams build generative AI applications without managing infrastructure.
+      - Amazon Rekognition: pre-trained image and video analysis, not generative AI.
+      - Amazon Comprehend: pre-trained NLP analysis such as sentiment.
+      - SageMaker Ground Truth (part of Amazon SageMaker AI): labels training data with human workers.
+      > 🇻🇳 Ứng dụng generative AI dùng foundation model qua API → Amazon Bedrock.
+  - id: "12-v1-08"
+    base: "56d3006c75"
+    options: { C: "Amazon Lex", D: "Build a custom personalization model on Amazon SageMaker AI" }
+    explanation: |
+      Amazon Personalize is a managed recommendation service: it trains on your interaction data and serves real-time recommendations through an API without in-house ML development.
+      - Amazon Comprehend: NLP on text, no recommendations.
+      - Amazon Lex: builds conversational chatbots.
+      - Custom model on SageMaker AI: possible, but you build, train and operate it yourself, which the scenario wants to avoid.
+      > 🇻🇳 Gợi ý sản phẩm real-time, không tự xây ML → Amazon Personalize.
+  - id: "12-v2-09"
+    base: "cd97fc0cd6"
+    options: { C: "Build a custom personalized-recommendation model on SageMaker AI", D: "Amazon Lex" }
+    explanation: |
+      Amazon Personalize is the managed recommendation service: it trains on interaction data and returns real-time personalized recommendations through an API.
+      - Amazon Rekognition: image and video analysis.
+      - Custom model on SageMaker AI: possible, but you must build, train and operate it yourself.
+      - Amazon Lex: conversational chatbots.
+      > 🇻🇳 Gợi ý sản phẩm cá nhân hoá real-time → Amazon Personalize.
+  - id: "13-v1-06"
+    base: "310d04f5f8"
+    options: { B: "AWS Global Accelerator" }
+    explanation: |
+      Local Zones place AWS compute, storage and database services in large metro areas close to users, giving single-digit millisecond latency where no Region is nearby.
+      - AWS Outposts: AWS racks in your own data center, for on-premises needs rather than players across a city.
+      - AWS Global Accelerator: improves routing over the AWS network, but traffic is still served from distant Regional endpoints.
+      - AWS Ground Station: satellite communications, unrelated to player latency.
+      > 🇻🇳 Độ trễ vài ms cho người dùng ở đô thị xa Region → AWS Local Zones.
+  - id: "13-v1-09"
+    base: "b53b10961e"
+    options: { B: "Amazon WorkSpaces", C: "Amazon Lex" }
+    explanation: |
+      Amazon Connect is a fully managed omnichannel cloud contact center (voice, chat, tasks) with pay-per-use pricing and no telephony hardware.
+      - Amazon WorkSpaces: virtual desktops for staff, not a contact center.
+      - Amazon Lex: builds chatbots that can plug into Connect, but it is not a contact center by itself.
+      - Amazon SES: sends email only.
+      > 🇻🇳 Contact center đa kênh được quản lý hoàn toàn → Amazon Connect.
+  - id: "13-v1-16"
+    base: "860898fc34"
+    options: { A: "AWS Local Zones" }
+    explanation: |
+      AWS Outposts installs AWS-managed racks or servers on premises that run the same AWS APIs, tools and services as the Region, for low-latency local processing.
+      - AWS Local Zones: extend a Region into a metro area, but the infrastructure runs in AWS facilities, not inside the factory.
+      - AWS Ground Station: satellite communications.
+      - CloudFront: caches content at edge locations; it does not run the application on premises.
+      > 🇻🇳 API AWS giống Region nhưng chạy tại chỗ, độ trễ thấp → AWS Outposts.
+  - id: "13-v2-08"
+    base: "8849cf0b37"
+    options: { A: "Amazon Lex", D: "Amazon WorkSpaces" }
+    explanation: |
+      Amazon Connect is a fully managed cloud contact center for customer service, with voice and chat channels and pay-per-use pricing.
+      - Amazon Lex: chatbots that can be added to Connect, not a contact center by itself.
+      - WorkMail: business email and calendars.
+      - Amazon WorkSpaces: virtual desktops.
+      > 🇻🇳 Contact center trên cloud được quản lý → Amazon Connect.
+  - id: "13-v2-10"
+    base: "04e9e77862"
+    options: { D: "Amazon WorkSpaces" }
+    explanation: |
+      Amazon WorkMail is a managed business email and calendaring service that works with Microsoft Outlook and mobile clients.
+      - SES: sends application email (transactional/marketing); no user mailboxes or calendars.
+      - Amazon Connect: cloud contact center.
+      - Amazon WorkSpaces: virtual desktops, not an email service.
+      > 🇻🇳 Email + lịch làm việc được quản lý → Amazon WorkMail.
+  - id: "14-v1-11"
+    base: "d1ec42c887"
+    options: { C: "DynamoDB vs DocumentDB" }
+    explanation: |
+      Amazon Neptune is the purpose-built graph database for highly connected relationships, and Amazon DocumentDB is the MongoDB-compatible document database.
+      - Keyspaces vs Neptune: Keyspaces is Cassandra-compatible wide-column, not graph.
+      - DynamoDB vs DocumentDB: DynamoDB is a key-value/document store, not a graph database.
+      - DocumentDB vs Neptune: the right services in the reverse order.
+      > 🇻🇳 Đồ thị → Neptune; tương thích MongoDB → DocumentDB.
+
+  # ── Renames in options (tên mới (tên cũ)) + explanation ──
+  - id: "09-v1-01"
+    base: "f0b8f3b546"
+    options: { B: "Amazon Data Firehose (Kinesis Data Firehose)" }
+    explanation: |
+      Kinesis Data Streams ingests records with sub-second latency, keeps them for a configurable retention period, and lets multiple consumer applications read the same data independently and replay it.
+      - Amazon Data Firehose (formerly Kinesis Data Firehose): buffers and delivers data to destinations such as S3; no replay or custom multi-consumer reads.
+      - Amazon SQS: a message is deleted after one consumer processes it, so several apps cannot replay it.
+      - Amazon Athena: queries data at rest in S3, not a streaming ingest service.
+      > 🇻🇳 Real-time, nhiều consumer cùng đọc, replay được → Kinesis Data Streams.
+  - id: "09-v2-01"
+    base: "d0684c6f51"
+    options: { D: "Amazon Data Firehose" }
+    explanation: |
+      Kinesis Data Streams ingests clickstream records in real time and lets several applications read the same records independently, with replay during the retention period.
+      - Amazon SQS: each message is processed by one consumer and then deleted.
+      - Amazon Athena: queries data at rest in S3.
+      - Amazon Data Firehose (formerly Kinesis Data Firehose): delivers data to destinations; no multiple custom consumers or replay.
+      > 🇻🇳 Ingest real-time, nhiều ứng dụng cùng xử lý một bản ghi → Kinesis Data Streams.
+  - id: "09-v1-02"
+    base: "51a50b6543"
+    options: { A: "Amazon Data Firehose" }
+    explanation: |
+      Amazon Data Firehose (formerly Kinesis Data Firehose) is fully managed: it buffers streaming data, optionally transforms it with Lambda, and loads it into S3 and Redshift in near real time with no servers or consumer code.
+      - AWS Glue: ETL jobs you author and schedule, more setup than a delivery stream.
+      - Amazon EMR: clusters you size and manage.
+      - Kinesis Data Streams: needs custom consumers to write the data to S3 or Redshift.
+      > 🇻🇳 Đẩy dữ liệu streaming vào S3/Redshift gần real-time, không quản lý server → Amazon Data Firehose.
+  - id: "09-v2-02"
+    base: "ba31975319"
+    options: { A: "Amazon Data Firehose" }
+    explanation: |
+      Amazon Data Firehose (formerly Kinesis Data Firehose) buffers incoming records and loads them into S3 or Redshift automatically, with no consumers to write and nothing to manage.
+      - Amazon MSK: managed Kafka brokers; you still need consumers or connectors to load S3/Redshift.
+      - Kinesis Data Streams: requires custom consumer applications.
+      - EMR: clusters to provision and operate.
+      > 🇻🇳 Giao dữ liệu streaming vào S3/Redshift ít vận hành nhất → Amazon Data Firehose.
+  - id: "09-v1-15"
+    base: "ebb3f83d42"
+    stem: |
+      Which destination is NOT natively supported by Amazon Data Firehose (formerly Kinesis Data Firehose)?
+    explanation: |
+      Amazon Data Firehose delivers to storage and analytics destinations such as Amazon S3, Amazon Redshift, Amazon OpenSearch Service, Splunk and HTTP endpoints; Amazon SQS is not a delivery destination.
+      - Amazon Redshift: supported (Firehose stages data in S3 and runs COPY).
+      - Amazon OpenSearch: supported as a direct destination.
+      - Amazon S3: the most common destination.
+      > 🇻🇳 Firehose không giao dữ liệu vào SQS; đích hỗ trợ: S3, Redshift, OpenSearch, Splunk, HTTP endpoint.
+  - id: "09-v2-19"
+    base: "628f247a60"
+    options: { C: "Amazon Data Firehose only, no transform" }
+    explanation: |
+      A Glue ETL job transforms the data and writes it to S3, and a daily Redshift COPY loads it in parallel; Redshift then runs the complex joins for BI.
+      - DynamoDB Streams to Redshift directly: not a load path; zero-ETL integrations replicate data without your transformation step.
+      - Athena writes directly into Redshift tables: Athena queries S3; it cannot insert into Redshift tables.
+      - Amazon Data Firehose only, no transform: streaming delivery without the required transformation.
+      > 🇻🇳 Biến đổi hằng ngày rồi nạp Redshift → Glue ETL ra S3 → COPY vào Redshift.
+  - id: "09-v2-25"
+    base: "6bd5bb02da"
+    options: { C: "Amazon Data Firehose" }
+    explanation: |
+      Managed Service for Apache Flink (formerly Kinesis Data Analytics) runs Apache Flink applications with exactly-once state consistency, event-time windows and sub-second latency.
+      - Glue crawler: infers schemas for the Data Catalog; it does not process streams.
+      - Amazon Data Firehose: buffers and delivers data, with no stateful windowed processing.
+      - Athena: queries data at rest in S3.
+      > 🇻🇳 Xử lý stream có trạng thái, exactly-once, windowing → Managed Service for Apache Flink.
+  - id: "09-v1-03"
+    base: "cef9393a88"
+    options: { B: "Amazon Quick (QuickSight)" }
+    explanation: |
+      Amazon Athena is serverless and runs standard SQL directly against data in S3 without loading it anywhere, billing per amount of data scanned.
+      - Amazon Quick (formerly QuickSight): BI dashboards; it can use Athena as a source but is not the query engine.
+      - Amazon EMR: clusters you provision and pay for while they run.
+      - Amazon Redshift: a data warehouse billed for compute capacity, built for loaded data rather than pay-per-scan ad hoc queries.
+      > 🇻🇳 SQL ad-hoc trực tiếp trên S3, trả theo dữ liệu quét → Amazon Athena.
+  - id: "09-v1-07"
+    base: "8a8094fde7"
+    options: { B: "Amazon Quick" }
+    explanation: |
+      Amazon Quick (formerly Amazon QuickSight; the exam guide lists it as Amazon Quick) is the managed BI service: analysts build interactive dashboards backed by the in-memory SPICE engine, with no servers to manage.
+      - Amazon EMR: big-data processing clusters, not BI dashboards.
+      - Amazon OpenSearch: search and log analytics, not business BI with SPICE.
+      - AWS Glue: ETL and data catalog.
+      > 🇻🇳 Dashboard BI tương tác, engine SPICE → Amazon Quick (trước đây QuickSight).
+  - id: "09-v1-10"
+    base: "52cdabcb1a"
+    options: { D: "Amazon Quick (QuickSight)" }
+    explanation: |
+      Amazon Managed Service for Apache Flink (formerly Kinesis Data Analytics) runs continuous SQL or Flink applications over streams, with time windows for real-time aggregations such as anomaly detection.
+      - AWS Glue: ETL jobs, mainly batch; not the engine for windowed real-time analytics.
+      - Amazon Athena: queries data at rest in S3, not live streams.
+      - Amazon Quick (formerly QuickSight): visualizes results; it does not process streams.
+      > 🇻🇳 Phân tích SQL trên dữ liệu streaming theo cửa sổ thời gian → Managed Service for Apache Flink.
+  - id: "09-v1-19"
+    base: "d39b016a68"
+    options: { A: "Amazon Quick (QuickSight)" }
+    explanation: |
+      AWS Glue DataBrew is a visual data-preparation tool with hundreds of built-in transformations, so analysts clean and normalize data without writing code.
+      - Amazon Quick (formerly QuickSight): visualizes prepared data; it is not a full cleaning and normalizing tool.
+      - Amazon EMR: requires Spark/Hadoop code and cluster management.
+      - Amazon Athena: SQL queries, which is still code.
+      > 🇻🇳 Làm sạch/chuẩn hoá dữ liệu trực quan, không viết code → AWS Glue DataBrew.
+  - id: "09-v2-05"
+    base: "8eee1a8280"
+    options: { D: "Amazon Quick (QuickSight)" }
+    explanation: |
+      Amazon EMR runs managed Hadoop and Spark clusters where you choose instance types, versions and configuration, giving full control for large-scale big-data processing.
+      - Athena: serverless SQL on S3 with no cluster control.
+      - AWS Glue: serverless Spark ETL where AWS manages the environment, so control is limited.
+      - Amazon Quick (formerly QuickSight): BI dashboards, not a processing engine.
+      > 🇻🇳 Cluster Hadoop/Spark được quản lý nhưng toàn quyền cấu hình → Amazon EMR.
+  - id: "09-v2-07"
+    base: "be5d7e3a43"
+    options: { D: "Amazon Quick" }
+    explanation: |
+      Amazon Quick (formerly Amazon QuickSight; the exam guide lists it as Amazon Quick) is the managed, serverless BI service for interactive dashboards and visualizations.
+      - Amazon Athena: SQL queries on S3; no dashboards.
+      - AWS Glue: ETL and data catalog.
+      - OpenSearch: search and log analytics rather than business BI.
+      > 🇻🇳 Dashboard BI, trực quan hoá, serverless → Amazon Quick (trước đây QuickSight).
+  - id: "09-v2-16"
+    base: "337f2fdd6a"
+    options: { C: "Amazon Quick (QuickSight) only" }
+    explanation: |
+      Amazon OpenSearch Service indexes log data in near real time, supports full-text search, and includes OpenSearch Dashboards for operational dashboards.
+      - Amazon Athena: ad hoc SQL over files in S3, no full-text index or live dashboards.
+      - Amazon Redshift: data warehouse for structured analytics, not log search.
+      - Amazon Quick (formerly QuickSight) only: BI dashboards without full-text log search.
+      > 🇻🇳 Log gần real-time + tìm kiếm full-text + dashboard vận hành → Amazon OpenSearch Service.
+  - id: "12-v1-07"
+    base: "09c6e2fca4"
+    options: { C: "Amazon SageMaker AI" }
+    explanation: |
+      Amazon SageMaker AI (formerly Amazon SageMaker) provides managed notebooks, training jobs, automatic model tuning and hosted endpoints, covering the full build-train-deploy lifecycle for custom models.
+      - Amazon Rekognition: pre-trained image and video analysis API.
+      - Amazon Comprehend: pre-trained NLP API.
+      - AWS Glue: ETL for data preparation, not model training or hosting.
+      > 🇻🇳 Tự xây, huấn luyện, tinh chỉnh, triển khai model riêng → Amazon SageMaker AI.
+  - id: "12-v1-18"
+    base: "9f9fbc2a9b"
+    options: { B: "Amazon SageMaker AI" }
+    explanation: |
+      Amazon SageMaker AI (formerly Amazon SageMaker) gives full control over algorithms, training code, infrastructure and hyperparameters for a fully custom model.
+      - Amazon Personalize: managed recommendations with limited control over the model.
+      - Amazon Comprehend: pre-trained NLP API.
+      - Amazon Rekognition: pre-trained image and video API.
+      > 🇻🇳 Cần model hoàn toàn tuỳ biến, toàn quyền huấn luyện → Amazon SageMaker AI.
+  - id: "12-v1-19"
+    base: "1ee071cd73"
+    options: { D: "Amazon SageMaker AI (training your own model)" }
+    explanation: |
+      Amazon Rekognition and Amazon Comprehend are pre-trained AI services: you call an API for image/video or text analysis without any ML expertise.
+      - Amazon Redshift: data warehouse, not an AI service.
+      - Amazon SageMaker AI (training your own model): requires ML skills to build and train models.
+      - Amazon EMR: big-data processing clusters.
+      > 🇻🇳 Dịch vụ AI dùng sẵn qua API, không cần chuyên môn ML → Rekognition + Comprehend.
+  - id: "12-v2-10"
+    base: "de0e5198d3"
+    options: { B: "Amazon SageMaker AI" }
+    explanation: |
+      Amazon SageMaker AI (formerly Amazon SageMaker) is the managed environment to build, train and deploy custom ML models end to end.
+      - Amazon Lex: builds chatbots.
+      - Amazon Rekognition: pre-trained image and video analysis.
+      - Amazon Comprehend: pre-trained NLP.
+      > 🇻🇳 Xây, huấn luyện, triển khai model riêng trọn vòng đời → Amazon SageMaker AI.
+  - id: "12-v2-14"
+    base: "dd33478ec4"
+    stem: |
+      An Amazon SageMaker AI inference endpoint has spiky traffic and must scale to zero when idle to save cost while handling bursts. Which option?
+    options: { C: "SageMaker AI Serverless Inference" }
+    explanation: |
+      SageMaker AI Serverless Inference provisions compute only while requests arrive, scales to zero when idle and scales out automatically for bursts, so you pay per use.
+      - Multi-model endpoint always-on: hosts many models on one endpoint but keeps instances running when idle.
+      - Always-on real-time endpoint: billed for instances around the clock even with no traffic.
+      - Batch transform only: offline jobs with no low-latency responses to live requests.
+      > 🇻🇳 Traffic thất thường, cần về 0 khi rảnh → SageMaker AI Serverless Inference.
+  - id: "12-v1-12"
+    base: "7d69f53e22"
+    explanation: |
+      Amazon Bedrock offers foundation models from Amazon and other providers through a single managed API, so the app gains generative AI without hosting any model infrastructure.
+      - Amazon Rekognition: pre-trained image and video analysis, not generative.
+      - Amazon Lex: builds chatbots with intents; it is not general access to foundation models.
+      - SageMaker Ground Truth (part of Amazon SageMaker AI): labels training data with human workers.
+      > 🇻🇳 Dùng foundation model qua API, không quản lý hạ tầng → Amazon Bedrock.
+  - id: "12-v1-15"
+    base: "4a78aa9ba9"
+    explanation: |
+      SageMaker Ground Truth (a feature of Amazon SageMaker AI) builds labeled training datasets using human reviewers (your own team, vendors or Mechanical Turk), with optional automated labeling.
+      - Amazon Rekognition: detects objects with pre-trained models; it does not manage human labeling jobs.
+      - Amazon Mechanical Turk only: a crowd workforce without a managed labeling workflow, tools or data integration.
+      - Amazon Comprehend: NLP analysis, no human annotation.
+      > 🇻🇳 Gán nhãn dữ liệu huấn luyện bằng người → SageMaker Ground Truth (thuộc SageMaker AI).
+  - id: "13-v1-12"
+    base: "af93445ff2"
+    options: { B: "Amazon SageMaker AI endpoints" }
+    explanation: |
+      Amazon Mechanical Turk is a crowdsourcing marketplace where human workers complete small tasks such as data labeling or content moderation at scale.
+      - Amazon Connect: cloud contact center.
+      - Amazon SageMaker AI endpoints: host trained models for inference; no human workers.
+      - AWS Lambda: runs code, not human tasks.
+      > 🇻🇳 Thuê người làm việc nhỏ quy mô lớn (crowdsourcing) → Amazon Mechanical Turk.
+
+  # ── Explanation-only: status of retired / closed services in distractors or Snow Family keys ──
+  - id: "02-v1-08"
+    base: "e2f7af2be0"
+    explanation: |
+      At 200 Mbps the link moves only about 2 TB per day, so 600 TB would take roughly nine months online; Snowball Edge Storage Optimized devices ship the data offline within two weeks.
+      - DataSync over the internet: still capped by the 200 Mbps link.
+      - S3 Transfer Acceleration: optimizes the network path but cannot exceed the link bandwidth.
+      - Storage Gateway: hybrid access that uploads over the same slow link.
+      Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+      > 🇻🇳 Dữ liệu lớn + băng thông thấp + hạn gấp → thiết bị offline Snowball Edge (đề cương vẫn có Snow Family; thực tế chỉ còn cho khách hàng hiện có từ 2025-11-07, ngừng hỗ trợ 2026-12-31).
+  - id: "02-v2-12"
+    base: "ae44fa00ba"
+    explanation: |
+      With limited bandwidth and a tight deadline, 500 TB cannot be uploaded in time; Snowball Edge devices move the data offline and import it into S3.
+      - Direct upload via CLI: limited by the same slow link.
+      - DataSync over the internet: automates the transfer but cannot exceed the available bandwidth.
+      - S3 Transfer Acceleration: optimizes the path, not the link capacity.
+      Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+      > 🇻🇳 Hàng trăm TB + băng thông hạn chế + hạn gấp → Snowball Edge (chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
+  - id: "10-v1-03"
+    base: "426a1de01d"
+    explanation: |
+      With limited bandwidth and a tight deadline, shipping 80 TB on a Snowball Edge device is faster than pushing it over the network.
+      - AWS DataSync: online transfer, still limited by the slow link.
+      - S3 Transfer Acceleration: optimizes the path, not the link capacity.
+      - AWS Storage Gateway: hybrid access that uploads over the same link.
+      Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+      > 🇻🇳 Băng thông thấp + hạn gấp → chuyển offline bằng Snowball Edge (chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
+  - id: "10-v2-03"
+    base: "3a99cd8cd1"
+    explanation: |
+      200 TB over a limited-bandwidth link cannot meet a tight deadline; Snowball Edge devices move the data offline and import it into S3.
+      - DataSync over the internet: still limited by the slow link.
+      - AWS Transfer Family: SFTP/FTP endpoints for file exchange, not bulk migration.
+      - Direct upload via CLI: same bandwidth limit, plus manual retries.
+      Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+      > 🇻🇳 200 TB + băng thông hạn chế + hạn gấp → Snowball Edge (chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
+  - id: "10-v1-13"
+    base: "0fcbe4a0eb"
+    explanation: |
+      An offline Snowball Edge device makes sense when moving the data over the available network would take weeks; otherwise DataSync over the network is simpler and continuous.
+      - The data is already in AWS: there is nothing to import.
+      - Small dataset and high bandwidth: a network transfer finishes faster than shipping a device.
+      - Real-time continuous replication: needs an online service such as DataSync or DMS, not a shipped device.
+      Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new large transfers use DataSync over Direct Connect or AWS Data Transfer Terminal.
+      > 🇻🇳 Chọn thiết bị offline khi truyền qua mạng mất hàng tuần (Snowball Edge chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
+  - id: "14-v1-16"
+    base: "47c201665d"
+    explanation: |
+      DataSync performs online, automated, incremental transfers over the network, while a Snowball device is the offline option when bandwidth is too limited.
+      - Snowball vs DataSync: the right services in the reverse order.
+      - Transfer Family vs Snowball: Transfer Family offers SFTP/FTPS endpoints for partners, not incremental sync.
+      - Storage Gateway vs DataSync: Storage Gateway is hybrid storage access, and DataSync is online, not offline.
+      Status: Snowball Edge is available only to existing customers since 2025-11-07 (device support ends 2026-12-31).
+      > 🇻🇳 Online, incremental → DataSync; thiết bị offline → Snowball (chỉ còn cho khách hàng hiện có).
+  - id: "02-v1-19"
+    base: "82c3582f9e"
+    explanation: |
+      DataSync runs scheduled, incremental transfers from on-premises NFS/SMB/HDFS storage to S3, EFS or FSx, and Storage Gateway continuously moves on-premises data into AWS storage while keeping a local cache.
+      - Amazon S3 Transfer Acceleration: speeds up individual uploads but has no scheduling or incremental sync.
+      - Amazon Macie: discovers sensitive data in S3; it does not transfer data.
+      - AWS Snowmobile: retired (full shutdown in 2024); it was a one-time offline exabyte transport, never a scheduled sync.
+      > 🇻🇳 Chuyển dữ liệu tự động, theo lịch, incremental từ on-prem → DataSync + Storage Gateway (Snowmobile đã ngừng hẳn).
+  - id: "10-v1-04"
+    base: "2d2412c3cd"
+    explanation: |
+      Application Migration Service (MGN) installs a replication agent that continuously copies block-level data from physical and virtual servers to AWS, then launches EC2 instances at cutover with minimal downtime.
+      - AWS Snowmobile: retired (full shutdown in 2024); it only moved data offline, never running servers.
+      - AWS DMS: migrates databases, not whole servers.
+      - AWS DataSync: copies files and objects, not bootable server volumes.
+      > 🇻🇳 Lift-and-shift hàng trăm server, sao chép block liên tục, downtime thấp → Application Migration Service (MGN).
+  - id: "10-v1-18"
+    base: "7101bd4242"
+    explanation: |
+      Storage Gateway (File Gateway, or Volume Gateway in cached mode) keeps frequently used data in a local cache for low-latency access while continuously storing the full data set in AWS.
+      - AWS Transfer Family: SFTP/FTP endpoints into S3 or EFS, with no local cache.
+      - AWS Snowmobile: retired (full shutdown in 2024), and only ever a one-time offline transfer.
+      - AWS DMS: replicates databases, not file shares.
+      > 🇻🇳 File share on-prem cần cache cục bộ + lưu trên AWS → Storage Gateway (File/Volume Gateway).
+  - id: "10-v1-20"
+    base: "e98bbf1b01"
+    explanation: |
+      Application Migration Service (MGN) rehosts VMware VMs by continuously replicating them to AWS and launching them as EC2 instances, so applications move without refactoring and cutover can be tested first.
+      - Snowmobile: retired (full shutdown in 2024); it only moved data offline.
+      - AWS Glue ETL: transforms data; it does not migrate servers.
+      - Rebuild every app manually on EC2: maximum effort and cutover risk.
+      > 🇻🇳 Di chuyển VMware quy mô lớn, ít sửa ứng dụng → Application Migration Service (lift-and-shift).
+  - id: "10-v2-10"
+    base: "c372830cb5"
+    explanation: |
+      AWS DMS performs a homogeneous Oracle-to-RDS-for-Oracle migration with a full load followed by change data capture (CDC), keeping the source live until a short cutover.
+      - DataSync: copies files and objects, not live database changes.
+      - Snowmobile: retired (full shutdown in 2024); an offline transfer could not keep changes in sync anyway.
+      - Storage Gateway: hybrid file/volume/tape storage, not database replication.
+      > 🇻🇳 Oracle → RDS Oracle, downtime thấp → AWS DMS (full load + CDC).
+  - id: "13-v1-08"
+    base: "37f307083f"
+    explanation: |
+      AWS Ground Station is a managed network of antennas: teams schedule satellite contacts and downlink data directly into AWS without building ground stations.
+      - AWS Snowmobile: retired (full shutdown in 2024), and it was a truck for offline data transfer.
+      - AWS IoT Core: connects IoT devices over MQTT, not satellites.
+      - AWS Outposts: AWS infrastructure on premises, with no satellite antennas.
+      > 🇻🇳 Điều khiển/tải dữ liệu vệ tinh mà không cần trạm mặt đất riêng → AWS Ground Station.
+  - id: "10-v2-14"
+    base: "02c90542de"
+    explanation: |
+      Migration Evaluator analyzes on-premises utilization data and produces a business case with projected AWS costs before any migration starts.
+      - AWS Migration Hub: tracks migration progress and is no longer open to new customers (since 2025-11-07); it does not build cost estimates.
+      - AWS DMS: replicates databases during the migration, not pre-migration cost analysis.
+      - Compute Optimizer: right-sizes resources that already run in AWS.
+      > 🇻🇳 Ước tính chi phí chạy workload on-prem trên AWS trước khi di chuyển → Migration Evaluator.
+  - id: "06-v1-01"
+    base: "fb3cbb5bac"
+    explanation: |
+      CloudFormation provisions infrastructure from declarative templates that can be kept in version control and deployed repeatedly as stacks (or StackSets) in any Region.
+      - AWS OpsWorks: Chef/Puppet configuration management, discontinued in 2024 (full shutdown), and never a template-based provisioning service.
+      - AWS Systems Manager: operates and patches existing resources; it does not model whole environments as templates.
+      - AWS Config: records and evaluates resource configuration; it does not create resources.
+      > 🇻🇳 Hạ tầng dạng code, lặp lại được giữa các Region → CloudFormation (OpsWorks đã ngừng hẳn năm 2024).
+  - id: "06-v2-01"
+    base: "be37778749"
+    explanation: |
+      CloudFormation models whole environments (VPC, EC2, RDS) as code in templates and deploys them repeatedly as stacks, or across Regions with StackSets.
+      - AWS Config: records and evaluates resource configuration; it does not provision.
+      - AWS OpsWorks: Chef/Puppet configuration management, discontinued in 2024 (full shutdown).
+      - AWS Systems Manager: operates existing resources; it does not define environments as templates.
+      > 🇻🇳 Dựng cả môi trường bằng code, lặp lại giữa các Region → AWS CloudFormation (OpsWorks đã ngừng hẳn).
+  - id: "08-v1-13"
+    base: "7bd2561e1f"
+    explanation: |
+      AWS SAM extends CloudFormation with a shorthand syntax for functions, APIs and tables; the SAM transform expands the template into a full CloudFormation stack during deployment.
+      - AWS CodeArtifact: stores software packages; it does not define infrastructure.
+      - AWS OpsWorks: Chef/Puppet configuration management, discontinued in 2024 (full shutdown).
+      - AWS CodeDeploy: shifts traffic to new code versions but does not define serverless resources.
+      > 🇻🇳 Template rút gọn cho serverless, chuyển thành CloudFormation → AWS SAM (OpsWorks đã ngừng hẳn).

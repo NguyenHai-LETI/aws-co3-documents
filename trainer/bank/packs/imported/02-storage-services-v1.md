@@ -180,6 +180,7 @@ An on-premises application uses NFS/SMB and needs low-latency local access while
 - services: Snow Family
 - difficulty: easy
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/02-storage-services-exam.md#Q8
 
 A company must transfer 600 TB to AWS within two weeks over a 200 Mbps internet link. Which solution is MOST appropriate?
@@ -191,7 +192,12 @@ A company must transfer 600 TB to AWS within two weeks over a 200 Mbps internet 
 
 **Answer:** A
 
-**Explanation:** 600 TB in 2 weeks over slow link = Snowball Edge Storage Optimized.
+**Explanation:** At 200 Mbps the link moves only about 2 TB per day, so 600 TB would take roughly nine months online; Snowball Edge Storage Optimized devices ship the data offline within two weeks.
+- DataSync over the internet: still capped by the 200 Mbps link.
+- S3 Transfer Acceleration: optimizes the network path but cannot exceed the link bandwidth.
+- Storage Gateway: hybrid access that uploads over the same slow link.
+Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+> 🇻🇳 Dữ liệu lớn + băng thông thấp + hạn gấp → thiết bị offline Snowball Edge (đề cương vẫn có Snow Family; thực tế chỉ còn cho khách hàng hiện có từ 2025-11-07, ngừng hỗ trợ 2026-12-31).
 
 ---
 
@@ -272,18 +278,23 @@ A Windows-based application needs shared storage over SMB with Active Directory 
 - tags: s3-transfer-acceleration
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/02-storage-services-exam.md#Q12
 
 To speed up uploads of large files from users worldwide to a single S3 bucket, which feature should be used?
 
 - A. Byte-range fetches
 - B. S3 Transfer Acceleration
-- C. S3 Select
+- C. S3 Requester Pays
 - D. S3 Cross-Region Replication
 
 **Answer:** B
 
-**Explanation:** Faster global uploads to one bucket = S3 Transfer Acceleration.
+**Explanation:** S3 Transfer Acceleration routes uploads through the nearest CloudFront edge location and then over the AWS backbone to the bucket, which speeds up long-distance transfers of large files into a single bucket.
+- Byte-range fetches: parallelize downloads (GET), not uploads.
+- S3 Requester Pays: changes who pays for requests and data transfer, not speed.
+- S3 Cross-Region Replication: copies objects after the upload; it does not make the upload faster.
+> 🇻🇳 Người dùng toàn cầu upload chậm vào một bucket → S3 Transfer Acceleration (edge + backbone AWS).
 
 ---
 
@@ -291,22 +302,27 @@ To speed up uploads of large files from users worldwide to a single S3 bucket, w
 - domain: performance
 - task: 3.1
 - topic: storage
-- services: S3
+- services: Athena, S3
 - tags: columnar-formats
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/02-storage-services-exam.md#Q13
 
-Which design retrieves only specific rows/columns from large CSV/Parquet objects in S3 using SQL, reducing data scanned?
+Which service retrieves only specific rows/columns from large CSV/Parquet objects in S3 using SQL, reducing data scanned?
 
 - A. S3 Storage Lens
 - B. S3 Inventory
 - C. S3 Batch Operations
-- D. S3 Select
+- D. Amazon Athena
 
 **Answer:** D
 
-**Explanation:** SQL to retrieve subset from one object = S3 Select.
+**Explanation:** Amazon Athena runs standard SQL directly on objects in S3; with columnar formats such as Parquet (plus partitioning) it reads only the needed columns and partitions, so less data is scanned and billed. AWS recommends Athena for querying data in S3: https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/
+- S3 Storage Lens: organization-wide storage usage and activity metrics, no SQL over object contents.
+- S3 Inventory: scheduled lists of objects and their metadata, not their contents.
+- S3 Batch Operations: runs one action (copy, tag, invoke Lambda) across many objects; it does not query data.
+> 🇻🇳 SQL trực tiếp trên dữ liệu S3, chỉ đọc cột/hàng cần → Amazon Athena (Parquet + partition giảm dữ liệu quét).
 
 ---
 
@@ -432,6 +448,7 @@ A clustered application needs the SAME EBS volume attached to multiple EC2 insta
 - services: DataSync, Storage Gateway
 - difficulty: medium
 - time: 75
+- enriched: 2026-10-22
 - source: practice-exams/02-storage-services-exam.md#Q19
 
 Which two AWS services let an on-premises data center perform an automated, scheduled, incremental data transfer into AWS storage? (Choose TWO)
@@ -444,7 +461,11 @@ Which two AWS services let an on-premises data center perform an automated, sche
 
 **Answer:** D, E
 
-**Explanation:** Automated scheduled incremental transfer = DataSync and Storage Gateway.
+**Explanation:** DataSync runs scheduled, incremental transfers from on-premises NFS/SMB/HDFS storage to S3, EFS or FSx, and Storage Gateway continuously moves on-premises data into AWS storage while keeping a local cache.
+- Amazon S3 Transfer Acceleration: speeds up individual uploads but has no scheduling or incremental sync.
+- Amazon Macie: discovers sensitive data in S3; it does not transfer data.
+- AWS Snowmobile: retired (full shutdown in 2024); it was a one-time offline exabyte transport, never a scheduled sync.
+> 🇻🇳 Chuyển dữ liệu tự động, theo lịch, incremental từ on-prem → DataSync + Storage Gateway (Snowmobile đã ngừng hẳn).
 
 ---
 

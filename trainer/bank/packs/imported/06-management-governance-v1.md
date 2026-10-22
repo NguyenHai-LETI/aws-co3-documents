@@ -20,6 +20,7 @@ created: 2026-10-16
 - services: CloudFormation
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/06-management-governance-exam.md#Q1
 
 A team wants to provision identical infrastructure repeatably across Regions using version-controlled templates. Which service?
@@ -31,7 +32,11 @@ A team wants to provision identical infrastructure repeatably across Regions usi
 
 **Answer:** C
 
-**Explanation:** Repeatable, version-controlled IaC = CloudFormation.
+**Explanation:** CloudFormation provisions infrastructure from declarative templates that can be kept in version control and deployed repeatedly as stacks (or StackSets) in any Region.
+- AWS OpsWorks: Chef/Puppet configuration management, discontinued in 2024 (full shutdown), and never a template-based provisioning service.
+- AWS Systems Manager: operates and patches existing resources; it does not model whole environments as templates.
+- AWS Config: records and evaluates resource configuration; it does not create resources.
+> 🇻🇳 Hạ tầng dạng code, lặp lại được giữa các Region → CloudFormation (OpsWorks đã ngừng hẳn năm 2024).
 
 ---
 

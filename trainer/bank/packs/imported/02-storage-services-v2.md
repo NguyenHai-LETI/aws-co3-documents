@@ -271,6 +271,7 @@ On-premises servers need NFS/SMB file shares backed by S3, with a local cache fo
 - services: Snow Family
 - difficulty: medium
 - time: 55
+- enriched: 2026-10-22
 - source: practice-exams/02-storage-services-exam-v2.md#Q12
 
 A company must migrate 500 TB to AWS but has limited network bandwidth and a tight deadline. Which is BEST?
@@ -282,7 +283,12 @@ A company must migrate 500 TB to AWS but has limited network bandwidth and a tig
 
 **Answer:** A
 
-**Explanation:** 500 TB, limited bandwidth, deadline = Snowball Edge.
+**Explanation:** With limited bandwidth and a tight deadline, 500 TB cannot be uploaded in time; Snowball Edge devices move the data offline and import it into S3.
+- Direct upload via CLI: limited by the same slow link.
+- DataSync over the internet: automates the transfer but cannot exceed the available bandwidth.
+- S3 Transfer Acceleration: optimizes the path, not the link capacity.
+Status: Snowball Edge is available only to existing customers since 2025-11-07 and device support ends 2026-12-31; new designs use DataSync over Direct Connect or AWS Data Transfer Terminal (https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html).
+> 🇻🇳 Hàng trăm TB + băng thông hạn chế + hạn gấp → Snowball Edge (chỉ còn cho khách hàng hiện có, ngừng hỗ trợ 2026-12-31).
 
 ---
 
@@ -340,18 +346,23 @@ An EBS volume in us-east-1a must be used by an instance in us-east-1b. What must
 - tags: s3-transfer-acceleration
 - difficulty: medium
 - time: 55
+- enriched: 2026-10-22
 - source: practice-exams/02-storage-services-exam-v2.md#Q15
 
 Global users upload large files to a single S3 bucket and complain about slow uploads. Which feature helps MOST?
 
-- A. S3 Select
+- A. S3 Requester Pays bucket setting
 - B. Byte-range fetches
 - C. S3 Inventory
 - D. S3 Transfer Acceleration
 
 **Answer:** D
 
-**Explanation:** Speed up global large uploads to one bucket = S3 Transfer Acceleration.
+**Explanation:** S3 Transfer Acceleration sends uploads to the nearest CloudFront edge location and then across the AWS backbone to the bucket, which helps most when global users upload large files to one bucket.
+- S3 Requester Pays: changes who pays for requests and data transfer, not speed.
+- Byte-range fetches: parallelize downloads, not uploads.
+- S3 Inventory: lists objects and metadata on a schedule.
+> 🇻🇳 Upload toàn cầu chậm vào một bucket → S3 Transfer Acceleration.
 
 ---
 
@@ -382,21 +393,26 @@ An application must be notified to run a Lambda function whenever a new object i
 - domain: performance
 - task: 3.1
 - topic: storage
-- services: S3
+- services: Athena, S3
 - difficulty: medium
 - time: 55
+- enriched: 2026-10-22
 - source: practice-exams/02-storage-services-exam-v2.md#Q17
 
-A team needs to run SQL queries to retrieve only a subset of rows from large CSV objects without downloading whole files. Which feature?
+A team needs to run SQL queries to retrieve only a subset of rows from large CSV objects in Amazon S3 without downloading whole files. Which service?
 
 - A. S3 Transfer Acceleration
 - B. S3 Inventory
-- C. S3 Select
+- C. Amazon Athena
 - D. S3 Batch Operations
 
 **Answer:** C
 
-**Explanation:** SQL to retrieve subset from objects without full download = S3 Select.
+**Explanation:** Amazon Athena runs SQL directly against the objects in S3 and returns only the matching rows, so nobody has to download whole files; it is serverless and bills per data scanned. AWS recommends Athena for querying data in S3: https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/
+- S3 Transfer Acceleration: speeds up long-distance uploads; it does not query data.
+- S3 Inventory: lists objects and metadata, not rows inside them.
+- S3 Batch Operations: applies one action to many objects; no SQL filtering.
+> 🇻🇳 Lọc một phần dữ liệu CSV trên S3 bằng SQL, không tải cả file → Amazon Athena.
 
 ---
 
@@ -682,6 +698,7 @@ A company needs cross-account access to objects, wants the destination account t
 - services: Snow Family
 - difficulty: hard
 - time: 70
+- status: retired
 - source: practice-exams/02-storage-services-exam-v2.md#Q30
 
 An edge site with intermittent connectivity needs a small, rugged device to collect data and run limited compute, later shipping data to AWS. Which device?

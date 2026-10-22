@@ -43,6 +43,7 @@ A serverless REST API must front Lambda functions with throttling, authorization
 - tags: streaming-ingestion
 - difficulty: medium
 - time: 50
+- status: retired
 - source: practice-exams/11-api-integration-exam-v2.md#Q2
 
 A mobile app needs a managed GraphQL API with real-time subscriptions and offline sync. Which service?
@@ -65,18 +66,23 @@ A mobile app needs a managed GraphQL API with real-time subscriptions and offlin
 - services: SES
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/11-api-integration-exam-v2.md#Q3
 
 An application must send transactional and marketing emails at scale. Which service?
 
 - A. API Gateway
 - B. Amazon SES
-- C. Amazon Pinpoint only
+- C. AWS End User Messaging only
 - D. Amazon SNS
 
 **Answer:** B
 
-**Explanation:** Transactional/marketing email at scale = Amazon SES.
+**Explanation:** Amazon SES sends transactional and marketing email at scale with high deliverability, pay-as-you-go pricing and no mail servers to run.
+- API Gateway: exposes APIs; it does not send email.
+- AWS End User Messaging: SMS, voice and push channels, not email.
+- Amazon SNS: pub/sub notifications to subscribers, not full transactional or marketing email.
+> 🇻🇳 Email giao dịch + marketing quy mô lớn → Amazon SES.
 
 ---
 

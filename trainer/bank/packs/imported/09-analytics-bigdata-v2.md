@@ -21,6 +21,7 @@ created: 2026-10-16
 - tags: streaming-ingestion
 - difficulty: medium
 - time: 55
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q1
 
 A company must ingest streaming clickstream data in real time and allow multiple applications to process the same records. Which service?
@@ -28,11 +29,15 @@ A company must ingest streaming clickstream data in real time and allow multiple
 - A. Amazon SQS
 - B. Kinesis Data Streams
 - C. Amazon Athena
-- D. Kinesis Data Firehose
+- D. Amazon Data Firehose
 
 **Answer:** B
 
-**Explanation:** Real-time ingest, multiple consumers, replay = Kinesis Data Streams.
+**Explanation:** Kinesis Data Streams ingests clickstream records in real time and lets several applications read the same records independently, with replay during the retention period.
+- Amazon SQS: each message is processed by one consumer and then deleted.
+- Amazon Athena: queries data at rest in S3.
+- Amazon Data Firehose (formerly Kinesis Data Firehose): delivers data to destinations; no multiple custom consumers or replay.
+> 🇻🇳 Ingest real-time, nhiều ứng dụng cùng xử lý một bản ghi → Kinesis Data Streams.
 
 ---
 
@@ -44,18 +49,23 @@ A company must ingest streaming clickstream data in real time and allow multiple
 - tags: streaming-ingestion
 - difficulty: medium
 - time: 55
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q2
 
 Streaming data must be delivered to S3/Redshift with the LEAST management and near-real-time (buffered) loading, no custom consumers. Which service?
 
-- A. Kinesis Data Firehose
+- A. Amazon Data Firehose
 - B. Amazon MSK
 - C. Kinesis Data Streams
 - D. EMR
 
 **Answer:** A
 
-**Explanation:** Managed buffered delivery to S3/Redshift, no consumers = Kinesis Data Firehose.
+**Explanation:** Amazon Data Firehose (formerly Kinesis Data Firehose) buffers incoming records and loads them into S3 or Redshift automatically, with no consumers to write and nothing to manage.
+- Amazon MSK: managed Kafka brokers; you still need consumers or connectors to load S3/Redshift.
+- Kinesis Data Streams: requires custom consumer applications.
+- EMR: clusters to provision and operate.
+> 🇻🇳 Giao dữ liệu streaming vào S3/Redshift ít vận hành nhất → Amazon Data Firehose.
 
 ---
 
@@ -111,6 +121,7 @@ A serverless ETL service must crawl data, build a catalog, and transform data be
 - services: EMR
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q5
 
 A team needs managed Hadoop/Spark clusters for large-scale big-data processing with full control. Which service?
@@ -118,11 +129,15 @@ A team needs managed Hadoop/Spark clusters for large-scale big-data processing w
 - A. Athena
 - B. Amazon EMR
 - C. AWS Glue
-- D. QuickSight
+- D. Amazon Quick (QuickSight)
 
 **Answer:** B
 
-**Explanation:** Managed Hadoop/Spark with control = Amazon EMR.
+**Explanation:** Amazon EMR runs managed Hadoop and Spark clusters where you choose instance types, versions and configuration, giving full control for large-scale big-data processing.
+- Athena: serverless SQL on S3 with no cluster control.
+- AWS Glue: serverless Spark ETL where AWS manages the environment, so control is limited.
+- Amazon Quick (formerly QuickSight): BI dashboards, not a processing engine.
+> 🇻🇳 Cluster Hadoop/Spark được quản lý nhưng toàn quyền cấu hình → Amazon EMR.
 
 ---
 
@@ -155,6 +170,7 @@ A company needs a managed search and log analytics engine with dashboards (Kiban
 - services: QuickSight
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q7
 
 Business users need interactive BI dashboards and visualizations with a managed, serverless service. Which service?
@@ -162,11 +178,15 @@ Business users need interactive BI dashboards and visualizations with a managed,
 - A. Amazon Athena
 - B. AWS Glue
 - C. OpenSearch
-- D. Amazon QuickSight
+- D. Amazon Quick
 
 **Answer:** D
 
-**Explanation:** Managed BI dashboards/visualizations = Amazon QuickSight.
+**Explanation:** Amazon Quick (formerly Amazon QuickSight; the exam guide lists it as Amazon Quick) is the managed, serverless BI service for interactive dashboards and visualizations.
+- Amazon Athena: SQL queries on S3; no dashboards.
+- AWS Glue: ETL and data catalog.
+- OpenSearch: search and log analytics rather than business BI.
+> 🇻🇳 Dashboard BI, trực quan hoá, serverless → Amazon Quick (trước đây QuickSight).
 
 ---
 
@@ -369,19 +389,24 @@ A company needs a governed data lake with fine-grained permissions on S3-based t
 - services: OpenSearch
 - tags: streaming-ingestion
 - difficulty: medium
-- time: 50
+- time: 55
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q16
 
 Which service is BEST to visualize log data ingested from applications for near-real-time operational dashboards and full-text search?
 
 - A. Amazon Athena
 - B. Amazon Redshift
-- C. QuickSight only
+- C. Amazon Quick (QuickSight) only
 - D. Amazon OpenSearch Service
 
 **Answer:** D
 
-**Explanation:** Near-real-time log dashboards + full-text search = OpenSearch.
+**Explanation:** Amazon OpenSearch Service indexes log data in near real time, supports full-text search, and includes OpenSearch Dashboards for operational dashboards.
+- Amazon Athena: ad hoc SQL over files in S3, no full-text index or live dashboards.
+- Amazon Redshift: data warehouse for structured analytics, not log search.
+- Amazon Quick (formerly QuickSight) only: BI dashboards without full-text log search.
+> 🇻🇳 Log gần real-time + tìm kiếm full-text + dashboard vận hành → Amazon OpenSearch Service.
 
 ---
 
@@ -437,18 +462,23 @@ Firehose vs Data Streams: which statement is TRUE?
 - tags: etl
 - difficulty: medium
 - time: 60
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q19
 
 A pipeline must load transformed data into Redshift daily and support complex joins for BI. Which combination is appropriate?
 
 - A. DynamoDB Streams to Redshift directly
 - B. Athena writes directly into Redshift tables
-- C. Kinesis Firehose only, no transform
+- C. Amazon Data Firehose only, no transform
 - D. Glue ETL to S3 → COPY into Redshift
 
 **Answer:** D
 
-**Explanation:** Daily transform + BI joins = Glue ETL to S3 then COPY to Redshift.
+**Explanation:** A Glue ETL job transforms the data and writes it to S3, and a daily Redshift COPY loads it in parallel; Redshift then runs the complex joins for BI.
+- DynamoDB Streams to Redshift directly: not a load path; zero-ETL integrations replicate data without your transformation step.
+- Athena writes directly into Redshift tables: Athena queries S3; it cannot insert into Redshift tables.
+- Amazon Data Firehose only, no transform: streaming delivery without the required transformation.
+> 🇻🇳 Biến đổi hằng ngày rồi nạp Redshift → Glue ETL ra S3 → COPY vào Redshift.
 
 ---
 
@@ -577,18 +607,23 @@ A company must minimize Athena cost on a multi-TB dataset queried by date. Which
 - tags: streaming-ingestion
 - difficulty: hard
 - time: 70
+- enriched: 2026-10-22
 - source: practice-exams/09-analytics-bigdata-exam-v2.md#Q25
 
 A streaming pipeline needs sub-second, exactly-once, stateful stream processing with windowing. Which service is BEST?
 
 - A. Managed Service for Apache Flink (Kinesis Data Analytics)
 - B. Glue crawler
-- C. Kinesis Data Firehose
+- C. Amazon Data Firehose
 - D. Athena
 
 **Answer:** A
 
-**Explanation:** Sub-second exactly-once stateful windowing = Managed Service for Apache Flink.
+**Explanation:** Managed Service for Apache Flink (formerly Kinesis Data Analytics) runs Apache Flink applications with exactly-once state consistency, event-time windows and sub-second latency.
+- Glue crawler: infers schemas for the Data Catalog; it does not process streams.
+- Amazon Data Firehose: buffers and delivers data, with no stateful windowed processing.
+- Athena: queries data at rest in S3.
+> 🇻🇳 Xử lý stream có trạng thái, exactly-once, windowing → Managed Service for Apache Flink.
 
 ---
 

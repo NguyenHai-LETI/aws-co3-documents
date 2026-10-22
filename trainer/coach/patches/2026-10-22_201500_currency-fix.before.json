@@ -1,0 +1,640 @@
+{
+ "run": "2026-10-22_201500_currency-fix",
+ "task": "patch",
+ "created": "2026-10-22T19:41:52+07:00",
+ "updated": "2026-10-22T19:41:52+07:00",
+ "questions": {
+  "02-v2-30": {
+   "file": "bank/packs/imported/02-storage-services-v2.md",
+   "before": "## Q 02-v2-30\n- domain: performance\n- task: 3.5\n- topic: storage\n- services: Snow Family\n- difficulty: hard\n- time: 70\n- source: practice-exams/02-storage-services-exam-v2.md#Q30\n\nAn edge site with intermittent connectivity needs a small, rugged device to collect data and run limited compute, later shipping data to AWS. Which device?\n\n- A. Snowball Edge Storage Optimized (80 TB)\n- B. Snowcone\n- C. Snowmobile\n- D. Storage Gateway appliance\n\n**Answer:** B\n\n**Explanation:** Small rugged edge device with limited compute = AWS Snowcone.",
+   "beforeSig": "1948c98dd9ed",
+   "afterSig": "18b15f2f3eee",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "02-v2-17": {
+   "file": "bank/packs/imported/02-storage-services-v2.md",
+   "before": "## Q 02-v2-17\n- domain: performance\n- task: 3.1\n- topic: storage\n- services: S3\n- difficulty: medium\n- time: 55\n- source: practice-exams/02-storage-services-exam-v2.md#Q17\n\nA team needs to run SQL queries to retrieve only a subset of rows from large CSV objects without downloading whole files. Which feature?\n\n- A. S3 Transfer Acceleration\n- B. S3 Inventory\n- C. S3 Select\n- D. S3 Batch Operations\n\n**Answer:** C\n\n**Explanation:** SQL to retrieve subset from objects without full download = S3 Select.",
+   "beforeSig": "2b3a137deec8",
+   "afterSig": "fc8cc253fa3b",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "02-v2-15": {
+   "file": "bank/packs/imported/02-storage-services-v2.md",
+   "before": "## Q 02-v2-15\n- domain: performance\n- task: 3.1\n- topic: storage\n- services: S3\n- tags: s3-transfer-acceleration\n- difficulty: medium\n- time: 55\n- source: practice-exams/02-storage-services-exam-v2.md#Q15\n\nGlobal users upload large files to a single S3 bucket and complain about slow uploads. Which feature helps MOST?\n\n- A. S3 Select\n- B. Byte-range fetches\n- C. S3 Inventory\n- D. S3 Transfer Acceleration\n\n**Answer:** D\n\n**Explanation:** Speed up global large uploads to one bucket = S3 Transfer Acceleration.",
+   "beforeSig": "c319f4de0c1a",
+   "afterSig": "928795918a11",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "02-v2-12": {
+   "file": "bank/packs/imported/02-storage-services-v2.md",
+   "before": "## Q 02-v2-12\n- domain: performance\n- task: 3.5\n- topic: storage\n- services: Snow Family\n- difficulty: medium\n- time: 55\n- source: practice-exams/02-storage-services-exam-v2.md#Q12\n\nA company must migrate 500 TB to AWS but has limited network bandwidth and a tight deadline. Which is BEST?\n\n- A. AWS Snowball Edge\n- B. Direct upload via CLI\n- C. AWS DataSync over the internet\n- D. S3 Transfer Acceleration\n\n**Answer:** A\n\n**Explanation:** 500 TB, limited bandwidth, deadline = Snowball Edge.",
+   "beforeSig": "0d8ee853a8bf",
+   "afterSig": "122f893f1f45",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-10": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-10\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Snow Family\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q10\n\nA remote edge site with intermittent connectivity needs a small, rugged, portable device to collect and ship a few terabytes of data. Which device?\n\n- A. AWS Snowcone\n- B. Storage Gateway\n- C. Direct Connect\n- D. Snowmobile\n\n**Answer:** A\n\n**Explanation:** Small, rugged, portable few-TB device = Snowcone.",
+   "beforeSig": "09d56a789820",
+   "afterSig": "681e7dc58a5f",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-09": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-09\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Snow Family\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q9\n\nAn exabyte-scale (100 PB) data-center migration must move data physically. Which device?\n\n- A. Snowball Edge Storage Optimized\n- B. DataSync\n- C. Snowmobile\n- D. Snowcone\n\n**Answer:** C\n\n**Explanation:** 100 PB physical move = Snowmobile.",
+   "beforeSig": "9a2e9d5182cd",
+   "afterSig": "6ff0a1321770",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-08": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-08\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Migration Hub, DMS, Application Migration Service\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q8\n\nWhich service provides a central dashboard to track the status of migrations across DMS, MGN, and discovery tools?\n\n- A. AWS Config\n- B. AWS Migration Hub\n- C. AWS Organizations\n- D. AWS Control Tower\n\n**Answer:** B\n\n**Explanation:** Central migration tracking = Migration Hub.",
+   "beforeSig": "0f4f74663ad6",
+   "afterSig": "67a393ec832a",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-12": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-12\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Application Discovery Service, Migration Evaluator\n- tags: right-sizing\n- difficulty: easy\n- time: 50\n- enriched: 2026-10-22\n- source: practice-exams/10-migration-transfer-exam.md#Q12\n\nA company wants to discover on-premises server dependencies and right-size before migrating. Which tool helps plan the migration?\n\n- A. AWS Config resource discovery for AWS compliance\n- B. AWS Application Discovery Service / Migration Evaluator\n- C. AWS Migration Hub for tracking migration progress\n- D. Amazon Inspector vulnerability scans\n\n**Answer:** B\n\n**Explanation:** Discover dependencies/right-size = Application Discovery Service/Migration Evaluator.",
+   "beforeSig": "4bc2a0d1215d",
+   "afterSig": "c26204b95a66",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-05": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-05\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: DataSync, EFS\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q5\n\nA company needs automated, scheduled, incremental file transfers from on-premises NFS to Amazon EFS. Which service?\n\n- A. AWS DataSync\n- B. AWS Transfer Family\n- C. AWS Snowcone\n- D. AWS Backup\n\n**Answer:** A\n\n**Explanation:** Scheduled incremental NFS->EFS = DataSync.",
+   "beforeSig": "1d7fc5f8dc25",
+   "afterSig": "845c840286b3",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-03": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-03\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Snow Family\n- tags: offline-transfer\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q3\n\nA company must move 80 TB to AWS but has limited bandwidth and a tight deadline. Which service?\n\n- A. AWS DataSync\n- B. S3 Transfer Acceleration\n- C. AWS Snowball Edge\n- D. AWS Storage Gateway\n\n**Answer:** C\n\n**Explanation:** 80 TB, limited bandwidth, deadline = Snowball Edge.",
+   "beforeSig": "56ddc4539362",
+   "afterSig": "c0c69c4e03fe",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-13": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-13\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Snow Family, DataSync\n- tags: offline-transfer\n- difficulty: easy\n- time: 50\n- source: practice-exams/10-migration-transfer-exam.md#Q13\n\nWhich is the BEST reason to choose Snowball Edge over network transfer (DataSync)?\n\n- A. The data is already in AWS\n- B. The dataset is small and bandwidth is high\n- C. Transferring over the network would take weeks due to limited bandwidth\n- D. Real-time continuous replication is required\n\n**Answer:** C\n\n**Explanation:** Network would take weeks = use Snowball Edge.",
+   "beforeSig": "d40aa86ac53d",
+   "afterSig": "cfeaf9a04eaf",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-04": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-04\n- domain: resilient\n- task: 2.2\n- topic: migration\n- services: Application Migration Service, EC2\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q4\n\nA data center needs to migrate hundreds of physical and virtual servers to EC2 with continuous block-level replication and minimal downtime (lift-and-shift). Which service?\n\n- A. AWS Snowmobile\n- B. AWS DMS\n- C. AWS DataSync\n- D. AWS Application Migration Service (MGN)\n\n**Answer:** D\n\n**Explanation:** Lift-and-shift servers w/ continuous replication = MGN.",
+   "beforeSig": "2e0f788144f4",
+   "afterSig": "a0ecb3b0f1bd",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-18": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-18\n- domain: performance\n- task: 3.1\n- topic: migration\n- services: Storage Gateway\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q18\n\nA workload needs to continuously replicate an on-premises file share to AWS and serve it locally with low latency using a cached gateway. Which service?\n\n- A. AWS Transfer Family\n- B. AWS Storage Gateway (File/Volume Gateway)\n- C. AWS Snowmobile\n- D. AWS DMS\n\n**Answer:** B\n\n**Explanation:** On-prem file share cached locally + replicate to AWS = Storage Gateway.",
+   "beforeSig": "b8daeadfa879",
+   "afterSig": "c6e20d325f17",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v1-20": {
+   "file": "bank/packs/imported/10-migration-transfer-v1.md",
+   "before": "## Q 10-v1-20\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Application Migration Service\n- difficulty: easy\n- time: 45\n- source: practice-exams/10-migration-transfer-exam.md#Q20\n\nA company must migrate a large VMware-based estate to AWS with minimal refactoring and cutover risk. Which approach is BEST?\n\n- A. AWS Application Migration Service (MGN) for lift-and-shift\n- B. Snowmobile\n- C. AWS Glue ETL\n- D. Rebuild every app manually on EC2\n\n**Answer:** A\n\n**Explanation:** Large VMware lift-and-shift, low risk = MGN.",
+   "beforeSig": "5131a1a8688a",
+   "afterSig": "c8d90415e4b4",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "03-v1-12": {
+   "file": "bank/packs/imported/03-database-services-v1.md",
+   "before": "## Q 03-v1-12\n- domain: resilient\n- task: 2.2\n- topic: database\n- services: QLDB\n- difficulty: easy\n- time: 45\n- source: practice-exams/03-database-services-exam.md#Q12\n\nA company wants an immutable, cryptographically verifiable ledger of financial transactions. Which service?\n\n- A. Amazon Redshift\n- B. Amazon QLDB\n- C. Amazon DynamoDB\n- D. Amazon Aurora\n\n**Answer:** B\n\n**Explanation:** Immutable, cryptographically verifiable ledger = QLDB.",
+   "beforeSig": "124291da3b69",
+   "afterSig": "d09d695849bb",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "03-v1-16": {
+   "file": "bank/packs/imported/03-database-services-v1.md",
+   "before": "## Q 03-v1-16\n- domain: resilient\n- task: 2.2\n- topic: database\n- services: Timestream\n- difficulty: easy\n- time: 45\n- source: practice-exams/03-database-services-exam.md#Q16\n\nA workload ingests IoT sensor metrics and needs efficient storage and time-based analytics at scale. Which purpose-built database?\n\n- A. Amazon RDS\n- B. Amazon Neptune\n- C. Amazon Timestream\n- D. Amazon QLDB\n\n**Answer:** C\n\n**Explanation:** Time-series IoT metrics = Amazon Timestream.",
+   "beforeSig": "751cceb7254d",
+   "afterSig": "be952141e0db",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v2-08": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-08\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Migration Hub\n- difficulty: medium\n- time: 50\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q8\n\nA single dashboard must track migration progress across multiple tools and accounts. Which service?\n\n- A. AWS Migration Hub\n- B. AWS Config\n- C. CloudWatch\n- D. Trusted Advisor\n\n**Answer:** A\n\n**Explanation:** Central migration tracking dashboard = AWS Migration Hub.",
+   "beforeSig": "c638a22e76e0",
+   "afterSig": "2b0a59d4e1e5",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v2-06": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-06\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Application Discovery Service\n- difficulty: medium\n- time: 50\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q6\n\nA company needs to discover on-premises server inventory and dependencies before migrating. Which service?\n\n- A. Trusted Advisor\n- B. AWS Application Discovery Service\n- C. AWS Config\n- D. AWS DMS\n\n**Answer:** B\n\n**Explanation:** Discover server inventory + dependencies = Application Discovery Service.",
+   "beforeSig": "e8cc6a32c009",
+   "afterSig": "b27948d8b44e",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v2-04": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-04\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Transfer Family, S3\n- difficulty: medium\n- time: 50\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q4\n\nPartners upload files daily using SFTP; the company wants a managed SFTP endpoint storing files in S3. Which service?\n\n- A. AWS Transfer Family\n- B. Snowcone\n- C. AWS DataSync\n- D. Storage Gateway\n\n**Answer:** A\n\n**Explanation:** Managed SFTP to S3 = AWS Transfer Family.",
+   "beforeSig": "53f521fd6fa5",
+   "afterSig": "290ce0644343",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v2-03": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-03\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: Snow Family, S3\n- difficulty: medium\n- time: 55\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q3\n\nA company must transfer 200 TB to S3 over a limited-bandwidth link within a tight deadline. Which service?\n\n- A. AWS DataSync over the internet\n- B. AWS Transfer Family\n- C. Direct upload via CLI\n- D. AWS Snowball Edge\n\n**Answer:** D\n\n**Explanation:** 200 TB, limited bandwidth, deadline = Snowball Edge.",
+   "beforeSig": "8d45e5647a5b",
+   "afterSig": "5898c70ae38a",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v2-10": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-10\n- domain: performance\n- task: 3.3\n- topic: migration\n- services: DMS, RDS\n- tags: cdc-replication\n- difficulty: medium\n- time: 50\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q10\n\nA company must migrate an Oracle database to RDS Oracle (same engine) with minimal downtime. Which service?\n\n- A. DataSync\n- B. Snowmobile\n- C. AWS DMS (homogeneous, with CDC)\n- D. Storage Gateway\n\n**Answer:** C\n\n**Explanation:** Homogeneous Oracle->RDS Oracle minimal downtime = DMS with CDC.",
+   "beforeSig": "64c9df4af840",
+   "afterSig": "61109193244e",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "10-v2-14": {
+   "file": "bank/packs/imported/10-migration-transfer-v2.md",
+   "before": "## Q 10-v2-14\n- domain: cost\n- task: 4.4\n- topic: migration\n- services: Migration Evaluator\n- difficulty: hard\n- time: 75\n- enriched: 2026-10-22\n- source: practice-exams/10-migration-transfer-exam-v2.md#Q14\n\nA company wants recommendations on the cost of running on-premises workloads in AWS before migrating. Which service?\n\n- A. AWS Migration Evaluator\n- B. AWS Migration Hub for migration tracking\n- C. AWS DMS for live database replication\n- D. AWS Compute Optimizer for existing resources\n\n**Answer:** A\n\n**Explanation:** Pre-migration cost recommendations = Migration Evaluator.",
+   "beforeSig": "438127d9c3ac",
+   "afterSig": "e8b2cc943bd4",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "11-v1-02": {
+   "file": "bank/packs/imported/11-api-integration-v1.md",
+   "before": "## Q 11-v1-02\n- domain: performance\n- task: 3.4\n- topic: api\n- services: AppSync\n- tags: streaming-ingestion\n- difficulty: easy\n- time: 45\n- source: practice-exams/11-api-integration-exam.md#Q2\n\nA mobile app needs a flexible API where clients request exactly the data they need, with real-time subscriptions and offline sync. Which service?\n\n- A. Amazon SQS\n- B. Amazon API Gateway REST API\n- C. Amazon SNS\n- D. AWS AppSync (GraphQL)\n\n**Answer:** D\n\n**Explanation:** GraphQL, exact data, real-time + offline = AppSync.",
+   "beforeSig": "370707901c97",
+   "afterSig": "481bb2b79771",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "11-v1-20": {
+   "file": "bank/packs/imported/11-api-integration-v1.md",
+   "before": "## Q 11-v1-20\n- domain: performance\n- task: 3.4\n- topic: api\n- services: AppSync\n- tags: streaming-ingestion\n- difficulty: easy\n- time: 45\n- source: practice-exams/11-api-integration-exam.md#Q20\n\nA serverless backend needs near-real-time data sync to mobile clients and conflict resolution when offline. Which service is purpose-built?\n\n- A. Amazon SQS\n- B. Amazon Kinesis\n- C. AWS AppSync\n- D. Amazon API Gateway REST\n\n**Answer:** C\n\n**Explanation:** Mobile near-real-time sync + offline conflict = AppSync.",
+   "beforeSig": "3518d47f0183",
+   "afterSig": "382a9752ffa5",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "11-v1-11": {
+   "file": "bank/packs/imported/11-api-integration-v1.md",
+   "before": "## Q 11-v1-11\n- domain: performance\n- task: 3.4\n- topic: api\n- services: Pinpoint\n- difficulty: easy\n- time: 45\n- source: practice-exams/11-api-integration-exam.md#Q11\n\nA marketing team needs multi-channel customer engagement (email, SMS, push) with campaigns and analytics. Which service?\n\n- A. Amazon Pinpoint\n- B. Amazon SES\n- C. Amazon EventBridge\n- D. Amazon SNS\n\n**Answer:** A\n\n**Explanation:** Multi-channel campaigns + analytics = Amazon Pinpoint.",
+   "beforeSig": "1cef4040bbdb",
+   "afterSig": "e406a0ea40d4",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "11-v1-10": {
+   "file": "bank/packs/imported/11-api-integration-v1.md",
+   "before": "## Q 11-v1-10\n- domain: cost\n- task: 4.2\n- topic: api\n- services: SES\n- difficulty: easy\n- time: 45\n- source: practice-exams/11-api-integration-exam.md#Q10\n\nA company sends large volumes of transactional emails (receipts) and wants a scalable, cost-effective email service. Which service?\n\n- A. Amazon SES\n- B. Amazon Pinpoint journeys only\n- C. Amazon Connect\n- D. Amazon SNS\n\n**Answer:** A\n\n**Explanation:** Scalable transactional email = Amazon SES.",
+   "beforeSig": "4cccd39dbfc9",
+   "afterSig": "404d8549fa90",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "11-v2-02": {
+   "file": "bank/packs/imported/11-api-integration-v2.md",
+   "before": "## Q 11-v2-02\n- domain: performance\n- task: 3.4\n- topic: api\n- services: AppSync\n- tags: streaming-ingestion\n- difficulty: medium\n- time: 50\n- source: practice-exams/11-api-integration-exam-v2.md#Q2\n\nA mobile app needs a managed GraphQL API with real-time subscriptions and offline sync. Which service?\n\n- A. Amazon SES\n- B. Cognito\n- C. API Gateway REST\n- D. AWS AppSync\n\n**Answer:** D\n\n**Explanation:** Managed GraphQL + real-time + offline sync = AWS AppSync.",
+   "beforeSig": "8327994bbfcd",
+   "afterSig": "fac4404b4083",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "11-v2-03": {
+   "file": "bank/packs/imported/11-api-integration-v2.md",
+   "before": "## Q 11-v2-03\n- domain: performance\n- task: 3.4\n- topic: api\n- services: SES\n- difficulty: medium\n- time: 50\n- source: practice-exams/11-api-integration-exam-v2.md#Q3\n\nAn application must send transactional and marketing emails at scale. Which service?\n\n- A. API Gateway\n- B. Amazon SES\n- C. Amazon Pinpoint only\n- D. Amazon SNS\n\n**Answer:** B\n\n**Explanation:** Transactional/marketing email at scale = Amazon SES.",
+   "beforeSig": "ab1f55ec7a90",
+   "afterSig": "c21b0e811b44",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-09": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-09\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Forecast\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q9\n\nA retailer needs accurate time-series demand forecasting using ML. Which service?\n\n- A. Amazon Rekognition\n- B. Amazon Personalize\n- C. Amazon Timestream\n- D. Amazon Forecast\n\n**Answer:** D\n\n**Explanation:** Time-series demand forecasting = Forecast.",
+   "beforeSig": "4733b7c20291",
+   "afterSig": "8dcb9e2f61fb",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-11": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-11\n- domain: performance\n- task: 3.3\n- topic: ml\n- services: Kendra\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q11\n\nAn enterprise needs an intelligent, ML-powered internal search engine over documents with natural-language queries. Which service?\n\n- A. Amazon OpenSearch\n- B. Amazon Athena\n- C. Amazon Kendra\n- D. Amazon Comprehend\n\n**Answer:** C\n\n**Explanation:** ML-powered NL enterprise search = Kendra.",
+   "beforeSig": "83c5c2c9d03f",
+   "afterSig": "5b3ceeb86be3",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-14": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-14\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Fraud Detector\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q14\n\nA bank wants to detect potentially fraudulent online transactions using ML with minimal data science effort. Which service?\n\n- A. Amazon Macie\n- B. AWS WAF\n- C. Amazon Fraud Detector\n- D. Amazon GuardDuty\n\n**Answer:** C\n\n**Explanation:** ML fraud detection, low effort = Amazon Fraud Detector.",
+   "beforeSig": "e830ebf73ea7",
+   "afterSig": "3dc3485e3880",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-03": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-03\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Transcribe\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q3\n\nWhich service converts speech in audio files into text (e.g., for call-center transcripts)?\n\n- A. Amazon Polly\n- B. Amazon Transcribe\n- C. Amazon Comprehend\n- D. Amazon Kendra\n\n**Answer:** B\n\n**Explanation:** Speech-to-text = Transcribe.",
+   "beforeSig": "50de5de1a146",
+   "afterSig": "b70156fa05e8",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-16": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-16\n- domain: performance\n- task: 3.5\n- topic: ml\n- services: Transcribe\n- tags: streaming-ingestion\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q16\n\nA live streaming platform must automatically caption audio to text in real time. Which service?\n\n- A. Amazon Kendra\n- B. Amazon Polly\n- C. Amazon Translate\n- D. Amazon Transcribe (streaming)\n\n**Answer:** D\n\n**Explanation:** Real-time captions = Transcribe streaming.",
+   "beforeSig": "58583fee14b1",
+   "afterSig": "424789795a79",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-20": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-20\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Transcribe, Comprehend\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q20\n\nA contact center wants to transcribe calls, then analyze sentiment and redact PII. Which combination is BEST?\n\n- A. Amazon Rekognition + Amazon Kendra\n- B. Amazon Polly + Amazon Translate\n- C. Amazon Transcribe + Amazon Comprehend\n- D. Amazon Lex + Amazon Forecast\n\n**Answer:** C\n\n**Explanation:** Transcribe calls + analyze/redact = Transcribe + Comprehend.",
+   "beforeSig": "a68ce8540e3f",
+   "afterSig": "2dae3671b004",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-08": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-08\n- domain: performance\n- task: 3.5\n- topic: ml\n- services: Personalize\n- tags: streaming-ingestion\n- difficulty: easy\n- time: 45\n- enriched: 2026-10-22\n- source: practice-exams/12-ml-ai-exam.md#Q8\n\nAn e-commerce site wants real-time personalized product recommendations without building ML from scratch. Which service?\n\n- A. Amazon Personalize\n- B. Amazon Comprehend\n- C. Amazon Kendra\n- D. Build a custom personalization model on Amazon SageMaker\n\n**Answer:** A\n\n**Explanation:** Real-time recommendations = Personalize.",
+   "beforeSig": "7265bae842cc",
+   "afterSig": "a24d30c92158",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-07": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-07\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: SageMaker\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q7\n\nA data science team needs to build, train, tune, and deploy custom ML models with notebooks and managed infrastructure. Which service?\n\n- A. Amazon Rekognition\n- B. Amazon Comprehend\n- C. Amazon SageMaker\n- D. AWS Glue\n\n**Answer:** C\n\n**Explanation:** Build/train/deploy custom models = SageMaker.",
+   "beforeSig": "398c26b7ba35",
+   "afterSig": "dcf9397b0c8e",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-18": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-18\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: SageMaker\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q18\n\nWhich is the BEST choice when a fully custom model and full control of training are required?\n\n- A. Amazon Personalize\n- B. Amazon SageMaker\n- C. Amazon Comprehend\n- D. Amazon Rekognition\n\n**Answer:** B\n\n**Explanation:** Full custom model/control = SageMaker.",
+   "beforeSig": "8990df5d2da5",
+   "afterSig": "8beba749a0db",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-19": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-19\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Rekognition, Comprehend\n- difficulty: medium\n- time: 75\n- source: practice-exams/12-ml-ai-exam.md#Q19\n\nWhich two are managed AI services that require NO ML expertise to use via API? (Choose TWO)\n\n- A. Amazon Rekognition\n- B. Amazon Comprehend\n- C. Amazon Redshift\n- D. Amazon SageMaker (training your own model)\n- E. Amazon EMR\n\n**Answer:** A, B\n\n**Explanation:** Pre-trained API AI services = Rekognition and Comprehend.",
+   "beforeSig": "7b430b6b0fbc",
+   "afterSig": "6bdd09ee1647",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-12": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-12\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Bedrock\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q12\n\nA company wants to add generative AI (foundation models) to an app via a managed API without managing infrastructure. Which service?\n\n- A. Amazon Rekognition\n- B. Amazon Bedrock\n- C. Amazon Lex\n- D. Amazon SageMaker Ground Truth\n\n**Answer:** B\n\n**Explanation:** Generative AI foundation models via API = Bedrock.",
+   "beforeSig": "ed04af93e66b",
+   "afterSig": "afe15034f6e2",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v1-15": {
+   "file": "bank/packs/imported/12-ml-ai-v1.md",
+   "before": "## Q 12-v1-15\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: SageMaker\n- difficulty: easy\n- time: 45\n- source: practice-exams/12-ml-ai-exam.md#Q15\n\nWhich service would you use to label/annotate training datasets with human reviewers?\n\n- A. Amazon Rekognition\n- B. Amazon Mechanical Turk only\n- C. Amazon Comprehend\n- D. Amazon SageMaker Ground Truth\n\n**Answer:** D\n\n**Explanation:** Human-labeled training data = SageMaker Ground Truth.",
+   "beforeSig": "de9cef65ba05",
+   "afterSig": "1a07737b043d",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-11": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-11\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Forecast\n- difficulty: hard\n- time: 90\n- enriched: 2026-10-21\n- source: practice-exams/12-ml-ai-exam-v2.md#Q11\n\nA company must forecast future product demand from historical time-series data without building models manually. Which service?\n\n- A. Amazon SageMaker AI (formerly SageMaker), which requires manually designing and training a custom forecasting model\n- B. Amazon QuickSight, which can chart historical trends but needs an analyst to configure each forecast manually\n- C. Amazon Kinesis Data Analytics, which processes streaming data in real time but does not generate demand forecasts\n- D. Amazon Forecast, which builds and trains the forecasting model automatically from the historical data\n\n**Answer:** D\n\n**Explanation:** Amazon Forecast is the purpose-built managed service that trains and selects a time-series forecasting model automatically, so no data-science team has to design one by hand.\n- SageMaker AI (formerly SageMaker): a general ML platform where you still have to build, train, and tune the forecasting model yourself.\n- QuickSight: visualizes trends and offers a basic forecast widget, but each chart's forecast must be configured manually, it is not a dedicated demand-forecasting pipeline.\n- Kinesis Data Analytics: processes streaming data in real time; it does not train or produce forward-looking demand predictions.\n> 🇻🇳 Cần dự báo tự động, không tự xây model → Amazon Forecast; các lựa chọn khác đều cần tự thiết lập mô hình/báo cáo.",
+   "beforeSig": "b5ca11d6a243",
+   "afterSig": "ecc5183146d2",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-08": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-08\n- domain: performance\n- task: 3.3\n- topic: ml\n- services: Kendra\n- difficulty: medium\n- time: 50\n- source: practice-exams/12-ml-ai-exam-v2.md#Q8\n\nA company wants an intelligent enterprise search service over internal documents using natural language queries. Which service?\n\n- A. OpenSearch only\n- B. Athena\n- C. Amazon Comprehend\n- D. Amazon Kendra\n\n**Answer:** D\n\n**Explanation:** Enterprise NL document search = Amazon Kendra.",
+   "beforeSig": "b9691d4f1cbc",
+   "afterSig": "b275c1ef23be",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-12": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-12\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Fraud Detector\n- difficulty: hard\n- time: 65\n- source: practice-exams/12-ml-ai-exam-v2.md#Q12\n\nA company must detect potentially fraudulent online transactions using ML with minimal ML expertise. Which service?\n\n- A. Amazon Fraud Detector\n- B. Amazon Comprehend\n- C. Amazon Macie\n- D. Amazon GuardDuty\n\n**Answer:** A\n\n**Explanation:** ML fraud detection, low expertise = Amazon Fraud Detector.",
+   "beforeSig": "74c71585c57e",
+   "afterSig": "eb1dd9c87fbb",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-06": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-06\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Comprehend\n- difficulty: medium\n- time: 50\n- source: practice-exams/12-ml-ai-exam-v2.md#Q6\n\nA company must analyze customer feedback for sentiment and key phrases (NLP). Which service?\n\n- A. Amazon Kendra\n- B. Amazon Personalize\n- C. Amazon Rekognition\n- D. Amazon Comprehend\n\n**Answer:** D\n\n**Explanation:** Sentiment/key phrase NLP = Amazon Comprehend.",
+   "beforeSig": "636e3d4ac19a",
+   "afterSig": "8da2b1a01324",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-13": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-13\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: Bedrock\n- difficulty: hard\n- time: 70\n- source: practice-exams/12-ml-ai-exam-v2.md#Q13\n\nA team needs to build generative AI applications using foundation models via a managed API without managing infrastructure. Which service?\n\n- A. Amazon Bedrock\n- B. Amazon Kendra\n- C. Amazon Comprehend\n- D. Amazon SageMaker Ground Truth\n\n**Answer:** A\n\n**Explanation:** Generative AI via foundation-model API = Amazon Bedrock.",
+   "beforeSig": "e79fbf5d874e",
+   "afterSig": "fa588da90dcf",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-09": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-09\n- domain: performance\n- task: 3.5\n- topic: ml\n- services: Personalize\n- tags: streaming-ingestion\n- difficulty: medium\n- time: 50\n- enriched: 2026-10-22\n- source: practice-exams/12-ml-ai-exam-v2.md#Q9\n\nAn e-commerce site wants real-time personalized product recommendations. Which service?\n\n- A. Amazon Personalize\n- B. Amazon Rekognition\n- C. Build a custom personalized-recommendation model on SageMaker\n- D. Amazon Kendra\n\n**Answer:** A\n\n**Explanation:** Real-time personalized recommendations = Amazon Personalize.",
+   "beforeSig": "99eec289238a",
+   "afterSig": "88334f333d58",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-10": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-10\n- domain: performance\n- task: 3.2\n- topic: ml\n- services: SageMaker\n- difficulty: medium\n- time: 50\n- source: practice-exams/12-ml-ai-exam-v2.md#Q10\n\nA company must build, train, and deploy custom ML models end-to-end in a managed environment. Which service?\n\n- A. Amazon Lex\n- B. Amazon SageMaker\n- C. Amazon Rekognition\n- D. Amazon Comprehend\n\n**Answer:** B\n\n**Explanation:** Build/train/deploy custom models = Amazon SageMaker.",
+   "beforeSig": "fd0731413c52",
+   "afterSig": "66708e6d4b97",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "12-v2-14": {
+   "file": "bank/packs/imported/12-ml-ai-v2.md",
+   "before": "## Q 12-v2-14\n- domain: cost\n- task: 4.2\n- topic: ml\n- services: SageMaker\n- tags: serverless-cost\n- difficulty: hard\n- time: 70\n- source: practice-exams/12-ml-ai-exam-v2.md#Q14\n\nA SageMaker inference endpoint has spiky traffic and must scale to zero when idle to save cost while handling bursts. Which option?\n\n- A. Multi-model endpoint always-on\n- B. Always-on real-time endpoint\n- C. SageMaker Serverless Inference\n- D. Batch transform only\n\n**Answer:** C\n\n**Explanation:** Scale-to-zero spiky inference = SageMaker Serverless Inference.",
+   "beforeSig": "485d10cfd35a",
+   "afterSig": "66122c1154b8",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "02-v1-13": {
+   "file": "bank/packs/imported/02-storage-services-v1.md",
+   "before": "## Q 02-v1-13\n- domain: performance\n- task: 3.1\n- topic: storage\n- services: S3\n- tags: columnar-formats\n- difficulty: easy\n- time: 45\n- source: practice-exams/02-storage-services-exam.md#Q13\n\nWhich design retrieves only specific rows/columns from large CSV/Parquet objects in S3 using SQL, reducing data scanned?\n\n- A. S3 Storage Lens\n- B. S3 Inventory\n- C. S3 Batch Operations\n- D. S3 Select\n\n**Answer:** D\n\n**Explanation:** SQL to retrieve subset from one object = S3 Select.",
+   "beforeSig": "b8eb464a8999",
+   "afterSig": "0f066ef1dea0",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "02-v1-12": {
+   "file": "bank/packs/imported/02-storage-services-v1.md",
+   "before": "## Q 02-v1-12\n- domain: performance\n- task: 3.1\n- topic: storage\n- services: S3\n- tags: s3-transfer-acceleration\n- difficulty: easy\n- time: 45\n- source: practice-exams/02-storage-services-exam.md#Q12\n\nTo speed up uploads of large files from users worldwide to a single S3 bucket, which feature should be used?\n\n- A. Byte-range fetches\n- B. S3 Transfer Acceleration\n- C. S3 Select\n- D. S3 Cross-Region Replication\n\n**Answer:** B\n\n**Explanation:** Faster global uploads to one bucket = S3 Transfer Acceleration.",
+   "beforeSig": "56a84fd87829",
+   "afterSig": "996f6cd8c3a5",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "02-v1-08": {
+   "file": "bank/packs/imported/02-storage-services-v1.md",
+   "before": "## Q 02-v1-08\n- domain: performance\n- task: 3.5\n- topic: storage\n- services: Snow Family\n- difficulty: easy\n- time: 50\n- source: practice-exams/02-storage-services-exam.md#Q8\n\nA company must transfer 600 TB to AWS within two weeks over a 200 Mbps internet link. Which solution is MOST appropriate?\n\n- A. AWS Snowball Edge Storage Optimized\n- B. AWS DataSync over the internet\n- C. S3 Transfer Acceleration\n- D. AWS Storage Gateway\n\n**Answer:** A\n\n**Explanation:** 600 TB in 2 weeks over slow link = Snowball Edge Storage Optimized.",
+   "beforeSig": "b928d77bec4a",
+   "afterSig": "a27384b45249",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "02-v1-19": {
+   "file": "bank/packs/imported/02-storage-services-v1.md",
+   "before": "## Q 02-v1-19\n- domain: performance\n- task: 3.5\n- topic: storage\n- services: DataSync, Storage Gateway\n- difficulty: medium\n- time: 75\n- source: practice-exams/02-storage-services-exam.md#Q19\n\nWhich two AWS services let an on-premises data center perform an automated, scheduled, incremental data transfer into AWS storage? (Choose TWO)\n\n- A. Amazon S3 Transfer Acceleration\n- B. Amazon Macie\n- C. AWS Snowmobile\n- D. AWS DataSync\n- E. AWS Storage Gateway\n\n**Answer:** D, E\n\n**Explanation:** Automated scheduled incremental transfer = DataSync and Storage Gateway.",
+   "beforeSig": "8d1821de16d6",
+   "afterSig": "ee7e2ffa2a71",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "03-v2-12": {
+   "file": "bank/packs/imported/03-database-services-v2.md",
+   "before": "## Q 03-v2-12\n- domain: resilient\n- task: 2.2\n- topic: database\n- services: Timestream\n- difficulty: medium\n- time: 50\n- source: practice-exams/03-database-services-exam-v2.md#Q12\n\nIoT sensors send time-stamped metrics needing efficient storage and time-series analytics at scale. Which service?\n\n- A. QLDB\n- B. Timestream\n- C. RDS\n- D. Neptune\n\n**Answer:** B\n\n**Explanation:** Time-series IoT metrics = Amazon Timestream.",
+   "beforeSig": "b03e051451e8",
+   "afterSig": "e91ad7c4298a",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "06-v2-21": {
+   "file": "bank/packs/imported/06-management-governance-v2.md",
+   "before": "## Q 06-v2-21\n- domain: secure\n- task: 1.2\n- topic: management\n- services: CloudFormation\n- difficulty: hard\n- time: 75\n- enriched: 2026-10-22\n- source: practice-exams/06-management-governance-exam-v2.md#Q21\n\nA CloudFormation update fails midway. The team wants automatic return to the last known good state. Which behavior/feature applies?\n\n- A. StackSets for automatic cross-account updates\n- B. Manual deletion only\n- C. Manual stack deletion after a failed update\n- D. Drift detection for manual configuration review\n\n**Answer:** C\n\n**Explanation:** Return to last good state on failed update = automatic rollback.",
+   "beforeSig": "a4b12021eb1e",
+   "afterSig": "3367de3f309d",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "06-v2-01": {
+   "file": "bank/packs/imported/06-management-governance-v2.md",
+   "before": "## Q 06-v2-01\n- domain: secure\n- task: 1.2\n- topic: management\n- services: CloudFormation, VPC, EC2, RDS\n- difficulty: medium\n- time: 50\n- source: practice-exams/06-management-governance-exam-v2.md#Q1\n\nA team wants to provision entire environments (VPC, EC2, RDS) as code, repeatable across Regions. Which service?\n\n- A. AWS Config\n- B. AWS OpsWorks\n- C. AWS Systems Manager\n- D. AWS CloudFormation\n\n**Answer:** D\n\n**Explanation:** Infrastructure as code, repeatable = AWS CloudFormation.",
+   "beforeSig": "120fdd87693e",
+   "afterSig": "0baaa2b5dd02",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v2-11": {
+   "file": "bank/packs/imported/13-other-services-v2.md",
+   "before": "## Q 13-v2-11\n- domain: performance\n- task: 3.2\n- topic: other\n- services: Outposts, Local Zones\n- difficulty: hard\n- time: 95\n- source: practice-exams/13-other-services-exam-v2.md#Q11\n\nA regulated workload must keep data on-premises for residency but use AWS APIs/services locally, with a consistent hybrid experience. Which two are appropriate? (Choose TWO)\n\n- A. Local Zones for metro low latency\n- B. AWS Outposts (rack/servers)\n- C. CloudFront\n- D. Snowmobile\n- E. Global Accelerator\n\n**Answer:** A, B\n\n**Explanation:** On-prem residency + metro low latency = Outposts + Local Zones.",
+   "beforeSig": "272c0ba053f5",
+   "afterSig": "610dd916c010",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v2-08": {
+   "file": "bank/packs/imported/13-other-services-v2.md",
+   "before": "## Q 13-v2-08\n- domain: resilient\n- task: 2.2\n- topic: other\n- services: Amazon Connect\n- difficulty: medium\n- time: 50\n- source: practice-exams/13-other-services-exam-v2.md#Q8\n\nA company wants a managed cloud contact center for customer service. Which service?\n\n- A. Amazon Pinpoint\n- B. Amazon Connect\n- C. WorkMail\n- D. Amazon Chime\n\n**Answer:** B\n\n**Explanation:** Managed cloud contact center = Amazon Connect.",
+   "beforeSig": "02883e81b408",
+   "afterSig": "48bc29e3ddd3",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v2-10": {
+   "file": "bank/packs/imported/13-other-services-v2.md",
+   "before": "## Q 13-v2-10\n- domain: resilient\n- task: 2.2\n- topic: other\n- difficulty: medium\n- time: 50\n- source: practice-exams/13-other-services-exam-v2.md#Q10\n\nA company wants managed business email and calendaring. Which service?\n\n- A. SES\n- B. Amazon Connect\n- C. Amazon WorkMail\n- D. Amazon WorkDocs\n\n**Answer:** C\n\n**Explanation:** Managed email + calendaring = Amazon WorkMail.",
+   "beforeSig": "85d639c5724e",
+   "afterSig": "9b69b7e62263",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "16-v2-24": {
+   "file": "bank/packs/imported/16-cost-optimization-v2.md",
+   "before": "## Q 16-v2-24\n- domain: cost\n- task: 4.1\n- topic: cost\n- services: S3 Glacier, S3, Data Pipeline\n- tags: s3-storage-classes\n- difficulty: hard\n- time: 105\n- source: practice-exams/16-cost-optimization-exam-v2.md#Q24\n\nA data pipeline writes to S3 and immediately transitions objects to Glacier, but small objects incur high per-object and minimum-duration charges. Which two considerations apply? (Choose TWO)\n\n- A. IA/Glacier classes have minimum storage durations (30/90 days) and per-object overhead\n- B. Very small/short-lived objects may be cheaper in S3 Standard\n- C. One Zone-IA has no minimum duration\n- D. Lifecycle transitions are free of minimums\n- E. Glacier is always cheapest regardless of object size/age\n\n**Answer:** A, B\n\n**Explanation:** IA/Glacier have min durations + per-object overhead; tiny/short objects cheaper in Standard.",
+   "beforeSig": "10c2e944ec49",
+   "afterSig": "acb4c8561aeb",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "17-v1-10": {
+   "file": "bank/packs/imported/17-gap-services-v1.md",
+   "before": "## Q 17-v1-10\n- domain: secure\n- task: 1.3\n- topic: storage\n- services: S3, Lambda\n- tags: s3-object-lambda\n- difficulty: easy\n- time: 45\n- source: practice-exams/17-gap-services-exam.md#Q10\n\nWhich feature lets you transform and modify objects retrieved from S3 on the fly (e.g., redact PII) using a Lambda without storing copies?\n\n- A. S3 Select\n- B. S3 Object Lambda\n- C. S3 Inventory\n- D. S3 Batch Operations\n\n**Answer:** B\n\n**Explanation:** Modify S3 objects on retrieval via Lambda = S3 Object Lambda.",
+   "beforeSig": "919931781bae",
+   "afterSig": "ef06e51ae049",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "17-v2-10": {
+   "file": "bank/packs/imported/17-gap-services-v2.md",
+   "before": "## Q 17-v2-10\n- domain: secure\n- task: 1.3\n- topic: storage\n- services: S3, Lambda\n- tags: s3-object-lambda\n- difficulty: medium\n- time: 55\n- source: practice-exams/17-gap-services-exam-v2.md#Q10\n\nObjects must be transformed (e.g., redact PII) as they are retrieved via a GET, without changing the stored object. Which feature?\n\n- A. Byte-range fetch\n- B. S3 Select\n- C. S3 Object Lambda\n- D. Lifecycle rule\n\n**Answer:** C\n\n**Explanation:** Transform objects on GET without changing stored object = S3 Object Lambda.",
+   "beforeSig": "609f766dcd05",
+   "afterSig": "a2937244e633",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "15-v1-08": {
+   "file": "bank/packs/imported/15-resilience-disaster-recovery-v1.md",
+   "before": "## Q 15-v1-08\n- domain: resilient\n- task: 2.2\n- topic: resilience\n- services: S3\n- tags: s3-versioning, mfa\n- difficulty: easy\n- time: 45\n- source: practice-exams/15-resilience-disaster-recovery-exam.md#Q8\n\nTo protect against accidental deletion of critical S3 data and enable recovery of prior versions, enable:\n\n- A. S3 Select\n- B. Requester Pays\n- C. S3 Transfer Acceleration\n- D. S3 Versioning (optionally with MFA Delete)\n\n**Answer:** D\n\n**Explanation:** Protect/recover S3 data = Versioning (+ MFA Delete).",
+   "beforeSig": "1dda3b73bb38",
+   "afterSig": "3da29f1914bd",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-04": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-04\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Glue\n- tags: etl\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q4\n\nA company needs a serverless ETL service to crawl data, infer schema into a catalog, and transform data for analytics. Which service?\n\n- A. Amazon Athena\n- B. AWS Glue\n- C. Amazon Kinesis\n- D. AWS Data Pipeline\n\n**Answer:** B\n\n**Explanation:** Serverless ETL + crawler + catalog = AWS Glue.",
+   "beforeSig": "bbe989edb8f8",
+   "afterSig": "19b3c3a36108",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-01": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-01\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Kinesis Data Streams\n- tags: streaming-ingestion\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q1\n\nA company must ingest real-time clickstream data (sub-second) and allow multiple applications to consume and replay it. Which service?\n\n- A. Amazon Kinesis Data Streams\n- B. Amazon Kinesis Data Firehose\n- C. Amazon SQS\n- D. Amazon Athena\n\n**Answer:** A\n\n**Explanation:** Real-time, multi-consumer, replay = Kinesis Data Streams.",
+   "beforeSig": "c403c56dda2b",
+   "afterSig": "714c5f3b2ae1",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-02": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-02\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Data Firehose, S3, Redshift, Lambda\n- tags: streaming-ingestion\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q2\n\nStreaming data must be delivered (near real-time) to Amazon S3 and Redshift with optional Lambda transformation and NO server management. Which service?\n\n- A. Kinesis Data Firehose\n- B. AWS Glue\n- C. Amazon EMR\n- D. Kinesis Data Streams\n\n**Answer:** A\n\n**Explanation:** Near-real-time managed delivery to S3/Redshift = Kinesis Firehose.",
+   "beforeSig": "c84a24274d0f",
+   "afterSig": "0abf6519e643",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-15": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-15\n- domain: performance\n- task: 3.2\n- topic: analytics\n- services: SQS, Data Firehose\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q15\n\nWhich destination is NOT natively supported by Kinesis Data Firehose?\n\n- A. Amazon Redshift\n- B. Amazon OpenSearch\n- C. Amazon SQS\n- D. Amazon S3\n\n**Answer:** C\n\n**Explanation:** Firehose does NOT deliver to SQS (S3/Redshift/OpenSearch/Splunk yes).",
+   "beforeSig": "3543d1d1e16d",
+   "afterSig": "63e9ac1c2ccd",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-03": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-03\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Athena, S3\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q3\n\nA team wants to run ad-hoc SQL queries directly against data in S3 without loading it into a database, paying per data scanned. Which service?\n\n- A. Amazon Athena\n- B. Amazon QuickSight\n- C. Amazon EMR\n- D. Amazon Redshift\n\n**Answer:** A\n\n**Explanation:** Ad-hoc SQL on S3, pay per scan = Amazon Athena.",
+   "beforeSig": "b65045ba4bae",
+   "afterSig": "ce8fdd99e18b",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-07": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-07\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: QuickSight\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q7\n\nBusiness analysts need interactive BI dashboards with an in-memory engine (SPICE) and pay-per-session pricing. Which service?\n\n- A. Amazon EMR\n- B. Amazon QuickSight\n- C. Amazon OpenSearch\n- D. AWS Glue\n\n**Answer:** B\n\n**Explanation:** BI dashboards, SPICE, per-session = QuickSight.",
+   "beforeSig": "15d85b7fe4cb",
+   "afterSig": "345f60b72f40",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-10": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-10\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Managed Apache Flink\n- tags: streaming-ingestion, threat-detection\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q10\n\nA pipeline must run SQL analytics on streaming data in real time (e.g., anomaly detection over a time window). Which service?\n\n- A. Amazon Managed Service for Apache Flink (Kinesis Data Analytics)\n- B. AWS Glue\n- C. Amazon Athena\n- D. Amazon QuickSight\n\n**Answer:** A\n\n**Explanation:** Real-time SQL/stream analytics = Managed Flink (Kinesis Data Analytics).",
+   "beforeSig": "9e33ba10ca37",
+   "afterSig": "7c59b6b6fa07",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v1-19": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v1.md",
+   "before": "## Q 09-v1-19\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Glue\n- difficulty: easy\n- time: 45\n- source: practice-exams/09-analytics-bigdata-exam.md#Q19\n\nA company needs visual data preparation (cleaning/normalizing) for analysts without writing code. Which service?\n\n- A. Amazon QuickSight\n- B. Amazon EMR\n- C. Amazon Athena\n- D. AWS Glue DataBrew\n\n**Answer:** D\n\n**Explanation:** No-code visual data prep = Glue DataBrew.",
+   "beforeSig": "65955b01fa44",
+   "afterSig": "7488c5850c98",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "05-v2-10": {
+   "file": "bank/packs/imported/05-security-services-v2.md",
+   "before": "## Q 05-v2-10\n- domain: secure\n- task: 1.2\n- topic: security\n- services: Cognito\n- tags: federation\n- difficulty: medium\n- time: 50\n- source: practice-exams/05-security-services-exam-v2.md#Q10\n\nA mobile app needs user sign-up, sign-in, and federated identity (Google/Facebook) with tokens. Which service?\n\n- A. Amazon Cognito User Pools\n- B. AWS SSO only\n- C. IAM users\n- D. AWS Directory Service\n\n**Answer:** A\n\n**Explanation:** User sign-up/sign-in + federation + tokens = Cognito User Pools.",
+   "beforeSig": "b977013c8dcc",
+   "afterSig": "1ea9ab53e54d",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "07-v1-03": {
+   "file": "bank/packs/imported/07-application-integration-v1.md",
+   "before": "## Q 07-v1-03\n- domain: resilient\n- task: 2.1\n- topic: integration\n- services: S3, SNS, SQS\n- tags: fan-out\n- difficulty: easy\n- time: 50\n- source: practice-exams/07-application-integration-exam.md#Q3\n\nWhen an S3 object is uploaded, three independent pipelines must each receive the event and process it in parallel. Which pattern is BEST?\n\n- A. S3 → single SQS queue\n- B. S3 → SNS topic → three SQS queues (fan-out)\n- C. S3 → Kinesis Firehose\n- D. S3 → Lambda only\n\n**Answer:** B\n\n**Explanation:** Parallel fan-out = S3 -> SNS -> multiple SQS queues.",
+   "beforeSig": "4ee7203c9ea8",
+   "afterSig": "4c08244e8841",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "08-v2-03": {
+   "file": "bank/packs/imported/08-developer-tools-v2.md",
+   "before": "## Q 08-v2-03\n- domain: secure\n- task: 1.1\n- topic: devtools\n- services: CodeCommit, IAM\n- difficulty: medium\n- time: 50\n- source: practice-exams/08-developer-tools-exam-v2.md#Q3\n\nA company needs a private, managed Git repository integrated with AWS IAM. Which service?\n\n- A. CodeGuru\n- B. Cloud9\n- C. CodeArtifact\n- D. CodeCommit\n\n**Answer:** D\n\n**Explanation:** Private managed Git with IAM = AWS CodeCommit.",
+   "beforeSig": "3bbd773c16f0",
+   "afterSig": "3e0fd9e6683a",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "08-v2-08": {
+   "file": "bank/packs/imported/08-developer-tools-v2.md",
+   "before": "## Q 08-v2-08\n- domain: resilient\n- task: 2.2\n- topic: devtools\n- services: CDK, CloudFormation\n- difficulty: medium\n- time: 50\n- source: practice-exams/08-developer-tools-exam-v2.md#Q8\n\nA team defines infrastructure using familiar programming languages (TypeScript/Python) that synthesizes CloudFormation. Which tool?\n\n- A. CodeBuild\n- B. Cloud9\n- C. CodePipeline\n- D. AWS CDK\n\n**Answer:** D\n\n**Explanation:** IaC in programming languages -> CloudFormation = AWS CDK.",
+   "beforeSig": "b1d4b9f56e12",
+   "afterSig": "0e977b291b58",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v1-06": {
+   "file": "bank/packs/imported/13-other-services-v1.md",
+   "before": "## Q 13-v1-06\n- domain: performance\n- task: 3.4\n- topic: other\n- services: Local Zones\n- difficulty: easy\n- time: 45\n- source: practice-exams/13-other-services-exam.md#Q6\n\nA gaming company needs single-digit millisecond latency to end users in a metro area not near a Region. Which service?\n\n- A. AWS Outposts\n- B. AWS Snowcone\n- C. AWS Local Zones\n- D. AWS Ground Station\n\n**Answer:** C\n\n**Explanation:** Low latency metro near users = Local Zones.",
+   "beforeSig": "ee40a7e5637f",
+   "afterSig": "9b3ec967c2cc",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v1-09": {
+   "file": "bank/packs/imported/13-other-services-v1.md",
+   "before": "## Q 13-v1-09\n- domain: resilient\n- task: 2.2\n- topic: other\n- services: Amazon Connect\n- difficulty: easy\n- time: 45\n- source: practice-exams/13-other-services-exam.md#Q9\n\nWhich service provides a fully managed, omnichannel cloud contact center?\n\n- A. Amazon Connect\n- B. Amazon Chime\n- C. Amazon Pinpoint\n- D. Amazon SES\n\n**Answer:** A\n\n**Explanation:** Managed omnichannel contact center = Amazon Connect.",
+   "beforeSig": "61f791666930",
+   "afterSig": "59264fe69c0f",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v1-16": {
+   "file": "bank/packs/imported/13-other-services-v1.md",
+   "before": "## Q 13-v1-16\n- domain: performance\n- task: 3.2\n- topic: other\n- services: Outposts\n- difficulty: easy\n- time: 45\n- source: practice-exams/13-other-services-exam.md#Q16\n\nA hybrid setup needs consistent AWS APIs both in-Region and on-premises for a low-latency manufacturing app. Which is BEST?\n\n- A. AWS Snowmobile\n- B. AWS Outposts\n- C. AWS Ground Station\n- D. CloudFront\n\n**Answer:** B\n\n**Explanation:** Consistent AWS APIs on-prem, low latency = Outposts.",
+   "beforeSig": "9b6961a4c5e1",
+   "afterSig": "54ceda7260a4",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v1-12": {
+   "file": "bank/packs/imported/13-other-services-v1.md",
+   "before": "## Q 13-v1-12\n- domain: resilient\n- task: 2.2\n- topic: other\n- difficulty: easy\n- time: 45\n- source: practice-exams/13-other-services-exam.md#Q12\n\nA team needs human workers to perform small tasks (data labeling, content moderation) at scale (crowdsourcing). Which service?\n\n- A. Amazon Connect\n- B. Amazon SageMaker endpoints\n- C. AWS Lambda\n- D. Amazon Mechanical Turk\n\n**Answer:** D\n\n**Explanation:** Crowdsourced human tasks = Mechanical Turk.",
+   "beforeSig": "570e78ea286d",
+   "afterSig": "3316bf1b3c35",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "13-v1-08": {
+   "file": "bank/packs/imported/13-other-services-v1.md",
+   "before": "## Q 13-v1-08\n- domain: resilient\n- task: 2.2\n- topic: other\n- difficulty: easy\n- time: 45\n- source: practice-exams/13-other-services-exam.md#Q8\n\nA research team needs to schedule and downlink data from satellites without owning ground-station infrastructure. Which service?\n\n- A. AWS Snowmobile\n- B. AWS Ground Station\n- C. AWS IoT Core\n- D. AWS Outposts\n\n**Answer:** B\n\n**Explanation:** Satellite downlink as a service = Ground Station.",
+   "beforeSig": "879203802216",
+   "afterSig": "f49301a2e5ee",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "14-v1-11": {
+   "file": "bank/packs/imported/14-service-comparisons-v1.md",
+   "before": "## Q 14-v1-11\n- domain: performance\n- task: 3.3\n- topic: database\n- services: Neptune, DocumentDB\n- difficulty: easy\n- time: 45\n- source: practice-exams/14-service-comparisons-exam.md#Q11\n\nFor \"graph relationships\" vs \"MongoDB-compatible document store,\" choose the pair.\n\n- A. Neptune vs DocumentDB\n- B. Keyspaces vs Neptune\n- C. QLDB vs DocumentDB\n- D. DocumentDB vs Neptune\n\n**Answer:** A\n\n**Explanation:** Graph = Neptune; MongoDB-compatible = DocumentDB.",
+   "beforeSig": "483a6b2e6df3",
+   "afterSig": "5338c509b717",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "14-v1-16": {
+   "file": "bank/packs/imported/14-service-comparisons-v1.md",
+   "before": "## Q 14-v1-16\n- domain: performance\n- task: 3.5\n- topic: migration\n- services: DataSync, Snow Family\n- tags: offline-transfer\n- difficulty: easy\n- time: 45\n- source: practice-exams/14-service-comparisons-exam.md#Q16\n\n\"Online automated incremental transfer over network\" vs \"offline physical device for limited bandwidth.\" Which pair?\n\n- A. DataSync vs Snowball\n- B. Snowball vs DataSync\n- C. Transfer Family vs Snowball\n- D. Storage Gateway vs DataSync\n\n**Answer:** A\n\n**Explanation:** Online incremental = DataSync; offline device = Snowball.",
+   "beforeSig": "12f33eed8405",
+   "afterSig": "5262bbc1a9cf",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v2-01": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-01\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Kinesis Data Streams\n- tags: streaming-ingestion\n- difficulty: medium\n- time: 55\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q1\n\nA company must ingest streaming clickstream data in real time and allow multiple applications to process the same records. Which service?\n\n- A. Amazon SQS\n- B. Kinesis Data Streams\n- C. Amazon Athena\n- D. Kinesis Data Firehose\n\n**Answer:** B\n\n**Explanation:** Real-time ingest, multiple consumers, replay = Kinesis Data Streams.",
+   "beforeSig": "87c384f70810",
+   "afterSig": "d806a4d3bd05",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v2-02": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-02\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Data Firehose, S3, Redshift\n- tags: streaming-ingestion\n- difficulty: medium\n- time: 55\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q2\n\nStreaming data must be delivered to S3/Redshift with the LEAST management and near-real-time (buffered) loading, no custom consumers. Which service?\n\n- A. Kinesis Data Firehose\n- B. Amazon MSK\n- C. Kinesis Data Streams\n- D. EMR\n\n**Answer:** A\n\n**Explanation:** Managed buffered delivery to S3/Redshift, no consumers = Kinesis Data Firehose.",
+   "beforeSig": "df9e65a14c97",
+   "afterSig": "6fa6b8c295d4",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v2-19": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-19\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Glue, S3, Redshift\n- tags: etl\n- difficulty: medium\n- time: 60\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q19\n\nA pipeline must load transformed data into Redshift daily and support complex joins for BI. Which combination is appropriate?\n\n- A. DynamoDB Streams to Redshift directly\n- B. Athena writes directly into Redshift tables\n- C. Kinesis Firehose only, no transform\n- D. Glue ETL to S3 → COPY into Redshift\n\n**Answer:** D\n\n**Explanation:** Daily transform + BI joins = Glue ETL to S3 then COPY to Redshift.",
+   "beforeSig": "82c18316522a",
+   "afterSig": "8678a560a79d",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v2-25": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-25\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: Managed Apache Flink\n- tags: streaming-ingestion\n- difficulty: hard\n- time: 70\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q25\n\nA streaming pipeline needs sub-second, exactly-once, stateful stream processing with windowing. Which service is BEST?\n\n- A. Managed Service for Apache Flink (Kinesis Data Analytics)\n- B. Glue crawler\n- C. Kinesis Data Firehose\n- D. Athena\n\n**Answer:** A\n\n**Explanation:** Sub-second exactly-once stateful windowing = Managed Service for Apache Flink.",
+   "beforeSig": "dfead491933f",
+   "afterSig": "a02e1eb06d80",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v2-05": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-05\n- domain: performance\n- task: 3.2\n- topic: analytics\n- services: EMR\n- difficulty: medium\n- time: 50\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q5\n\nA team needs managed Hadoop/Spark clusters for large-scale big-data processing with full control. Which service?\n\n- A. Athena\n- B. Amazon EMR\n- C. AWS Glue\n- D. QuickSight\n\n**Answer:** B\n\n**Explanation:** Managed Hadoop/Spark with control = Amazon EMR.",
+   "beforeSig": "579407392c18",
+   "afterSig": "e51642174534",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v2-07": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-07\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: QuickSight\n- difficulty: medium\n- time: 50\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q7\n\nBusiness users need interactive BI dashboards and visualizations with a managed, serverless service. Which service?\n\n- A. Amazon Athena\n- B. AWS Glue\n- C. OpenSearch\n- D. Amazon QuickSight\n\n**Answer:** D\n\n**Explanation:** Managed BI dashboards/visualizations = Amazon QuickSight.",
+   "beforeSig": "9acabc2f9761",
+   "afterSig": "8da456b63b25",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "09-v2-16": {
+   "file": "bank/packs/imported/09-analytics-bigdata-v2.md",
+   "before": "## Q 09-v2-16\n- domain: performance\n- task: 3.5\n- topic: analytics\n- services: OpenSearch\n- tags: streaming-ingestion\n- difficulty: medium\n- time: 50\n- source: practice-exams/09-analytics-bigdata-exam-v2.md#Q16\n\nWhich service is BEST to visualize log data ingested from applications for near-real-time operational dashboards and full-text search?\n\n- A. Amazon Athena\n- B. Amazon Redshift\n- C. QuickSight only\n- D. Amazon OpenSearch Service\n\n**Answer:** D\n\n**Explanation:** Near-real-time log dashboards + full-text search = OpenSearch.",
+   "beforeSig": "c4822534f17f",
+   "afterSig": "a74064bc2535",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "06-v1-01": {
+   "file": "bank/packs/imported/06-management-governance-v1.md",
+   "before": "## Q 06-v1-01\n- domain: secure\n- task: 1.2\n- topic: management\n- services: CloudFormation\n- difficulty: easy\n- time: 45\n- source: practice-exams/06-management-governance-exam.md#Q1\n\nA team wants to provision identical infrastructure repeatably across Regions using version-controlled templates. Which service?\n\n- A. AWS OpsWorks\n- B. AWS Systems Manager\n- C. AWS CloudFormation\n- D. AWS Config\n\n**Answer:** C\n\n**Explanation:** Repeatable, version-controlled IaC = CloudFormation.",
+   "beforeSig": "f675a25111f7",
+   "afterSig": "8069e6e6a765",
+   "at": "2026-10-22T19:41:52+07:00"
+  },
+  "08-v1-13": {
+   "file": "bank/packs/imported/08-developer-tools-v1.md",
+   "before": "## Q 08-v1-13\n- domain: resilient\n- task: 2.1\n- topic: devtools\n- services: SAM, CloudFormation\n- difficulty: easy\n- time: 45\n- source: practice-exams/08-developer-tools-exam.md#Q13\n\nWhich service helps deploy a serverless application defined with a simplified template (transforms to CloudFormation)?\n\n- A. AWS CodeArtifact\n- B. AWS OpsWorks\n- C. AWS CodeDeploy\n- D. AWS SAM (Serverless Application Model)\n\n**Answer:** D\n\n**Explanation:** Simplified serverless template -> CFN = AWS SAM.",
+   "beforeSig": "a2e2ab80b977",
+   "afterSig": "d5051200a091",
+   "at": "2026-10-22T19:41:52+07:00"
+  }
+ },
+ "createdIds": [],
+ "packs": []
+}

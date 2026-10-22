@@ -131,18 +131,23 @@ A company must translate text between languages in real time. Which service?
 - services: Comprehend
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam-v2.md#Q6
 
 A company must analyze customer feedback for sentiment and key phrases (NLP). Which service?
 
-- A. Amazon Kendra
+- A. Amazon Translate
 - B. Amazon Personalize
 - C. Amazon Rekognition
 - D. Amazon Comprehend
 
 **Answer:** D
 
-**Explanation:** Sentiment/key phrase NLP = Amazon Comprehend.
+**Explanation:** Amazon Comprehend is the managed NLP service that detects sentiment, key phrases, entities and language in text such as customer feedback.
+- Amazon Translate: converts text between languages; no sentiment analysis.
+- Amazon Personalize: product recommendations from interaction data.
+- Amazon Rekognition: analyzes images and video, not text.
+> 🇻🇳 Phân tích cảm xúc, cụm từ khoá trong văn bản → Amazon Comprehend.
 
 ---
 
@@ -175,6 +180,7 @@ A team must build a conversational chatbot with automatic speech recognition and
 - services: Kendra
 - difficulty: medium
 - time: 50
+- status: retired
 - source: practice-exams/12-ml-ai-exam-v2.md#Q8
 
 A company wants an intelligent enterprise search service over internal documents using natural language queries. Which service?
@@ -205,12 +211,16 @@ An e-commerce site wants real-time personalized product recommendations. Which s
 
 - A. Amazon Personalize
 - B. Amazon Rekognition
-- C. Build a custom personalized-recommendation model on SageMaker
-- D. Amazon Kendra
+- C. Build a custom personalized-recommendation model on SageMaker AI
+- D. Amazon Lex
 
 **Answer:** A
 
-**Explanation:** Real-time personalized recommendations = Amazon Personalize.
+**Explanation:** Amazon Personalize is the managed recommendation service: it trains on interaction data and returns real-time personalized recommendations through an API.
+- Amazon Rekognition: image and video analysis.
+- Custom model on SageMaker AI: possible, but you must build, train and operate it yourself.
+- Amazon Lex: conversational chatbots.
+> 🇻🇳 Gợi ý sản phẩm cá nhân hoá real-time → Amazon Personalize.
 
 ---
 
@@ -221,18 +231,23 @@ An e-commerce site wants real-time personalized product recommendations. Which s
 - services: SageMaker
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam-v2.md#Q10
 
 A company must build, train, and deploy custom ML models end-to-end in a managed environment. Which service?
 
 - A. Amazon Lex
-- B. Amazon SageMaker
+- B. Amazon SageMaker AI
 - C. Amazon Rekognition
 - D. Amazon Comprehend
 
 **Answer:** B
 
-**Explanation:** Build/train/deploy custom models = Amazon SageMaker.
+**Explanation:** Amazon SageMaker AI (formerly Amazon SageMaker) is the managed environment to build, train and deploy custom ML models end to end.
+- Amazon Lex: builds chatbots.
+- Amazon Rekognition: pre-trained image and video analysis.
+- Amazon Comprehend: pre-trained NLP.
+> 🇻🇳 Xây, huấn luyện, triển khai model riêng trọn vòng đời → Amazon SageMaker AI.
 
 ---
 
@@ -243,6 +258,7 @@ A company must build, train, and deploy custom ML models end-to-end in a managed
 - services: Forecast
 - difficulty: hard
 - time: 90
+- status: retired
 - enriched: 2026-10-21
 - source: practice-exams/12-ml-ai-exam-v2.md#Q11
 
@@ -270,6 +286,7 @@ A company must forecast future product demand from historical time-series data w
 - services: Fraud Detector
 - difficulty: hard
 - time: 65
+- status: retired
 - source: practice-exams/12-ml-ai-exam-v2.md#Q12
 
 A company must detect potentially fraudulent online transactions using ML with minimal ML expertise. Which service?
@@ -292,18 +309,23 @@ A company must detect potentially fraudulent online transactions using ML with m
 - services: Bedrock
 - difficulty: hard
 - time: 70
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam-v2.md#Q13
 
 A team needs to build generative AI applications using foundation models via a managed API without managing infrastructure. Which service?
 
 - A. Amazon Bedrock
-- B. Amazon Kendra
+- B. Amazon Rekognition
 - C. Amazon Comprehend
 - D. Amazon SageMaker Ground Truth
 
 **Answer:** A
 
-**Explanation:** Generative AI via foundation-model API = Amazon Bedrock.
+**Explanation:** Amazon Bedrock gives access to foundation models from Amazon and other providers through one managed API, so teams build generative AI applications without managing infrastructure.
+- Amazon Rekognition: pre-trained image and video analysis, not generative AI.
+- Amazon Comprehend: pre-trained NLP analysis such as sentiment.
+- SageMaker Ground Truth (part of Amazon SageMaker AI): labels training data with human workers.
+> 🇻🇳 Ứng dụng generative AI dùng foundation model qua API → Amazon Bedrock.
 
 ---
 
@@ -315,18 +337,23 @@ A team needs to build generative AI applications using foundation models via a m
 - tags: serverless-cost
 - difficulty: hard
 - time: 70
+- enriched: 2026-10-22
 - source: practice-exams/12-ml-ai-exam-v2.md#Q14
 
-A SageMaker inference endpoint has spiky traffic and must scale to zero when idle to save cost while handling bursts. Which option?
+An Amazon SageMaker AI inference endpoint has spiky traffic and must scale to zero when idle to save cost while handling bursts. Which option?
 
 - A. Multi-model endpoint always-on
 - B. Always-on real-time endpoint
-- C. SageMaker Serverless Inference
+- C. SageMaker AI Serverless Inference
 - D. Batch transform only
 
 **Answer:** C
 
-**Explanation:** Scale-to-zero spiky inference = SageMaker Serverless Inference.
+**Explanation:** SageMaker AI Serverless Inference provisions compute only while requests arrive, scales to zero when idle and scales out automatically for bursts, so you pay per use.
+- Multi-model endpoint always-on: hosts many models on one endpoint but keeps instances running when idle.
+- Always-on real-time endpoint: billed for instances around the clock even with no traffic.
+- Batch transform only: offline jobs with no low-latency responses to live requests.
+> 🇻🇳 Traffic thất thường, cần về 0 khi rảnh → SageMaker AI Serverless Inference.
 
 ---
 

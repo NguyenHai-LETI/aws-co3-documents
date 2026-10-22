@@ -43,6 +43,7 @@ A company wants a fully managed, serverless REST API backed by Lambda with throt
 - tags: streaming-ingestion
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/11-api-integration-exam.md#Q2
 
 A mobile app needs a flexible API where clients request exactly the data they need, with real-time subscriptions and offline sync. Which service?
@@ -236,18 +237,23 @@ Which feature reduces calls to the backend by storing responses for a configurab
 - services: SES
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/11-api-integration-exam.md#Q10
 
 A company sends large volumes of transactional emails (receipts) and wants a scalable, cost-effective email service. Which service?
 
 - A. Amazon SES
-- B. Amazon Pinpoint journeys only
+- B. AWS End User Messaging SMS only
 - C. Amazon Connect
 - D. Amazon SNS
 
 **Answer:** A
 
-**Explanation:** Scalable transactional email = Amazon SES.
+**Explanation:** Amazon SES is a scalable, pay-as-you-go email service built for high-volume transactional and marketing email such as receipts.
+- AWS End User Messaging SMS: sends SMS and voice messages, not email.
+- Amazon Connect: cloud contact center, not bulk email.
+- Amazon SNS: pub/sub notifications; its email protocol suits plain alerts to subscribers, not branded transactional email at scale.
+> 🇻🇳 Gửi email giao dịch số lượng lớn, rẻ → Amazon SES.
 
 ---
 
@@ -258,6 +264,7 @@ A company sends large volumes of transactional emails (receipts) and wants a sca
 - services: Pinpoint
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/11-api-integration-exam.md#Q11
 
 A marketing team needs multi-channel customer engagement (email, SMS, push) with campaigns and analytics. Which service?
@@ -465,6 +472,7 @@ Which two are TRUE about Amazon API Gateway? (Choose TWO)
 - tags: streaming-ingestion
 - difficulty: easy
 - time: 45
+- status: retired
 - source: practice-exams/11-api-integration-exam.md#Q20
 
 A serverless backend needs near-real-time data sync to mobile clients and conflict resolution when offline. Which service is purpose-built?

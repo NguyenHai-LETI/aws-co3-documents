@@ -234,19 +234,24 @@ A company wants organization-wide visibility into S3 usage and activity metrics 
 - services: S3, Lambda
 - tags: s3-object-lambda
 - difficulty: medium
-- time: 55
+- time: 75
+- enriched: 2026-10-22
 - source: practice-exams/17-gap-services-exam-v2.md#Q10
 
-Objects must be transformed (e.g., redact PII) as they are retrieved via a GET, without changing the stored object. Which feature?
+Objects in Amazon S3 must be transformed (for example, PII redacted) as they are retrieved via a GET request, without changing the stored object. Which design meets this requirement?
 
-- A. Byte-range fetch
-- B. S3 Select
-- C. S3 Object Lambda
-- D. Lifecycle rule
+- A. Byte-range fetch that skips the sensitive part of each object
+- B. S3 Batch Operations job that redacts every object in place
+- C. Lambda function URL that fetches the object and returns a redacted version
+- D. S3 Lifecycle rule that transitions objects to a cheaper storage class
 
 **Answer:** C
 
-**Explanation:** Transform objects on GET without changing stored object = S3 Object Lambda.
+**Explanation:** A Lambda function URL (or API Gateway, or CloudFront in front of Lambda) receives the GET, reads the object from S3, redacts it and returns the result, leaving the stored object untouched. This is AWS's recommended replacement now that S3 Object Lambda accepts only existing customers (since 2025-11-07): https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html
+- Byte-range fetch that skips the sensitive part: returns raw bytes only, and PII is mixed into the content, so nothing is actually redacted.
+- S3 Batch Operations redacting in place: changes the stored object, which is not allowed.
+- S3 Lifecycle rule: transitions or expires objects; it never transforms content.
+> 🇻🇳 Biến đổi dữ liệu khi GET mà không sửa object gốc → Lambda (function URL / API Gateway) đọc S3 rồi trả bản đã che.
 
 ---
 

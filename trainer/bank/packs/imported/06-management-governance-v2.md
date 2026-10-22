@@ -20,6 +20,7 @@ created: 2026-10-16
 - services: CloudFormation, VPC, EC2, RDS
 - difficulty: medium
 - time: 50
+- enriched: 2026-10-22
 - source: practice-exams/06-management-governance-exam-v2.md#Q1
 
 A team wants to provision entire environments (VPC, EC2, RDS) as code, repeatable across Regions. Which service?
@@ -31,7 +32,11 @@ A team wants to provision entire environments (VPC, EC2, RDS) as code, repeatabl
 
 **Answer:** D
 
-**Explanation:** Infrastructure as code, repeatable = AWS CloudFormation.
+**Explanation:** CloudFormation models whole environments (VPC, EC2, RDS) as code in templates and deploys them repeatedly as stacks, or across Regions with StackSets.
+- AWS Config: records and evaluates resource configuration; it does not provision.
+- AWS OpsWorks: Chef/Puppet configuration management, discontinued in 2024 (full shutdown).
+- AWS Systems Manager: operates existing resources; it does not define environments as templates.
+> 🇻🇳 Dựng cả môi trường bằng code, lặp lại giữa các Region → AWS CloudFormation (OpsWorks đã ngừng hẳn).
 
 ---
 
@@ -467,20 +472,24 @@ A company must ensure CloudTrail logs cannot be tampered with and are retained c
 - topic: management
 - services: CloudFormation
 - difficulty: hard
-- time: 75
+- time: 80
 - enriched: 2026-10-22
 - source: practice-exams/06-management-governance-exam-v2.md#Q21
 
 A CloudFormation update fails midway. The team wants automatic return to the last known good state. Which behavior/feature applies?
 
-- A. StackSets for automatic cross-account updates
-- B. Manual deletion only
-- C. Manual stack deletion after a failed update
-- D. Drift detection for manual configuration review
+- A. StackSets to push the update to other accounts automatically
+- B. Termination protection to block deletion of the stack
+- C. Automatic rollback that restores the previous stack configuration
+- D. Drift detection to review manual configuration changes
 
 **Answer:** C
 
-**Explanation:** Return to last good state on failed update = automatic rollback.
+**Explanation:** When a stack update fails, CloudFormation rolls back by default: every changed resource returns to its previous stable configuration (UPDATE_ROLLBACK_COMPLETE), and rollback triggers can start the same rollback from CloudWatch alarms. https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stack-failure-options.html
+- StackSets: deploy one template across accounts and Regions; they do not undo a failed update.
+- Termination protection: prevents a stack from being deleted, not an update from failing.
+- Drift detection: reports changes made outside CloudFormation; it restores nothing.
+> 🇻🇳 Cập nhật stack lỗi giữa chừng → CloudFormation tự rollback về cấu hình ổn định trước đó (mặc định).
 
 ---
 

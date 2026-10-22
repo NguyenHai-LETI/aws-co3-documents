@@ -247,18 +247,23 @@ Which is correct for "serverless SQL over S3" vs "managed petabyte data warehous
 - services: Neptune, DocumentDB
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/14-service-comparisons-exam.md#Q11
 
 For "graph relationships" vs "MongoDB-compatible document store," choose the pair.
 
 - A. Neptune vs DocumentDB
 - B. Keyspaces vs Neptune
-- C. QLDB vs DocumentDB
+- C. DynamoDB vs DocumentDB
 - D. DocumentDB vs Neptune
 
 **Answer:** A
 
-**Explanation:** Graph = Neptune; MongoDB-compatible = DocumentDB.
+**Explanation:** Amazon Neptune is the purpose-built graph database for highly connected relationships, and Amazon DocumentDB is the MongoDB-compatible document database.
+- Keyspaces vs Neptune: Keyspaces is Cassandra-compatible wide-column, not graph.
+- DynamoDB vs DocumentDB: DynamoDB is a key-value/document store, not a graph database.
+- DocumentDB vs Neptune: the right services in the reverse order.
+> 🇻🇳 Đồ thị → Neptune; tương thích MongoDB → DocumentDB.
 
 ---
 
@@ -361,6 +366,7 @@ For "shared file storage for Linux (NFS, multi-AZ)" vs "shared file storage for 
 - tags: offline-transfer
 - difficulty: easy
 - time: 45
+- enriched: 2026-10-22
 - source: practice-exams/14-service-comparisons-exam.md#Q16
 
 "Online automated incremental transfer over network" vs "offline physical device for limited bandwidth." Which pair?
@@ -372,7 +378,12 @@ For "shared file storage for Linux (NFS, multi-AZ)" vs "shared file storage for 
 
 **Answer:** A
 
-**Explanation:** Online incremental = DataSync; offline device = Snowball.
+**Explanation:** DataSync performs online, automated, incremental transfers over the network, while a Snowball device is the offline option when bandwidth is too limited.
+- Snowball vs DataSync: the right services in the reverse order.
+- Transfer Family vs Snowball: Transfer Family offers SFTP/FTPS endpoints for partners, not incremental sync.
+- Storage Gateway vs DataSync: Storage Gateway is hybrid storage access, and DataSync is online, not offline.
+Status: Snowball Edge is available only to existing customers since 2025-11-07 (device support ends 2026-12-31).
+> 🇻🇳 Online, incremental → DataSync; thiết bị offline → Snowball (chỉ còn cho khách hàng hiện có).
 
 ---
 

@@ -225,19 +225,24 @@ EC2 instances and container images must be scanned for software vulnerabilities 
 - services: Cognito
 - tags: federation
 - difficulty: medium
-- time: 50
+- time: 55
+- enriched: 2026-10-22
 - source: practice-exams/05-security-services-exam-v2.md#Q10
 
 A mobile app needs user sign-up, sign-in, and federated identity (Google/Facebook) with tokens. Which service?
 
 - A. Amazon Cognito User Pools
-- B. AWS SSO only
+- B. IAM Identity Center (AWS SSO) only
 - C. IAM users
 - D. AWS Directory Service
 
 **Answer:** A
 
-**Explanation:** User sign-up/sign-in + federation + tokens = Cognito User Pools.
+**Explanation:** Cognito user pools provide a managed user directory with sign-up and sign-in, federation with social identity providers such as Google and Facebook, and JWT tokens for the mobile app.
+- IAM Identity Center (formerly AWS SSO): workforce single sign-on to AWS accounts and business apps, not end-user sign-up for a consumer app.
+- IAM users: long-term credentials inside your AWS account, not built for millions of app users.
+- AWS Directory Service: managed Microsoft AD for enterprise workloads, no social federation.
+> 🇻🇳 Đăng ký/đăng nhập người dùng app + federation Google/Facebook + token → Cognito User Pools (IAM Identity Center dành cho nhân viên).
 
 ---
 
