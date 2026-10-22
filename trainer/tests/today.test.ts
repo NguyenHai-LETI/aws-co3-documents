@@ -56,7 +56,7 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, practice: Partial<AppConfi
       idle_tasks: ['enrich'],
       twins_per_run: 10,
       tutor_daily_turns: 40,
-      verify: { auto: false, auto_draft: false, batch_size: 10, grounded: false, local_model: '' },
+      verify: { auto: false, auto_draft: false, batch_size: 10, grounded: false, local_model: '', probe_model: 'haiku' },
     },
     srs: {
       algorithm: 'fsrs',
@@ -80,7 +80,7 @@ function makeCfg(srs: Partial<AppConfig['srs']> = {}, practice: Partial<AppConfi
     practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true, today_minutes: 25, relearn: true, ...practice },
     exam: { sealed_forms: 0, sealed_size: 50 },
     stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300 },
-    quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88, longform_target_per_task: 12 },
+    quality: { embeddings: 'off', ollama_url: '', embedding_model: '', semantic_threshold: 0.88, longform_target_per_task: 12, exam_spec_since: '2026-10-22' },
     server: { lan: false, lan_admin: false, https: 'off', https_cert: '', https_key: '' },
     export: { anki_deck: 'test', ankiconnect_url: '' },
     cache: { sqlite: false },

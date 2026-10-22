@@ -11,6 +11,9 @@ export interface Option {
   text: string;
 }
 
+/** [v6] How close a question is to a real SAA-C03 item (shared/tier.ts): A exam-grade · B short scenario · C drill. */
+export type Tier = 'A' | 'B' | 'C';
+
 export interface Question {
   id: string;
   pack: string;
@@ -37,6 +40,7 @@ export interface Question {
   enriched?: string; // YYYY-MM-DD when the ENRICH routine last improved this question
   words: number; // computed: words in the stem
   longForm: boolean; // computed: stem ≥ timing.long_form_min_words (exam-realistic length)
+  tier?: Tier; // [v6] computed (shared/tier.ts): A exam-grade · B short scenario · C drill
   hash: string; // computed: short hash of stem + options + answer (patch base check, change detection)
   requirements?: string[]; // computed: requirement categories the stem asks for (taxonomy.keywords groups: cost, ops, resilient, performance, secure, negative)
   outOfScope?: boolean; // computed: a correct option names a service the official exam guide lists as out of scope
@@ -119,7 +123,7 @@ export interface Taxonomy {
   difficulties: { id: Difficulty; label: string }[];
   topics: TopicDef[];
   timing: TimingRubric;
-  services: Record<string, { topic: string; match: string[]; scope?: 'in' | 'out'; aliases?: string[] }>; // [γ] scope: out = official out-of-scope list · aliases = official / renamed names
+  services: Record<string, { topic: string; match: string[]; scope?: 'in' | 'out' | 'legacy'; aliases?: string[] }>; // [γ] scope: out = official out-of-scope list · [v6] legacy = dropped from the official in-scope list or retired with no in-scope successor (treated like out) · aliases = official / renamed names
   features: Record<string, string[]>;
   tasks: TaskDef[];
   keywords: Record<string, string[]>; // category → phrases to highlight (qualifier, cost, ops, resilient, performance, secure)

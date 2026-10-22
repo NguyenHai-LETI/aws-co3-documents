@@ -61,6 +61,7 @@ export interface AppConfig {
       batch_size: number; // questions per verifier call
       grounded: boolean; // [v5] disputed / stale-flagged questions: fact-check against AWS documentation (WebFetch limited to AWS domains)
       local_model: string; // [v5] Ollama chat model for a third, different-family vote ('' = off) — tie-breaker only
+      probe_model: string; // [v6] model of the choices-only cue probe (sees the options without the stem); '' = coach.models.verify
     };
   };
   srs: {
@@ -97,6 +98,7 @@ export interface AppConfig {
     embedding_model: string;
     semantic_threshold: number; // cosine similarity ≥ this = likely duplicate
     longform_target_per_task: number; // [v5] exam-like (long scenario) questions wanted per exam-guide task
+    exam_spec_since: string; // [v6] YYYY-MM-DD: AI questions (origin ai | doc, medium / hard) created on or after it are linted against the exam-grade spec (SCHEMA §6b); '' = off
   };
   server: {
     lan: boolean; // also listen on the local network (phone access with an access token)
@@ -140,7 +142,7 @@ const DEFAULT_CONFIG: AppConfig = {
     idle_tasks: ['enrich'],
     twins_per_run: 10,
     tutor_daily_turns: 40,
-    verify: { auto: true, auto_draft: true, batch_size: 10, grounded: true, local_model: '' },
+    verify: { auto: true, auto_draft: true, batch_size: 10, grounded: true, local_model: '', probe_model: 'haiku' },
   },
   srs: {
     algorithm: 'fsrs',
@@ -163,7 +165,7 @@ const DEFAULT_CONFIG: AppConfig = {
   practice: { default_count: 20, quick_count: 10, shuffle_options: true, exclude_out_of_scope: true, today_minutes: 25, relearn: true },
   exam: { sealed_forms: 2, sealed_size: 50 },
   stats: { rushed_median_seconds: 5, recency_half_life_days: 14, recognized_wpm: 300 },
-  quality: { embeddings: 'auto', ollama_url: 'http://127.0.0.1:11434', embedding_model: 'embeddinggemma', semantic_threshold: 0.88, longform_target_per_task: 12 },
+  quality: { embeddings: 'auto', ollama_url: 'http://127.0.0.1:11434', embedding_model: 'embeddinggemma', semantic_threshold: 0.88, longform_target_per_task: 12, exam_spec_since: '2026-10-22' },
   server: { lan: false, lan_admin: false, https: 'off', https_cert: '', https_key: '' },
   export: { anki_deck: 'AWS SAA-C03', ankiconnect_url: 'http://127.0.0.1:8765' },
   cache: { sqlite: true },
