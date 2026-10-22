@@ -189,33 +189,33 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html
 - domain: performance
 - task: 3.2
 - topic: compute
-- services: API Gateway, SQS, Lambda, RDS
-- tags: decoupling, load-leveling, async-processing
+- services: Lambda, API Gateway, SQS
+- tags: decoupling, async-invocation, lambda-destinations
 - difficulty: medium
-- skills: 3.2.s1, 3.2.k3
-- concept: An API Gateway service integration that writes straight to SQS decouples the API tier from the database-writing tier so each scales on its own and peaks are absorbed without custom code
-- refs: 07-application-integration.md, 11-api-integration.md
-- hint: Xác nhận đơn hàng được phép bất đồng bộ — đặt thứ gì giữa API và cơ sở dữ liệu để đỉnh tải được hấp thụ và ghi theo nhịp DB chịu được?
+- skills: 3.2.s1, 3.2.k5, 3.2.k3
+- concept: Invoking a function asynchronously hands the event to Lambda's internal queue with automatic retries, decoupling the caller from a slow step, and an on-failure destination captures events that still fail
+- refs: 01-compute-services.md, 07-application-integration.md
+- hint: Bước biên lai chậm và hay lỗi làm checkout chậm theo — cách gọi hàm nào cho phép bên gọi trả lời ngay mà Lambda tự xếp hàng và thử lại?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
+- time: 135
 
-A food-delivery company's mobile app posts orders to an Amazon API Gateway HTTP API. A Lambda function validates each order and writes it to an Amazon RDS for PostgreSQL database during the same request. At lunch peaks the database reaches its connection and write limits, requests time out, and customers resubmit orders. Order confirmation can be asynchronous. The company wants the API tier and the database-writing tier to scale independently and to absorb the peaks, with the LEAST custom code. Which solution will meet these requirements?
+A subscription company's checkout API runs on AWS Lambda behind Amazon API Gateway. After charging the card, the checkout function synchronously invokes a second function that generates a PDF receipt, uploads it to Amazon S3, and emails the customer. The second function takes about four seconds and sometimes fails when the email provider is down, so checkout responses are slow and customers see errors for receipts they do not need immediately. The company wants checkout to respond right away, the receipt step to scale on its own with automatic retries, and failed receipt events to be kept for inspection, with the LEAST code. Which solution will meet these requirements?
 
-- A. Change the API route to send each order directly to an Amazon SQS queue through a service integration, and have the order service read the queue at its own pace.
-- B. Raise the Lambda function's reserved concurrency and move the database to a larger instance class so that more order writes can run at the same time in each request.
-- C. Add an RDS Proxy in front of the database so that the function reuses database connections while it keeps writing each order synchronously in the same request.
-- D. Turn on API Gateway caching for the order route so that repeated order submissions during a lunch peak are answered from the cache instead of the database.
+- A. Invoke the receipt function asynchronously from the checkout function and configure an on-failure destination, such as an Amazon SQS queue, on the receipt function.
+- B. Keep the synchronous invocation and raise the memory of the receipt function so that it finishes before the checkout function times out.
+- C. Increase the timeout of the checkout function and add code that invokes the receipt function again whenever the first call fails.
+- D. Set the reserved concurrency of the receipt function to one so that receipts are generated one at a time and cannot overwhelm the email provider.
 
 **Answer:** A
 
-**Explanation:** An API Gateway service integration can put each order straight into SQS, so the API tier accepts peaks quickly while the order service drains the queue at the rate the database sustains, and the tiers scale independently.
-- Higher concurrency and a larger database: scales both tiers together and stays synchronous (vi phạm ràng buộc)
-- RDS Proxy: pools connections but removes neither write saturation nor request timeouts (giải bài toán khác)
-- API Gateway caching: orders are unique writes, so there is nothing to answer from a cache (dùng sai tính năng)
-Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-aws-services.html
-> 🇻🇳 Xác nhận bất đồng bộ + đỉnh tải → API Gateway ghi thẳng vào SQS, worker xử lý theo nhịp DB; RDS Proxy không tách tầng.
+**Explanation:** Asynchronous invocation hands the event to Lambda, which queues it, returns at once, and retries failures automatically; an on-failure destination keeps events that still fail, so checkout is decoupled and the receipt step scales on its own with almost no code.
+- Synchronous call with more memory: the caller still waits and fails when the callee fails (vi phạm ràng buộc)
+- Retry code in the caller: more code, and the caller still blocks (tốn vận hành hơn)
+- Reserved concurrency of one: throttles receipts and does not decouple the caller (giải bài toán khác)
+Docs: https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html
+> 🇻🇳 Bước phụ chậm/hay lỗi → gọi bất đồng bộ (Lambda tự xếp hàng, thử lại) + on-failure destination; không cần thêm code.
 
 ---
 
@@ -233,7 +233,7 @@ Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-deve
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
+- time: 110
 
 A company runs an image-resizing AWS Lambda function that a web application invokes synchronously whenever a user uploads a photo. The function is configured with 256 MB of memory, never uses more than 150 MB, and each invocation is CPU-bound and takes about 6 seconds. The product team wants invocations to finish in under 2 seconds without rewriting the code, and the traffic level is moderate and steady. Which action will meet this requirement with the LEAST effort?
 
@@ -440,6 +440,7 @@ Docs: https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
+- time: 110
 
 An online retailer serves its storefront through Amazon CloudFront. Before a request is forwarded to the origin, the retailer must validate a session token by calling an external identity API over HTTPS and must read a per-country pricing rule with the AWS SDK. The extra processing may take a few tens of milliseconds, and the retailer wants the logic to run close to viewers without managing servers. Which solution will meet these requirements?
 

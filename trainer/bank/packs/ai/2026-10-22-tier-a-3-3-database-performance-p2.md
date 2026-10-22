@@ -93,7 +93,7 @@ Docs: https://docs.aws.amazon.com/keyspaces/latest/devguide/what-is-keyspaces.ht
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
+- time: 115
 
 A manufacturer collects readings from thousands of production-line sensors every second and keeps them in a self-managed InfluxDB 2.x server on Amazon EC2. The operations team spends time patching the server and building failover, and dashboards that query recent data need single-digit millisecond responses. The Telegraf agents and queries already use InfluxDB's line protocol and query languages. The company wants a managed service that keeps the existing agents and queries working, with Multi-AZ availability and minimal changes. Which solution will meet these requirements?
 
@@ -161,6 +161,7 @@ Docs: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
+- time: 145
 
 A company runs a 3 TiB Amazon RDS for MySQL database and wants to move it to Amazon Aurora MySQL for better read scaling and storage. The application can be offline for no more than a few minutes during the cutover, the copy can run in the background for hours, and the team does not want to convert schemas or rewrite queries. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -230,6 +231,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
+- time: 120
 
 A retail company caches product-detail data in an Amazon ElastiCache for Valkey cluster with one shard, while the products themselves live in Amazon Aurora. Before each seasonal campaign, engineers estimate the data set size and resize the node type by hand because evictions rise when memory fills and the node's network saturates. Between campaigns the cache is mostly idle. The company wants the cache to adapt its memory, compute, and network capacity to demand automatically, with no capacity forecasting and the LEAST operational overhead. Which solution will meet these requirements?
 

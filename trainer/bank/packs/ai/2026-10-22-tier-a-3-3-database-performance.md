@@ -51,7 +51,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Integr
 - topic: database
 - services: Aurora
 - tags: aurora-endpoints, read-replicas
-- difficulty: hard
+- difficulty: medium
 - skills: 3.3.s1, 3.3.k7, 3.3.k3
 - concept: Aurora custom endpoints group chosen replicas so that application reads and heavy BI queries use different replicas; the reader endpoint balances across all replicas and promotion tiers do not steer reads
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -59,7 +59,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Integr
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 160
+- time: 145
 
 A SaaS company runs an Amazon Aurora PostgreSQL cluster with one writer and four Aurora Replicas: two small replicas that serve the user-facing application and two large replicas intended for heavy business-intelligence queries. Analysts' long queries are slowing application reads because the application connects to the reader endpoint, which spreads connections across all four replicas. The company wants the application and the analytics tools each to use only their own replicas, with connection strings that do not depend on individual instance names. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -85,32 +85,32 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overvi
 - task: 3.3
 - topic: database
 - services: Aurora
-- tags: aurora-serverless, capacity-planning
-- difficulty: medium
-- skills: 3.3.k8, 3.3.k4
-- concept: Aurora Serverless v2 scales compute in fine-grained ACU steps in place, which suits many clusters with unpredictable, spiky load better than peak-sized provisioned instances
+- tags: aurora-serverless, read-replicas, capacity-planning
+- difficulty: hard
+- skills: 3.3.k8, 3.3.k4, 3.3.s1
+- concept: A cluster can mix provisioned and Serverless v2 instances; Serverless v2 readers in promotion tier 2 or higher scale in place, independently of the writer, which makes only the spiky reader capacity elastic
 - refs: 03-database-services.md, R-performance-benchmarks.md
-- hint: Tải đột biến khó đoán, phần lớn thời gian rảnh, không muốn ai phải đổi cỡ instance — dung lượng tính toán nên tự co giãn tại chỗ.
+- hint: Chỉ phần đọc phân tích bị đột biến ngắn, writer ổn định đã có Reserved Instance — làm sao chỉ reader co giãn tại chỗ, độc lập với writer?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
+- time: 135
 
-A software company hosts a multi-tenant reporting product on Amazon Aurora MySQL, with one isolated cluster for each customer. Usage is highly variable: most clusters are nearly idle, but a few jump from light to heavy use within minutes when customers run month-end reports, and the timing is unpredictable. Every writer is a provisioned instance sized for peak load, so most capacity sits idle. The company wants each cluster's compute capacity to follow its load without interrupting running queries and without the operations team resizing instances. Which solution will meet these requirements?
+A media company runs an Amazon Aurora MySQL cluster with a provisioned writer that carries a steady transactional load and is covered by Reserved Instances. Two provisioned readers sized for peak serve analytics queries that spike for a few minutes at unpredictable times and otherwise sit nearly idle, and adding Aurora Replicas during a spike takes too long to help. The company wants reader capacity to follow the spikes inside the cluster, without changing the writer or the application, and with the LEAST operational effort. Which solution will meet these requirements?
 
-- A. Keep the provisioned writers and schedule instance class changes with AWS Lambda functions before each customer's expected month-end window.
-- B. Add Aurora Replicas to each cluster and apply Aurora Auto Scaling so that reader capacity grows while the month-end reports run.
-- C. Move each customer's data to Amazon DynamoDB on-demand tables so that capacity follows the request rate of each customer.
-- D. Convert the writer and reader instances to Aurora Serverless v2 and set a minimum and maximum capacity range for each cluster.
+- A. Apply Aurora Auto Scaling to the cluster with a target on reader CPU utilization so that more provisioned replicas are added during each spike.
+- B. Convert the writer and the readers to Aurora Serverless v2 and give up the Reserved Instance commitment that covers the writer.
+- C. Add more provisioned readers sized for peak load and create a custom endpoint that sends the analytics queries to them.
+- D. Replace the provisioned readers with Aurora Serverless v2 readers in the same cluster and set their promotion tier to 2 or higher.
 
 **Answer:** D
 
-**Explanation:** Aurora Serverless v2 adjusts capacity in fine-grained ACU increments, in place and without disrupting running queries, so idle clusters cost little and busy ones grow quickly within their range with nobody resizing instances.
-- Scheduled instance class changes: the busy times are unpredictable and each change interrupts connections (vi phạm ràng buộc)
-- Replicas with Aurora Auto Scaling: the writer stays sized for peak and each replica is a fixed-size instance (giải bài toán khác)
-- DynamoDB: would force a redesign of the relational reports (vi phạm ràng buộc)
-Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.html
-> 🇻🇳 Tải biến động khó đoán, nhiều cluster rảnh → Aurora Serverless v2 (ACU tự co giãn tại chỗ, không gián đoạn).
+**Explanation:** A cluster can mix provisioned and Serverless v2 instances; Serverless v2 readers scale in place in fine-grained steps, and readers in promotion tier 2 or higher scale independently of the writer, so only the readers become elastic.
+- Aurora Auto Scaling: adds fixed-size provisioned replicas, which launch too slowly for short spikes (giải bài toán khác)
+- Converting the writer too: changes the steady writer and wastes its reservation (vi phạm ràng buộc)
+- More provisioned readers: pays for peak capacity all the time (tốn chi phí hơn)
+Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.setting-capacity.html
+> 🇻🇳 Writer ổn định + reader đột biến ngắn → reader Aurora Serverless v2 (promotion tier ≥ 2) co giãn độc lập writer; Auto Scaling replica quá chậm.
 
 ---
 
@@ -152,33 +152,34 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 - domain: performance
 - task: 3.3
 - topic: database
-- services: ElastiCache, RDS
-- tags: caching-strategies, write-through
+- services: ElastiCache
+- tags: read-replicas, multi-az, redis-vs-memcached
 - difficulty: medium
-- skills: 3.3.k2, 3.3.s5
-- concept: When users must never see an outdated value, write-through keeps the cache current on every write, and lazy loading as a fallback refills a replaced node; long TTLs leave stale data and ElastiCache has no write-behind to a database
+- skills: 3.3.k7, 3.3.k2, 3.3.s5
+- concept: A replication group with replicas in other AZs and Multi-AZ automatic failover scales cache reads through the reader endpoint and survives a node loss; vertical sizing, extra shards and Memcached do neither
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
-- hint: Giá thay đổi phải hiện ngay sau khi commit, nhưng node mới thay thế bắt đầu rỗng — kết hợp hai chiến lược nạp cache nào bù cho nhau?
+- hint: Đọc làm nghẽn CPU của một node duy nhất và node hỏng làm mất sạch cache — thêm bản sao ở AZ khác và gửi lệnh đọc tới đúng endpoint.
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
+- time: 145
 
-A trading-education platform keeps course prices in Amazon RDS for PostgreSQL and caches them in Amazon ElastiCache. Almost every price is read many times a minute, and prices change a few times a day. After a price change commits, users must never see the old price, and the application must still answer quickly after a cache node is replaced and starts empty. Which combination of actions will meet these requirements? (Choose TWO)
+A forum runs a single-node Amazon ElastiCache for Valkey cache in front of its database. Read commands now saturate the node's CPU, and a node failure empties the cache and sends a surge of queries to the database. The data set fits in one node's memory and the write volume is low. The company wants to scale read throughput and fail over automatically, with minimal application change. Which combination of steps will meet these requirements? (Choose TWO)
 
-- A. Cache each price with a time to live of 24 hours and rely on expiration to remove outdated prices after each change.
-- B. Update the cached price in the same code path that writes the new price to the database, so the cache cannot lag.
-- C. Remove the cache and read every price from a read replica of the database so that the data stays current for readers.
-- D. Load a missing price from the database and store it in the cache when it is requested, so that a replaced node refills itself.
-- E. Configure the cache node to acknowledge price changes immediately and copy them to the database afterward, even if the node is replaced.
+- A. Move to a cluster-mode-enabled configuration and add shards so that the write load is spread across more primary nodes.
+- B. Create a replication group with a primary node and replicas in other Availability Zones, and turn on Multi-AZ with automatic failover.
+- C. Move to a larger node type so that a single node has more CPU and can keep serving the read commands.
+- D. Send the read commands to the replicas by using the reader endpoint and keep the write commands on the primary endpoint.
+- E. Replace the cache with an ElastiCache for Memcached cluster and let the client library spread the keys across the nodes with automatic node discovery.
 
 **Answer:** B, D
 
-**Explanation:** Write-through updates the cache whenever the database is written, so readers never see a stale price, and lazy loading as a fallback reloads missing prices after a node replacement, covering write-through's gap.
-- Long time to live: leaves the old price visible for hours after a change (vi phạm ràng buộc)
-- Read replica without a cache: replication is asynchronous, so reads can lag the primary (giải bài toán khác)
-- Write-behind to the database: ElastiCache does not write changes back to a database (cấu hình không tồn tại)
-Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html
-> 🇻🇳 Không bao giờ thấy giá cũ → write-through; node mới rỗng → thêm lazy loading làm dự phòng (TTL dài gây dữ liệu cũ).
+**Explanation:** A replication group adds read-only replicas in other zones, and with Multi-AZ a replica is promoted if the primary fails, so the cache survives a node loss; sending reads to the reader endpoint moves read load off the primary.
+- Adding shards: spreads writes, which are low here, and the cache still lacks a replica (giải bài toán khác)
+- Larger node type: raises one node's capacity but adds no failover (vi phạm ràng buộc)
+- Memcached: has no replication or automatic failover, so a node loss still empties part of the cache (dùng sai tính năng)
+Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Replication.html
+> 🇻🇳 Đọc nghẽn + node đơn là điểm lỗi → replication group (replica khác AZ, Multi-AZ failover) + gửi đọc tới reader endpoint.
 
 ---
 
@@ -290,33 +291,33 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html
 - domain: performance
 - task: 3.3
 - topic: database
-- services: Neptune, Aurora, DocumentDB, Redshift
-- tags: graph-database, purpose-built
+- services: Aurora, DynamoDB, DocumentDB, Keyspaces
+- tags: relational-vs-nonrelational, purpose-built
 - difficulty: easy
 - skills: 3.3.s4, 3.3.k8
-- concept: Multi-hop relationship traversals over billions of connections are the use case of Amazon Neptune, a purpose-built graph database
+- concept: Complex joins, multi-table ACID transactions and ad hoc SQL reporting call for a relational engine such as Aurora, not a key-value, document or wide-column store
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
-- hint: Truy vấn nhiều bước qua các mối quan hệ chung thiết bị/địa chỉ/số điện thoại — kiểu dữ liệu nào lưu quan hệ như thành phần chính?
+- hint: Truy vấn join phức tạp, giao dịch ACID nhiều bảng và báo cáo SQL tùy ý — nhóm cơ sở dữ liệu nào được thiết kế cho các yêu cầu đó?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 100
+- time: 90
 
-A financial-services company wants to detect fraud rings by finding accounts that share devices, addresses, and phone numbers across several hops of relationships. In its current Amazon Aurora PostgreSQL database these queries need deeply nested self-joins across billions of rows and take minutes. The company wants these relationship traversals to return in milliseconds, and it wants a managed service that offers high availability and read replicas. Which solution will meet these requirements?
+A wholesale distributor is replacing its legacy order-management system. The application runs complex multi-table joins for invoicing, requires ACID transactions across orders, line items, and inventory, and lets analysts run ad hoc SQL reports. Order volume is growing quickly, and the company wants a managed database with automatic failover, read scaling, and storage that grows without manual provisioning. Which database should a solutions architect choose?
 
-- A. Migrate the data to Amazon DocumentDB and store each account's connections as nested documents inside the account document.
-- B. Migrate the data to Amazon Redshift and run the traversals as SQL window functions over the full table of relationships.
-- C. Add Aurora Replicas and create composite indexes on every column that the self-joins use, then tune the join order.
-- D. Migrate the data to Amazon Neptune and run the traversals with a graph query language such as Gremlin or openCypher.
+- A. Use Amazon DynamoDB with one table for each entity and join the entities in application code.
+- B. Use Amazon DocumentDB and store each order as a document that embeds its line items and inventory counts.
+- C. Use Amazon Keyspaces and model orders and line items as wide-column tables that are queried with CQL.
+- D. Use Amazon Aurora with a MySQL-compatible or PostgreSQL-compatible cluster and add Aurora Replicas for reads.
 
 **Answer:** D
 
-**Explanation:** Neptune is a purpose-built graph database that stores relationships natively and is optimized for querying billions of relationships with millisecond latency using Gremlin, openCypher, or SPARQL, with Multi-AZ storage and up to 15 read replicas.
-- DocumentDB: a document store whose nested documents do not make multi-hop traversals fast (dùng sai tính năng)
-- Redshift: an analytic warehouse tuned for scans and aggregations, not interactive traversals (giải bài toán khác)
-- More replicas and indexes: self-joins stay expensive at every extra hop (dùng sai tính năng)
-Docs: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html
-> 🇻🇳 Truy vấn quan hệ nhiều bước trên hàng tỷ kết nối, cần mili giây → Amazon Neptune (graph database).
+**Explanation:** Aurora is a managed relational engine with SQL joins and ACID transactions across tables, automatic failover, up to 15 low-lag Aurora Replicas for read scaling, and storage that grows automatically.
+- DynamoDB: no joins or ad hoc SQL, so the joins would move into application code (dùng sai tính năng)
+- DocumentDB: document model that does not provide relational joins or SQL reporting (dùng sai tính năng)
+- Keyspaces: wide-column store queried by key with CQL, not for joins or ad hoc SQL (dùng sai tính năng)
+Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_AuroraOverview.html
+> 🇻🇳 Join phức tạp + giao dịch ACID + báo cáo SQL → cơ sở dữ liệu quan hệ (Amazon Aurora), không phải DynamoDB/DocumentDB/Keyspaces.
 
 ---
 
@@ -334,7 +335,7 @@ Docs: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 180
+- time: 175
 
 A game studio is designing the data layer for a global online game that expects millions of concurrent players. Player profiles and inventories are read and written by player ID at very high request rates and must scale horizontally with single-digit millisecond latency. A live leaderboard must rank millions of players and refresh in under a millisecond. Purchase transactions require ACID guarantees across multiple related tables. The team wants to use purpose-built managed databases. Which combination of designs will meet these requirements? (Choose THREE)
 
