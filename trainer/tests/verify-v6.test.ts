@@ -141,7 +141,9 @@ test('[v6] shuffled blind solve: an order per question hash + attempt, letters r
   const out = (answer: string[], reason = 'r') => ({ results: [{ id: q1.id, answer, confidence: 'high', ambiguous: false, reason }] });
   const [ok] = verify.verdictsFor([q1], out([letterOf(o0, 'A')], `Phương án ${letterOf(o0, wrong)} chậm hơn; VPC A và bản ghi A không liên quan`), { runId: 'r1', model: 'opus', orders });
   assert.deepEqual([ok.outcome, ok.picked, ok.key, ok.order], ['ok', 'A', 'A', o0.join('')]);
-  assert.equal(ok.reason, `Phương án ${wrong} chậm hơn; VPC A và bản ghi A không liên quan`, 'option references mapped, other letters kept');
+  assert.ok(ok.reason!.startsWith(`Phương án ${wrong} chậm hơn; VPC A và bản ghi A không liên quan`), 'option references mapped, other letters kept');
+  // a bare letter may still be an option reference: the order the solver saw is spelled out (unless it is the bank order)
+  if (o0.join('') !== 'ABCD') assert.match(ok.reason!, /\(model thấy: A=[A-D], B=[A-D], C=[A-D], D=[A-D]\)$/);
   const [miss] = verify.verdictsFor([q1], out([letterOf(o0, wrong)]), { runId: 'r1', model: 'opus', orders });
   assert.deepEqual([miss.outcome, miss.picked, miss.key], ['mismatch', wrong, 'A']);
   assert.equal(verify.verdictsFor([q1], out(['E']), { runId: 'r1', orders })[0].outcome, 'error', 'a letter past the shown options is no answer');
@@ -163,11 +165,13 @@ test('[v6] shuffled blind solve: an order per question hash + attempt, letters r
   assert.deepEqual([back.picked, back.key, back.order], [wrong, 'A', o0.join('')]);
   assert.equal(verify.parseVerdicts(line.replace(/"order":"[A-H]+"/, '"order":"ZZ"'))[0].order, undefined, 'a malformed order is dropped');
 
-  // option references written in shown letters → bank letters (lists too); bare letters are left alone
+  // option references written in shown letters → bank letters (lists too); bare letters are left alone but the shown order
+  // is spelled out after the reason (a bare "B" may still mean an option)
   const ord = ['C', 'A', 'D', 'B']; // shown A = C, B = A, C = D, D = B
   assert.equal(verify.remapLetterRefs('Phương án B và D cùng đúng; đáp án C sai, option A thiếu HA, lựa chọn B/C, choices A, D', ord), 'Phương án A và B cùng đúng; đáp án D sai, option C thiếu HA, lựa chọn A/D, choices C, B');
   const bare = 'VPC A peering với VPC B; bản ghi A alias trỏ tới ALB; Phương ánh sáng';
-  assert.equal(verify.remapLetterRefs(bare, ord), bare);
+  assert.equal(verify.remapLetterRefs(bare, ord), `${bare} (model thấy: A=C, B=A, C=D, D=B)`);
+  assert.equal(verify.remapLetterRefs('Read replicas không có failover tự động', ord), 'Read replicas không có failover tự động');
 });
 
 // ── choices-only cue probe: orders, prompt, outcome, ledger line ───────────

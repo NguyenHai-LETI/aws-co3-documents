@@ -1738,7 +1738,9 @@ export class CoachRunner extends EventEmitter {
       });
     };
     const build = (o: Record<string, unknown> | undefined) => dedupe((Array.isArray(o?.questions) ? (o!.questions as unknown[]) : []).slice(0, MAX_NEW_QUESTIONS).map((raw, i) => check(raw, plan.idOf(i))));
-    const failuresOf = (es: Entry[]): ItemFailure[] => es.filter((e) => e.errors.length).map((e) => ({ id: e.id, errors: e.errors, label: stemLabel(e.raw), warnings: examSpecWarnings(e.warnings) }));
+    // [v6] a twin keeps its original's shape (TWINS.md): no "make the stem / options longer" nudges for twins
+    const specWarnings = (w: string[]) => examSpecWarnings(w).filter((x) => task !== 'twins' || !/\[(stem-short|options-bare)\]$/.test(x));
+    const failuresOf = (es: Entry[]): ItemFailure[] => es.filter((e) => e.errors.length).map((e) => ({ id: e.id, errors: e.errors, label: stemLabel(e.raw), warnings: specWarnings(e.warnings) }));
     let entries = build(first);
     let fails = entries.length ? failuresOf(entries) : [{ id: '(tất cả)', errors: ['không có câu hỏi nào trong JSON (`questions` rỗng hoặc thiếu)'] }];
     emit('tool', `Kiểm tra JSON: ${entries.length - failuresOf(entries).length}/${entries.length} câu hợp lệ${fails.length ? ` · ${fails.length} bị từ chối` : ''}`);
@@ -2196,6 +2198,7 @@ export class CoachRunner extends EventEmitter {
         const out = structuredOutput(r.result);
         if (!out || r.error || r.result?.is_error) {
           emit('stderr', `🎯 Lần ${run} · lượt ${i + 1}/${batches.length}: không có kết quả JSON${r.error ? ` (${r.error})` : ''} — ${batch.length} câu chưa dò xong.`);
+          if (r.error === 'timeout') late = true; // [v6] cut off mid-call: these questions are "remaining", not errors
           continue;
         }
         const got = probeAnswers(items, out);

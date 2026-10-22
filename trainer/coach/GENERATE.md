@@ -56,7 +56,7 @@ trong ngân hàng câu hỏi để người học luyện ngay trong app.
    - front matter: `pack: doc-<slug>` (kebab-case, duy nhất), `title`, `exam: SAA-C03`, `origin: doc`,
      `created`, `generated_by: <run_id>`, `source: <danh sách file nguồn>`.
    - id câu: `doc-<slug>-<nn>` (01, 02, …).
-   - mỗi câu đủ metadata: `domain, task, topic, services, tags, difficulty, time, concept, refs, hint`, `skills`
+   - mỗi câu đủ metadata: `domain, task, topic, services, tags, difficulty, time, concept, refs, hint`, `created` (ngày hôm nay — lint chuẩn đề §6b chỉ đọc `created` của từng câu, không đọc front matter), `skills`
      (1–3 mục đề cương câu kiểm tra; lượt có danh sách `skills` → **mỗi câu ít nhất một mục trong danh sách**, chia đều ≥ 1 câu/mục —
      app từ chối câu không ghi mục nào của lượt)
      (`task` = task statement exam guide **cùng domain**; `refs` = file nguồn + anchor nếu có;

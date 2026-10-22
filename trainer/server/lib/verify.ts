@@ -626,7 +626,12 @@ const OPTION_REF = /((?:[Pp]hương án|[Ll]ựa chọn|[Đđ]áp án|[Oo]ptions
  * letters stay as written — "VPC A", "bản ghi A" are no option references; the prompt asks for options by content.
  */
 export function remapLetterRefs(text: string, order: readonly string[]): string {
-  return text.replace(OPTION_REF, (_m, word: string, list: string) => word + list.replace(/[A-H]/g, (l) => order[LETTERS.indexOf(l)] ?? l));
+  const out = text.replace(OPTION_REF, (_m, word: string, list: string) => word + list.replace(/[A-H]/g, (l) => order[LETTERS.indexOf(l)] ?? l));
+  // a bare letter of the shown range may still be an option reference ("Chọn B vì…", "(B) đúng hơn (C)"): spell out what
+  // the solver saw so nobody (review queue, ENRICH batch) reads it as a bank letter
+  const shown = new RegExp(`(?<![\\p{L}\\p{N}])[${LETTERS.slice(0, order.length)}](?![\\p{L}\\p{N}])`, 'u');
+  const identity = order.every((k, i) => k === LETTERS[i]);
+  return !identity && shown.test(text.replace(OPTION_REF, '')) ? `${out} (model thấy: ${order.map((k, i) => `${LETTERS[i]}=${k}`).join(', ')})` : out;
 }
 
 // ── the verifier call ───────────────────────────────────────────────────────

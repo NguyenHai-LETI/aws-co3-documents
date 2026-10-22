@@ -14,6 +14,7 @@ import { localDateKey } from './time.ts';
 import { sealedIds } from './sealed.ts';
 import { guideCoverage, loadExamGuide } from './exam-guide.ts';
 import { detectServices } from './classify.ts';
+import { outOfScopeSet } from './taxonomy.ts';
 import { questionTier } from '../../shared/tier.ts';
 import type { DomainId, GuideTaskCoverage, Question, Taxonomy, Tier } from '../../shared/types.ts';
 
@@ -298,7 +299,9 @@ export function computeCoverage(bank: BankState, today: string = localDateKey(ne
   for (const q of active) for (const s of q.services) perService.set(s, (perService.get(s) ?? 0) + 1);
   const none: Record<string, string[]> = {};
   const thin: { name: string; count: number }[] = [];
+  const outOfScope = outOfScopeSet(tax); // [v6] out / legacy services are not gaps to fill
   for (const [name, def] of Object.entries(tax.services)) {
+    if (outOfScope.has(name)) continue;
     const n = perService.get(name) ?? 0;
     if (!n) (none[def.topic] ??= []).push(name);
     else if (n <= THIN_SERVICE) thin.push({ name, count: n });
