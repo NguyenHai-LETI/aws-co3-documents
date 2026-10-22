@@ -180,6 +180,7 @@ export interface SelectionFilters {
   tags?: string[];
   tasks?: string[];
   requirements?: string[]; // Question.requirements categories
+  tiers?: Tier[]; // [v6] Question.tier (A exam-grade · B short scenario · C drill)
   search?: string;
 }
 
