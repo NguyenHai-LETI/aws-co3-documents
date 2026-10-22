@@ -323,33 +323,33 @@ Docs: https://docs.aws.amazon.com/fsx/latest/WindowsGuide/high-availability-mult
 - domain: resilient
 - task: 2.2
 - topic: database
-- services: ElastiCache, EC2 Auto Scaling, ALB, S3, EBS
+- services: ElastiCache, EC2 Auto Scaling, ALB
 - tags: redis-vs-memcached, multi-az, high-availability
 - difficulty: medium
+- time: 110
 - skills: 2.2.k5, 2.2.s4
-- concept: A stateless web tier keeps session state in a Multi-AZ ElastiCache replication group instead of instance memory with sticky sessions
+- concept: An ElastiCache (Redis OSS) replication group with replicas in other Availability Zones and Multi-AZ automatic failover keeps session data through a node or AZ failure; Memcached does not replicate, backups need a manual restore, and a bigger node is still one node
 - refs: 03-database-services.md, C-kien-truc-web-app.md
-- hint: Giỏ hàng nằm trong RAM từng instance nên mất khi scale-in hoặc lỗi — đưa trạng thái ra một kho dùng chung, nhanh và chịu lỗi AZ.
+- hint: Kho phiên chỉ có một node ở một AZ — engine và cấu hình nào vừa giữ bản sao dữ liệu ở AZ khác vừa tự chuyển khi node chính hỏng?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
-An online ticketing site runs a stateful PHP application on EC2 instances behind an Application Load Balancer with sticky sessions enabled. Sessions are stored in each instance's memory. During Auto Scaling scale-in events and instance failures, customers lose their shopping carts and are signed out. The company wants carts to survive instance failures and scale-in with the lowest latency and minimal code changes; the framework supports external session handlers. Which solution meets these requirements?
+An online ticketing site runs a PHP application on Amazon EC2 instances in an Auto Scaling group behind an Application Load Balancer. The web tier is stateless: shopping carts and sign-in sessions are stored in an Amazon ElastiCache (Redis OSS) cluster that has a single node in one Availability Zone. Last month that node failed, and every customer was signed out and lost their cart until a new node was created. The company wants the session store to survive the loss of a node or an Availability Zone without manual recovery and to keep sub-millisecond reads, and it can change only the application's configuration. Which solution will meet these requirements with the LEAST operational overhead?
 
-- A. Increase the sticky session duration on the load balancer and turn on scale-in protection for the Auto Scaling group so that instances are not terminated
-- B. Store each session as an object in Amazon S3 through the framework's session handler and have the application read and write it on every request
-- C. Store the sessions on an Amazon EBS volume attached to each instance, point the session handler at it, and snapshot the volumes every five minutes
-- D. Store the sessions in an Amazon ElastiCache replication group with Multi-AZ automatic failover and use the framework's session handler
+- A. Replace the cluster with an ElastiCache (Memcached) cluster that has three nodes in different Availability Zones and spread the session keys across the nodes
+- B. Enable daily automatic backups on the existing single-node cluster and restore the newest backup to a new node whenever the current node fails
+- C. Move the cluster to a larger node type with more memory and network capacity so that the single node is less likely to fail during peak hours
+- D. Add read replicas in two other Availability Zones, enable Multi-AZ with automatic failover, and point the session handler at the primary endpoint
 
 **Answer:** D
 
-**Explanation:** Moving session state out of the instances makes the web tier stateless; an ElastiCache replication group gives in-memory speed, survives web instance failures and scale-in, and with Multi-AZ automatic failover protects the cache itself; framework session handlers need only configuration.
-- Longer stickiness with scale-in protection: stickiness still ties a user to one instance, and protection does not help when it fails (dùng sai tính năng).
-- Per-request session objects in S3: durable, but every request pays object-store latency (vi phạm ràng buộc).
-- Instance-attached EBS with snapshots: volumes go with the instance and snapshots lag minutes (đặt sai chỗ).
+**Explanation:** A Redis OSS replication group with replicas in other Availability Zones and Multi-AZ enabled promotes a replica automatically when the primary node or its zone fails, and the primary endpoint keeps its DNS name, so only the session handler's configuration changes.
+- Memcached across three zones: nodes do not replicate, so a failed node takes its share of the sessions with it (dùng sai tính năng).
+- Daily backups with a manual restore: loses up to a day of sessions and needs work during each failure (vi phạm ràng buộc).
+- Larger node type: still one node in one zone, so a node or zone failure still signs everyone out (giải bài toán khác).
 Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html
-> 🇻🇳 Web tier phải stateless: session ra ElastiCache (Multi-AZ) thay vì RAM instance + sticky session.
+> 🇻🇳 Kho session phải chịu lỗi node/AZ → ElastiCache (Redis OSS/Valkey) replication group có replica ở AZ khác + Multi-AZ auto failover; Memcached không sao chép dữ liệu.
 
 ---
 

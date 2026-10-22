@@ -18,6 +18,7 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.3"
 - services: Cost Explorer, AWS Budgets, Organizations, Aurora, DynamoDB
 - tags: tagging, cost-allocation-tags, multi-account-billing
 - difficulty: medium
+- time: 135
 - skills: 4.3.k1, 4.3.k2
 - concept: Cost allocation tags must be activated from the management account, and AWS Budgets filtered by the tag alerts on forecasted spend
 - refs: 06-management-governance.md
@@ -25,9 +26,8 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.3"
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
-A software company runs Amazon Aurora and Amazon DynamoDB databases for 30 applications across 14 AWS accounts in AWS Organizations. Finance wants to see database cost per application in AWS Cost Explorer and to receive an email when the forecasted database spend of an application is about to exceed its monthly limit. Engineers already tag every database resource with an application tag. Which TWO actions should a solutions architect take? (Choose TWO)
+A software company runs Amazon Aurora and Amazon DynamoDB databases for 30 applications across 14 AWS accounts in AWS Organizations. Finance wants to see database cost per application in AWS Cost Explorer and to receive an email when the forecasted database spend of an application is about to exceed its monthly limit. Engineers already tag every database resource with an application tag. Which TWO actions will meet these requirements? (Choose TWO)
 
 - A. Activate the application tag separately in the billing console of each of the 14 member accounts.
 - B. Activate the application tag as a user-defined cost allocation tag from the management account.
@@ -223,6 +223,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.h
 - services: RDS, S3, Athena, AWS Backup
 - tags: automated-backups, pitr, snapshots, data-retention
 - difficulty: hard
+- time: 145
 - skills: 4.3.s1, 4.3.k4
 - concept: For long retention, keep PITR for the short window and export month-end snapshots to S3 in Parquet with a Glacier lifecycle instead of keeping many snapshots
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -230,9 +231,8 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.h
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
-A company runs 50 Amazon RDS for PostgreSQL production databases. It keeps point-in-time recovery for 14 days and also keeps a daily manual snapshot of every database for seven years to satisfy an audit rule. Snapshot storage has become the largest part of the database bill. Auditors run SQL queries against old data only a few times a year and accept a one-day delay, and data older than 14 days is never restored into a running database. Which solution will meet these requirements MOST cost-effectively?
+A company runs 50 Amazon RDS for PostgreSQL production databases. It keeps point-in-time recovery for 14 days and also keeps a daily manual snapshot of every database for seven years, although the audit rule requires only the state of each database on the last day of every month to be kept for seven years. Snapshot storage has become the largest part of the database bill. Auditors run SQL queries against old data only a few times a year and accept a one-day delay, and data older than 14 days is never restored into a running database. Which solution will meet these requirements MOST cost-effectively?
 
 - A. Raise the automated backup retention to the maximum number of days allowed and delete the daily manual snapshots after making that change to each database.
 - B. Keep 14 days of automated backups, export month-end snapshots to S3 as Parquet with a Glacier Deep Archive lifecycle rule, and delete the rest.
@@ -241,12 +241,12 @@ A company runs 50 Amazon RDS for PostgreSQL production databases. It keeps point
 
 **Answer:** B
 
-**Explanation:** Automated backups cover the 14-day recovery need; exported Parquet files in S3 Glacier Deep Archive cost far less than snapshots and can be queried with Athena after a restore, and the other snapshots can be deleted.
+**Explanation:** Automated backups cover the 14-day recovery need; the audit rule needs only end-of-month data, and snapshot exports to S3 as Parquet under a Glacier Deep Archive lifecycle rule cost far less than seven years of daily snapshots and can be queried with Athena after a restore within a day, so the other manual snapshots can be deleted.
 - Maximum automated retention: the setting tops out at 35 days, far below seven years (vi phạm ràng buộc)
 - Daily snapshots plus a second Region: more snapshots and more storage (tốn chi phí hơn)
-- AWS Backup cold storage for RDS: not supported for RDS snapshots (cấu hình không tồn tại)
+- AWS Backup cold storage for RDS: lifecycle to cold storage is not supported for RDS snapshots (cấu hình không tồn tại)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ExportSnapshot.html
-> 🇻🇳 PITR cho 14 ngày; lưu 7 năm → export snapshot cuối tháng sang S3 (Parquet) + Glacier Deep Archive, truy vấn bằng Athena.
+> 🇻🇳 PITR cho 14 ngày; audit chỉ cần dữ liệu cuối tháng 7 năm → export snapshot cuối tháng sang S3 (Parquet) + Glacier Deep Archive, truy vấn bằng Athena.
 
 ---
 
@@ -396,6 +396,7 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand
 - services: Aurora, RDS
 - tags: aurora-io-optimized, savings-plans, rds-extended-support
 - difficulty: hard
+- time: 170
 - skills: 4.3.s3, 4.3.k9
 - concept: Aurora I/O-Optimized for I/O-heavy clusters, upgrading past RDS Extended Support, and Database Savings Plans for flexible steady-state commitments
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -403,9 +404,8 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 170
 
-A SaaS company runs 30 Amazon Aurora MySQL provisioned clusters and 20 Amazon RDS for MySQL 5.7 instances in production. A cost review found that read and write I/O charges are about 40% of the Aurora spend, that the RDS for MySQL 5.7 instances show a monthly Extended Support charge, and that instance usage has been steady for two years. The company will commit for one year with no upfront payment but must stay free to change engines, instance families, and Regions. Which THREE actions will reduce database cost the MOST? (Choose THREE)
+A SaaS company runs 30 Amazon Aurora MySQL provisioned clusters and 20 Amazon RDS for MySQL 5.7 instances in production. A cost review found that read and write I/O charges are about 40% of the Aurora spend, that the RDS for MySQL 5.7 instances show a monthly Extended Support charge, and that instance usage has been steady for two years. The company will commit for one year with no upfront payment but must stay free to change engines, instance families, and Regions. Which THREE actions will meet these requirements and reduce database cost the MOST? (Choose THREE)
 
 - A. Change the Aurora clusters to the Aurora I/O-Optimized configuration so that read and write I/O are no longer billed.
 - B. Upgrade the RDS for MySQL 5.7 instances to MySQL 8.0 and stop at that version to end the database Extended Support charge.

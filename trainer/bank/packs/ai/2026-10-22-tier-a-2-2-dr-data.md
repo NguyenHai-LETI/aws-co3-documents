@@ -18,15 +18,15 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.2"
 - services: DynamoDB, EC2 Auto Scaling, ALB, Route 53, AWS Backup, CloudFormation
 - tags: dr-pilot-light, rto-rpo, dynamodb-global-tables, multi-region
 - difficulty: medium
+- time: 140
 - skills: 2.2.k4, 2.2.s6
+- family: dr-strategy-qualifier
 - concept: Pilot light is the cheapest DR strategy that meets an RPO of seconds when the RTO allows an hour of downtime
 - refs: A-nen-tang-kien-truc.md, P-architecture-diagrams.md
-- hint: RPO vài giây loại sao lưu theo giờ; RTO một giờ cho phép chưa bật phần tính toán — chọn mức rẻ nhất vẫn đạt cả hai.
-- family: dr-strategy-qualifier
+- hint: RPO vài giây loại được phương án nào? Với RTO một giờ, thành phần nào thật sự phải chạy sẵn ở Region DR, và tiền nằm ở đâu?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A ride-sharing company runs its trip-booking API in us-east-1 on an Auto Scaling group of Amazon EC2 instances fronted by an Application Load Balancer, with trip data in an Amazon DynamoDB table. Client traffic is routed by Amazon Route 53. The company is designing disaster recovery in us-west-2 in case us-east-1 becomes unavailable. The business accepts up to one hour of downtime but only a few seconds of data loss. The application tier is stateless, and its AMIs and infrastructure are defined in AWS CloudFormation templates. Which solution meets these requirements MOST cost-effectively?
 
@@ -292,9 +292,10 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html
 - domain: resilient
 - task: 2.2
 - topic: resilience
-- services: AWS Backup, Organizations, EBS, RDS, EFS
+- services: AWS Backup, Organizations, EBS, Aurora, EFS
 - tags: automated-backups, multi-region, cross-account-access, snapshots
 - difficulty: hard
+- time: 180
 - skills: 2.2.s5, 2.2.s1
 - concept: AWS Backup Organizations policies, cross-account backup, and a logically air-gapped vault protect backups from a compromised account
 - refs: 13-other-services.md, B-bao-mat-compliance.md
@@ -302,9 +303,8 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 180
 
-A retailer runs workloads in 25 AWS accounts managed with AWS Organizations. Amazon EBS volumes, Amazon RDS databases, and Amazon EFS file systems must be backed up daily and retained for 90 days. After a ransomware scare, the security team requires a copy of every backup in a second Region and in a separate backup account, stored in a vault that attackers who compromise a workload account cannot delete. The same policy must apply automatically to new accounts. Which combination of steps will meet these requirements? (Choose THREE)
+A retailer runs workloads in 25 AWS accounts managed with AWS Organizations. Amazon EBS volumes, Amazon Aurora DB clusters, and Amazon EFS file systems must be backed up daily and retained for 90 days; all of them are encrypted with customer managed AWS KMS keys. After a ransomware scare, the security team requires a copy of every backup in a second Region and in a separate backup account, stored in a vault that attackers who compromise a workload account cannot delete. The same policy must apply automatically to new accounts. Which combination of steps will meet these requirements? (Choose THREE)
 
 - A. Create an AWS Organizations backup policy that defines a daily plan with 90-day retention and a copy action, and attach it to the organization root
 - B. Configure a local backup plan in each workload account of the organization and copy the recovery points to the backup account manually with the AWS CLI after each daily job
@@ -315,12 +315,12 @@ A retailer runs workloads in 25 AWS accounts managed with AWS Organizations. Ama
 
 **Answer:** A, C, F
 
-**Explanation:** An Organizations backup policy applies the plan and copy action to every account, including new ones; cross-account backup lets copies leave the account, and a logically air-gapped vault is locked, so a compromised workload account cannot delete its recovery points.
+**Explanation:** An Organizations backup policy applies the daily plan, retention, and copy action to every account, including new ones; cross-account backup lets copies leave the workload accounts, and a logically air-gapped vault is locked in compliance mode, so a compromised workload account cannot delete those recovery points.
 - Local plans with manual CLI copies: no automatic coverage of new accounts and more work (tốn vận hành hơn).
-- S3 replication and Object Lock: these protect S3 objects, not EBS, RDS, or EFS recovery points (giải bài toán khác).
+- S3 replication and Object Lock: these protect S3 objects, not EBS, Aurora, or EFS recovery points (giải bài toán khác).
 - Standard vault with an IAM deny: an administrator of a compromised account can remove it (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html
-> 🇻🇳 Backup chống ransomware đa tài khoản: Organizations backup policy + bật cross-account + vault air-gapped ở tài khoản backup, khác Region.
+> 🇻🇳 Backup chống ransomware đa tài khoản: Organizations backup policy + bật cross-account + vault air-gapped ở tài khoản backup, khác Region (Aurora/EBS/EFS chép vào được; RDS DB instance hiện chưa hỗ trợ loại vault này).
 
 ---
 

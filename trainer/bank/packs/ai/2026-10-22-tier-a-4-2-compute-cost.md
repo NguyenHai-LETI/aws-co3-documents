@@ -156,6 +156,7 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/introducti
 - services: EC2 Auto Scaling, EC2, ALB
 - tags: spot-instances, launch-template, high-availability
 - difficulty: hard
+- time: 140
 - skills: 4.2.k4, 4.2.k9
 - concept: A mixed instances policy with an On-Demand base, diversified Spot, price-capacity-optimized allocation and Capacity Rebalancing cuts cost while keeping availability
 - refs: 01-compute-services.md, A-nen-tang-kien-truc.md
@@ -163,9 +164,8 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/introducti
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
-An e-commerce company runs a stateless web tier on an Amazon EC2 Auto Scaling group behind an Application Load Balancer. All instances are On-Demand instances of a single type across three Availability Zones, and traffic peaks sharply during campaigns. The company wants to reduce compute cost while keeping the site available if Spot capacity in one capacity pool disappears. Which Auto Scaling configuration meets this goal MOST cost-effectively?
+An e-commerce company runs a stateless web tier on an Amazon EC2 Auto Scaling group behind an Application Load Balancer. All instances are On-Demand instances of a single type across three Availability Zones, and traffic peaks sharply during campaigns. The company wants to reduce compute cost, but a minimum amount of capacity must always run on instances that Amazon EC2 cannot reclaim, and the site must stay available if Spot capacity in one capacity pool disappears. Which Auto Scaling configuration will meet these requirements MOST cost-effectively?
 
 - A. Use a mixed instances policy that runs the entire group on Spot Instances across several instance types and three Availability Zones, with no On-Demand base capacity
 - B. Keep On-Demand Instances for the whole group and buy Standard Reserved Instances sized for the campaign peak capacity in each Availability Zone
@@ -174,10 +174,10 @@ An e-commerce company runs a stateless web tier on an Amazon EC2 Auto Scaling gr
 
 **Answer:** C
 
-**Explanation:** The On-Demand base keeps a floor of capacity, diversification spreads Spot across many pools, price-capacity-optimized picks pools that are cheap and unlikely to be interrupted, and Capacity Rebalancing replaces at-risk instances early.
-- Spot only with no base: no floor if Spot capacity shrinks (vi phạm ràng buộc).
-- Reserved Instances for the peak: paying for peak capacity all year (tốn chi phí hơn).
-- One instance type with lowest-price: concentrates capacity in one pool, raising interruption risk (vi phạm ràng buộc).
+**Explanation:** The On-Demand base keeps a floor of capacity that EC2 cannot reclaim, diversification spreads Spot across many pools, price-capacity-optimized picks pools that are cheap and unlikely to be interrupted, and Capacity Rebalancing replaces at-risk instances early.
+- Spot only with no base: every instance can be reclaimed, so there is no guaranteed floor (vi phạm ràng buộc "capacity that Amazon EC2 cannot reclaim")
+- Reserved Instances for the peak: paying for peak capacity all year (tốn chi phí hơn)
+- One instance type with lowest-price: concentrates Spot capacity in the cheapest pools, raising interruption risk (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.html
 > 🇻🇳 Spot an toàn: nền On-Demand nhỏ + Spot đa dạng instance/AZ + price-capacity-optimized + Capacity Rebalancing.
 
@@ -362,6 +362,7 @@ Docs: https://aws.amazon.com/ec2/graviton/
 - services: Lambda, Fargate, ALB
 - tags: serverless-cost, lambda-concurrency
 - difficulty: medium
+- time: 125
 - skills: 4.2.s3, 4.2.k8
 - concept: Idle-most-of-the-day bursty stateless work is cheapest on Lambda with on-demand concurrency; provisioned or always-on capacity pays for idle time
 - refs: 01-compute-services.md, L-quyet-dinh-nhanh.md
@@ -369,9 +370,8 @@ Docs: https://aws.amazon.com/ec2/graviton/
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
-A property-management company runs a service that generates a PDF statement whenever a tenant asks for one. The service is idle for most of the day and then receives bursts of hundreds of requests within a minute. Each request is stateless, finishes in under 10 seconds, uses 1 GB of memory, and tolerates a short startup delay. The service runs on Amazon ECS with AWS Fargate behind an Application Load Balancer, with a minimum of three tasks to absorb bursts. Which solution will reduce compute cost MOST cost-effectively?
+A property-management company runs a service that generates a PDF statement whenever a tenant asks for one, stores it in Amazon S3, and returns a download link. The service is idle for most of the day and then receives bursts of hundreds of requests within a minute. Each request is stateless, finishes in under 10 seconds, uses 1 GB of memory, and tolerates a short startup delay. The service runs on Amazon ECS with AWS Fargate behind an Application Load Balancer, with a minimum of three tasks to absorb bursts. Which solution will meet these requirements MOST cost-effectively?
 
 - A. Keep the Fargate service behind the load balancer and buy a Compute Savings Plan that covers the three-task baseline
 - B. Package the code as a Lambda function and register it as a target of the load balancer with default on-demand concurrency
@@ -380,12 +380,12 @@ A property-management company runs a service that generates a PDF statement when
 
 **Answer:** B
 
-**Explanation:** Lambda bills per request and duration, scales out instantly for bursts, and costs nothing while idle, which suits short stateless requests that tolerate a cold start.
-- Fargate with a Savings Plan: still pays for three always-on tasks and their commitment (tốn chi phí hơn).
-- EC2 Auto Scaling with Reserved Instances: pays for idle baseline instances and adds management (tốn vận hành hơn).
-- Provisioned concurrency for the largest burst: pays for idle provisioned capacity (tốn chi phí hơn).
-Docs: https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html
-> 🇻🇳 Tải thưa, bùng nổ ngắn, request ngắn và stateless → Lambda (trả theo lần chạy, về 0 khi rảnh), không dùng provisioned concurrency.
+**Explanation:** Lambda bills per request and duration, scales out quickly for bursts, and costs nothing while idle, which suits short stateless requests that tolerate a cold start; an Application Load Balancer can invoke a Lambda function as a target, so clients keep the same endpoint.
+- Fargate with a Savings Plan: still pays for three always-on tasks and their commitment (tốn chi phí hơn)
+- EC2 Auto Scaling with Reserved Instances: pays for idle baseline instances and adds management (tốn chi phí hơn)
+- Provisioned concurrency for the largest burst: pays for idle provisioned capacity (tốn chi phí hơn)
+Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/lambda-functions.html
+> 🇻🇳 Tải thưa, bùng nổ ngắn, request ngắn và stateless → Lambda làm target của ALB (trả theo lần chạy, về 0 khi rảnh), không dùng provisioned concurrency.
 
 ---
 
@@ -431,6 +431,7 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-sch
 - services: EC2 Auto Scaling, EC2
 - tags: asg-warm-pool, ec2-hibernation, scaling-policies
 - difficulty: hard
+- time: 130
 - skills: 4.2.k9, 4.2.s2
 - concept: A Hibernated warm pool keeps RAM contents on EBS so slow-to-initialize instances enter service fast while compute is not billed
 - refs: 01-compute-services.md
@@ -438,9 +439,8 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-sch
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
-A trading analytics company runs an in-memory risk engine on an Amazon EC2 Auto Scaling group of On-Demand memory-optimized instances. Each instance takes about 12 minutes to load reference data into memory before it can serve requests, so the company keeps extra instances running around the clock to absorb spikes triggered by breaking news. The spikes cannot be predicted. The company wants to cut idle compute cost while still putting new capacity in service within a couple of minutes. Which solution will meet these requirements MOST cost-effectively?
+A trading analytics company runs an in-memory risk engine on an Amazon EC2 Auto Scaling group of On-Demand memory-optimized Linux instances with 64 GiB of memory each. Each instance takes about 12 minutes to load reference data into memory before it can serve requests, so the company keeps extra instances running around the clock to absorb spikes triggered by breaking news. The spikes cannot be predicted. The company wants to cut idle compute cost while still putting new capacity in service within a couple of minutes. Which solution will meet these requirements MOST cost-effectively?
 
 - A. Add a warm pool with instances in the Stopped state and let the group draw from the pool during scale-out events
 - B. Add a warm pool with instances in the Running state and keep them ready for scale-out events at any time
@@ -449,9 +449,9 @@ A trading analytics company runs an in-memory risk engine on an Amazon EC2 Auto 
 
 **Answer:** C
 
-**Explanation:** Hibernation writes RAM to the encrypted EBS root volume, so a resumed instance has its data loaded again within minutes, while a hibernated instance incurs charges only for EBS storage and Elastic IPs, not compute.
-- Stopped state: instances boot fresh and must reload the 12 minutes of data (vi phạm ràng buộc).
-- Running state: pays full compute for idle instances, as before (tốn chi phí hơn).
-- Scheduled scaling: the spikes are not predictable (vi phạm ràng buộc).
+**Explanation:** Hibernation writes RAM to the encrypted EBS root volume, so a resumed instance has its reference data in memory again within minutes, while a hibernated instance incurs charges only for EBS storage and Elastic IPs, not compute. The 64 GiB instances are within the hibernation RAM limit for Linux (less than 150 GiB).
+- Stopped state: instances boot fresh and must reload the 12 minutes of data (vi phạm ràng buộc)
+- Running state: pays full compute for idle instances, as before (tốn chi phí hơn)
+- Scheduled scaling: the spikes are not predictable (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-warm-pools.html
-> 🇻🇳 Khởi tạo chậm do nạp RAM, spike không đoán trước → warm pool trạng thái Hibernated (giữ RAM trên EBS, không tính tiền compute).
+> 🇻🇳 Khởi tạo chậm do nạp RAM, spike không đoán trước → warm pool trạng thái Hibernated (giữ RAM trên EBS, không tính tiền compute; RAM < 150 GiB).

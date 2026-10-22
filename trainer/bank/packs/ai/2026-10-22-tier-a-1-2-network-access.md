@@ -88,14 +88,14 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html
 - services: VPC Endpoint, S3
 - tags: s3-block-public-access, iam-policies
 - difficulty: hard
+- time: 135
 - skills: 1.2.k2, 1.2.k3
 - concept: A gateway endpoint policy limits which buckets a VPC can reach (exfiltration control); a bucket policy with aws:SourceVpce limits who can reach a bucket
 - refs: 04-networking-services.md
-- hint: Cần chặn đường ra tới bucket của người khác, không phải chặn người lạ vào bucket của mình — chính sách nào gắn vào endpoint?
+- hint: Cần chặn đường ra tới bucket của người khác, không phải chặn người lạ vào bucket của mình — kiểm soát phải đặt ở phía nào của kết nối?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A financial firm runs data-processing instances in private subnets. The instances read and write the firm's Amazon S3 buckets through a gateway VPC endpoint. An audit found that a compromised instance could copy data through the same endpoint to an S3 bucket that belongs to an unknown external account. The firm must close this exfiltration path, keep S3 traffic on the AWS network through the endpoint, and avoid adding proxy servers. Which solution will meet these requirements?
 
@@ -329,15 +329,15 @@ Docs: https://docs.aws.amazon.com/directconnect/latest/UserGuide/encryption-in-t
 - services: Site-to-Site VPN, Direct Connect, Client VPN
 - tags: dx-resiliency
 - difficulty: medium
+- time: 110
 - skills: 1.2.s4
+- family: hybrid-encrypted-link
 - concept: Private IP VPN over a Direct Connect transit virtual interface gives IPsec encryption and an end-to-end private path
 - refs: 04-networking-services.md
 - hint: Mã hoá IPsec mà vẫn không đi qua internet và không dùng IP public — kết hợp nào cho đường riêng đã mã hoá?
 - status: draft
-- family: hybrid-encrypted-link
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A pharmaceutical company must connect its data center to a VPC to exchange clinical-study reports that total a few gigabytes per day. Compliance requires that all traffic between the data center and AWS be encrypted in transit. The company has no existing connectivity to AWS, and its edge routers support IPsec. Which solution will meet these requirements MOST securely?
 
@@ -351,6 +351,6 @@ A pharmaceutical company must connect its data center to a VPC to exchange clini
 **Explanation:** Private IP VPN over a Direct Connect transit virtual interface encrypts traffic with IPsec and keeps it on a private path with no public IP addresses or internet exposure.
 - Client VPN on data center servers: per-client tool that does not connect a site (giải bài toán khác)
 - Direct Connect with a private virtual interface: private path but no encryption, which compliance requires (vi phạm ràng buộc)
-- Site-to-Site VPN over the internet: encrypted, but the tunnels cross the public internet and are more exposed (vi phạm ràng buộc)
+- Site-to-Site VPN over the internet: encrypted, but the tunnels use public endpoints across the internet, a less secure path than a private encrypted link (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/vpn/latest/s2svpn/private-ip-dx.html
 > 🇻🇳 Bảo mật nhất = riêng tư + mã hoá: Direct Connect transit VIF + private IP VPN.

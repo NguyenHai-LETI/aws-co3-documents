@@ -85,14 +85,14 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-comparison.html
 - services: NLB, ELB
 - tags: elb-features, cross-zone, data-transfer-cost
 - difficulty: hard
+- time: 140
 - skills: 4.4.k3, 4.4.s3
 - concept: Enabling cross-zone load balancing on an NLB incurs inter-AZ data transfer charges; disabling it keeps traffic within each AZ
 - refs: 04-networking-services.md
-- hint: Chi phí truyền dữ liệu giữa các AZ tăng vì NLB đang bật cross-zone — thiết lập nào giữ lưu lượng trong từng AZ mà không bỏ AZ nào?
+- hint: Client đã chia đều ba AZ — phí truyền dữ liệu giữa AZ phát sinh ở chặng nào của đường đi client → NLB → target?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A gaming company runs a TCP-based matchmaking service behind an internet-facing Network Load Balancer that has cross-zone load balancing enabled. The targets are EC2 instances spread evenly across three Availability Zones by an Auto Scaling group, and clients are distributed evenly across the three zonal addresses of the load balancer. The monthly bill shows significant inter-AZ data transfer charges for the service. The company must keep using all three zones for availability, keep the NLB and the TCP protocol, and avoid code changes. Which solution will reduce the data transfer charges MOST cost-effectively?
 
@@ -118,6 +118,7 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-targe
 - services: Cost and Usage Report, Athena, VPC Flow Logs, NAT Gateway
 - tags: data-transfer-cost, cost-and-usage-report, vpc-flow-logs
 - difficulty: hard
+- time: 170
 - skills: 4.4.s5, 4.4.k2
 - concept: Review network cost with CUR resource-level line items queried in Athena plus VPC Flow Logs to find traffic sources
 - refs: 06-management-governance.md, 04-networking-services.md
@@ -125,7 +126,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-targe
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 170
 
 A company's monthly bill shows a large increase in NAT gateway data processing charges. The company operates NAT gateways in several VPCs across 12 accounts and cannot tell which gateways are responsible or which applications and destinations generate the traffic. The cloud team wants to identify the most expensive NAT gateways and the main sources and destinations of traffic through them before it decides how to optimize, by using managed services and SQL queries. Which combination of actions will meet these requirements with the LEAST operational overhead? (Choose TWO)
 
@@ -140,7 +140,7 @@ A company's monthly bill shows a large increase in NAT gateway data processing c
 **Explanation:** The Cost and Usage Report is the most detailed cost dataset and, with resource IDs, shows the charge per NAT gateway. Flow Logs record the traffic through the gateway interfaces, so Athena queries reveal who sends data and where.
 - Budgets with alerts: say that spending rose, not which gateway or traffic causes it (giải bài toán khác)
 - CloudTrail data events for S3: log S3 object API calls, not network flows (dùng sai tính năng)
-- Compute Optimizer for NAT gateways: gives no recommendations for NAT gateways (dùng sai tính năng)
+- Compute Optimizer: only flags idle, unused NAT gateways; it does not right-size busy ones or show traffic sources (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
 > 🇻🇳 Rà soát chi phí mạng: CUR (kèm resource ID) + Athena cho chi phí theo NAT gateway, VPC Flow Logs cho nguồn/đích lưu lượng.
 ---
@@ -251,14 +251,14 @@ Docs: https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
 - services: Route 53 Resolver, RAM, Route 53
 - tags: hybrid-dns, resolver-endpoints, data-transfer-cost
 - difficulty: hard
+- time: 165
 - skills: 4.4.k7
 - concept: Resolver endpoints are billed per ENI-hour, so centralize one outbound endpoint and share forwarding rules through AWS RAM
 - refs: 04-networking-services.md
-- hint: Mỗi VPC có endpoint Resolver riêng nên tốn phí theo giờ — hãy dùng một endpoint chung và chia sẻ rule cho các VPC khác.
+- hint: Phí Resolver endpoint tính theo ENI-giờ ở từng VPC — làm sao để 40 VPC dùng chung đường chuyển tiếp DNS mà PHZ và tên dịch vụ AWS vẫn như cũ?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 165
 
 A company has 40 VPCs in 40 accounts of one organization. Each VPC has its own Route 53 Resolver outbound endpoint and a forwarding rule for corp.example.com, which resolves on on-premises DNS servers over Direct Connect. The bill shows high Resolver endpoint charges. The company wants to reduce DNS costs while resolution of corp.example.com keeps working from every VPC, private hosted zones and AWS service names keep resolving as they do today, and operational effort stays low. Which combination of steps will meet these requirements? (Choose TWO)
 

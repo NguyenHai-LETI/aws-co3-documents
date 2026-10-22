@@ -87,6 +87,7 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introducti
 - services: Site-to-Site VPN, Transit Gateway, Direct Connect
 - tags: transit-gateway, ecmp, vpn-throughput
 - difficulty: hard
+- time: 135
 - skills: 3.4.k4, 3.4.s2
 - concept: Standard VPN tunnels are limited in throughput; aggregating several VPN connections needs a transit gateway with BGP and ECMP, which a virtual private gateway, static routing or acceleration cannot provide
 - refs: 04-networking-services.md, 14-so-sanh-services.md
@@ -94,7 +95,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introducti
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A company connects its data center to AWS with a Site-to-Site VPN that terminates on a virtual private gateway. A new nightly replication job needs about 4 Gbps of throughput to workloads in VPCs that belong to three accounts, but one VPN connection carries far less than that. A Direct Connect connection will not be ready for several months, and the company's router supports BGP. The company wants the interim connection to carry the load and reach all three VPCs. Which solution will meet these requirements?
 
@@ -105,7 +105,7 @@ A company connects its data center to AWS with a Site-to-Site VPN that terminate
 
 **Answer:** D
 
-**Explanation:** A transit gateway aggregates the bandwidth of several VPN tunnels with ECMP when the connections use dynamic routing, and it connects many VPCs; a standard tunnel carries up to 1.25 Gbps, so two connections with four tunnels cover 4 Gbps.
+**Explanation:** A transit gateway aggregates the bandwidth of several VPN tunnels with ECMP when the connections use dynamic routing, and it connects many VPCs; a standard tunnel carries up to 1.25 Gbps, so two connections with four tunnels cover 4 Gbps. (Transit gateways can also use large-bandwidth tunnels of up to 5 Gbps.)
 - Virtual private gateway: no tunnel aggregation, and one VPC only (đặt sai chỗ)
 - Static routes with ECMP: ECMP is not supported with static routing (cấu hình không tồn tại)
 - Acceleration: improves the network path but leaves each tunnel's throughput limit unchanged (dùng sai tính năng)
@@ -121,6 +121,7 @@ Docs: https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-limits.html
 - services: Local Zones, Outposts, Wavelength, CloudFront, EC2
 - tags: local-zones, resource-placement
 - difficulty: medium
+- time: 110
 - skills: 3.4.s3, 3.4.s1, 3.4.k2
 - concept: To place compute close to users in a metro area without on-premises hardware, extend the VPC to a Local Zone; Outposts needs on-site racks, Wavelength targets 5G mobile users, and CloudFront does not cut interactive session latency
 - refs: 13-other-services.md, 04-networking-services.md
@@ -128,14 +129,13 @@ Docs: https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-limits.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
-A video-production studio in Houston edits high-resolution footage in virtual workstations that run on GPU instances. The nearest AWS Region is more than 20 milliseconds away, and editors report laggy scrubbing. The studio needs single-digit millisecond latency to the workstations. It has no space for on-premises racks, wants to keep using EC2 and the AWS APIs it already uses, and keeps its projects database in the parent Region. Which solution will meet these requirements?
+A video-production studio in Denver edits high-resolution footage in virtual workstations that run on GPU instances. The nearest AWS Region is more than 20 milliseconds away, and editors report laggy scrubbing. The studio needs single-digit millisecond latency to the workstations. It has no space for on-premises racks, wants to keep using EC2 and the AWS APIs it already uses, and keeps its projects database in the parent Region. Which solution will meet these requirements?
 
 - A. Order AWS Outposts racks for the studio's building and run the GPU workstations on them.
 - B. Launch the GPU workstations in a Wavelength Zone so that the editors connect through a carrier's 5G network.
-- C. Extend the VPC to an AWS Local Zone in the Houston area and run the GPU workstations and their EBS volumes there.
-- D. Place the GPU workstations in the Region closest to Houston and put an Amazon CloudFront distribution in front of them.
+- C. Extend the VPC to an AWS Local Zone in the Denver area and run the GPU workstations and their EBS volumes there.
+- D. Place the GPU workstations in the Region closest to Denver and put an Amazon CloudFront distribution in front of them.
 
 **Answer:** C
 

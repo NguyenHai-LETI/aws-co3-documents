@@ -88,15 +88,15 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-managing
 - services: S3
 - tags: s3-lifecycle, s3-versioning, compliance
 - difficulty: hard
+- time: 120
 - skills: 1.3.k3, 1.3.s6
+- family: s3-retention-and-deletion
 - concept: In a versioned bucket a lifecycle expiration only adds a delete marker; permanent deletion also needs noncurrent version expiration
 - refs: 02-storage-services.md
 - hint: Trong bucket bật versioning, hết hạn bản hiện tại chỉ tạo delete marker — bản cũ vẫn còn nếu không có quy tắc cho nó.
-- family: s3-retention-and-deletion
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A mortgage lender stores signed loan documents in a new Amazon S3 bucket that has versioning enabled. Documents are uploaded once under unique keys and are never overwritten. Company policy sets a seven-year life for each document. Each document must be deleted automatically seven years after upload, and no protection is required before then. Which solution will meet this requirement with the LEAST operational overhead?
 
@@ -108,7 +108,8 @@ A mortgage lender stores signed loan documents in a new Amazon S3 bucket that ha
 **Answer:** C
 
 **Explanation:** In a versioned bucket, expiring the current version only adds a delete marker. Adding noncurrent version expiration permanently removes the original version, so the document is actually deleted with no manual work.
-- Object Lock in either mode: only prevents deletion until retention ends; nothing deletes the data afterwards (giải bài toán khác).
+- Object Lock in compliance mode: only prevents deletion until retention ends; nothing deletes the data afterwards (giải bài toán khác).
+- Object Lock in governance mode with a bypass permission: also only blocks deletion and schedules nothing (giải bài toán khác).
 - MFA delete: adds manual friction to deletions and never schedules them (giải bài toán khác).
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-expire-general-considerations.html
 > 🇻🇳 Xoá tự động sau 7 năm trong bucket versioning → lifecycle expire bản hiện tại + xoá vĩnh viễn noncurrent version; Object Lock chỉ chặn xoá.
@@ -432,6 +433,7 @@ Docs: https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html
 - services: S3, VPC Endpoint
 - tags: s3-access-points, iam-policies, least-privilege
 - difficulty: medium
+- time: 120
 - skills: 1.3.s6, 1.3.k1
 - concept: S3 Access Points give each team a dedicated policy and optional VPC restriction, replacing an ever-growing bucket policy
 - refs: 02-storage-services.md
@@ -439,9 +441,8 @@ Docs: https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
-A data platform team keeps a shared data lake in one Amazon S3 bucket with prefixes for 40 analytics teams. The bucket policy has grown so large that it is hard to review. Each team must be restricted to its own prefix, and some teams must be reachable from their own VPC alone. The company wants to simplify access management without moving the data or changing the bucket's location. Which solution will meet these requirements?
+A data platform team keeps a shared data lake in one Amazon S3 bucket with prefixes for 40 analytics teams. The bucket policy has grown so large that it is hard to review. Each team must be restricted to its own prefix, and some teams must be able to reach their data only from their own VPC. The company wants to simplify access management without moving the data or changing the bucket's location. Which solution will meet these requirements?
 
 - A. Create an S3 access point per team with its own policy and VPC restriction, and delegate access control from the bucket policy to them
 - B. Create a separate bucket for each team, replicate each team's prefix into it with S3 Replication, and apply the VPC restriction per bucket

@@ -52,6 +52,7 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets
 - services: S3, Data Firehose, Athena
 - tags: s3-batching, request-cost, small-objects
 - difficulty: medium
+- time: 110
 - skills: 4.1.s1
 - concept: Batching many tiny writes into larger S3 objects cuts per-request charges (batch uploads versus individual uploads)
 - refs: 02-storage-services.md, 09-analytics-bigdata.md
@@ -59,9 +60,8 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
-A logistics company's tracking service writes each GPS event, about 2 KB of JSON, to Amazon S3 as its own object. The service produces roughly 150 million events per day, and S3 request charges are now the largest part of the storage bill. Analysts query the data once a day with Amazon Athena, and a delay of a few minutes before events become queryable is acceptable. Which change will reduce the S3 cost the MOST?
+A logistics company's tracking service writes each GPS event, about 2 KB of JSON, to Amazon S3 as its own object. The service produces roughly 150 million events per day, and S3 request charges are now the largest part of the storage bill. Analysts query the data once a day with Amazon Athena, and a delay of a few minutes before events become queryable is acceptable. Which change will meet these requirements and reduce the S3 cost the MOST?
 
 - A. Send the events to Amazon Data Firehose, which buffers them and delivers larger compressed objects to the bucket.
 - B. Compress the events with gzip before uploading them, and keep writing one object per event to the bucket.
@@ -120,6 +120,7 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.
 - services: S3
 - tags: s3-lifecycle, s3-versioning, s3-multipart-upload
 - difficulty: medium
+- time: 125
 - skills: 4.1.s5, 4.1.s9, 4.1.k7
 - concept: Lifecycle rules should expire noncurrent versions after the undo window and abort incomplete multipart uploads
 - refs: 02-storage-services.md
@@ -127,9 +128,8 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
-A document-management company stores customer files in an Amazon S3 bucket that has versioning enabled. The application overwrites files often, so older versions pile up and storage costs keep rising. Staff open current files throughout the day, and users upload large videos with multipart uploads that are frequently abandoned halfway. The company needs only the previous 30 days of versions for undo and wants to cut storage cost without changing the application. Which TWO S3 Lifecycle actions should a solutions architect configure? (Choose TWO)
+A document-management company stores customer files in an Amazon S3 bucket that has versioning enabled. The application overwrites files often, so older versions pile up and storage costs keep rising. Staff open current files throughout the day, and users upload large videos with multipart uploads that are frequently abandoned halfway. The company needs only the previous 30 days of versions for undo and wants to cut storage cost without changing the application. Which TWO S3 Lifecycle actions will meet these requirements? (Choose TWO)
 
 - A. Transition current object versions to S3 Glacier Deep Archive a few days after they are created.
 - B. Expire noncurrent object versions 30 days after they become noncurrent.
@@ -362,14 +362,14 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/lifecycle-management-efs.html
 - services: S3, Organizations, Athena
 - tags: s3-storage-lens, storage-access-patterns
 - difficulty: hard
+- time: 145
 - skills: 4.1.k9, 4.1.k3
 - concept: An organization-level S3 Storage Lens dashboard on the advanced tier gives prefix-level activity metrics and recommendations across accounts
 - refs: 02-storage-services.md, 06-management-governance.md
-- hint: Một khung nhìn toàn tổ chức — cần bật quyền tin cậy từ tài khoản quản lý và chọn tầng có số liệu hoạt động theo prefix.
+- hint: Một khung nhìn cho cả tổ chức cần điều kiện gì ở AWS Organizations? Số liệu lượt request theo prefix có ở mọi bậc của công cụ không?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A company has 85 AWS accounts in AWS Organizations and thousands of Amazon S3 buckets. The finance team wants one view across all accounts that shows buckets without rules to expire incomplete multipart uploads and shows which prefixes are rarely requested, so that the team can add lifecycle transitions. The solution must not require custom code or per-bucket configuration. Which TWO actions will meet these requirements? (Choose TWO)
 

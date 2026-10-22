@@ -156,6 +156,7 @@ Docs: https://docs.aws.amazon.com/transfer/latest/userguide/create-server-in-vpc
 - services: Kinesis Data Streams
 - tags: sharding, kinesis-shards, streaming-ingestion
 - difficulty: hard
+- time: 135
 - skills: 3.5.k6, 3.5.s2, 3.5.s6
 - concept: A hot partition key can exceed one shard's limit; neither on-demand mode nor more shards fix it, so a higher-cardinality key that keeps per-entity order is needed
 - refs: 09-analytics-bigdata.md
@@ -163,9 +164,8 @@ Docs: https://docs.aws.amazon.com/transfer/latest/userguide/create-server-in-vpc
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
-A logistics company streams GPS events from 60,000 trucks into a provisioned-mode Kinesis data stream. Producers use the truck's depot ID as the partition key, and about 25 depots exist. One central depot generates more traffic than a single shard can ingest, so producers receive WriteProvisionedThroughputExceeded errors while most other shards are nearly idle. Events from the same truck must be processed in order. Which solution will stop the throttling?
+A logistics company streams GPS events from 60,000 trucks into a provisioned-mode Kinesis data stream. Producers use the truck's depot ID as the partition key, and about 25 depots exist. One central depot generates more traffic than a single shard can ingest, so producers receive WriteProvisionedThroughputExceeded errors while most other shards are nearly idle. Events from the same truck must be processed in order. The company must stop the throttling. Which solution will meet these requirements?
 
 - A. Switch the stream to on-demand capacity mode so that Kinesis Data Streams splits the busy shards automatically as traffic grows
 - B. Change the partition key to the truck ID so that records spread across the shards while the events of each truck stay in one shard

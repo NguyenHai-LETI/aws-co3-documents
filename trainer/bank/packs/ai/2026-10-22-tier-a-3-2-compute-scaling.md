@@ -122,6 +122,7 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-war
 - services: Lambda, API Gateway
 - tags: lambda-concurrency, snapstart, cold-start
 - difficulty: medium
+- time: 120
 - skills: 3.2.k5, 3.2.s4
 - family: lambda-java-cold-start
 - concept: For a Java Lambda function, SnapStart removes most of the cold-start delay at no additional charge, which beats provisioned concurrency on cost
@@ -130,9 +131,8 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-war
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
-A fintech company hosts a customer-facing REST API on AWS Lambda behind Amazon API Gateway. The functions use the Java 17 runtime and load a large dependency framework during start-up, so the first request that reaches each new execution environment takes several seconds. Traffic is spiky: it can jump from a handful of requests to thousands per second within a minute after a push notification. The company wants to remove this start-up delay without rewriting the functions. Which solution will meet these requirements MOST cost-effectively?
+A fintech company hosts a customer-facing REST API on AWS Lambda behind Amazon API Gateway. The functions use the Java 17 runtime and load a large dependency framework during start-up, so the first request that reaches each new execution environment takes several seconds. Traffic is spiky: it jumps from a handful of requests to thousands per second within a minute after each push notification, and the marketing team sends the notifications at fixed, published times. The company wants to remove this start-up delay without rewriting the functions. Which solution will meet these requirements MOST cost-effectively?
 
 - A. Raise the memory setting of each function to the maximum value so that the start-up code finishes faster on every new execution environment.
 - B. Enable Lambda SnapStart on each function, publish a version, and send traffic to that version through an alias.
@@ -157,6 +157,7 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html
 - services: Lambda, API Gateway
 - tags: lambda-concurrency, provisioned-concurrency, cold-start
 - difficulty: hard
+- time: 135
 - skills: 3.2.k5, 3.2.s4
 - family: lambda-java-cold-start
 - concept: When start-up latency must be the lowest and most predictable, provisioned concurrency (double-digit milliseconds) beats SnapStart (sub-second at best)
@@ -165,9 +166,8 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
-A fintech company hosts a customer-facing REST API on AWS Lambda behind Amazon API Gateway. The functions use the Java 17 runtime and load a large dependency framework during start-up, so the first request that reaches each new execution environment takes several seconds. Traffic is spiky: it can jump from a handful of requests to thousands per second within a minute after a push notification. The company wants to remove this start-up delay without rewriting the functions. Which solution will give the LOWEST and most predictable start-up latency?
+A fintech company hosts a customer-facing REST API on AWS Lambda behind Amazon API Gateway. The functions use the Java 17 runtime and load a large dependency framework during start-up, so the first request that reaches each new execution environment takes several seconds. Traffic is spiky: it jumps from a handful of requests to thousands per second within a minute after each push notification, and the marketing team sends the notifications at fixed, published times. The company wants to remove this start-up delay without rewriting the functions. Which solution will give the LOWEST and most predictable start-up latency?
 
 - A. Raise the memory setting of each function to the maximum value so that the start-up code finishes faster on every new execution environment.
 - B. Enable Lambda SnapStart on each function, publish a version, and send traffic to that version through an alias.
@@ -176,12 +176,12 @@ A fintech company hosts a customer-facing REST API on AWS Lambda behind Amazon A
 
 **Answer:** D
 
-**Explanation:** Provisioned concurrency keeps execution environments initialized and ready to respond in double-digit milliseconds, and Application Auto Scaling can follow the traffic; AWS recommends it when SnapStart cannot meet strict start-up targets.
-- SnapStart: cuts start-up to sub-second at best but still resumes environments on demand, so latency is not eliminated (vi phạm ràng buộc)
+**Explanation:** Provisioned concurrency keeps execution environments initialized and ready to respond in double-digit milliseconds, and because the notification times are known, Application Auto Scaling scheduled actions can raise it before each burst. AWS recommends provisioned concurrency when start-up targets are stricter than SnapStart can meet.
+- SnapStart: cuts start-up to as low as sub-second but still restores each new environment on demand, so start-up latency is lower but not the lowest (vi phạm ràng buộc "LOWEST and most predictable")
 - Maximum memory: initialization still runs on every new environment (vi phạm ràng buộc)
 - Reserved concurrency: caps or reserves capacity but pre-initializes nothing (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html
-> 🇻🇳 Cần độ trễ khởi động thấp và dễ đoán nhất → provisioned concurrency (hàng chục ms); SnapStart chỉ giảm xuống dưới một giây.
+> 🇻🇳 Cần độ trễ khởi động thấp và dễ đoán nhất, giờ cao điểm biết trước → provisioned concurrency (hàng chục ms, scale theo lịch); SnapStart chỉ giảm xuống mức dưới một giây.
 
 ---
 

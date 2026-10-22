@@ -259,6 +259,7 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html
 - services: DAX, DynamoDB, ElastiCache, Aurora
 - tags: caching-strategies, redis-vs-memcached
 - difficulty: medium
+- time: 120
 - skills: 3.3.s5, 3.3.k2
 - family: dynamodb-aurora-cache-choice
 - concept: ElastiCache is a general-purpose cache usable with any data store, so one layer can serve both DynamoDB and Aurora; DAX caches DynamoDB only
@@ -267,9 +268,8 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
-A gaming company stores player profiles in an Amazon DynamoDB table and match catalogs in an Amazon Aurora MySQL database. A small set of popular streamer profiles accounts for most profile reads, and the same hot match-catalog queries repeat constantly, so both data stores are slowed by repeated reads. The profile reads are eventually consistent, and the application is written with the AWS SDK for DynamoDB and a MySQL driver. Which solution will accelerate both the profile reads and the catalog queries by using a single caching layer?
+A gaming company stores player profiles in an Amazon DynamoDB table and match catalogs in an Amazon Aurora MySQL database. A small set of popular streamer profiles accounts for most profile reads, and the same hot match-catalog queries repeat constantly, so both data stores are slowed by repeated reads. The profile reads are eventually consistent, and the application is written with the AWS SDK for DynamoDB and a MySQL driver. Which solution will meet the requirement to accelerate both the profile reads and the catalog queries with a single caching layer?
 
 - A. Deploy an Amazon ElastiCache for Valkey cache, check it first on every read, and load it on a miss for both data stores.
 - B. Add a second Region with DynamoDB global tables and Aurora Replicas so that reads are served from the Region nearest to each player.

@@ -154,6 +154,7 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introdu
 - services: CloudFront, Global Accelerator, NLB, ALB, S3, Route 53
 - tags: route53-health-checks, high-availability
 - difficulty: hard
+- time: 170
 - skills: 2.1.k7, 2.1.s6
 - concept: CloudFront accelerates cacheable HTTP content; Global Accelerator gives static anycast IPs and fast health-based failover for UDP/TCP endpoints; DNS routing and wrong pairings fail the stated constraints
 - refs: 04-networking-services.md, 14-so-sanh-services.md
@@ -161,9 +162,8 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introdu
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 170
 
-A multiplayer game company serves two kinds of traffic from AWS. A web portal and its marketing images are delivered over HTTPS from an Application Load Balancer and an Amazon S3 bucket in us-east-1. Real-time game sessions run on dedicated servers behind Network Load Balancers in three Regions and use UDP. Players' firewalls allow-list a fixed set of IP addresses, and sessions must fail over to another Region within seconds when a Region becomes unhealthy. The company wants better performance for players worldwide for both kinds of traffic. Which combination of steps will meet these requirements? (Choose TWO)
+A multiplayer game company serves two kinds of traffic from AWS. A web portal and its marketing images are delivered over HTTPS from an Application Load Balancer and an Amazon S3 bucket in us-east-1. Real-time game sessions run on dedicated servers behind Network Load Balancers in three Regions and use UDP. For game sessions, players' firewalls allow-list a fixed set of IP addresses, and sessions must fail over to another Region within seconds when a Region becomes unhealthy. The company wants better performance for players worldwide for both kinds of traffic. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Create an Amazon CloudFront distribution with the S3 bucket and the ALB as origins to cache the portal content close to players.
 - B. Create a CloudFront distribution with the three NLBs as origins so that the UDP game sessions travel through CloudFront edge locations to the servers.

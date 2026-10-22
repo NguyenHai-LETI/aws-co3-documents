@@ -18,6 +18,7 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.1"
 - services: EBS, EC2
 - tags: ebs-volume-types, elastic-volumes
 - difficulty: hard
+- time: 140
 - skills: 3.1.s1, 3.1.k2
 - concept: gp3 (up to 80,000 IOPS and 2,000 MiB/s, independent of size) changed online with Elastic Volumes beats resizing gp2 or paying for io2 Block Express when the numbers fit gp3
 - refs: 02-storage-services.md, R-performance-benchmarks.md
@@ -25,7 +26,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.1"
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A logistics company runs a self-managed PostgreSQL database on a large Nitro-based Amazon EC2 instance. The 3 TiB data volume is a General Purpose SSD (gp2) volume, and month-end batch jobs now saturate it at about 9,000 IOPS and 250 MiB/s. Monitoring shows that the database needs a sustained 45,000 IOPS and 1,200 MiB/s. Single-digit millisecond latency is acceptable, the database cannot be stopped, and the company wants the lowest-cost fix. Which solution will meet these requirements MOST cost-effectively?
 
@@ -36,12 +36,12 @@ A logistics company runs a self-managed PostgreSQL database on a large Nitro-bas
 
 **Answer:** C
 
-**Explanation:** gp3 can be provisioned up to 80,000 IOPS and 2,000 MiB/s regardless of size, and Elastic Volumes applies the change without stopping the instance, so gp3 meets the numbers at the lowest price.
-- io2 Block Express: also works, but nothing requires sub-millisecond latency or more than 80,000 IOPS (tốn chi phí hơn)
+**Explanation:** gp3 performance is provisioned separately from capacity: up to 80,000 IOPS (500 IOPS per GiB) and 2,000 MiB/s (0.25 MiB/s per provisioned IOPS), so a 3 TiB volume can carry 45,000 IOPS and 1,200 MiB/s. Elastic Volumes changes the type without stopping the instance, and gp3 is the lowest-cost SSD that meets the numbers.
+- io2 Block Express: also works, but nothing requires sub-millisecond latency, so the extra price buys nothing (tốn chi phí hơn)
 - Larger gp2 volume: gp2 tops out at 16,000 IOPS and 250 MiB/s whatever its size (cấu hình không tồn tại)
 - RAID 0 of gp2 volumes: needs a data copy and a cutover that stops the database (vi phạm ràng buộc)
-Docs: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html
-> 🇻🇳 gp3 chỉnh IOPS/throughput độc lập dung lượng, đổi loại online bằng Elastic Volumes và rẻ hơn io2.
+Docs: https://docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html
+> 🇻🇳 gp3 cấp IOPS/throughput tách khỏi dung lượng (trong tỉ lệ 500 IOPS/GiB, 0,25 MiB/s mỗi IOPS), đổi loại online bằng Elastic Volumes và rẻ hơn io2.
 
 ---
 
@@ -190,6 +190,7 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleratio
 - services: S3
 - tags: s3-prefixes, request-rate
 - difficulty: medium
+- time: 120
 - skills: 3.1.s2, 3.1.s1
 - concept: S3 request rates scale per key prefix; 503 Slow Down on one hot prefix is fixed by spreading keys across many prefixes and parallelizing, not by quotas, acceleration or multipart
 - refs: 02-storage-services.md, R-performance-benchmarks.md
@@ -197,9 +198,8 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleratio
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
-An IoT analytics company ingests sensor files into one Amazon S3 bucket. Thousands of devices upload small objects, and every object key begins with the same date segment, such as 2026-10-22/device-id/file. At peak, the ingestion service sends about 12,000 PUT requests per second to keys that begin with the same date and receives HTTP 503 Slow Down responses. The data must stay in one bucket in the S3 Standard storage class for later queries. Which change will increase the sustained write rate?
+An IoT analytics company ingests sensor files into one Amazon S3 bucket. Thousands of devices upload small objects, and every object key begins with the same date segment, such as 2026-10-22/device-id/file. At peak, the ingestion service sends about 12,000 PUT requests per second to keys that begin with the same date and receives HTTP 503 Slow Down responses. The data must stay in one bucket in the S3 Standard storage class for later queries. The company needs a higher sustained write rate. Which solution will meet these requirements?
 
 - A. Add a short hash to the beginning of each object name so that requests spread across many prefixes, and send the uploads in parallel.
 - B. Enable S3 Transfer Acceleration on the bucket and have the ingestion service send every upload through the bucket's accelerate endpoint.

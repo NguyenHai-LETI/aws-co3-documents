@@ -86,6 +86,7 @@ Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-acces
 - services: Cognito, S3, IAM
 - tags: federation, iam-roles
 - difficulty: medium
+- time: 145
 - skills: 1.2.k4, 1.2.k5
 - concept: Cognito user pool authenticates users; an identity pool exchanges the token for temporary credentials scoped by an IAM role policy variable
 - refs: 05-security-services.md
@@ -93,15 +94,14 @@ Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-acces
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
-A photo-sharing startup is building a mobile app. Users sign up with an email address and password. The app must upload each user's photos directly to an Amazon S3 bucket, and each user must be able to reach objects under only their own prefix. The team does not want to run authentication servers or ship long-term AWS credentials inside the app. Which combination of steps will meet these requirements? (Choose TWO)
+A fitness startup is building a mobile app. Users sign up with an email address and password. The app must upload each user's workout videos directly to an Amazon S3 bucket, and each user must be able to reach objects under only their own prefix. The team does not want to run authentication servers or ship long-term AWS credentials inside the app. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Create an Amazon Cognito user pool for sign-up and sign-in, and exchange its tokens for temporary AWS credentials by using a Cognito identity pool
 - B. Create an IAM user for each app user and ship the long-term credentials as access keys in the secure storage of the mobile device on each phone
 - C. Attach an IAM role to the identity pool that allows object actions under a prefix built with the cognito-identity.amazonaws.com:sub variable
 - D. Attach the S3 permissions policy directly to the Cognito user pool so that signed-in users inherit access to their own prefix in the bucket and its objects
-- E. Configure a bucket policy that allows uploads from any principal and require the app to use random object names for the photos that it stores
+- E. Configure a bucket policy that allows uploads from any principal and require the app to use random object names for the videos that it stores
 
 **Answer:** A, C
 
@@ -258,30 +258,30 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-gro
 - services: Shield, WAF, CloudFront, ALB, Route 53
 - tags: ddos-protection, web-attacks
 - difficulty: hard
+- time: 130
 - skills: 1.2.k6, 1.2.s3
-- concept: Shield Advanced adds the Shield Response Team (with Business or Enterprise Support), cost protection, and automatic layer 7 mitigation through a WAF web ACL
+- concept: Shield Advanced adds the Shield Response Team (with Business or Enterprise Support) and cost protection; layer 7 floods are mitigated automatically by the AWS WAF Anti-DDoS managed rule group
 - refs: 05-security-services.md
 - hint: Cần chuyên gia DDoS 24/7, được hoàn chi phí scale do tấn công, và tự giảm thiểu L7 — gói nào của Shield, và cần gói Support nào?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A gaming company serves players through Amazon Route 53, an Amazon CloudFront distribution, and an internet-facing Application Load Balancer. A large HTTP flood recently made the game unavailable and caused a large scaling bill. The company has an AWS Enterprise Support plan. It wants 24/7 access to AWS DDoS experts during attacks, credits for attack-related scaling costs, and automatic mitigation of layer 7 floods without writing rules during an incident. Which solution will meet these requirements?
 
-- A. Subscribe to AWS Shield Advanced, add the CloudFront distribution and the load balancer as protected resources, and turn on automatic layer 7 DDoS mitigation
+- A. Subscribe to AWS Shield Advanced, add the CloudFront distribution and the load balancer as protected resources, and add the AWS WAF Anti-DDoS managed rule group to their web ACLs
 - B. Rely on AWS Shield Standard for DDoS protection and create AWS WAF rate-based rules on the CloudFront distribution that block IP addresses above a request threshold
 - C. Deploy AWS Network Firewall in the VPC with automatic layer 4 rules that drop traffic from known attacker IP address ranges as DDoS mitigation at the subnet edge
 - D. Use AWS Firewall Manager to create security group policies that restrict the load balancer to the CloudFront IP address ranges
 
 **Answer:** A
 
-**Explanation:** Shield Advanced provides access to the Shield Response Team (with Business or Enterprise Support), cost protection through service credits, and automatic layer 7 mitigation that manages WAF rules during an attack.
+**Explanation:** Shield Advanced provides access to the Shield Response Team (with Business or Enterprise Support) and cost protection through service credits for attack-related scaling. The AWS WAF Anti-DDoS managed rule group detects HTTP floods against the traffic baseline and challenges or blocks attack requests automatically; since March 2026 it replaces Shield Advanced's legacy automatic layer 7 mitigation.
 - Shield Standard with rate-based rules: no expert team, no cost protection, and rules are written by hand (vi phạm ràng buộc)
 - Network Firewall in the VPC: not an edge DDoS service and offers neither experts nor credits (dùng sai tính năng)
 - Firewall Manager security group policies: restrict the origin but do not mitigate floods (giải bài toán khác)
-Docs: https://docs.aws.amazon.com/waf/latest/developerguide/ddos-advanced-summary-capabilities.html
-> 🇻🇳 DDoS: chuyên gia SRT 24/7 + hoàn chi phí + tự giảm thiểu L7 → Shield Advanced (cần Business/Enterprise Support).
+Docs: https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response.html
+> 🇻🇳 DDoS: chuyên gia SRT 24/7 + hoàn chi phí → Shield Advanced (cần Business/Enterprise Support); tự giảm thiểu L7 → WAF Anti-DDoS managed rule group.
 
 ---
 
@@ -292,6 +292,7 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/ddos-advanced-summar
 - services: Firewall Manager, WAF, Shield, Organizations, AWS Config
 - tags: web-attacks, ddos-protection, scp
 - difficulty: hard
+- time: 165
 - skills: 1.2.s3, 1.2.k6
 - concept: Firewall Manager needs a delegated administrator and AWS Config, and its WAF and Shield Advanced policies auto-protect new resources and accounts
 - refs: 05-security-services.md
@@ -299,7 +300,6 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/ddos-advanced-summar
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 165
 
 A company has 90 accounts in AWS Organizations. Security requires a baseline AWS WAF web ACL and AWS Shield Advanced protection on every Application Load Balancer and CloudFront distribution, including resources that teams create later and accounts that join the organization later. Non-compliant resources must be remediated automatically with the LEAST operational overhead. Which combination of steps will meet these requirements? (Choose THREE)
 
@@ -313,7 +313,7 @@ A company has 90 accounts in AWS Organizations. Security requires a baseline AWS
 **Answer:** B, D, F
 
 **Explanation:** Firewall Manager needs an administrator account and AWS Config, and its policies keep protecting new resources and new accounts, remediating non-compliant ones automatically.
-- StackSet of web ACLs: covers today's load balancers but not resources created later (tốn vận hành hơn)
+- StackSet of web ACLs: covers today's load balancers but not resources created later (vi phạm ràng buộc)
 - Service control policy: cannot evaluate whether a web ACL is associated (dùng sai tính năng)
 - Security Hub in the management account: reports findings and does not apply protections (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/waf/latest/developerguide/fms-chapter.html

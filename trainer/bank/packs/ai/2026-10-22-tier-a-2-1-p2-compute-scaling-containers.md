@@ -123,6 +123,7 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - services: EC2 Auto Scaling, EBS, ALB
 - tags: asg-warm-pool, scaling-policies, launch-template
 - difficulty: hard
+- time: 145
 - skills: 2.1.k6, 2.1.s2
 - concept: A warm pool of stopped, pre-initialized instances cuts scale-out latency for slow-booting instances at a cost of EBS only, unlike scheduled scaling, timer tweaks, or a peak-sized minimum
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
@@ -130,9 +131,8 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
-A genomics SaaS company runs a web application on EC2 instances in an Auto Scaling group. Each new instance downloads a large reference dataset to its EBS root volume and builds caches during boot, which takes about ten minutes before the instance passes load balancer health checks. Request volume rises sharply and unpredictably several times a day, and users see timeouts while new instances are still starting. Keeping the group scaled for the peak all day would be too expensive. Which solution will reduce the scale-out delay MOST cost-effectively?
+A genomics SaaS company runs a web application on EC2 instances in an Auto Scaling group. Each new instance downloads a large reference dataset to its EBS root volume and builds index files on that volume during boot, which takes about ten minutes before the instance passes load balancer health checks. Request volume rises sharply and unpredictably several times a day, and users see timeouts while new instances are still starting. Keeping the group scaled for the peak all day would be too expensive. Which solution will reduce the scale-out delay MOST cost-effectively?
 
 - A. Reduce the health check grace period and the scaling cooldown of the Auto Scaling group so that new instances are launched and registered with the load balancer sooner.
 - B. Add a warm pool of pre-initialized instances in the Stopped state and use a lifecycle hook to finish initialization before the instances stop.
@@ -296,6 +296,7 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/efs-volumes.ht
 - services: Lambda, API Gateway, DynamoDB, SES, EC2, Fargate
 - tags: serverless-cost
 - difficulty: easy
+- time: 120
 - skills: 2.1.k12, 2.1.s5
 - concept: Bursty, rare, short work with no operations staff fits Lambda with API Gateway because it bills only while requests run and needs no capacity planning
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
@@ -303,7 +304,6 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/efs-volumes.ht
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A small online-learning company creates a student profile and sends a welcome email each time a student registers through a web form. Registrations arrive in short bursts after marketing campaigns and are rare otherwise, and each registration needs about two seconds of processing. The company has no operations staff and wants to pay only while registrations are processed, with no servers to manage and no capacity to plan. Which solution will meet these requirements MOST cost-effectively?
 
@@ -317,7 +317,7 @@ A small online-learning company creates a student profile and sends a welcome em
 **Explanation:** Lambda behind API Gateway bills for requests and run time, scales through bursts, and needs no servers, so idle periods cost almost nothing.
 - EC2 Auto Scaling group with ALB: instances and a load balancer bill around the clock (tốn chi phí hơn)
 - Fargate with one minimum task: a task and a load balancer run even when idle (tốn chi phí hơn)
-- One instance with a Savings Plan: a commitment on idle capacity that still needs patching (tốn vận hành hơn)
+- One instance with a Savings Plan: still a server to manage, and the commitment pays for idle hours (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
 > 🇻🇳 Tải rải rác, ngắn, không có đội vận hành, chỉ muốn trả khi có xử lý → Lambda + API Gateway; EC2/Fargate tối thiểu vẫn tính tiền khi rảnh.
 
@@ -399,6 +399,7 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introd
 - services: EC2 Auto Scaling, SQS, CloudWatch
 - tags: scaling-policies, decoupling
 - difficulty: medium
+- time: 135
 - skills: 2.1.s2, 2.1.k6
 - concept: Scale queue workers with target tracking on a backlog-per-instance metric derived from acceptable latency and processing time, not on CPU, raw queue length, or a fixed schedule
 - refs: C-kien-truc-web-app.md, 07-application-integration.md
@@ -406,19 +407,18 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introd
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A photo-printing company runs worker instances in an Auto Scaling group that pull print jobs from an Amazon SQS queue. Job arrival rates change unpredictably during the day, and the average processing time per job is a stable 6 seconds. The company wants jobs to wait no longer than about 2 minutes, without keeping unused instances. The group scales on average CPU utilization, which stays low even when the backlog grows because workers spend most of their time waiting on a slow third-party API. Which scaling approach will meet these requirements?
 
-- A. Use a target tracking policy on the ApproximateNumberOfMessagesVisible metric of the queue with a fixed backlog target that ignores the number of instances and the processing time of the jobs.
+- A. Use a target tracking policy on the ApproximateNumberOfMessagesVisible metric of the queue with a backlog target of 20 messages, the number of jobs one instance can process in 2 minutes.
 - B. Use a target tracking policy on a backlog-per-instance metric, calculated as queue length divided by in-service instances, with a target based on acceptable latency and job processing time.
 - C. Use a scheduled scaling action that doubles the desired capacity of the group every morning and halves it every evening to follow the average daily pattern of jobs.
 - D. Lower the CPU target value of the existing target tracking policy so that the group scales out at a lower average CPU utilization of the instances that process a job.
 
 **Answer:** B
 
-**Explanation:** Backlog per instance scales the fleet with the waiting work, using a target of acceptable latency divided by processing time (here 120 s ÷ 6 s = 20 messages), independent of CPU.
-- Raw queue length: ignores the number of running instances and can over-scale while the queue drains (dùng sai tính năng)
+**Explanation:** Backlog per instance scales the fleet with the waiting work, using a target of acceptable latency divided by processing time (here 120 s ÷ 6 s = 20 messages per instance), independent of CPU.
+- Raw queue length with a fixed target: the metric ignores how many instances share the backlog, so a per-instance figure applied to the whole queue makes the group scale out of proportion (dùng sai tính năng)
 - Scheduled scaling: arrival rates are unpredictable, so a schedule cannot track them (vi phạm ràng buộc)
 - Lower CPU target: CPU stays low while workers wait on the API, so it is the wrong signal (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.html

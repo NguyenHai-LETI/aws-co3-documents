@@ -121,6 +121,7 @@ Docs: https://docs.aws.amazon.com/storagegateway/latest/tgw/WhatIsStorageGateway
 - services: FSx
 - tags: fsx-windows, data-deduplication, storage-cost
 - difficulty: medium
+- time: 125
 - skills: 4.1.k4
 - concept: FSx for Windows File Server cost levers are HDD storage for low-I/O shares and Data Deduplication, while Multi-AZ stays for availability
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
@@ -128,9 +129,8 @@ Docs: https://docs.aws.amazon.com/storagegateway/latest/tgw/WhatIsStorageGateway
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
-A university is migrating 80 TB of departmental file shares and student home directories to Amazon FSx for Windows File Server. Users access the shares over SMB from domain-joined computers, I/O demand is low, and many files are duplicated across departments. The file system must be Multi-AZ so that it survives an Availability Zone failure. The university wants the lowest storage cost. Which TWO configuration choices should a solutions architect make? (Choose TWO)
+A university is migrating 80 TB of departmental file shares and student home directories to Amazon FSx for Windows File Server. Users access the shares over SMB from domain-joined computers, I/O demand is low, and many files are duplicated across departments. The file system must be Multi-AZ so that it survives an Availability Zone failure. The university wants the lowest storage cost. Which TWO configuration choices will meet these requirements? (Choose TWO)
 
 - A. Enable Data Deduplication on the file system so that duplicated data is stored once.
 - B. Deploy the file system as Single-AZ to avoid paying for the standby file server at a low price.
@@ -258,6 +258,7 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/restoring-objects-re
 - services: Organizations, S3
 - tags: consolidated-billing, volume-discount
 - difficulty: easy
+- time: 95
 - skills: 4.1.k2
 - concept: Consolidated billing in AWS Organizations combines usage across accounts so that volume pricing tiers and shared discounts apply
 - refs: 06-management-governance.md
@@ -265,9 +266,8 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/restoring-objects-re
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 95
 
-A retail group has seven business units, each with its own standalone AWS account that is paid with a separate corporate credit card. Together the accounts store about 280 TB in Amazon S3 Standard, but no single account is large enough to reach the lower per-GB price tiers, so every account pays the highest storage rate. The group does not want to move data or change any architecture. Which action will reduce the S3 storage cost?
+A retail group has seven business units, each with its own standalone AWS account that is paid with a separate corporate credit card. Together the accounts store about 280 TB in Amazon S3 Standard, but no single account is large enough to reach the lower per-GB price tiers, so every account pays the highest storage rate. The group does not want to move data or change any architecture. Which action will reduce the S3 storage cost while meeting these requirements?
 
 - A. Move the data of the seven accounts into one account's buckets and grant the other accounts access through bucket policies.
 - B. Purchase S3 reserved capacity in each account for a one-year term to receive a discount on the storage that it uses.

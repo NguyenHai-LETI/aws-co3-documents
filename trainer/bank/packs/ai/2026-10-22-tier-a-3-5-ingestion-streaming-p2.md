@@ -156,6 +156,7 @@ Docs: https://docs.aws.amazon.com/athena/latest/ug/columnar-storage.html
 - services: Storage Gateway, DataSync, S3, Transfer Family
 - tags: sgw-volume-modes
 - difficulty: hard
+- time: 125
 - skills: 3.5.k3, 3.5.k2, 3.5.s3
 - concept: S3 File Gateway ingests continuously written SMB or NFS files to S3 within minutes with a local cache; DataSync schedules run at one-hour intervals at the shortest
 - refs: 10-migration-transfer.md
@@ -163,7 +164,6 @@ Docs: https://docs.aws.amazon.com/athena/latest/ug/columnar-storage.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
 A genomics lab's sequencers write result files to an SMB share on an on-premises Windows server. The files must appear in Amazon S3 within minutes so that analysts can start Amazon Athena and Amazon EMR jobs, while lab staff keep opening recent files locally with low latency. The sequencer software cannot be changed, and the server has limited disk space. Which solution will meet these requirements?
 
@@ -174,11 +174,11 @@ A genomics lab's sequencers write result files to an SMB share on an on-premises
 
 **Answer:** C
 
-**Explanation:** S3 File Gateway presents an SMB share, uploads each written file to S3 in the background, and keeps recently used data in a local cache, so the sequencers need no change and the server needs little disk.
+**Explanation:** S3 File Gateway presents an SMB share, uploads each written file to S3 in the background, and keeps recently used data in a local cache, so the sequencers need no change, analysts see files within minutes, and the server needs little disk.
 - DataSync on a schedule: the shortest schedule interval is one hour, longer than minutes (vi phạm ràng buộc)
 - EFS mounted on the sequencers: the sequencer software cannot be changed to use it (vi phạm ràng buộc)
 - Transfer Family with hourly manual uploads: manual work and hourly delay (tốn vận hành hơn)
-Docs: https://docs.aws.amazon.com/datasync/latest/userguide/task-scheduling.html
+Docs: https://docs.aws.amazon.com/filegateway/latest/files3/what-is-file-s3.html
 > 🇻🇳 File ghi liên tục lên S3 trong vài phút + cache cục bộ → S3 File Gateway; DataSync có lịch tối thiểu 1 giờ.
 
 ---

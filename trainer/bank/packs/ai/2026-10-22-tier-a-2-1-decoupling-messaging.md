@@ -360,33 +360,33 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html
 - domain: resilient
 - task: 2.1
 - topic: integration
-- services: Amazon MQ, SQS, SNS, EC2
+- services: Amazon MQ, SQS, MSK, EC2
 - tags: decoupling
 - difficulty: easy
+- time: 100
 - skills: 2.1.k2, 2.1.s7
-- concept: Amazon MQ is the managed broker for applications that rely on JMS and ActiveMQ protocols, avoiding code changes and broker administration
+- concept: Amazon MQ for RabbitMQ keeps AMQP clients unchanged and removes broker administration; only a cluster deployment (three nodes across Availability Zones) survives an AZ failure, and MSK speaks Kafka, not AMQP
 - refs: 07-application-integration.md
-- hint: Giữ nguyên JMS/OpenWire và mã nguồn, không muốn vá lỗi máy chủ broker — dịch vụ message nào được quản lý hộ mà vẫn nói đúng giao thức đó?
+- hint: Giữ nguyên giao thức AMQP và mã nguồn, bỏ việc vá broker, chịu lỗi một AZ — dịch vụ managed nào nói giao thức này, và kiểu triển khai nào trải qua nhiều AZ?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
-A logistics company runs an order-routing application on premises that exchanges messages with an Apache ActiveMQ broker by using the JMS API and the OpenWire protocol. The company is moving the application to Amazon EC2 and wants to stop patching and operating broker servers while keeping the application code and messaging protocol unchanged. The broker must stay available if an Availability Zone fails. Which solution will meet these requirements?
+A logistics company runs an order-routing application on premises. Its services exchange messages through a RabbitMQ broker by using AMQP 0-9-1 client libraries. The company is moving the application to Amazon EC2 and wants to stop patching and operating broker servers while keeping the application code and messaging protocol unchanged. The broker must stay available if an Availability Zone fails. Which solution will meet these requirements?
 
 - A. Replace the broker with Amazon SQS standard queues and rewrite the messaging code of the application to use the AWS SDK for queue operations.
-- B. Create an Amazon MQ for ActiveMQ broker with an active/standby deployment across two Availability Zones and point the application at its endpoint.
-- C. Install Apache ActiveMQ on EC2 instances in an Auto Scaling group across two Availability Zones with a shared Amazon EFS file system.
-- D. Replace the broker with an Amazon SNS topic and subscribe the application's HTTPS endpoints so that messages are pushed to the application.
+- B. Create an Amazon MQ for RabbitMQ broker with a cluster deployment across three Availability Zones and point the application at its endpoint.
+- C. Create an Amazon MQ for RabbitMQ single-instance broker, enable automatic minor version upgrades, and point the application at its endpoint.
+- D. Replace the broker with an Amazon MSK cluster that has brokers in three Availability Zones and point the application's clients at the bootstrap brokers.
 
 **Answer:** B
 
-**Explanation:** Amazon MQ runs a managed ActiveMQ broker that existing applications use without rewriting messaging code, and an active/standby deployment puts the standby in a second Availability Zone while AWS handles patching.
+**Explanation:** Amazon MQ for RabbitMQ runs a managed RabbitMQ broker that existing AMQP 0-9-1 clients use without code changes, and a cluster deployment places three broker nodes in different Availability Zones behind one endpoint, while AWS handles patching.
 - SQS with an SDK rewrite: requires application code changes (vi phạm ràng buộc)
-- ActiveMQ on EC2 with EFS: patching, failover, and capacity stay with the team (tốn vận hành hơn)
-- SNS topic: a push pub/sub service with neither JMS queues nor OpenWire (dùng sai tính năng)
-Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/amazon-mq-broker-architecture.html
-> 🇻🇳 Giữ nguyên JMS/OpenWire, bỏ việc quản trị broker → Amazon MQ (ActiveMQ) active/standby đa AZ; SQS/SNS buộc sửa code.
+- Single-instance RabbitMQ broker: one node in one Availability Zone, so a zone failure stops messaging (vi phạm ràng buộc)
+- Amazon MSK: speaks the Apache Kafka protocol, so the AMQP clients would have to be rewritten (vi phạm ràng buộc)
+Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-broker-architecture.html
+> 🇻🇳 Giữ giao thức AMQP của RabbitMQ, bỏ quản trị broker, chịu lỗi AZ → Amazon MQ for RabbitMQ kiểu cluster deployment (3 node, nhiều AZ); single-instance chỉ ở 1 AZ, MSK là Kafka.
 
 ---
 

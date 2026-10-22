@@ -88,6 +88,7 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-default.h
 - services: KMS, S3, Organizations
 - tags: cross-account-access, sse-kms, iam-policies
 - difficulty: hard
+- time: 150
 - skills: 1.3.s4, 1.3.k1
 - concept: Org-wide key sharing with aws:PrincipalOrgID plus kms:ViaService limits use to S3 without per-account policy edits
 - refs: 05-security-services.md, B-bao-mat-compliance.md
@@ -95,9 +96,8 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-default.h
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
-A central security account owns a customer managed KMS key that encrypts objects in Amazon S3 buckets across the 70 accounts of an AWS Organization. New accounts join every month. Principals in member accounts must be able to use the key when they access S3 objects with SSE-KMS, but must not be able to call AWS KMS directly to decrypt data. The solution must not require a key policy change when an account is added. Which key policy design meets these requirements?
+A central security account owns a customer managed KMS key that encrypts objects in Amazon S3 buckets across the 70 accounts of an AWS Organization. New accounts join every month. Principals in member accounts must be able to use the key when they access S3 objects with SSE-KMS, but must not be able to call AWS KMS directly to decrypt data. Principals outside the organization must never be able to use the key. The solution must not require a key policy change when an account is added. Which key policy design meets these requirements?
 
 - A. Allow Principal "*" for the KMS actions that Amazon S3 needs, with a single condition that aws:PrincipalOrgID matches the ID of the organization and no other restriction
 - B. List the root principal of every member account in the key policy and add each new account to that list at the time the account joins the organization
@@ -106,10 +106,10 @@ A central security account owns a customer managed KMS key that encrypts objects
 
 **Answer:** C
 
-**Explanation:** The organization condition admits every current and future member account, and kms:ViaService limits use to requests made by S3 on the principal's behalf; member-account IAM policies still decide who may use S3.
+**Explanation:** The organization condition admits every current and future member account and excludes outsiders, and kms:ViaService limits use to requests made by S3 on the principal's behalf; member-account IAM policies still decide who may use S3.
 - Organization condition only: principals could call AWS KMS directly (vi phạm ràng buộc).
 - Root of every account in the key policy: needs a policy change for each new account (vi phạm ràng buộc).
-- ViaService only: any AWS account's principals could use the key through S3 (đặt sai chỗ).
+- ViaService only: principals of any AWS account, including outsiders, could use the key through S3 (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/kms/latest/developerguide/conditions-kms.html
 > 🇻🇳 Dùng aws:PrincipalOrgID (cả tổ chức) kết hợp kms:ViaService (chỉ qua S3) trong key policy — không cần sửa khi thêm account.
 

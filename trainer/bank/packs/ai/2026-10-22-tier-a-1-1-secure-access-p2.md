@@ -119,14 +119,14 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-policy-ge
 - services: IAM, IAM Identity Center
 - tags: abac, tagging, iam-policies, least-privilege
 - difficulty: hard
+- time: 160
 - skills: 1.1.s2
 - concept: Attribute-based access control matches principal tags to resource tags so one policy scales to many projects
 - refs: 05-security-services.md
-- hint: Sáu mươi dự án và thêm mới mỗi tuần mà không muốn viết policy mới — hãy so khớp thẻ của người dùng với thẻ của tài nguyên.
+- hint: Sáu mươi dự án, thêm mới mỗi tuần mà không viết policy mới — cần một điều kiện tự mở rộng theo dự án thay vì liệt kê từng tài nguyên.
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 160
 
 A company runs 60 projects in one AWS account. Each project team may start, stop and tag only the Amazon EC2 instances that belong to its own project. Engineers sign in through IAM Identity Center, and new projects are created every week. The security team wants to avoid writing and updating a separate IAM policy for every project. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -154,14 +154,14 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction_attribute-ba
 - services: Organizations
 - tags: scp, allow-list, multi-account
 - difficulty: hard
+- time: 160
 - skills: 1.1.s4, 1.1.k1
 - concept: An SCP allow list works only when FullAWSAccess is replaced at that level; deny lists leave future services open
 - refs: 06-management-governance.md
-- hint: FullAWSAccess vẫn gắn ở cấp OU thì allow-list không có tác dụng — cần thay thế chứ không chỉ thêm SCP.
+- hint: Đề chặn cả dịch vụ AWS ra mắt sau này — SCP kiểu allow hay deny làm được, và SCP mặc định đang gắn ở OU ảnh hưởng thế nào?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 160
 
 A company has 20 sandbox accounts in a Sandbox OU. The sandbox accounts must be able to use only Amazon EC2, Amazon S3 and AWS Lambda, and no other AWS service, including services that AWS launches in the future, even if a sandbox administrator attaches AdministratorAccess to a user. The organization has all features enabled, and the default FullAWSAccess SCP is attached to the root, the Sandbox OU and every account. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -254,14 +254,14 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-acc
 - services: S3, SQS, IAM
 - tags: resource-based-policies, confused-deputy
 - difficulty: hard
+- time: 135
 - skills: 1.1.s5
 - concept: S3 event notifications to SQS use the queue's resource policy for the S3 service principal, scoped with aws:SourceArn and aws:SourceAccount
 - refs: 05-security-services.md, 07-application-integration.md
-- hint: S3 gửi thông báo vào SQS dựa trên chính sách của hàng đợi, không phải role — và phải giới hạn đúng một bucket để tránh confused deputy.
+- hint: S3 giao thông báo với tư cách gì — và điều kiện nào ngăn bucket của tài khoản khác dùng hàng đợi (confused deputy)?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A company configures Amazon S3 event notifications so that a bucket sends messages to an Amazon SQS queue in the same account. The configuration fails validation because the queue's access policy has no statements. The security team also requires that only this specific bucket can send messages to the queue, and that buckets in other accounts cannot use the queue even if they name it as a destination. Which solution will meet these requirements?
 
@@ -322,6 +322,7 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condit
 - services: S3, IAM, Organizations
 - tags: resource-based-policies, cross-account-access, least-privilege
 - difficulty: medium
+- time: 130
 - skills: 1.1.s5, 1.1.k4
 - family: s3-data-lake-org-access
 - concept: Qualifier reading: aws:PrincipalOrgID in a bucket policy minimizes operations, naming approved roles gives the tightest control
@@ -330,7 +331,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condit
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A company keeps a central data lake in an Amazon S3 bucket owned by a data platform account in AWS Organizations. About 150 analytics accounts in the same organization read from the bucket through application roles, and new analytics accounts are created every week. The data must never be readable by principals outside the company. Which solution will meet these requirements and give the data platform team the TIGHTEST control over exactly which roles can read the data?
 
@@ -343,7 +343,7 @@ A company keeps a central data lake in an Amazon S3 bucket owned by a data platf
 
 **Explanation:** Naming each approved role in the bucket policy means only those roles can be granted access, whatever an account administrator attaches in their own account, the tightest least-privilege control at the resource.
 - Organization-wide condition: any role in the organization can be granted access by its own administrator (giải bài toán khác)
-- IAM users with shared keys: long-term credentials, with per-account rather than per-role control (vi phạm ràng buộc)
+- IAM users with shared keys: control is per account, not per role, and every holder of the key can read (giải bài toán khác)
 - S3 ACLs per canonical user ID: grants to whole accounts, and ACLs are disabled by default (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-account-resource-access.html
 > 🇻🇳 Kiểm soát chặt nhất role nào được đọc → bucket policy liệt kê từng role được duyệt (đánh đổi: tốn vận hành hơn).

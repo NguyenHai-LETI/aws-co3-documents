@@ -18,15 +18,15 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.2 �
 - services: Route 53, ALB, Global Accelerator, CloudFront
 - tags: route53-routing, route53-health-checks, alias-records, multi-region
 - difficulty: medium
+- time: 120
 - skills: 2.2.k1, 2.2.k6
+- family: regional-failover-qualifier
 - concept: Route 53 failover alias records with Evaluate Target Health are the cheapest automatic active-passive Regional failover
 - refs: 04-networking-services.md
-- hint: Cần chuyển Region tự động, không phụ thuộc Region chính, và rẻ nhất — loại giải pháp có phí cố định hoặc không xử lý được POST.
-- family: regional-failover-qualifier
+- hint: Ba yêu cầu: tự động, không phụ thuộc Region chính, rẻ nhất — với mỗi phương án, hỏi: tốn phí gì, chuyển được loại request nào, logic chạy ở đâu?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A gaming company serves a REST API at api.example.com from Application Load Balancers in two Regions: us-east-1 is primary and eu-west-1 is a warm standby. Most requests are HTTPS POST calls. The company wants traffic to move to the standby Region automatically when the primary Region's load balancer becomes unhealthy, and the move must not depend on any resource in the primary Region. Which solution meets these requirements MOST cost-effectively?
 
@@ -259,14 +259,14 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elas
 - services: NAT Gateway, VPC, Internet Gateway
 - tags: subnets, high-availability, egress-only-igw
 - difficulty: medium
+- time: 135
 - skills: 2.2.k3, 2.2.s4
-- concept: A NAT gateway is resilient only inside its Availability Zone, so each zone needs its own gateway and a route table pointing to it
+- concept: A zonal NAT gateway is resilient only inside its Availability Zone, so each zone needs its own gateway and a route table pointing to it (a regional NAT gateway is the newer multi-AZ alternative)
 - refs: 04-networking-services.md
-- hint: Một NAT gateway chỉ chịu lỗi trong AZ của nó — cần cả tài nguyên mỗi AZ lẫn bảng định tuyến trỏ đúng NAT cùng AZ.
+- hint: NAT gateway kiểu zonal chỉ dự phòng trong AZ của nó — mỗi AZ cần gì, và bảng định tuyến của từng subnet nên trỏ về đâu?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A company runs application servers in private subnets in three Availability Zones. All three private subnets share one route table whose default route points to a single NAT gateway in a public subnet in us-east-1a. The servers call external payment APIs. During an outage of us-east-1a, servers in all three zones lost outbound internet access. The company wants to remove this single point of failure while avoiding cross-zone dependencies. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -278,12 +278,12 @@ A company runs application servers in private subnets in three Availability Zone
 
 **Answer:** B, D
 
-**Explanation:** A NAT gateway is resilient only within its own Availability Zone, so each zone needs its own gateway, and each private subnet's route table must send the default route to the same-zone gateway.
-- Second gateway in one zone with multipath routing: a route has a single target and both gateways fail together (cấu hình không tồn tại).
+**Explanation:** A zonal NAT gateway is redundant only within its own Availability Zone, so each zone needs its own gateway, and each private subnet's route table must send the default route to the same-zone gateway. (A regional NAT gateway, available since November 2025, spans zones automatically, but it is not offered here.)
+- Second gateway in one zone with multipath routing: a route has a single target and both gateways fail with that zone (cấu hình không tồn tại).
 - NAT instance in a one-instance group in us-east-1a: still one zone, plus patching work (tốn vận hành hơn).
 - Egress-only internet gateway: outbound access for IPv6 only, not IPv4 NAT (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-scenarios.html
-> 🇻🇳 NAT gateway chỉ chịu lỗi trong 1 AZ → mỗi AZ một NAT gateway + route table từng AZ trỏ về NAT cùng AZ.
+> 🇻🇳 NAT gateway kiểu zonal chỉ chịu lỗi trong 1 AZ → mỗi AZ một NAT gateway + route table từng AZ trỏ về NAT cùng AZ (NAT gateway kiểu regional từ 11/2025 tự trải nhiều AZ).
 
 ---
 
