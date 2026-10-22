@@ -1,0 +1,344 @@
+---
+pack: ai-2026-10-22-tier-a-4-4
+title: "AI · Tầng A · Task 4.4 — Mạng tối ưu chi phí (NAT, kết nối, DNS, billing, throttling)"
+exam: SAA-C03
+origin: ai
+created: 2026-10-22
+generated_by: 2026-10-22_tier-a
+source: "v6 tầng A — đề cương 4.4"
+description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.4"
+---
+
+# AI · Tầng A · Task 4.4 — Mạng tối ưu chi phí (NAT, kết nối, DNS, billing, throttling)
+
+## Q ai-20261022-a44-01
+- domain: cost
+- task: 4.4
+- topic: cost
+- services: Cost Explorer, Organizations
+- tags: tagging, cost-allocation-tags, consolidated-billing
+- difficulty: medium
+- skills: 4.4.k1, 4.4.k2
+- concept: User-defined tags must be activated as cost allocation tags from the management account before Cost Explorer can group by them
+- refs: 06-management-governance.md
+- hint: Thẻ đã gắn nhiều tuần nhưng chưa xuất hiện để nhóm chi phí — thẻ phải được kích hoạt ở đâu, bởi tài khoản nào trong tổ chức?
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 150
+
+A company has 30 AWS accounts in an organization with all features enabled. Teams tag their resources with a ProductLine tag key. Finance wants a monthly view of costs per product line across all accounts, but ProductLine does not appear as a grouping option in AWS Cost Explorer even though the tag has been applied for several weeks. The company wants a solution that covers every member account without building custom reports. Which combination of steps will meet these requirements? (Choose TWO)
+
+- A. Activate the ProductLine user-defined cost allocation tag in the Billing and Cost Management console of the management account
+- B. Create an AWS Cost and Usage Report in every member account and report the monthly costs by combining them with an AWS Glue job and Amazon Athena queries
+- C. In AWS Cost Explorer for the management account, group the monthly costs by the ProductLine tag key
+- D. Create an AWS Organizations tag policy for the ProductLine key so that the tag becomes available in Cost Explorer as a billing dimension for costs
+- E. Activate the ProductLine cost allocation tag separately in the Billing and Cost Management console of each member account to expose the costs
+
+**Answer:** A, C
+
+**Explanation:** Tags appear in Cost Explorer only after activation as cost allocation tags, done in the management account, which also sees the consolidated costs of every member account.
+- Cost and Usage Report per member account plus Glue and Athena: builds the custom reporting the company wants to avoid (tốn vận hành hơn)
+- Organizations tag policy: standardizes tag keys, not billing activation (dùng sai tính năng)
+- Activating in each member account: only the management account has the cost allocation tags manager (đặt sai chỗ)
+Docs: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html
+> 🇻🇳 Thẻ chi phí phải được kích hoạt (cost allocation tag) ở tài khoản quản lý rồi mới nhóm được trong Cost Explorer.
+---
+
+## Q ai-20261022-a44-02
+- domain: cost
+- task: 4.4
+- topic: networking
+- services: NAT Gateway, VPC
+- tags: nat-gateway, single-nat, data-transfer-cost
+- difficulty: medium
+- skills: 4.4.k4, 4.4.s1
+- concept: A non-production VPC can share one NAT gateway across AZs to avoid per-AZ hourly charges when brief outages are acceptable
+- refs: 04-networking-services.md, L-quyet-dinh-nhanh.md
+- hint: Môi trường dev chấp nhận mất kết nối ngắn khi một AZ lỗi và không muốn quản lý instance NAT — một NAT gateway chung hay mỗi AZ một cái?
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 120
+
+A company runs a development and test environment in a VPC with private subnets in three Availability Zones. The EC2 instances download packages and container images from the internet over IPv4 and accept no inbound connections. Outbound traffic averages about 40 GB per day. The environment is used during business hours, and a brief loss of internet access during an Availability Zone failure is acceptable. The team has no capacity to patch or operate NAT instances. Which solution will meet these requirements MOST cost-effectively?
+
+- A. Create one NAT gateway in a public subnet of a single Availability Zone and point the default route of every private subnet to it
+- B. Create a NAT gateway in a public subnet of each Availability Zone and route each private subnet to the gateway in its own zone
+- C. Launch an Auto Scaling group of NAT instances across the three zones with a failover script, and route the private subnets to the instances
+- D. Create an egress-only internet gateway and add an IPv4 default route to it in the route tables of every private subnet
+
+**Answer:** A
+
+**Explanation:** NAT gateways are charged per gateway-hour and per GB processed, so one shared gateway avoids two extra hourly charges, and the accepted short outage removes the need for one per zone. It is also managed.
+- NAT gateway in every zone: zone independence nobody needs, at triple the hourly cost (tốn chi phí hơn)
+- NAT instances in Auto Scaling groups: patching and failover scripts are work the team cannot take (vi phạm ràng buộc)
+- Egress-only internet gateway: carries IPv6 only (dùng sai tính năng)
+Docs: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-comparison.html
+> 🇻🇳 Dev/test chịu được gián đoạn ngắn → một NAT gateway dùng chung rẻ hơn; mỗi AZ một NAT chỉ khi cần độc lập AZ.
+---
+
+## Q ai-20261022-a44-03
+- domain: cost
+- task: 4.4
+- topic: networking
+- services: NLB, ELB
+- tags: elb-features, cross-zone, data-transfer-cost
+- difficulty: hard
+- skills: 4.4.k3, 4.4.s3
+- concept: Enabling cross-zone load balancing on an NLB incurs inter-AZ data transfer charges; disabling it keeps traffic within each AZ
+- refs: 04-networking-services.md
+- hint: Chi phí truyền dữ liệu giữa các AZ tăng vì NLB đang bật cross-zone — thiết lập nào giữ lưu lượng trong từng AZ mà không bỏ AZ nào?
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 140
+
+A gaming company runs a TCP-based matchmaking service behind an internet-facing Network Load Balancer that has cross-zone load balancing enabled. The targets are EC2 instances spread evenly across three Availability Zones by an Auto Scaling group, and clients are distributed evenly across the three zonal addresses of the load balancer. The monthly bill shows significant inter-AZ data transfer charges for the service. The company must keep using all three zones for availability, keep the NLB and the TCP protocol, and avoid code changes. Which solution will reduce the data transfer charges MOST cost-effectively?
+
+- A. Replace the Network Load Balancer with an Application Load Balancer, keep cross-zone load balancing enabled, and register the same instances as targets
+- B. Turn off cross-zone load balancing and keep the group balanced across the three zones so that each zone has enough targets
+- C. Deregister the targets in two of the zones, keep cross-zone load balancing enabled, and let the Auto Scaling group serve every connection from one zone
+- D. Put AWS Global Accelerator in front of the load balancer, keep cross-zone load balancing enabled, and let clients enter the AWS network closer to the targets
+
+**Answer:** B
+
+**Explanation:** With cross-zone enabled, an NLB node forwards to targets in other zones and EC2 data transfer charges apply. Disabled, each node serves only its own zone, so balanced capacity per zone removes cross-AZ traffic while all zones stay in use.
+- Application Load Balancer: handles HTTP and HTTPS, not the custom TCP protocol (vi phạm ràng buộc)
+- Targets in a single zone: removes the multi-zone availability required (vi phạm ràng buộc)
+- Global Accelerator: does not change forwarding between zones, and adds charges (giải bài toán khác)
+Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-target-group-attributes.html#target-group-cross-zone
+> 🇻🇳 NLB bật cross-zone → tính phí truyền dữ liệu giữa AZ; tắt cross-zone và cân bằng số target mỗi AZ để giảm chi phí.
+---
+
+## Q ai-20261022-a44-04
+- domain: cost
+- task: 4.4
+- topic: cost
+- services: Cost and Usage Report, Athena, VPC Flow Logs, NAT Gateway
+- tags: data-transfer-cost, cost-and-usage-report, vpc-flow-logs
+- difficulty: hard
+- skills: 4.4.s5, 4.4.k2
+- concept: Review network cost with CUR resource-level line items queried in Athena plus VPC Flow Logs to find traffic sources
+- refs: 06-management-governance.md, 04-networking-services.md
+- hint: Cần biết NAT gateway nào tốn nhất và lưu lượng đi đâu — một nguồn cho dữ liệu chi phí theo resource ID, một nguồn cho luồng mạng.
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 170
+
+A company's monthly bill shows a large increase in NAT gateway data processing charges. The company operates NAT gateways in several VPCs across 12 accounts and cannot tell which gateways are responsible or which applications and destinations generate the traffic. The cloud team wants to identify the most expensive NAT gateways and the main sources and destinations of traffic through them before it decides how to optimize, by using managed services and SQL queries. Which combination of actions will meet these requirements with the LEAST operational overhead? (Choose TWO)
+
+- A. Create AWS Budgets cost budgets for each account with alerts at 80 percent so that the account owners investigate their NAT gateway usage
+- B. Create an organization-level Cost and Usage Report with resource IDs delivered to Amazon S3 and query the NAT gateway line items with Athena
+- C. Enable AWS CloudTrail data events for Amazon S3 and query them to find the instances that are the source or destination of traffic through the NAT gateways
+- D. Use AWS Compute Optimizer recommendations to right-size each NAT gateway according to its data processing charges
+- E. Enable VPC Flow Logs for the NAT gateways' network interfaces, deliver them to Amazon S3, and query the top source and destination addresses with Athena
+
+**Answer:** B, E
+
+**Explanation:** The Cost and Usage Report is the most detailed cost dataset and, with resource IDs, shows the charge per NAT gateway. Flow Logs record the traffic through the gateway interfaces, so Athena queries reveal who sends data and where.
+- Budgets with alerts: say that spending rose, not which gateway or traffic causes it (giải bài toán khác)
+- CloudTrail data events for S3: log S3 object API calls, not network flows (dùng sai tính năng)
+- Compute Optimizer for NAT gateways: gives no recommendations for NAT gateways (dùng sai tính năng)
+Docs: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
+> 🇻🇳 Rà soát chi phí mạng: CUR (kèm resource ID) + Athena cho chi phí theo NAT gateway, VPC Flow Logs cho nguồn/đích lưu lượng.
+---
+
+## Q ai-20261022-a44-05
+- domain: cost
+- task: 4.4
+- topic: networking
+- services: Direct Connect, S3
+- tags: direct-connect, hosted-connection, data-transfer-cost
+- difficulty: medium
+- skills: 4.4.k5, 4.4.s2
+- concept: A Direct Connect hosted connection sized to need beats internet or oversized ports on cost and consistent latency for steady heavy traffic
+- refs: 04-networking-services.md, L-quyet-dinh-nhanh.md
+- hint: Truyền dữ liệu ra nhiều TB mỗi tháng, cần độ trễ ổn định, chỉ cần dưới 1 Gbps — kết nối riêng cỡ nào và loại nào rẻ nhất?
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 115
+
+A media company's studio uploads source footage to Amazon S3 and downloads about 15 TB of rendered output from S3 every month. The studio currently uses a Site-to-Site VPN over the internet, which is congested at peak times, and the company needs consistent latency. The studio never needs more than 500 Mbps of throughput, and the company plans to keep the arrangement for at least three years. Which solution will meet these requirements MOST cost-effectively?
+
+- A. Order a 10 Gbps dedicated AWS Direct Connect connection and create a public virtual interface to reach Amazon S3 from the studio
+- B. Enable S3 Transfer Acceleration on the buckets and have the studio transfer the data through the accelerated endpoint over the internet
+- C. Order a 500 Mbps hosted Direct Connect connection from a Direct Connect Partner and create a public virtual interface to reach Amazon S3
+- D. Add Site-to-Site VPN connections over the internet and spread the traffic across them to deliver the 500 Mbps with less congestion
+
+**Answer:** C
+
+**Explanation:** A private connection removes congestion, and data transfer out over Direct Connect costs less per GB than internet transfer, which matters for 15 TB of downloads. A hosted connection can be sized below a dedicated port's 1 Gbps.
+- 10 Gbps dedicated connection: far more port capacity than the need (tốn chi phí hơn)
+- S3 Transfer Acceleration: still crosses the public internet and adds a per-GB fee (vi phạm ràng buộc)
+- More VPN connections: stay on the congested internet path at internet transfer rates (vi phạm ràng buộc)
+Docs: https://docs.aws.amazon.com/directconnect/latest/UserGuide/hosted_connection.html
+> 🇻🇳 Lưu lượng lớn, ổn định, cần độ trễ đều → Direct Connect; chọn hosted connection đúng băng thông thay vì cổng 10 Gbps.
+---
+
+## Q ai-20261022-a44-06
+- domain: cost
+- task: 4.4
+- topic: networking
+- services: Site-to-Site VPN, Direct Connect, Transit Gateway
+- tags: vpn, bandwidth, direct-connect
+- difficulty: medium
+- skills: 4.4.s7, 4.4.k5
+- concept: A single Site-to-Site VPN connection already supports up to 1.25 Gbps per tunnel, so moderate bandwidth needs do not justify multiple VPNs or Direct Connect
+- refs: 04-networking-services.md
+- hint: Nhu cầu khoảng 700 Mbps, cần triển khai trong vài ngày với chi phí thấp nhất — một kết nối VPN có đủ băng thông không?
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 105
+
+A company's data center must exchange about 700 Mbps of steady traffic with workloads in a single VPC for the next year. The traffic must be encrypted, the connection must survive the loss of one tunnel endpoint, the link must be running within a few days, and the company wants the LOWEST cost. The customer gateway device supports IPsec and BGP. Which solution will meet these requirements?
+
+- A. Create four Site-to-Site VPN connections attached to a transit gateway, with BGP routing and equal-cost multi-path routing across the tunnels
+- B. Order a 1 Gbps dedicated Direct Connect connection and add a backup Site-to-Site VPN connection for encryption and failover
+- C. Create an AWS Client VPN endpoint and install the client software on the servers in the data center
+- D. Create one Site-to-Site VPN connection to a virtual private gateway and configure both of its tunnels with BGP routing for redundancy
+
+**Answer:** D
+
+**Explanation:** Each standard VPN tunnel supports up to 1.25 Gbps, so one connection covers 700 Mbps, and its two tunnels end in different Availability Zones for redundancy. It is encrypted, ready in minutes, and cheaper than every larger design.
+- Four VPN connections with a transit gateway: extra connection, attachment and processing charges for unneeded bandwidth (tốn chi phí hơn)
+- Direct Connect with backup VPN: provisioning a physical connection takes far longer than days (vi phạm ràng buộc)
+- Client VPN: built for individual remote users, not site-to-site links (dùng sai tính năng)
+Docs: https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-limits.html
+> 🇻🇳 700 Mbps vừa trong giới hạn 1,25 Gbps mỗi tunnel → một Site-to-Site VPN (2 tunnel) là đủ và rẻ nhất.
+---
+
+## Q ai-20261022-a44-07
+- domain: cost
+- task: 4.4
+- topic: networking
+- services: Transit Gateway, VPC Peering, Direct Connect
+- tags: transit-gateway, vpc-peering, data-transfer-cost
+- difficulty: hard
+- skills: 4.4.k6, 4.4.s3
+- concept: Peering avoids Transit Gateway data processing charges for a high-volume pair, while the Transit Gateway hub still serves on-premises access
+- refs: 04-networking-services.md, Q-service-comparisons.md
+- hint: Hai VPC trao đổi hàng trăm TB mỗi tháng nên tính phí xử lý theo GB của Transit Gateway rất lớn — nhưng vẫn cần một trung tâm cho on-premises.
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 135
+
+A company runs 12 VPCs in one Region and none of the CIDR blocks overlap. An ingestion VPC and an analytics VPC exchange about 200 TB of data every month. The other ten VPCs need occasional low-volume access to a shared-services VPC. All 12 VPCs must also reach the company's data center through a single Direct Connect connection. The company wants private connectivity with the LOWEST total network cost. Which solution will meet these requirements?
+
+- A. Attach all 12 VPCs to a transit gateway, and add a VPC peering connection between the ingestion and analytics VPCs for their data exchange
+- B. Attach all 12 VPCs to a transit gateway and route all traffic, including the data exchange between the ingestion and analytics VPCs, through it
+- C. Create a full mesh of VPC peering connections among the analytics VPC, the ingestion VPC and the ten other VPCs, and route on-premises traffic through them
+- D. Create AWS PrivateLink endpoint services in the analytics VPC and interface endpoints in each of the other 11 VPCs, including the shared-services VPC
+
+**Answer:** A
+
+**Explanation:** The transit gateway is the hub for Direct Connect, but it charges per attachment hour and per GB processed. Peering has no hourly charge and same-zone traffic is free, so moving the 200 TB flow to peering removes the largest charge.
+- Everything through the transit gateway: processing charges apply to all 200 TB (tốn chi phí hơn)
+- Full mesh of peering: peering is not transitive, so Direct Connect cannot be shared (vi phạm ràng buộc)
+- PrivateLink endpoint services: charge per hour and per GB, and are not general connectivity (dùng sai tính năng)
+Docs: https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
+> 🇻🇳 Cặp VPC lưu lượng khổng lồ → VPC peering (không phí xử lý/giờ); Transit Gateway vẫn là hub cho on-premises.
+---
+
+## Q ai-20261022-a44-08
+- domain: cost
+- task: 4.4
+- topic: networking
+- services: Route 53 Resolver, RAM, Route 53
+- tags: hybrid-dns, resolver-endpoints, data-transfer-cost
+- difficulty: hard
+- skills: 4.4.k7
+- concept: Resolver endpoints are billed per ENI-hour, so centralize one outbound endpoint and share forwarding rules through AWS RAM
+- refs: 04-networking-services.md
+- hint: Mỗi VPC có endpoint Resolver riêng nên tốn phí theo giờ — hãy dùng một endpoint chung và chia sẻ rule cho các VPC khác.
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 165
+
+A company has 40 VPCs in 40 accounts of one organization. Each VPC has its own Route 53 Resolver outbound endpoint and a forwarding rule for corp.example.com, which resolves on on-premises DNS servers over Direct Connect. The bill shows high Resolver endpoint charges. The company wants to reduce DNS costs while resolution of corp.example.com keeps working from every VPC, private hosted zones and AWS service names keep resolving as they do today, and operational effort stays low. Which combination of steps will meet these requirements? (Choose TWO)
+
+- A. Create one outbound endpoint and forwarding rule in a shared-services VPC and delete the per-VPC endpoints
+- B. Create an inbound endpoint in each VPC so that on-premises DNS servers can resolve names hosted in the VPCs of the organization, and keep the outbound forwarding rules
+- C. Change the DHCP options set of each VPC to use the on-premises DNS servers directly as the sole name servers, replacing the outbound rule
+- D. Share the forwarding rule with the organization by using AWS Resource Access Manager and associate it with each of the 40 VPCs
+- E. Create a private hosted zone for corp.example.com in each VPC instead of the forwarding rule and copy the on-premises records into every zone
+
+**Answer:** A, D
+
+**Explanation:** Resolver endpoints are billed per network interface and hour, so one outbound endpoint replaces forty. A rule shared through AWS RAM and associated with each VPC sends queries through it.
+- Inbound endpoints in each VPC: serve queries from on-premises to AWS, the opposite direction, and add charges (giải bài toán khác)
+- On-premises DNS servers as sole name servers: private hosted zones and AWS names would stop resolving as today (vi phạm ràng buộc)
+- Copied records in private hosted zones: forty copies that drift from the source (tốn vận hành hơn)
+Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-rules-managing.html
+> 🇻🇳 Giảm phí Resolver endpoint: một outbound endpoint dùng chung + chia sẻ forwarding rule qua AWS RAM cho các VPC.
+---
+
+## Q ai-20261022-a44-09
+- domain: cost
+- task: 4.4
+- topic: networking
+- services: CloudFront, S3
+- tags: cloudfront, edge-caching, data-transfer-cost
+- difficulty: easy
+- skills: 4.4.s4
+- concept: CloudFront caches static downloads at the edge, cutting S3 data transfer out and latency while the bucket stays private through origin access control
+- refs: 04-networking-services.md
+- hint: Tệp ít thay đổi, người dùng toàn cầu, hoá đơn chủ yếu là truyền dữ liệu ra — lớp đệm nào ở biên giảm cả chi phí lẫn độ trễ?
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 100
+
+A software company provides installers and updates, each between 200 MB and 2 GB, from an Amazon S3 bucket in us-east-1 directly to customers worldwide. The monthly bill is dominated by S3 data transfer out to the internet, and customers in Asia report slow downloads. The files change only a few times per month, and the bucket must remain private. Which solution will reduce cost and improve download speed MOST cost-effectively?
+
+- A. Put AWS Global Accelerator in front of the S3 bucket and have customers download through the accelerator's static IP addresses worldwide
+- B. Create an Amazon CloudFront distribution with the S3 bucket as its origin by using origin access control, and serve downloads through it
+- C. Replicate the bucket to several Regions with Cross-Region Replication and route customers to the nearest bucket by using Route 53 latency routing
+- D. Enable S3 Transfer Acceleration on the bucket and have customers download through the accelerated endpoint from the nearest edge location
+
+**Answer:** B
+
+**Explanation:** CloudFront caches the rarely changing files at the edge, so most downloads never reach S3, origin fetches from S3 are free, and distant customers get faster delivery. Origin access control keeps the bucket private.
+- Global Accelerator in front of S3: it does not cache and S3 is not a supported endpoint (dùng sai tính năng)
+- Cross-Region Replication with latency routing: adds storage and replication cost, and downloads still come from S3 (tốn chi phí hơn)
+- Transfer Acceleration: speeds transfers but adds a fee and no caching (giải bài toán khác)
+Docs: https://aws.amazon.com/cloudfront/pricing/pay-as-you-go/
+> 🇻🇳 Tệp tĩnh ít đổi cho người dùng toàn cầu → CloudFront (cache ở biên, truyền S3→CloudFront miễn phí, bucket riêng tư qua OAC).
+---
+
+## Q ai-20261022-a44-10
+- domain: cost
+- task: 4.4
+- topic: api
+- services: API Gateway, Lambda
+- tags: throttling, usage-plans, api-keys
+- difficulty: medium
+- skills: 4.4.s6
+- concept: API Gateway usage plans with API keys throttle and cap each client by tier, protecting backend cost without code changes
+- refs: 11-api-integration.md, 04-networking-services.md
+- hint: Mỗi gói đối tác cần tốc độ và hạn mức tháng khác nhau — tính năng nào của API Gateway giới hạn theo từng khách hàng?
+- status: draft
+- created: 2026-10-22
+- enriched: 2026-10-22
+- time: 125
+
+A company exposes a REST API through Amazon API Gateway with AWS Lambda integrations. Partners buy the API on three subscription tiers that must allow different steady request rates and different monthly request volumes. A few Basic-tier partners send traffic bursts that raise Lambda concurrency and downstream database costs for everyone. The company wants to cap each partner according to its tier without changing the Lambda code. Which solution will meet these requirements with the LEAST operational overhead?
+
+- A. Create an AWS WAF rate-based rule that blocks any source IP address exceeding a fixed number of requests in a five-minute window, and review it monthly for each tier
+- B. Set reserved concurrency on the Lambda function to a value that limits simultaneous executions, and raise it each month for the higher tier
+- C. Create an API Gateway usage plan for each tier with rate, burst and monthly quota limits, and associate each partner's API key with its plan
+- D. Add an Amazon SQS queue between API Gateway and Lambda so that bursts from every partner are smoothed, with a larger queue for the Premium tier
+
+**Answer:** C
+
+**Explanation:** A usage plan sets per-client throttling rate, burst and quota for clients identified by API keys, so each tier gets its own limits and clients over them receive 429 responses before the backend runs.
+- WAF rate-based rule per IP address: partners can share egress IPs and the rule cannot enforce quotas per tier (dùng sai tính năng)
+- Reserved concurrency: caps the whole function for all partners rather than per tier (đặt sai chỗ)
+- SQS queue before Lambda: smooths load for everyone and applies no tier limits (giải bài toán khác)
+Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html
+> 🇻🇳 Giới hạn tốc độ và hạn mức theo từng gói/khách hàng → usage plan + API key trên API Gateway.
