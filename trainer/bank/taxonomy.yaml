@@ -17,6 +17,12 @@
 #     các chế độ luyện khi practice.exclude_out_of_scope); nêu ở phương án nhiễu = lint oos-distractor.
 #     Không ghi scope = trong phạm vi hoặc chưa được liệt kê (danh sách chính thức không đầy đủ) — không bị loại.
 #     "AWS Tools and SDKs" cũng ngoài phạm vi nhưng không đưa vào đây: đáp án đúng hay *dùng* SDK như một phần giải pháp.
+#   • scope: legacy = [v6] bị GỠ khỏi danh sách trong phạm vi chính thức (saa-03-in-scope-services, đối chiếu 2026-10-22:
+#     https://docs.aws.amazon.com/aws-certification/latest/solutions-architect-associate-03/saa-03-in-scope-services.html) hoặc đã
+#     ngừng mà dịch vụ kế nhiệm nằm ngoài phạm vi (Elastic Transcoder → MediaConvert). App coi như scope: out (oos-*, loại khỏi
+#     luyện / thi thử / đề niêm phong); coverage.ts liệt kê riêng ở mục "Dịch vụ bị gỡ khỏi phạm vi đề".
+#     Gỡ khỏi in-scope: Data Pipeline, AppSync, QLDB, Pinpoint, Forecast, Fraud Detector, Kendra, Proton, Application Discovery
+#     Service, Migration Hub, Audit Manager. Ngừng hẳn: Elastic Transcoder (2025-11-13).
 #   • aliases     = tên chính thức hiện tại / tên mới trong exam guide (vd QuickSight → Amazon Quick). Chỉ để hiển thị và để AI
 #     viết đúng tên — muốn nhận diện tên đó trong câu hỏi thì phải có trong `match`.
 # AI coach được phép BỔ SUNG service/feature mới vào đây (không xoá/đổi tên cái cũ).
@@ -111,6 +117,12 @@ services:
   Lightsail:             { topic: compute, match: [Lightsail], scope: out }
   App Runner:            { topic: compute, match: [App Runner] }
   EC2 Auto Scaling:      { topic: compute, match: [EC2 Auto Scaling, Auto Scaling group*, Auto Scaling, ASG] }
+  # [v6] có trong danh sách in-scope (đối chiếu 2026-10-22) nhưng chưa có trong taxonomy
+  ECS Anywhere:          { topic: compute, match: [ECS Anywhere], aliases: [Amazon ECS Anywhere] }
+  EKS Anywhere:          { topic: compute, match: [EKS Anywhere], aliases: [Amazon EKS Anywhere] }
+  EKS Distro:            { topic: compute, match: [EKS Distro], aliases: [Amazon EKS Distro] }
+  Serverless Application Repository: { topic: compute, match: [Serverless Application Repository], aliases: [AWS Serverless Application Repository] }
+  VMware Cloud on AWS:   { topic: compute, match: [VMware Cloud on AWS, VMC on AWS] }
   # ── Storage
   S3:                    { topic: storage, match: [S3, Simple Storage Service] }
   S3 Glacier:            { topic: storage, match: [Glacier] }
@@ -130,7 +142,7 @@ services:
   DocumentDB:            { topic: database, match: [DocumentDB] }
   Keyspaces:             { topic: database, match: [Keyspaces] }
   Timestream:            { topic: database, match: [Timestream] }
-  QLDB:                  { topic: database, match: [QLDB, Quantum Ledger Database] }
+  QLDB:                  { topic: database, match: [QLDB, Quantum Ledger Database], scope: legacy }
   Redshift:              { topic: database, match: [Redshift] }
   RDS on VMware:         { topic: database, match: [RDS on VMware], scope: out }
   # ── Networking & Content Delivery
@@ -158,7 +170,7 @@ services:
   Cloud Map:             { topic: networking, match: [Cloud Map], scope: out }
   # ── Security, Identity & Compliance
   IAM:                   { topic: security, match: [IAM, Identity and Access Management] }
-  IAM Identity Center:   { topic: security, match: [IAM Identity Center, AWS SSO, Single Sign-On] }
+  IAM Identity Center:   { topic: security, match: [IAM Identity Center, AWS SSO, Single Sign-On], aliases: [AWS IAM Identity Center] }
   STS:                   { topic: security, match: [STS, Security Token Service, AssumeRole] }
   KMS:                   { topic: security, match: [KMS, Key Management Service] }
   CloudHSM:              { topic: security, match: [CloudHSM] }
@@ -169,14 +181,14 @@ services:
   GuardDuty:             { topic: security, match: [GuardDuty] }
   Inspector:             { topic: security, match: [Inspector] }
   Macie:                 { topic: security, match: [Macie] }
-  Security Hub:          { topic: security, match: [Security Hub] }
+  Security Hub:          { topic: security, match: [Security Hub], aliases: [AWS Security Hub CSPM] }
   Detective:             { topic: security, match: [Amazon Detective] }
   Cognito:               { topic: security, match: [Cognito] }
   Directory Service:     { topic: security, match: [Directory Service, Managed Microsoft AD, AD Connector] }
   Firewall Manager:      { topic: security, match: [Firewall Manager] }
   RAM:                   { topic: security, match: [Resource Access Manager, AWS RAM] }
   AWS Artifact:          { topic: security, match: [AWS Artifact] }
-  Audit Manager:         { topic: security, match: [Audit Manager] }
+  Audit Manager:         { topic: security, match: [Audit Manager], scope: legacy }
   # ── Management & Governance
   CloudWatch:            { topic: management, match: [CloudWatch] }
   CloudTrail:            { topic: management, match: [CloudTrail] }
@@ -189,8 +201,14 @@ services:
   Trusted Advisor:       { topic: management, match: [Trusted Advisor] }
   Health Dashboard:      { topic: management, match: [Health Dashboard, AWS Health] }
   License Manager:       { topic: management, match: [License Manager] }
-  Proton:                { topic: management, match: [Proton] }
+  Proton:                { topic: management, match: [Proton], scope: legacy }
   Console Mobile App:    { topic: management, match: [Console Mobile Application, Console Mobile App], scope: out, aliases: [AWS Console Mobile Application] }
+  AWS Auto Scaling:      { topic: management, match: [AWS Auto Scaling, scaling plan*] }   # [v6] in-scope (scaling plan nhiều loại tài nguyên), khác EC2 Auto Scaling
+  AWS CLI:               { topic: management, match: [AWS CLI, AWS Command Line Interface] }   # [v6] in-scope
+  Managed Grafana:       { topic: management, match: [Managed Grafana], aliases: [Amazon Managed Grafana] }   # [v6] in-scope
+  Managed Prometheus:    { topic: management, match: [Managed Service for Prometheus, Managed Prometheus], aliases: [Amazon Managed Service for Prometheus] }   # [v6] in-scope
+  Management Console:    { topic: management, match: [Management Console], aliases: [AWS Management Console] }   # [v6] in-scope
+  Well-Architected Tool: { topic: management, match: [Well-Architected Tool], aliases: [AWS Well-Architected Tool] }   # [v6] in-scope
   Distro for OpenTelemetry: { topic: management, match: [Distro for OpenTelemetry, ADOT], scope: out, aliases: [AWS Distro for OpenTelemetry] }
   # ── Application Integration
   SQS:                   { topic: integration, match: [SQS, Simple Queue Service] }
@@ -220,30 +238,33 @@ services:
   Data Firehose:         { topic: analytics, match: [Kinesis Data Firehose, Data Firehose, Firehose], aliases: [Amazon Data Firehose] }
   Managed Apache Flink:  { topic: analytics, match: [Kinesis Data Analytics, Managed Service for Apache Flink, Apache Flink], aliases: [Amazon Managed Service for Apache Flink] }
   Kinesis Video Streams: { topic: analytics, match: [Kinesis Video Streams] }
+  Elastic Transcoder:    { topic: other, match: [Elastic Transcoder], scope: legacy, aliases: [Amazon Elastic Transcoder] }   # [v6] ngừng 2025-11-13, kế nhiệm MediaConvert ngoài phạm vi
   Athena:                { topic: analytics, match: [Athena] }
   Glue:                  { topic: analytics, match: [Glue, Glue Data Catalog, Glue crawler] }
   EMR:                   { topic: analytics, match: [EMR, Elastic MapReduce] }
   OpenSearch:            { topic: analytics, match: [OpenSearch, Elasticsearch], aliases: [Amazon OpenSearch Service] }
   QuickSight:            { topic: analytics, match: [QuickSight, Amazon Quick], aliases: [Amazon Quick] }
   Lake Formation:        { topic: analytics, match: [Lake Formation] }
+  Data Exchange:         { topic: analytics, match: [AWS Data Exchange], aliases: [AWS Data Exchange] }   # [v6] in-scope
   MSK:                   { topic: analytics, match: [MSK, Managed Streaming for Apache Kafka, Kafka] }
-  Data Pipeline:         { topic: analytics, match: [Data Pipeline] }
+  Data Pipeline:         { topic: analytics, match: [Data Pipeline], scope: legacy }
   # ── Migration & Transfer
   DMS:                   { topic: migration, match: [DMS, Database Migration Service] }
   SCT:                   { topic: migration, match: [SCT, Schema Conversion Tool] }
-  Application Migration Service: { topic: migration, match: [Application Migration Service, MGN] }
+  Application Migration Service: { topic: migration, match: [Application Migration Service, MGN, AWS Transform MGN], aliases: [AWS Transform MGN] }
   DataSync:              { topic: migration, match: [DataSync] }
   Transfer Family:       { topic: migration, match: [Transfer Family, Transfer for SFTP] }
   Snow Family:           { topic: migration, match: [Snowball, Snowcone, Snowmobile, Snow Family] }
-  Migration Hub:         { topic: migration, match: [Migration Hub] }
-  Application Discovery Service: { topic: migration, match: [Application Discovery Service, Discovery Agent] }
+  Migration Hub:         { topic: migration, match: [Migration Hub], scope: legacy }
+  Application Discovery Service: { topic: migration, match: [Application Discovery Service, Discovery Agent], scope: legacy }
   Migration Evaluator:   { topic: migration, match: [Migration Evaluator], scope: out }
   # ── API & Front-end
   API Gateway:           { topic: api, match: [API Gateway] }
-  AppSync:               { topic: api, match: [AppSync, GraphQL] }
+  AppSync:               { topic: api, match: [AppSync, GraphQL], scope: legacy }
   SES:                   { topic: api, match: [SES, Simple Email Service] }
-  Pinpoint:              { topic: api, match: [Pinpoint] }
+  Pinpoint:              { topic: api, match: [Pinpoint], scope: legacy }
   Amplify:               { topic: api, match: [Amplify] }
+  Device Farm:           { topic: api, match: [Device Farm], aliases: [AWS Device Farm] }   # [v6] in-scope
   # ── ML / AI
   SageMaker:             { topic: ml, match: [SageMaker], aliases: [Amazon SageMaker AI] }
   Rekognition:           { topic: ml, match: [Rekognition] }
@@ -253,10 +274,10 @@ services:
   Polly:                 { topic: ml, match: [Polly] }
   Lex:                   { topic: ml, match: [Lex] }
   Textract:              { topic: ml, match: [Textract] }
-  Kendra:                { topic: ml, match: [Kendra] }
+  Kendra:                { topic: ml, match: [Kendra], scope: legacy }
   Personalize:           { topic: ml, match: [Amazon Personalize], scope: out }
-  Forecast:              { topic: ml, match: [Amazon Forecast] }
-  Fraud Detector:        { topic: ml, match: [Fraud Detector] }
+  Forecast:              { topic: ml, match: [Amazon Forecast], scope: legacy }
+  Fraud Detector:        { topic: ml, match: [Fraud Detector], scope: legacy }
   Bedrock:               { topic: ml, match: [Bedrock] }
   Amazon Q:              { topic: ml, match: [Amazon Q] }
   DevOps Guru:           { topic: ml, match: [DevOps Guru], scope: out }
@@ -443,9 +464,11 @@ features:
 # Mỗi mục đã đối chiếu trên trang chính thức của AWS (url) ngày 2026-10-20 — KHÔNG thêm mục chỉ dựa vào trí nhớ.
 # pattern = regex (không phân biệt hoa thường) trên đề + phương án + giải thích, nói kiến thức cũ; unless = câu đã dùng cách
 # viết hiện hành (vd tên mới) thì bỏ qua. Sửa câu: viết "tên mới (tên cũ)" / giới hạn mới, đừng xoá kiến thức cũ khỏi giải thích.
-# Chưa đưa vào vì không mở được trang chính thức nào của AWS để đối chiếu: Snowmobile, QLDB, OpsWorks. Cố ý không đưa vào: Snowball
-# Edge chỉ còn cho khách cũ từ 2025-11-07, ngừng hỗ trợ 2026-12-31 (aws.amazon.com/snowball) — đề cương SAA-C03 (2026-10-20) vẫn ghi
-# "AWS Snow Family" trong phạm vi nên đáp án Snowball vẫn đúng cho đề thi; CodeCommit đã mở lại cho khách mới (2025-11-24).
+# [v6] 2026-10-22: thêm các mục từ research mục 9, mỗi mục đã mở trang nguồn (url) ngày 2026-10-22. Snowmobile / QLDB / OpsWorks nay
+# đối chiếu được qua danh sách full shutdown. Snowball Edge (vẫn "AWS Snow Family" trong đề cương): mục snowball-edge-closed chỉ bắt
+# giải thích GỢI Ý Snowball (= Snowball …) mà chưa ghi chú trạng thái — giữ đáp án, thêm ghi chú. CodeCommit đã mở lại (2025-11-24).
+# Cố ý không đưa vào (không viết được regex "kiến thức cũ" đủ chính xác): S3 ACL tắt mặc định, SSE-C tắt mặc định cho bucket mới,
+# Regional NAT gateway, IMDSv2 mặc định, giá DynamoDB on-demand, EFS Elastic Throughput mặc định (không tìm được ngày chính thức).
 currency:
   - id: sqs-max-message-1mib
     pattern: '(SQS|queue|message)[^.\n]{0,80}256\s?(KB|KiB)|256\s?(KB|KiB)[^.\n]{0,80}(SQS|queue|messag)'
@@ -506,3 +529,330 @@ currency:
     fact: 'Amazon QuickSight đã thành Amazon Quick Suite (2025-10-09); đề cương SAA-C03 hiện ghi “Amazon Quick”'
     since: '2025-10-09'
     url: 'https://aws.amazon.com/blogs/business-intelligence/reimagine-business-intelligence-amazon-quicksight-evolves-to-amazon-quick-suite · https://docs.aws.amazon.com/aws-certification/latest/solutions-architect-associate-03/saa-03-in-scope-services.html'
+  # ── S3
+  - id: s3-sse-s3-by-default
+    pattern: '(?:S3|bucket|object)[^.\n]{0,60}\b(?:not|aren.t|isn.t|never)\s+encrypted\s+by\s+default|(?:S3|bucket|object)[^.\n]{0,60}không\s+(?:được\s+)?mã\s+h(?:oá|óa)\s+mặc\s+định|(?:enable|turn\s+on|bật)\s+(?:the\s+)?(?:S3\s+|bucket\s+)?default\s+encryption(?![^.\n]{0,50}(?:KMS|DSSE))'
+    unless: 'automatically (?:applies|encrypts?)|tự động mã\s+h(?:oá|óa)|SSE-S3[^.\n]{0,40}(?:by default|mặc định|automatic)'
+    fact: 'S3 tự mã hoá mọi object mới bằng SSE-S3 từ 2023-01-05 (không tắt được) — "bật default encryption để object được mã hoá" đã lỗi thời; câu mã hoá nên xoay quanh SSE-KMS / S3 Bucket Key'
+    since: '2023-01-05'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2023/01/amazon-s3-automatically-encrypts-new-objects/'
+  - id: s3-object-max-50tb
+    pattern: '(?:max(?:imum)?|largest|up to|tối đa|lớn nhất)[^.\n]{0,30}(?:object|đối tượng)[^.\n]{0,30}\b5\s?TB\b|(?:object|đối tượng)s?[^.\n]{0,40}(?:max(?:imum)?|up to|tối đa|limit(?:ed)?|lớn nhất|cap)[^.\n]{0,20}\b5\s?TB\b|\b5\s?TB\b[^.\n]{0,40}(?:max(?:imum)?|limit)[^.\n]{0,30}(?:object|đối tượng)'
+    unless: '\b50\s?TB\b'
+    fact: 'Object S3 tối đa 50 TB từ 2025-12-02 (trước đó 5 TB)'
+    since: '2025-12-02'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/12/amazon-s3-maximum-object-size-50-tb/'
+  - id: s3-object-lambda-closed
+    pattern: 'Object Lambda'
+    unless: '(?:only|chỉ)[^.\n]{0,40}(?:existing customers|khách hàng hiện có)|no longer (?:open|available)|closed to new|không (?:còn )?nhận khách'
+    fact: 'S3 Object Lambda chỉ còn cho khách hàng hiện có từ 2025-11-07 — biến đổi dữ liệu khi đọc: Lambda gọi qua CloudFront / API Gateway / Function URL'
+    since: '2025-11-07'
+    url: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html'
+  - id: s3-mountable-file-system
+    pattern: '(?:\bS3\b|buckets?)[^.\n]{0,60}(?:cannot|can.t|can not|không thể)\s+(?:be\s+)?(?:mount\w*|gắn)|(?:cannot|can.t|can not|không thể)\s+(?:be\s+)?mount\w*[^.\n]{0,40}(?:\bS3\b|buckets?)'
+    unless: 'Mountpoint|S3 Files'
+    fact: 'S3 mount được như file system: Mountpoint for Amazon S3 (file client, GA 2023-08-09) và S3 Files (NFS v4.1+, từ 2026-04-07) — cần POSIX đầy đủ / chia sẻ file truyền thống vẫn chọn EFS / FSx'
+    since: '2023-08-09'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2023/08/mountpoint-amazon-s3-generally-available/ · https://aws.amazon.com/blogs/aws/launching-s3-files-making-s3-buckets-accessible-as-file-systems/'
+  - id: glacier-vaults-closed
+    pattern: 'Glacier\s+(?:Vault Lock|vaults?)\b|\bvaults?\s+(?:in|of|on)\s+(?:Amazon\s+|S3\s+)?Glacier\b|\bVault Lock polic(?:y|ies)|Glacier (?:API|Direct)\b'
+    unless: 'no longer accept|closed to new|not (?:open|available) to new|không (?:còn )?nhận khách'
+    fact: 'Amazon Glacier dạng vault (Glacier API, Vault Lock) không nhận khách hàng mới từ 2025-12-15 — dữ liệu lưu trữ mới: lớp S3 Glacier + Lifecycle, WORM bằng S3 Object Lock'
+    since: '2025-12-15'
+    url: 'https://aws.amazon.com/s3/glacier/pricing/'
+  # ── Snow Family / chuyển dữ liệu
+  - id: snowball-edge-closed
+    pattern: '(?:=|→|->)\s*(?:use\s+|order\s+|dùng\s+)?(?:an?\s+|the\s+)?(?:AWS\s+)?(?:Snowball|Snow Family)\b|(?:Snowball|Snow Family)[^.\n]{0,40}\b(?:is|are)\s+(?:the\s+)?(?:best|right|recommended|correct)\b'
+    unless: '(?:only|chỉ)[^.\n]{0,40}(?:existing customers|khách hàng hiện có|khách cũ)|no longer (?:available|offered|open)|(?:closed|not available) to new|không (?:còn )?nhận khách|Data Transfer Terminal|ngừng hỗ trợ'
+    fact: 'AWS Snowball Edge chỉ còn cho khách hàng hiện có từ 2025-11-07, ngừng hỗ trợ thiết bị ngày 2026-12-31 (thiết kế mới: DataSync, DataSync + Direct Connect, AWS Data Transfer Terminal) — đề cương SAA-C03 vẫn ghi "AWS Snow Family": giữ đáp án, ghi chú trạng thái trong giải thích'
+    since: '2025-11-07'
+    url: 'https://aws.amazon.com/snowball/faqs/ · https://aws.amazon.com/snowball/ · https://docs.aws.amazon.com/snowball/latest/developer-guide/snowball-edge-availability-change.html'
+  - id: snowmobile-retired
+    pattern: 'Snowmobile'
+    unless: 'retired|discontinued|no longer (?:available|offered)|full shutdown|đã ngừng|ngừng (?:hoạt động|cung cấp)'
+    fact: 'AWS Snowmobile đã ngừng hẳn (2024-03-14) — không được là đáp án; dữ liệu cỡ PB: DataSync qua Direct Connect, AWS Data Transfer Terminal'
+    since: '2024-03-14'
+    url: 'https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html'
+  - id: fsx-file-gateway-closed
+    pattern: 'FSx File Gateway'
+    unless: 'no longer|closed to new|không (?:còn )?nhận khách|khách hàng hiện có'
+    fact: 'Amazon FSx File Gateway không nhận khách hàng mới từ 2024-10-28 — truy cập FSx for Windows File Server trực tiếp (qua VPN / Direct Connect)'
+    since: '2024-10-28'
+    url: 'https://aws.amazon.com/blogs/storage/switch-your-file-share-access-from-amazon-fsx-file-gateway-to-amazon-fsx-for-windows-file-server/'
+  # ── Mạng
+  - id: cloudfront-oai-legacy
+    pattern: 'Origin Access Identity|\bOAI\b'
+    unless: 'Origin Access Control|\bOAC\b'
+    fact: 'CloudFront: Origin Access Control (OAC) thay Origin Access Identity (OAI, nay ghi là "legacy") để khoá origin S3 — OAI chỉ còn ở các Region ra mắt trước 12/2022'
+    since: '2022-08-25'
+    url: 'https://aws.amazon.com/blogs/networking-and-content-delivery/amazon-cloudfront-introduces-origin-access-control-oac/'
+  - id: public-ipv4-charge
+    pattern: '(?:Elastic IPs?|\bEIPs?\b|public IPv4|public IP)(?:\s+address(?:es)?)?[^.\n]{0,60}(?:\bfree\b|no (?:additional )?charge|not (?:be )?charged|at no (?:additional )?cost|miễn phí|không (?:bị )?(?:tính|mất) phí)|(?:Elastic IPs?|\bEIPs?\b)[^.\n]{0,60}(?:only|chỉ)[^.\n]{0,30}(?:charged|billed|tính phí)[^.\n]{0,50}(?:unattached|idle|not (?:associated|attached|in use)|stopped|không gắn|không dùng)'
+    unless: '0[.,]005'
+    fact: 'Từ 2024-02-01 mọi địa chỉ IPv4 public (kể cả Elastic IP đang gắn vào instance chạy) tính 0,005 USD/giờ — "EIP đang gắn thì miễn phí" đã lỗi thời'
+    since: '2024-02-01'
+    url: 'https://aws.amazon.com/blogs/aws/new-aws-public-ipv4-address-charge-public-ip-insights/'
+  - id: nlb-security-groups
+    pattern: '\b(?:NLBs?|Network Load Balancers?)\b[^.\n]{0,60}(?:do(?:es)?\s+not|don.t|doesn.t|cannot|can.t|can not|không(?: thể)?)\s+(?:(?:have|support|use|attach|associate|có|hỗ trợ|gắn|dùng)\w*\s+)?(?:an?\s+|any\s+)?(?:security groups?|\bSGs?\b)|(?:security groups?|\bSGs?\b)\s+(?:are\s+|is\s+)?not\s+supported\s+(?:on|by|for)\s+(?:an?\s+)?(?:NLBs?|Network Load Balancers?)\b'
+    unless: '(?:NLB|Network Load Balancer)s?\s+(?:now|also)\s+supports? security groups?|created without|at creation|when (?:you )?create|khi tạo|lúc tạo'
+    fact: 'Network Load Balancer hỗ trợ security group từ 2023-08-10 — "NLB không có security group" đã lỗi thời'
+    since: '2023-08-10'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2023/08/network-load-balancer-supports-security-groups/'
+  - id: alb-mutual-tls
+    pattern: '\b(?:ALBs?|Application Load Balancers?)\b[^.\n]{0,60}(?:do(?:es)?\s+not|don.t|doesn.t|cannot|can.t|can not|không(?: thể)?)\s+(?:(?:support|do|perform|handle|terminate|hỗ trợ|làm|xác thực)\w*\s+)?(?:mTLS|mutual TLS|client certificates?|chứng chỉ (?:của )?client)|(?:mTLS|mutual TLS)[^.\n]{0,80}(?:requires?|needs?|must use|only|cần|phải)[^.\n]{0,40}(?:\bNLB\b|Network Load Balancer|TCP pass-?through|passthrough)'
+    unless: '(?:ALB|Application Load Balancer)s?\s+(?:now|also)\s+supports? (?:mTLS|mutual)|(?:passthrough|verify) mode|trust ?store'
+    fact: 'Application Load Balancer hỗ trợ mutual TLS (xác thực chứng chỉ X.509 của client) từ 2023-11-26 — mTLS không còn bắt buộc NLB TCP passthrough'
+    since: '2023-11-26'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2023/11/application-load-balancer-authenticate-x509-certificate-based-identities/'
+  - id: ec2-instance-connect-endpoint
+    pattern: '\bbastion(?:\s+hosts?)?\s+(?:is|are)\s+(?:required|needed|necessary|mandatory)\s+(?:to|for)\s+(?:SSH|RDP|connect|access|reach|log)|\bthe only (?:way|option|method)\s+to\s+(?:SSH|RDP|connect|access|reach|log)[^.\n]{0,60}\bbastion|(?:bắt buộc|phải)\s+(?:dùng|có|qua)\s+(?:một\s+)?bastion'
+    unless: 'Instance Connect Endpoint|EIC Endpoint|Session Manager'
+    fact: 'EC2 Instance Connect Endpoint (từ 2023-06-13) cho SSH / RDP vào instance ở subnet private không cần IP public hay bastion — bastion không còn bắt buộc'
+    since: '2023-06-13'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2023/06/amazon-ec2-instance-connect-ssh-rdp-public-ip-address/'
+  - id: privatelink-cross-region
+    pattern: '(?:PrivateLink|interface (?:VPC )?endpoints?|endpoint services?)[^.\n]{0,80}(?:only|chỉ)[^.\n]{0,30}(?:within\s+)?(?:the\s+)?(?:same|single|one|cùng|một)\s+(?:AWS\s+)?Region|(?:PrivateLink|interface (?:VPC )?endpoints?)[^.\n]{0,60}(?:cannot|can.t|can not|does not|doesn.t|do not|don.t|không(?: thể)?)\s+(?:work\s+|connect\s+|kết nối\s+)?(?:across|cross|to another|to other|liên|sang|khác)[- ]?Regions?'
+    unless: 'cross-Region (?:connectivity|PrivateLink)|PrivateLink liên Region'
+    fact: 'PrivateLink kết nối được liên Region từ 2024-11-26 (interface endpoint tới endpoint service ở Region khác cùng partition) — "PrivateLink chỉ trong một Region" đã lỗi thời'
+    since: '2024-11-26'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2024/11/aws-privatelink-across-region-connectivity/'
+  - id: cloudfront-vpc-origins
+    pattern: '(?:origins?|ALBs?|Application Load Balancers?|load balancers?|EC2 instances?)[^.\n]{0,60}(?:must|has to|have to|needs? to|phải)\s+(?:be\s+)?(?:public(?:ly accessible)?|internet-facing|công khai|in a public subnet|ở subnet public)[^.\n]{0,60}CloudFront|CloudFront[^.\n]{0,80}(?:requires?|needs?|cần|phải có)\s+(?:an?\s+)?(?:public|internet-facing|công khai)\s+(?:origins?|ALBs?|load balancers?)'
+    unless: 'VPC origins?'
+    fact: 'CloudFront VPC origins (từ 2024-11-20) phục vụ trực tiếp từ ALB / NLB / EC2 trong subnet private — origin không còn phải public / internet-facing'
+    since: '2024-11-20'
+    url: 'https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-vpc-origins-enhanced-security-and-streamlined-operations-for-your-applications/'
+  - id: cloudfront-anycast-static-ips
+    pattern: 'CloudFront[^.\n]{0,80}(?:does not|doesn.t|do not|don.t|cannot|can.t|can not|không(?: thể)?)\s+(?:(?:provide|offer|support|give|have|cung cấp|có|hỗ trợ)\w*\s+)?(?:an?\s+|any\s+)?(?:static|fixed|tĩnh)\s+IPs?|(?:static|fixed) IPs?[^.\n]{0,60}(?:not (?:available|supported|possible)|không (?:có|hỗ trợ))[^.\n]{0,40}CloudFront|IP tĩnh[^.\n]{0,40}không[^.\n]{0,20}CloudFront'
+    unless: 'Anycast Static IPs?|anycast static'
+    fact: 'CloudFront có Anycast Static IPs (danh sách IP tĩnh tới mọi edge) từ 2024-11-20 — cần IP tĩnh cho allow-list không còn bắt buộc Global Accelerator'
+    since: '2024-11-20'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2024/11/amazon-cloudfront-anycast-static-ips/'
+  - id: app-mesh-discontinued
+    pattern: '\bApp\s?Mesh\b'
+    unless: 'discontinu|end of support|hết hỗ trợ|đã ngừng|Service Connect'
+    fact: 'AWS App Mesh không nhận khách mới từ 2024-09-24 và ngừng hẳn ngày 2026-09-30 — ECS: ECS Service Connect, EKS: Amazon VPC Lattice'
+    since: '2024-09-24'
+    url: 'https://aws.amazon.com/blogs/containers/migrating-from-aws-app-mesh-to-amazon-ecs-service-connect/ · https://docs.aws.amazon.com/general/latest/gr/sunset_services.html'
+  # ── Compute / serverless
+  - id: lambda-tmp-10gb
+    pattern: '(?:/tmp|ephemeral storage|temporary storage|lưu trữ tạm(?: thời)?)[^.\n]{0,40}(?:limit(?:ed)?(?: to)?|max(?:imum)?|only|up to|at most|tối đa|chỉ(?: có)?)[^.\n]{0,20}\b512\s?MB\b|\b512\s?MB\b[^.\n]{0,30}(?:limit|max(?:imum)?|tối đa)[^.\n]{0,40}(?:/tmp|ephemeral|temporary storage|lưu trữ tạm)'
+    unless: '10[.,]?240\s?MB|10\s?GB'
+    fact: 'Lambda cấu hình được /tmp (ephemeral storage) tới 10.240 MB từ 2022-03-24 (mặc định vẫn 512 MB) — "/tmp tối đa 512 MB" đã lỗi thời'
+    since: '2022-03-24'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2022/03/aws-lambda-configure-ephemeral-storage/'
+  - id: lambda-function-urls
+    pattern: '\bLambda\b[^.\n]{0,60}(?:cannot|can.t|can not|không thể)\s+(?:be\s+)?(?:invoked|called|reached|exposed|gọi)[^.\n]{0,30}(?:directly\s+)?(?:over\s+|via\s+|qua\s+)?HTTPS?\b|\bLambda\b[^.\n]{0,60}(?:only|chỉ)\s+(?:be\s+)?(?:invoked|called|exposed|reachable|gọi được)?\s*(?:over HTTPS?\s+)?(?:via|through|qua|bằng)\s+(?:Amazon\s+)?API Gateway'
+    unless: 'Function URLs?'
+    fact: 'Lambda Function URL (từ 2022-04-06): endpoint HTTPS dựng sẵn cho hàm Lambda — gọi Lambda qua HTTPS không bắt buộc API Gateway'
+    since: '2022-04-06'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2022/04/aws-lambda-function-urls-built-in-https-endpoints/'
+  - id: lambda-async-eventbridge-1mb
+    pattern: '(?:EventBridge|event bus|asynchronous(?:ly)?\s+invo\w*|async(?:hronous)?\s+(?:Lambda|invocations?))[^.\n;|*]{0,60}\b256\s?(?:KB|KiB)\b|\b256\s?(?:KB|KiB)\b[^.\n;|*]{0,30}(?:EventBridge|event bus|asynchronous|\basync\b)'
+    unless: '\b1\s?(?:MB|MiB)\b'
+    fact: 'Payload tối đa 1 MB (trước đó 256 KB) cho Lambda gọi bất đồng bộ (từ 2025-10-24) và sự kiện trên EventBridge event bus (AWS Compute Blog 2026-01-29)'
+    since: '2025-10-24'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/10/aws-lambda-payload-size-256-kb-1-mb-invocations/ · https://aws.amazon.com/blogs/compute/more-room-to-build-serverless-services-now-support-payloads-up-to-1-mb/'
+  - id: sns-max-message-1mib
+    pattern: '(?:\bSNS\b|Simple Notification Service)[^.\n;|*]{0,60}\b256\s?(?:KB|KiB)\b|\b256\s?(?:KB|KiB)\b[^.\n;|*]{0,30}(?:\bSNS\b|Simple Notification Service)'
+    unless: '\b1\s?(?:MB|MiB)\b'
+    fact: 'Amazon SNS cho phép message tối đa 1 MiB từ 2026-09-18 (trước đó 256 KiB)'
+    since: '2026-09-18'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2026/09/amazon-sns-1mib-support/'
+  - id: api-gateway-timeout-above-29s
+    pattern: '\b29[- ]?(?:s|sec|seconds?|giây)\b[^.\n]{0,60}(?:hard (?:limit|cap)|cannot be (?:increased|changed|raised|extended)|không (?:thể )?(?:tăng|đổi|nâng))|(?:hard|fixed|maximum|max|tối đa|cứng)[^.\n]{0,30}(?:integration\s+)?timeout[^.\n]{0,20}\b29[- ]?(?:s|sec|seconds?|giây)\b|API Gateway[^.\n]{0,60}\b29[- ]?(?:s|sec|seconds?|giây)\b[^.\n]{0,30}(?:limit|max(?:imum)?|tối đa|giới hạn|hard)|(?:hard|fixed)\s+(?:limit|cap|timeout)\s+(?:of\s+)?29[- ]?(?:s|sec|seconds?|giây)\b|API Gateway[^.\n]{0,60}(?:hard|fixed|maximum|max|tối đa|cứng)[^.\n]{0,30}\b29[- ]?(?:s|sec|seconds?|giây)\b'
+    unless: '(?:raise|increase|request|tăng)[^.\n]{0,40}(?:beyond|above|over|past|vượt|hơn|quá)\s+29'
+    fact: 'API Gateway REST API (Regional / private) tăng được integration timeout quá 29 giây từ 2024-06-04 (xin quota, có thể phải giảm throttle) — "29 giây là giới hạn cứng" không còn tuyệt đối'
+    since: '2024-06-04'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2024/06/amazon-api-gateway-integration-timeout-limit-29-seconds/'
+  - id: ebs-gp3-64tib-80k-iops
+    pattern: '\bgp3\b[^.\n]{0,80}\b16[.,]?000\s+IOPS|\bgp3\b[^.\n]{0,80}\b1[.,]?000\s+MiB/s|\bgp3\b[^.\n]{0,60}\b16\s?TiB|(?:more than|above|over|exceed(?:s|ing)?|beyond|greater than|>|vượt|trên|hơn)\s*16[.,]?000\s+IOPS[^.\n]{0,60}(?:\bio1\b|\bio2\b|Provisioned IOPS)|(?:\bio1\b|\bio2\b|Provisioned IOPS)[^.\n]{0,60}(?:more than|above|over|exceed(?:s|ing)?|beyond|greater than|>|vượt|trên|hơn)\s*16[.,]?000\s+IOPS'
+    unless: '80[.,]?000\s+IOPS'
+    fact: 'EBS gp3 tới 64 TiB, 80.000 IOPS, 2.000 MiB/s từ 2025-09-26 (trước đó 16 TiB / 16.000 IOPS / 1.000 MiB/s) — "> 16.000 IOPS bắt buộc io1/io2" đã lỗi thời'
+    since: '2025-09-26'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/09/amazon-ebs-size-provisioned-performance-gp3-volumes/'
+  - id: app-runner-closed
+    pattern: 'App Runner'
+    unless: 'no longer (?:open|available)|closed to new|không (?:còn )?nhận khách|khách hàng hiện có|ECS Express Mode'
+    fact: 'AWS App Runner không nhận khách hàng mới (AWS công bố 2026-03-31) — container web ít vận hành: Amazon ECS Express Mode (Fargate + ALB + auto scaling)'
+    since: '2026-03-31'
+    url: 'https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html · https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html'
+  # ── Database
+  - id: aurora-serverless-v1-eol
+    pattern: 'Aurora Serverless\s*(?:v1\b|\(v1\)|version 1\b)|\bServerless v1\b'
+    unless: '(?:end[- ]of[- ]life|EOL|hết (?:vòng đời|hỗ trợ)|đã ngừng)'
+    fact: 'Aurora Serverless v1 hết vòng đời ngày 2025-03-31 (không tạo mới từ 2025-01-08) — dùng Aurora Serverless v2 (nay gọi "Aurora serverless")'
+    since: '2025-03-31'
+    url: 'https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/WhatsNew.html'
+  - id: aurora-serverless-v2-scale-to-zero
+    pattern: '(?:Serverless v2|Aurora Serverless)[^.\n]{0,60}(?:cannot|can.t|can not|does not|doesn.t|không(?: thể)?)[^.\n]{0,30}(?:scale (?:down )?to (?:zero|0)|pause|tạm dừng|về 0)|(?:minimum|min\.?|tối thiểu|lowest)[^.\n]{0,30}\b0[.,]5 ACUs?\b|\b0[.,]5 ACUs?\b[^.\n]{0,30}(?:minimum|tối thiểu)|(?:only|chỉ)[^.\n]{0,40}\bv1\b[^.\n]{0,40}(?:scale to (?:zero|0)|pause|tạm dừng|về 0)'
+    unless: '\b0 ACUs?\b|về 0 ACU'
+    fact: 'Aurora Serverless v2 scale được về 0 ACU và tự tạm dừng khi không có kết nối từ 2024-11-20 (trước đó tối thiểu 0,5 ACU)'
+    since: '2024-11-20'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2024/11/amazon-aurora-serverless-v2-scaling-zero-capacity/'
+  - id: rds-15-read-replicas
+    pattern: '(?:up to|maximum(?: of)?|max\.?|tối đa|limit(?:ed)? (?:of|to)|giới hạn)\s*(?:5|five)\s+(?:RDS\s+)?read replicas?(?![^.\n]{0,15}(?:cross|khác|liên)[- ]?Region)|\b(?:5|five)\s+read replicas?\s+(?:max(?:imum)?|tối đa|limit)'
+    unless: 'Oracle|SQL Server|Db2|15 read replicas?'
+    fact: 'RDS for MySQL / MariaDB / PostgreSQL có tới 15 read replica mỗi instance (gồm tối đa 5 replica khác Region) từ 2022-10-20 — "RDS tối đa 5 read replica" đã lỗi thời'
+    since: '2022-10-20'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2022/10/amazon-rds-mysql-mariadb-postgre-sql-support-15-read-replicas-3x-read-capacity/'
+  - id: aurora-global-database-10-regions
+    pattern: 'Global Database[^.\n]{0,80}(?:up to|maximum(?: of)?|max\.?|tối đa)\s*(?:5|five)\s+(?:secondary\s+)?(?:AWS\s+)?Regions?|(?:up to|maximum(?: of)?|max\.?|tối đa)\s*(?:5|five)\s+(?:secondary\s+)?(?:AWS\s+)?Regions?[^.\n]{0,60}Global Database|\b(?:5|five)\s+secondary (?:AWS )?Regions'
+    unless: '\b10 (?:secondary )?(?:AWS )?Regions?'
+    fact: 'Aurora Global Database hỗ trợ tới 10 Region phụ từ 2025-05-22 (trước đó 5)'
+    since: '2025-05-22'
+    url: 'https://aws.amazon.com/blogs/database/amazon-aurora-global-database-introduces-support-for-up-to-10-secondary-regions/'
+  - id: dynamodb-global-tables-strong-consistency
+    pattern: 'global tables?[^.\n]{0,80}(?:only|chỉ)[^.\n]{0,30}eventual\w*|eventual(?:ly)?\s+consisten\w*[^.\n]{0,40}(?:only|chỉ)[^.\n]{0,40}global tables?|global tables?[^.\n]{0,80}(?:do(?:es)?\s+not|don.t|doesn.t|cannot|can.t|can not|không(?: thể)?)\s+(?:(?:support|provide|offer|hỗ trợ|cung cấp)\w*\s+)?(?:strong(?:ly)?|mạnh)'
+    unless: 'multi-Region strong consistency|\bMRSC\b'
+    fact: 'DynamoDB global tables có chế độ nhất quán mạnh đa Region (MRSC, RPO = 0) từ 2025-06-30 — "global tables chỉ eventually consistent" đã lỗi thời'
+    since: '2025-06-30'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/06/amazon-dynamo-db-global-tables-multi-region-strong-consistency-generally-available/'
+  - id: database-savings-plans
+    pattern: '(?<!(?:Compute|Instance)\s)Savings Plans?[^.\n]{0,80}(?:do(?:es)?\s+not|don.t|doesn.t|cannot|can.t|can not|không)\s+(?:(?:apply|cover|include|support|áp dụng|bao gồm|giảm)\w*\s+)?(?:to\s+|for\s+|cho\s+)?(?:Amazon\s+)?(?:RDS|Aurora|DynamoDB|ElastiCache|databases?|cơ sở dữ liệu)|(?:only|chỉ(?: có)?)\s+(?:RDS\s+|DB\s+)?Reserved (?:DB )?Instances?[^.\n]{0,60}(?:RDS|databases?|Aurora|cơ sở dữ liệu)|(?:RDS|Aurora|databases?|cơ sở dữ liệu)[^.\n]{0,60}(?:only|chỉ(?: có)?)\s+(?:(?:RDS|DB)\s+)?Reserved (?:DB )?Instances?'
+    unless: 'Database Savings Plans?'
+    fact: 'Database Savings Plans (từ 2025-12-02): cam kết USD/giờ 1 năm, không trả trước, giảm tới 35 % cho Aurora, RDS, DynamoDB, ElastiCache, DocumentDB, Neptune, Keyspaces, Timestream, DMS — "chỉ Reserved Instance mới giảm giá database" đã lỗi thời'
+    since: '2025-12-02'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/12/database-savings-plans-savings/'
+  - id: rds-extended-support
+    pattern: '(?:automatic(?:ally)?|auto|tự động)[^.\n]{0,40}(?:upgrade[sd]?|nâng cấp)[^.\n]{0,60}(?:end of (?:standard )?support|\bEOL\b|end[- ]of[- ]life|hết hỗ trợ)|(?:end of (?:standard )?support|\bEOL\b|end[- ]of[- ]life|hết hỗ trợ)[^.\n]{0,80}(?:automatic(?:ally)?|tự động)\s+(?:be\s+)?(?:upgrade[sd]?|nâng cấp)'
+    unless: 'Extended Support'
+    fact: 'Hết standard support, RDS / Aurora không tự nâng major version mà tự đăng ký RDS Extended Support có tính phí (từ 2024-02-29 với MySQL 5.7, PostgreSQL 11) — câu chi phí: nâng cấp phiên bản đúng hạn'
+    since: '2024-02-29'
+    url: 'https://aws.amazon.com/blogs/aws/your-mysql-5-7-and-postgresql-11-databases-will-be-automatically-enrolled-into-amazon-rds-extended-support/'
+  - id: rds-custom-oracle-end-of-support
+    pattern: 'RDS Custom for Oracle|RDS Custom\b[^.\n]{0,30}\bOracle\b'
+    unless: 'deprecat|end of support|hết hỗ trợ|ngừng hỗ trợ'
+    fact: 'Amazon RDS Custom for Oracle bị khai tử: giai đoạn chuyển đổi từ 2026-03-31, hết hỗ trợ 2027-03-31 — AWS khuyên chạy Oracle tự quản trên EC2'
+    since: '2026-03-31'
+    url: 'https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/RDS-Custom-for-Oracle-end-of-support.html'
+  - id: qldb-end-of-support
+    pattern: '\bQLDB\b|Quantum Ledger'
+    unless: 'end of support|hết hỗ trợ|đã ngừng|full shutdown|ngừng (?:hoạt động|hỗ trợ)|discontinu'
+    fact: 'Amazon QLDB đã ngừng hoạt động (hết hỗ trợ 2025-07-31) và không còn trong danh sách dịch vụ của đề — không được là đáp án'
+    since: '2025-07-31'
+    url: 'https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html'
+  - id: timestream-liveanalytics-closed
+    pattern: '(?:=|→|->)\s*(?:use\s+|dùng\s+)?(?:Amazon\s+)?Timestream\b(?!\s+for\s+InfluxDB)|\b(?:use|choose|recommend|dùng|chọn)\w*\s+(?:Amazon\s+)?Timestream\b(?!\s+for\s+InfluxDB)|Timestream for LiveAnalytics'
+    unless: 'InfluxDB|no longer (?:open|available)|closed to new|không (?:còn )?nhận khách'
+    fact: 'Amazon Timestream for LiveAnalytics (Timestream bản gốc) không nhận khách hàng mới từ 2025-06-20 — dữ liệu time-series mới: Amazon Timestream for InfluxDB'
+    since: '2025-06-20'
+    url: 'https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html · https://docs.aws.amazon.com/timestream/latest/developerguide/timestream-for-influxdb.html'
+  # ── Analytics / media
+  - id: kda-sql-discontinued
+    pattern: '(?:Kinesis Data Analytics|\bKDA)\s+(?:for\s+)?SQL(?:\s+applications?)?\b|SQL applications?[^.\n]{0,30}(?:Kinesis Data Analytics|\bKDA\b)|Kinesis Data Analytics\s*\(\s*SQL\s*\)'
+    unless: 'discontinu|đã ngừng|ngừng (?:hoạt động|hỗ trợ)|bị xoá'
+    fact: 'Kinesis Data Analytics for SQL Applications đã ngừng (không tạo app mới từ 2025-10-15, app bị xoá từ 2026-01-27) — xử lý stream bằng SQL: Amazon Managed Service for Apache Flink (Studio)'
+    since: '2026-01-27'
+    url: 'https://docs.aws.amazon.com/kinesisanalytics/latest/dev/discontinuation.html'
+  - id: opensearch-rename
+    pattern: 'Amazon\s+(?:Elasticsearch|ES)\b(?:\s+Service)?|\bElasticsearch Service\b|\bAWS Elasticsearch\b'
+    unless: 'OpenSearch'
+    fact: 'Amazon Elasticsearch Service đã đổi tên thành Amazon OpenSearch Service'
+    since: '2021-09-08'
+    url: 'https://aws.amazon.com/blogs/aws/amazon-elasticsearch-service-is-now-amazon-opensearch-service-and-supports-opensearch-10/'
+  - id: elastic-transcoder-shutdown
+    pattern: 'Elastic Transcoder'
+    unless: 'discontinu|đã ngừng|ngừng (?:hoạt động|hỗ trợ)|full shutdown'
+    fact: 'Amazon Elastic Transcoder đã ngừng hẳn (2025-11-13); AWS chuyển sang AWS Elemental MediaConvert — dịch vụ ngoài phạm vi đề, nên không viết câu chuyển mã video mới'
+    since: '2025-11-13'
+    url: 'https://aws.amazon.com/blogs/media/support-for-amazon-elastic-transcoder-ending-soon/ · https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html'
+  # ── Bảo mật / định danh
+  - id: iam-identity-center-rename
+    pattern: '\bAWS\s+(?:SSO|Single Sign-On)\b'
+    unless: 'IAM Identity Center'
+    fact: 'AWS Single Sign-On (AWS SSO) đã đổi tên thành AWS IAM Identity Center — tên dùng trong đề cương SAA-C03'
+    since: '2022-07-26'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2022/07/aws-single-sign-on-aws-sso-now-aws-iam-identity-center/'
+  - id: kms-rotation-period
+    pattern: '(?:customer[- ]managed(?: KMS)? keys?|\bCMKs?\b)[^.\n]{0,80}(?:only|chỉ)[^.\n]{0,25}(?:once\s+(?:a|per|every)\s+year|every\s+(?:year|365 days)|annually|hằng năm|hàng năm|mỗi năm)|(?:customer[- ]managed(?: KMS)? keys?|\bCMKs?\b)[^.\n]{0,80}(?:cannot|can.t|can not|không thể)[^.\n]{0,30}(?:change|customi[sz]e|configure|set|đổi|tuỳ chỉnh|chỉnh)[^.\n]{0,30}rotation|(?:customer[- ]managed(?: KMS)? keys?|\bCMKs?\b)[^.\n]{0,60}rotation(?:\s+(?:period|frequency|schedule|interval))?[^.\n]{0,20}(?:cannot|can.t|can not|không thể)\s+(?:be\s+)?(?:changed|customi[sz]ed|configured|đổi|tuỳ chỉnh)|AWS[- ]managed\s+(?:KMS\s+)?keys?[^.\n]{0,60}(?:three|3)\s+years|(?:three|3)\s+years[^.\n]{0,40}AWS[- ]managed'
+    unless: '\b90\b[^.\n]{0,20}2[.,]?560|on-demand rotation|RotateKeyOnDemand|xoay theo yêu cầu'
+    fact: 'KMS: khoá customer managed xoay tự động theo chu kỳ tuỳ chọn 90–2.560 ngày (mặc định 365) và xoay theo yêu cầu được từ 2024-04-12; khoá AWS managed xoay mỗi năm (từ 5/2022, trước đó 3 năm)'
+    since: '2024-04-12'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2024/04/aws-kms-automatic-key-rotation/ · https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html'
+  - id: acm-exportable-public-certificates
+    pattern: '(?:ACM|Certificate Manager)\s+(?:public\s+)?(?:SSL/TLS\s+|TLS\s+)?certificates?[^.\n]{0,60}(?:cannot|can.t|can not|không thể|không)\s+(?:be\s+)?(?:export\w*|install\w*|used?\s+(?:directly\s+)?(?:on|with|trên)\s+(?:EC2|(?:the\s+)?instances?|on-prem\w*|máy chủ)|xuất|cài)|(?:cannot|can.t|can not|không thể)\s+(?:export|install|xuất|cài)[^.\n]{0,40}(?:ACM|Certificate Manager)\s+(?:public\s+)?certificates?'
+    unless: 'exportable|export(?:ed|able)? public|xuất được'
+    fact: 'ACM cấp chứng chỉ public "exportable" (trả phí) dùng được trên EC2 / container / on-premises từ 2025-06-17 — "chứng chỉ ACM không cài được lên EC2" không còn tuyệt đối (chứng chỉ cấp trước ngày này vẫn không xuất được)'
+    since: '2025-06-17'
+    url: 'https://aws.amazon.com/about-aws/whats-new/2025/06/aws-certificate-manager-public-certificates-use-anywhere/'
+  - id: simple-ad-closed
+    pattern: '(?:=|→|->)\s*(?:AWS\s+)?(?:Directory Service\s+)?Simple AD\b|\b(?:use|choose|deploy|create|recommend|dùng|chọn)\w*\s+(?:an?\s+|the\s+)?(?:AWS\s+)?(?:Directory Service\s+)?\(?\s*Simple AD\b|Simple AD\b[^.\n]{0,40}\b(?:is|are|=)\s+(?:the\s+)?(?:best|cheapest|right|recommended|most cost-effective|lowest[- ]cost|rẻ nhất)'
+    unless: '(?:only|chỉ)[^.\n]{0,30}existing customers|closed to new|no longer (?:open|available)|không (?:còn )?nhận khách|khách hàng hiện có|new customer onboarding'
+    fact: 'AWS Directory Service Simple AD không nhận khách hàng mới (AWS công bố 2026-06-30) — thiết kế mới: AWS Managed Microsoft AD hoặc AD Connector'
+    since: '2026-06-30'
+    url: 'https://docs.aws.amazon.com/directoryservice/latest/admin-guide/simple-ad-availability-change.html · https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html'
+  - id: audit-manager-maintenance
+    pattern: 'Audit Manager'
+    unless: 'maintenance mode|chế độ bảo trì|no longer (?:open|available)|không (?:còn )?nhận khách'
+    fact: 'AWS Audit Manager chuyển chế độ bảo trì: từ 2026-04-30 không thiết lập được cho tài khoản mới, đã bị gỡ khỏi phạm vi đề — AWS gợi ý AWS Config Conformance Packs'
+    since: '2026-04-30'
+    url: 'https://docs.aws.amazon.com/audit-manager/latest/userguide/audit-manager-availability-change.html'
+  # ── Quản trị / di chuyển
+  - id: cloudtrail-lake-closed
+    pattern: 'CloudTrail Lake'
+    unless: 'no longer (?:open|available)|closed to new|không (?:còn )?nhận khách|khách hàng hiện có'
+    fact: 'AWS CloudTrail Lake không nhận khách hàng mới từ 2026-05-31 (trail CloudTrail vẫn bình thường) — AWS gợi ý Amazon CloudWatch để lưu và phân tích log kiểm toán'
+    since: '2026-05-31'
+    url: 'https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-lake-service-availability-change.html'
+  - id: ssm-incident-change-manager-closed
+    pattern: 'Incident Manager|Change Manager'
+    unless: 'no longer (?:open|available)|closed to new|không (?:còn )?nhận khách|khách hàng hiện có'
+    fact: 'Systems Manager Incident Manager và Change Manager không nhận khách hàng mới từ 2025-11-07, không thêm tính năng'
+    since: '2025-11-07'
+    url: 'https://docs.aws.amazon.com/incident-manager/latest/userguide/incident-manager-availability-change.html · https://docs.aws.amazon.com/systems-manager/latest/userguide/change-manager-availability-change.html'
+  - id: migration-hub-closed
+    pattern: 'Migration Hub'
+    unless: 'AWS Transform|no longer (?:open|available)|closed to new|không (?:còn )?nhận khách|khách hàng hiện có'
+    fact: 'AWS Migration Hub không nhận khách hàng mới từ 2025-11-07 và đã bị gỡ khỏi phạm vi đề — AWS gợi ý AWS Transform'
+    since: '2025-11-07'
+    url: 'https://docs.aws.amazon.com/migrationhub/latest/ug/migrationhub-availability-change.html'
+  - id: application-discovery-service-closed
+    pattern: 'Application Discovery Service|Discovery (?:Agent|Connector)'
+    unless: 'AWS Transform|no longer (?:open|available)|closed to new|không (?:còn )?nhận khách|khách hàng hiện có'
+    fact: 'AWS Application Discovery Service không nhận khách hàng mới từ 2025-11-07 và đã bị gỡ khỏi phạm vi đề — AWS gợi ý AWS Transform'
+    since: '2025-11-07'
+    url: 'https://docs.aws.amazon.com/application-discovery/latest/userguide/application-discovery-service-availability-change.html'
+  - id: server-migration-service-shutdown
+    pattern: 'Server Migration Service'
+    unless: 'full shutdown|đã ngừng|discontinu'
+    fact: 'AWS Server Migration Service (SMS) đã ngừng hẳn (2023-04-01) — dịch vụ rehost trong đề cương: AWS Application Migration Service'
+    since: '2023-04-01'
+    url: 'https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html'
+  - id: opsworks-shutdown
+    pattern: 'OpsWorks'
+    unless: 'full shutdown|đã ngừng|discontinu|end of life'
+    fact: 'AWS OpsWorks (Stacks, Chef Automate, Puppet Enterprise) đã ngừng hẳn (2024-05-01) — không được là đáp án'
+    since: '2024-05-01'
+    url: 'https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html'
+  - id: proton-end-of-support
+    pattern: '\bAWS Proton\b|\bProton\b'
+    unless: 'end of support|hết hỗ trợ|discontinu|đã ngừng'
+    fact: 'AWS Proton không nhận khách mới từ 2025-10-07 và hết hỗ trợ ngày 2026-10-07, đã bị gỡ khỏi phạm vi đề'
+    since: '2026-10-07'
+    url: 'https://docs.aws.amazon.com/proton/latest/userguide/proton-end-of-support.html'
+  # ── ML / ứng dụng khác
+  - id: fraud-detector-closed
+    pattern: 'Fraud Detector'
+    unless: 'no longer (?:open|available)|closed to new|không (?:còn )?nhận khách|khách hàng hiện có'
+    fact: 'Amazon Fraud Detector không nhận khách hàng mới từ 2025-11-07 và đã bị gỡ khỏi phạm vi đề (AWS gợi ý AutoGluon + SageMaker AI, AWS WAF Fraud Control)'
+    since: '2025-11-07'
+    url: 'https://docs.aws.amazon.com/frauddetector/latest/ug/frauddetector-availability-change.html'
+  - id: kendra-maintenance
+    pattern: 'Kendra'
+    unless: 'maintenance mode|chế độ bảo trì|no longer (?:open|available)|không (?:còn )?nhận khách|Bedrock (?:Managed )?Knowledge Bases?'
+    fact: 'Amazon Kendra vào chế độ bảo trì từ 2026-06-30, không nhận khách mới từ 2026-07-30 và đã bị gỡ khỏi phạm vi đề — AWS gợi ý Amazon Bedrock Knowledge Bases'
+    since: '2026-07-30'
+    url: 'https://docs.aws.amazon.com/kendra/latest/dg/kendra-availability-change.html'
+  - id: workdocs-shutdown
+    pattern: 'WorkDocs'
+    unless: 'full shutdown|đã ngừng|discontinu'
+    fact: 'Amazon WorkDocs đã ngừng hoạt động hoàn toàn (2025-04-25)'
+    since: '2025-04-25'
+    url: 'https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html'
+  - id: chime-end-of-support
+    pattern: 'Amazon Chime\b(?!\s+SDK)'
+    unless: 'end of support|hết hỗ trợ|đã ngừng|discontinu'
+    fact: 'Amazon Chime (họp / gọi điện) không nhận khách mới từ 2025-02-19 và ngừng hỗ trợ ngày 2026-02-20 (Amazon Chime SDK không bị ảnh hưởng)'
+    since: '2026-02-20'
+    url: 'https://aws.amazon.com/blogs/messaging-and-targeting/update-on-support-for-amazon-chime/'

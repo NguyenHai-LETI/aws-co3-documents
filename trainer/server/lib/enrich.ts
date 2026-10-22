@@ -557,7 +557,7 @@ export function writeLongformFile(runId: string, targets: LongformTarget[], bank
     '> File tự sinh bởi trainer app — đầu vào cho phần **B** của `trainer/coach/ENRICH.md` (đọc file đó trước).',
     `> Viết **${plan.count}** câu mới (mỗi câu là biến thể dài của một câu gốc bên dưới, \`variant_of: <id gốc>\`) vào pack mới`,
     `> \`${plan.packFile}\` (thay \`<slug>\` bằng 2–4 từ kebab-case), pack id \`${plan.packId}\`, id câu \`${plan.idPrefix}01\`, \`${plan.idPrefix}02\`, …`,
-    `> Stem 60–120 từ (≥ ${minWords} từ mới được tính là câu dài). Sau đó chạy \`node trainer/scripts/validate.ts ${plan.packFile.replace(/^trainer\//, '').replace(/^bank\//, '')} --fill-time\`.`,
+    `> Stem 55–130 từ (nên 70–100) (≥ ${minWords} từ mới được tính là câu dài). Sau đó chạy \`node trainer/scripts/validate.ts ${plan.packFile.replace(/^trainer\//, '').replace(/^bank\//, '')} --fill-time\`.`,
     '',
     '**Task statements (exam guide):**',
     ...taskTable(bank),

@@ -83,7 +83,7 @@ test('GET /api/exam-guide: 189 official bullets, 14 tasks, coverage of the pract
   assert.ok(g.body.total > 600);
   assert.ok(g.body.bullets.every((b) => b.need >= 0 && b.need <= 2 && b.answers === 0));
   assert.deepEqual(g.body.multi.target, [0.2, 0.3]);
-  assert.ok(g.body.tasks.every((t) => t.target === 12));
+  assert.ok(g.body.tasks.every((t) => t.target === 20)); // [v6] config.yaml quality.longform_target_per_task (14 tasks × 20 ≈ 280 tier A)
   const bank = await api.get<{ questions: Question[] }>('/api/bank');
   const clustered = bank.body.questions.filter((q) => q.cluster);
   assert.ok(clustered.length > 100, `${clustered.length} questions with siblings`);

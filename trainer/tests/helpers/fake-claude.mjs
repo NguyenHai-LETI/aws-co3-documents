@@ -19,7 +19,10 @@
 //   FAKE_OPTIONS=<id,…>        ENRICH rewrites a distractor of these questions (new hash → auto blind-solve)
 //   FAKE_VERIFY=<json>         {"<id or pattern with *>": {"answer": ["C"], "ambiguous": false, "confidence": "high", "reason": "…",
 //                              "until": "<text>"}} — with `until`: the override applies only while the question does not contain
-//                              that text (e.g. a distractor ENRICH rewrote), afterwards the real key is given
+//                              that text (e.g. a distractor ENRICH rewrote), afterwards the real key is given. [v6] The app shows
+//                              each question's options shuffled (letters re-assigned): the real key and the override letters are
+//                              bank letters, answered under the letters the prompt shows them with (matched by option text) —
+//                              `"shown": true` passes the override letters through as they are (cue-probe labels p1-1 …)
 //   FAKE_SLOW_RESUME_MS / FAKE_SLOW_VERIFY_MS   sleep before answering a repair (--resume) / blind-solve call
 //   FAKE_SLOW_FILE_MS          sleep before a file-mode (analyze) call writes anything
 //   FAKE_RESULT_ERROR=1        the result line reports an error
@@ -86,7 +89,8 @@ const failing = [...prompt.matchAll(/^- `([^`]+)`/gm)].map((m) => m[1]); // repa
 const GOOD_EXPLANATION = (others) =>
   [
     'The chosen design meets the stated requirement directly with the least operational effort, which is exactly what the scenario asks the architect to deliver here.',
-    ...others.slice(0, 2).map((t) => `- ${t.replace(/[:.]+$/, '').slice(0, 60)}: misses a key constraint of the scenario.`),
+    ...others.map((t) => `- ${t.replace(/[:.]+$/, '').slice(0, 60)}: misses a key constraint of the scenario.`),
+    'Source: https://docs.aws.amazon.com/wellarchitected/latest/framework/welcome.html',
     '> 🇻🇳 Đọc kỹ ràng buộc chính của đề rồi chọn giải pháp đáp ứng trực tiếp.',
   ].join('\n');
 const BAD_EXPLANATION = 'Option B is correct because it is the only answer that meets the requirement; answer C does not.';
@@ -218,16 +222,51 @@ function bankKeys() {
   return keys;
 }
 
+/** [v6] Option texts of every question in the bank: id → Map(bank letter → text). */
+function bankOptions() {
+  const root = path.join(process.env.TRAINER_HOME ?? 'trainer', 'bank', 'packs');
+  const out = new Map();
+  const walk = (d) => {
+    for (const e of fs.existsSync(d) ? fs.readdirSync(d, { withFileTypes: true }) : []) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith('.md')) {
+        for (const block of fs.readFileSync(p, 'utf8').split(/\n(?=## Q )/)) {
+          const id = /^## Q:? (\S+)/.exec(block)?.[1];
+          if (id) out.set(id, new Map([...block.matchAll(/^\s*[-*]\s+(?:\[[ xX]\]\s+)?([A-H])[.)]\s+(.*)$/gm)].map((m) => [m[1], norm(m[2])])));
+        }
+      }
+    }
+  };
+  walk(root);
+  return out;
+}
+
+const norm = (t) => t.replace(/\s+/g, ' ').trim();
+
+/** [v6] Bank letters → the letters this prompt section shows those options under (matched by text; unknown → as is). */
+function shownLetters(section, bank, letters) {
+  if (!bank) return letters;
+  const shown = [...section.matchAll(/^- ([A-H])\. (.*)$/gm)].map((m) => [m[1], norm(m[2])]);
+  return letters.map((l) => {
+    const text = bank.get(l);
+    if (!text) return l;
+    return (shown.find(([, t]) => t === text) ?? shown.find(([, t]) => t.startsWith(`${text} `)))?.[0] ?? l;
+  });
+}
+
 function verifyAnswer() {
   const overrides = Object.entries(JSON.parse(process.env.FAKE_VERIFY || '{}')).map(([k, v]) => [new RegExp(`^${k.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`), v]);
   const keys = bankKeys();
+  const options = bankOptions();
   const sections = prompt.split(/\n(?=## \d+\. `)/).slice(1);
   const ids = sections.map((sec) => /^## \d+\. `([^`]+)`/.exec(sec)?.[1]).filter(Boolean);
   const results = ids.map((id) => {
     const section = sections.find((sec) => sec.startsWith(`## `) && sec.includes(`\`${id}\``)) ?? '';
     const found = overrides.find(([re]) => re.test(id))?.[1];
     const o = found && !(found.until && section.includes(found.until)) ? found : undefined;
-    return { id, answer: o?.answer ?? keys.get(id) ?? ['A'], confidence: o?.confidence ?? 'high', ambiguous: o?.ambiguous ?? false, reason: o?.reason ?? 'Giải thử: lựa chọn này đáp ứng đúng yêu cầu chính của đề.' };
+    const answer = o?.answer ?? keys.get(id) ?? ['A'];
+    return { id, answer: o?.shown ? answer : shownLetters(section, options.get(id), answer), confidence: o?.confidence ?? 'high', ambiguous: o?.ambiguous ?? false, reason: o?.reason ?? 'Giải thử: lựa chọn này đáp ứng đúng yêu cầu chính của đề.' };
   });
   return { results };
 }

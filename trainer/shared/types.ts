@@ -1223,7 +1223,7 @@ export interface SealedFormSummary {
 
 /** [γ] Bank → Chất lượng → 🎯 Phạm vi đề thi: active questions (not sealed) naming out-of-scope services. */
 export interface ScopeReport {
-  services: { name: string; topic: string; aliases?: string[]; answers: number; distractors: number }[]; // taxonomy services with scope: out
+  services: { name: string; topic: string; aliases?: string[]; scope?: 'legacy'; answers: number; distractors: number }[]; // taxonomy services with scope: out · [v6] scope: legacy = dropped from the official in-scope list
   answer: { id: string; services: string[] }[]; // a correct option names an out-of-scope service (Question.outOfScope)
   distractor: { id: string; options: { key: string; services: string[] }[] }[]; // only distractors do (correct options in scope)
   excluded: boolean; // config practice.exclude_out_of_scope: `answer` questions are left out of practice modes

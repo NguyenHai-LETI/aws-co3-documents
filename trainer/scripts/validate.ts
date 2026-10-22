@@ -61,7 +61,7 @@ const packs = bank.packs.filter((p) => match(p.file));
 // ── [v6] exam-spec questions (active, selected files) and the pack-level checks ──
 const since = examSpecSince();
 const examSpec = bank.questions.filter((q) => q.status === 'active' && match(q.file) && isExamSpec(q, since));
-const packWarnings = packs.flatMap((p) => packSpecWarnings(examSpec.filter((q) => q.file === p.file)).map((message) => ({ file: p.file, pack: p.id, message })));
+const packWarnings = packs.flatMap((p) => packSpecWarnings(examSpec.filter((q) => q.file === p.file && !q.family && !q.variantOf.length)) /* [v6] families / twins mirror their originals' shape */.map((message) => ({ file: p.file, pack: p.id, message })));
 
 // ── lint (active questions of the selected files) ──
 interface LintRow {

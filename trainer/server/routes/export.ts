@@ -85,7 +85,7 @@ function cleanFilters(f: unknown): SelectionFilters | undefined {
   if (!f || typeof f !== 'object') return undefined;
   const src = f as Record<string, unknown>;
   const out: Record<string, unknown> = {};
-  for (const k of ['packs', 'topics', 'domains', 'difficulties', 'origins', 'services', 'tags', 'tasks', 'requirements']) {
+  for (const k of ['packs', 'topics', 'domains', 'difficulties', 'origins', 'services', 'tags', 'tasks', 'requirements', 'tiers']) {
     if (Array.isArray(src[k])) out[k] = (src[k] as unknown[]).filter((x): x is string => typeof x === 'string');
   }
   if (typeof src.search === 'string') out.search = src.search.slice(0, 200);

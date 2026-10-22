@@ -30,7 +30,10 @@ function copyData(dest: string, opts: { results?: boolean }) {
     .replace(/^(\s+embeddings:\s*)\w+/m, '$1off')
     .replace(/^(\s+sealed_forms:\s*)\d+/m, '$10')
     .replace(/^(\s+auto:\s*)idle\b/m, '$1off')
-    .replace(/^(\s+load_balance:\s*)true\b/m, '$1false');
+    .replace(/^(\s+load_balance:\s*)true\b/m, '$1false')
+    // [v6] the shipped config runs extra AI work after analyze / on idle; tests start from the code defaults and opt in
+    .replace(/^(\s+enrich_after_analyze:\s*)true\b/m, '$1false')
+    .replace(/^(\s+idle_tasks:\s*)\[[^\]]*\]/m, '$1[enrich]');
   fs.writeFileSync(path.join(dest, 'config.yaml'), sandboxCfg);
   const coach = path.join(TRAINER_ROOT, 'coach');
   fs.mkdirSync(path.join(dest, 'coach'), { recursive: true });

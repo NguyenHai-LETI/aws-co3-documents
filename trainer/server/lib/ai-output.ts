@@ -358,7 +358,7 @@ export interface PackPlan {
 
 /** Pack naming of the tasks that write variants of prepared questions (longform, twins) or families. */
 const BATCH_PACKS: Record<Exclude<PackTask, 'generate'>, { word: string; slug: string; title: string; description: string; ids: string }> = {
-  longform: { word: 'longform', slug: 'cau-dai', title: 'Câu dài chuẩn đề thi', description: 'Biến thể dài (60–120 từ) của các câu ngắn hay gặp/hay sai', ids: 'lf' },
+  longform: { word: 'longform', slug: 'cau-dai', title: 'Câu dài chuẩn đề thi', description: 'Biến thể dài (55–130 từ) của các câu ngắn hay gặp/hay sai', ids: 'lf' },
   twins: { word: 'twins', slug: 'song-sinh', title: 'Câu song sinh', description: 'Câu song sinh (diễn đạt lại / tương phản) của các câu sắp ôn — chống học vẹt', ids: 'tw' },
   family: { word: 'family', slug: 'ho-cau', title: 'Họ câu đổi yêu cầu', description: 'Cùng tình huống, cùng lựa chọn — câu hỏi cuối (yêu cầu) khác nhau thì đáp án khác nhau', ids: 'fa' },
 };
@@ -527,7 +527,7 @@ export function draftOf(raw: unknown, id: string, ctx: DraftContext): { draft?: 
     else if (ctx.kind === 'twins' && variantOf.length > 1) errors.push(`câu song sinh chỉ có một câu gốc (variant_of: ${variantOf.join(', ')})`);
     else if (ctx.originals && variantOf.some((v) => !ctx.originals!.includes(v))) errors.push(`variant_of ${variantOf.join(', ')} không phải câu gốc của lô (${ctx.originals.join(', ')})`);
     const min = tax.timing.long_form_min_words ?? 55;
-    if (ctx.kind === 'longform' && stem && countWords(stem) < min) errors.push(`đề chỉ ${countWords(stem)} từ — câu dài cần ≥ ${min} từ (nên 60–120)`);
+    if (ctx.kind === 'longform' && stem && countWords(stem) < min) errors.push(`đề chỉ ${countWords(stem)} từ — câu dài cần ≥ ${min} từ (nên 70–100, tối đa 130)`);
   } else if (ctx.kind === 'family') {
     if (variantOf.length) warnings.push('câu trong họ không ghi variant_of — bỏ qua');
   } else if (ctx.bank) {

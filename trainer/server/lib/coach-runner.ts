@@ -52,6 +52,7 @@ import {
   enrichItems,
   mergeRepaired,
   planPack,
+  examSpecWarnings,
   repairPrompt,
   schemaFor,
   structuredOutput,
@@ -1737,7 +1738,7 @@ export class CoachRunner extends EventEmitter {
       });
     };
     const build = (o: Record<string, unknown> | undefined) => dedupe((Array.isArray(o?.questions) ? (o!.questions as unknown[]) : []).slice(0, MAX_NEW_QUESTIONS).map((raw, i) => check(raw, plan.idOf(i))));
-    const failuresOf = (es: Entry[]): ItemFailure[] => es.filter((e) => e.errors.length).map((e) => ({ id: e.id, errors: e.errors, label: stemLabel(e.raw) }));
+    const failuresOf = (es: Entry[]): ItemFailure[] => es.filter((e) => e.errors.length).map((e) => ({ id: e.id, errors: e.errors, label: stemLabel(e.raw), warnings: examSpecWarnings(e.warnings) }));
     let entries = build(first);
     let fails = entries.length ? failuresOf(entries) : [{ id: '(tất cả)', errors: ['không có câu hỏi nào trong JSON (`questions` rỗng hoặc thiếu)'] }];
     emit('tool', `Kiểm tra JSON: ${entries.length - failuresOf(entries).length}/${entries.length} câu hợp lệ${fails.length ? ` · ${fails.length} bị từ chối` : ''}`);
@@ -1823,7 +1824,12 @@ export class CoachRunner extends EventEmitter {
     const failuresOf = (fs: Fam[]): ItemFailure[] =>
       fs
         .filter((f) => f.errors.length || f.members.some((m) => m.errors.length))
-        .map((f) => ({ id: f.id, label: f.label, errors: [...f.errors, ...f.members.filter((m) => m.errors.length).map((m) => `${m.id}: ${m.errors.join('; ')}`)] }));
+        .map((f) => ({
+          id: f.id,
+          label: f.label,
+          errors: [...f.errors, ...f.members.filter((m) => m.errors.length).map((m) => `${m.id}: ${m.errors.join('; ')}`)],
+          warnings: f.members.flatMap((m) => examSpecWarnings(m.warnings).map((w) => `${m.id}: ${w}`)), // [v6]
+        }));
     const list = (o: Record<string, unknown> | undefined) => (Array.isArray(o?.families) ? (o!.families as unknown[]) : []).slice(0, MAX_FAMILIES);
     let fams = list(first).map((raw, i) => checked(buildOne(raw, i)));
     let fails = fams.length ? failuresOf(fams) : [{ id: '(tất cả)', errors: ['không có họ câu nào trong JSON (`families` rỗng hoặc thiếu)'] }];

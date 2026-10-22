@@ -296,7 +296,7 @@ export function scopeReport(bank: Pick<BankState, 'taxonomy'>, questions: Questi
     .map((name) => {
       const def = tax.services[name];
       const t = tally.get(name) ?? { answers: 0, distractors: 0 };
-      return { name, topic: def.topic, ...(def.aliases?.length ? { aliases: def.aliases } : {}), ...t };
+      return { name, topic: def.topic, ...(def.aliases?.length ? { aliases: def.aliases } : {}), ...(def.scope === 'legacy' ? { scope: 'legacy' as const } : {}), ...t };
     })
     .sort((a, b) => b.answers - a.answers || b.distractors - a.distractors || a.name.localeCompare(b.name));
   return { services, answer, distractor, excluded: cfg.practice?.exclude_out_of_scope !== false };

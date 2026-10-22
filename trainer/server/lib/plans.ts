@@ -8,7 +8,7 @@ import { PLANS_DIR, rel } from '../config.ts';
 import { asString, asStringList, splitFrontMatter } from './frontmatter.ts';
 import { listMarkdownFiles } from './bank.ts';
 import { ParseCache, statSig } from './index-db.ts';
-import type { Attempt, BuildTestRequest, Difficulty, DomainId, FeedbackMode, Plan, PlanSession, PlanSummary, TestMode } from '../../shared/types.ts';
+import type { Attempt, BuildTestRequest, Difficulty, DomainId, FeedbackMode, Plan, PlanSession, PlanSummary, TestMode, Tier } from '../../shared/types.ts';
 
 /** Bump when the stored parse of a plan file changes shape. */
 const PLAN_PARSE_VERSION = 1;
@@ -43,6 +43,7 @@ function toSession(raw: Record<string, unknown>, i: number): PlanSession {
             difficulties: filter.difficulties ? (asStringList(filter.difficulties) as Difficulty[]) : undefined,
             tasks: filter.tasks ? asStringList(filter.tasks) : undefined,
             requirements: filter.requirements ? asStringList(filter.requirements) : undefined,
+            tiers: filter.tiers ? (asStringList(filter.tiers).filter((t) => t === 'A' || t === 'B' || t === 'C') as Tier[]) : undefined,
           },
           pearson: filter.pearson === true ? true : undefined,
           recallFirst: filter.recallFirst === true ? true : undefined,
