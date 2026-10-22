@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.2 �
 - concept: EC2 automatic recovery restores a single legacy instance on new hardware in the same zone with the same ID, IPs, and volumes
 - refs: 01-compute-services.md
 - hint: Chỉ hỏng phần cứng host của một instance duy nhất, phần mềm không chạy song song được — giữ nguyên ID, IP, EBS với công sức ít nhất.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.h
 - concept: Immutable infrastructure bakes a new AMI per release and shifts ALB target group weights between old and new groups for instant rollback
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Không sửa instance đang chạy: mỗi bản phát hành là một image mới, và việc quay lại phải tức thì mà không phải thay instance lần nữa.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -92,7 +90,6 @@ Docs: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_
 - concept: AWS X-Ray traces individual requests across services and shows a service map with latency and error rates
 - refs: Q-service-comparisons.md, 06-management-governance.md
 - hint: Trung bình từng hàm đều bình thường nhưng vẫn có request chậm — cần theo dấu từng request xuyên nhiều dịch vụ, không phải số liệu gộp.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html
 - concept: Amazon Comprehend is a managed NLP service that replaces a self-managed model fleet for sentiment, key phrases, and PII detection
 - refs: 12-ml-ai.md
 - hint: Phân tích cảm xúc, cụm từ khoá và PII trên văn bản mà không tự quản server hay train model — dịch vụ AI nào làm sẵn việc này?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -160,7 +156,6 @@ Docs: https://docs.aws.amazon.com/comprehend/latest/dg/what-is.html
 - concept: Amazon Polly is a managed text-to-speech service that removes the self-managed engine fleet and its capacity planning
 - refs: 12-ml-ai.md
 - hint: Đầu vào là văn bản, đầu ra là giọng nói, trả tiền theo lượng văn bản chuyển đổi — chiều chuyển đổi nào đúng với dịch vụ cần chọn?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -189,14 +184,13 @@ Docs: https://docs.aws.amazon.com/polly/latest/dg/what-is.html
 - services: CloudWatch, ALB, Aurora
 - tags: aurora-global-database, rto-rpo, observability
 - difficulty: hard
+- time: 160
 - skills: 2.2.s3, 2.2.k12
 - concept: Alarms should track the business requirement directly: the 5XX error ratio for customer success and AuroraGlobalDBRPOLag for cross-Region RPO
 - refs: 06-management-governance.md, 03-database-services.md
 - hint: Mỗi yêu cầu kinh doanh cần một chỉ số đo đúng nó: trải nghiệm thành công của khách và lượng dữ liệu có thể mất khi mất Region.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 160
 
 A company runs a checkout API on an Application Load Balancer with Amazon EC2 targets in us-east-1. Its Aurora PostgreSQL database uses Aurora Global Database with a DR cluster in us-west-2. The business defines two requirements: at least 99.9 percent of checkout requests must return a successful response, and a Regional failure must lose no more than one minute of committed data. The operations team wants CloudWatch alarms that directly track these two requirements. Which combination of alarms should the team create? (Choose TWO)
 
@@ -229,7 +223,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - concept: RDS Proxy pools connections and bypasses DNS caches during failover, so an unmodifiable legacy app needs only a new endpoint
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Không sửa được code, chỉ đổi chuỗi kết nối; JVM cache DNS cũ và quá nhiều kết nối ngắn — lớp trung gian nào giải quyết cả hai?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -263,7 +256,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-planning.
 - concept: Amazon MQ active/standby brokers across two zones give a managed, JMS-compatible broker that removes the single point of failure without code changes
 - refs: 07-application-integration.md
 - hint: Dịch vụ cũ nói JMS và không được viết lại — cần broker managed cùng giao thức, có dự phòng ở AZ thứ hai.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -297,7 +289,6 @@ Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/amazon-mq-bro
 - concept: FSx for Windows File Server Multi-AZ gives SMB shares with synchronous replication and automatic failover for legacy Windows workloads
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Chia sẻ SMB cho Windows, tích hợp Active Directory, phải sống sót khi mất một AZ mà không tự vận hành — loại EFS vì giao thức.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -331,7 +322,6 @@ Docs: https://docs.aws.amazon.com/fsx/latest/WindowsGuide/high-availability-mult
 - concept: An ElastiCache (Redis OSS) replication group with replicas in other Availability Zones and Multi-AZ automatic failover keeps session data through a node or AZ failure; Memcached and replica-less shards do not replicate, and backups need a manual restore
 - refs: 03-database-services.md, C-kien-truc-web-app.md
 - hint: Kho phiên chỉ có một node ở một AZ — engine và cấu hình nào vừa giữ bản sao dữ liệu ở AZ khác vừa tự chuyển khi node chính hỏng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -365,7 +355,6 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html
 - concept: Handle throttling with exponential backoff and jitter, buffer bursts in a queue, and let DynamoDB on-demand capacity follow traffic
 - refs: 07-application-integration.md, 03-database-services.md
 - hint: Throttle xảy ra do tải đột biến và retry dồn dập — cần giãn retry, có vùng đệm cho đợt tăng đột biến, và bảng tự co giãn theo tải.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

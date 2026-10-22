@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.1"
 - concept: SQS FIFO with a message group ID per entity keeps order inside each group, drops duplicate sends, and still lets many consumers work on different groups in parallel
 - refs: 07-application-integration.md
 - hint: Thứ tự chỉ cần đúng trong từng tài khoản và gửi lại không được xử lý hai lần — loại hàng đợi nào cho nhóm tin nhắn chạy song song?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - concept: For mixed short and very long jobs, keep the SQS visibility timeout short and extend it per message with ChangeMessageVisibility while a job still runs
 - refs: 07-application-integration.md
 - hint: Việc ngắn lẫn việc rất dài, worker hỏng thì tin phải hiện lại nhanh — chỉnh thời gian ẩn một lần cho cả queue có đủ không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -91,7 +89,6 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - concept: A redrive policy with a maximum receive count sends poison messages to a same-type DLQ, whose retention must exceed the source queue's because the original enqueue time is kept
 - refs: 07-application-integration.md
 - hint: Tin lỗi phải tự được cô lập và còn đủ lâu để xem — DLQ phải cùng loại với queue gốc và thời gian lưu tính từ lúc nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - concept: SNS-to-SQS fan-out with one queue per subscriber buffers events while a consumer is offline, and subscription filter policies deliver only the needed event types
 - refs: 07-application-integration.md
 - hint: Mỗi dịch vụ chỉ cần một phần sự kiện và có lúc ngừng bảo trì — thứ gì giữ sự kiện cho dịch vụ offline và ai lọc theo loại?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -161,7 +157,6 @@ Docs: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
 - concept: EventBridge Scheduler one-time schedules in a chosen time zone scale to millions with no polling code, unlike scheduled rules (UTC, legacy, limited per bus), a Step Functions Wait state (one-year limit), or a table polled every minute
 - refs: 07-application-integration.md
 - hint: Nhắc hẹn một lần, giờ địa phương, đặt trước nhiều năm, hàng triệu lịch, sai số khoảng một phút — công cụ lên lịch nào đáp ứng cả bốn?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -195,7 +190,6 @@ Docs: https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html
 - concept: EventBridge Pipes connects a polled source such as a DynamoDB stream to a target with filtering and enrichment and no glue code; event bus rules cannot read streams
 - refs: 07-application-integration.md
 - hint: Nguồn là stream cần được poll, có lọc và gọi API để làm giàu, không muốn code keo — rule trên event bus có đọc được stream không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -224,14 +218,13 @@ Docs: https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes.html
 - services: Step Functions, Lambda, ECS, Fargate
 - tags: orchestration, serverless-cost
 - difficulty: medium
+- time: 115
 - skills: 2.1.k16, 2.1.s5
 - concept: Step Functions Express workflows (billed per execution and duration) are cheaper than Standard (billed per state transition) for high-volume, short, idempotent workflows
 - refs: 07-application-integration.md
 - hint: Bước ngắn, idempotent, hàng trăm nghìn sự kiện mỗi phút — hai loại workflow tính tiền khác nhau thế nào ở khối lượng này?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A mobile-gaming company validates in-game purchase events. Each event passes through three short steps: a fraud check, a currency conversion, and an entitlement update. The steps finish in under 10 seconds in total, every step is idempotent, and the platform receives several hundred thousand events per minute. The company wants built-in retries and error handling, no servers to manage, and the lowest possible cost. Which solution will meet these requirements MOST cost-effectively?
 
@@ -263,7 +256,6 @@ Docs: https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-typ
 - concept: A poison record blocks a Kinesis shard for a Lambda event source mapping until bisect-on-error, retry and age limits, and an on-failure destination are set; a function DLQ covers only asynchronous invocations
 - refs: 01-compute-services.md, 07-application-integration.md
 - hint: Bản ghi lỗi chặn shard vì Lambda thử lại vô hạn — thiết lập nào nằm trên event source mapping, và DLQ của function dành cho kiểu gọi nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -299,7 +291,6 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-parameters.h
 - concept: To cap how fast Lambda drains an SQS queue, set maximum concurrency on the event source mapping; reserved concurrency throttles invocations and can push messages to the DLQ
 - refs: 01-compute-services.md, 07-application-integration.md
 - hint: Cần giới hạn song song mà tin không bị đẩy vào DLQ chỉ vì bị throttle — giới hạn đặt trên function hay trên nguồn sự kiện?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -328,14 +319,13 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-scaling.html
 - services: S3, EventBridge, Step Functions, Lambda, SNS
 - tags: event-driven, s3-event-notifications, orchestration
 - difficulty: hard
+- time: 170
 - skills: 2.1.k5, 2.1.s1
 - concept: S3 notifications cannot target Step Functions or filter on size; enabling EventBridge on the bucket lets a rule filter by prefix, suffix, and size and start the state machine directly
 - refs: 07-application-integration.md
 - hint: Đích của S3 event notification chỉ gồm vài loại và không lọc theo kích thước — kênh sự kiện nào cho rule lọc sâu rồi gọi thẳng workflow?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 170
 
 A genomics lab uploads sequencing files to an Amazon S3 bucket. The lab wants an AWS Step Functions state machine to start automatically only when a new object under the raw/ prefix has the .fastq.gz suffix and is larger than a minimum size. The solution must not use custom code to poll the bucket or to forward events, and the lab expects to add other targets for the same events later. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -368,7 +358,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html
 - concept: Amazon MQ for RabbitMQ keeps AMQP 0-9-1 clients unchanged; only its cluster deployment survives an AZ failure, while ActiveMQ (AMQP 1.0, OpenWire) and MSK (Kafka) would need client changes
 - refs: 07-application-integration.md
 - hint: Giữ nguyên giao thức AMQP và mã nguồn, bỏ việc vá broker, chịu lỗi một AZ — dịch vụ managed nào nói giao thức này, và kiểu triển khai nào trải qua nhiều AZ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -397,15 +386,14 @@ Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-brok
 - services: Step Functions, SQS, EventBridge, Lambda
 - tags: orchestration, event-driven, decoupling
 - difficulty: medium
+- time: 135
 - skills: 2.1.k16, 2.1.s1
 - family: parcel-stage-integration
 - concept: Step Functions gives per-execution visibility, retries, and callback waits with the least custom code when stages need orchestration
 - refs: 07-application-integration.md
 - hint: Cần xem tiến trình từng lô hàng và tự retry, chờ phản hồi nhiều ngày — kiểu tích hợp nào cho sẵn lịch sử từng lần chạy?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A parcel-delivery company moves each shipment through five stages: label validation, route planning, customs pre-check, carrier handoff, and delivery confirmation. Each stage is a separate AWS Lambda function owned by a different team, and each function calls the next one directly through the AWS SDK. When a downstream function fails or is throttled, the shipment is lost, and nobody can tell where it stopped. The customs pre-check can wait several days for a customs broker's reply. Which solution will give the operations team a visual, per-shipment view of progress with the LEAST custom code?
 
@@ -432,15 +420,14 @@ Docs: https://docs.aws.amazon.com/step-functions/latest/dg/welcome.html
 - services: Step Functions, SQS, EventBridge, Lambda
 - tags: orchestration, event-driven, decoupling
 - difficulty: medium
+- time: 135
 - skills: 2.1.k5, 2.1.s3
 - family: parcel-stage-integration
 - concept: Publishing events to an EventBridge bus lets new stages subscribe with their own rules without changing producers or a central workflow
 - refs: 07-application-integration.md
 - hint: Đội mới phải gắn thêm giai đoạn mà không động vào thành phần cũ — mô hình nào chỉ cần phát sự kiện và để bên nhận tự đăng ký?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A parcel-delivery company moves each shipment through five stages: label validation, route planning, customs pre-check, carrier handoff, and delivery confirmation. Each stage is a separate AWS Lambda function owned by a different team, and each function calls the next one directly through the AWS SDK. When a downstream function fails or is throttled, the shipment is lost, and nobody can tell where it stopped. The customs pre-check can wait several days for a customs broker's reply. Which solution will allow a new team to add a stage that reacts to finished carrier handoffs without changing any existing function or workflow definition?
 
@@ -467,14 +454,13 @@ Docs: https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rules.html
 - services: Kinesis Data Streams, SNS, SQS
 - tags: decoupling, streaming-ingestion
 - difficulty: medium
+- time: 125
 - skills: 2.1.k11, 2.1.s3
 - concept: When several teams must each read every record in per-key order and re-read recent history, a Kinesis data stream fits; SQS and SNS delete or reorder messages
 - refs: 07-application-integration.md, 09-analytics-bigdata.md
 - hint: Ba đội cùng đọc toàn bộ, đúng thứ tự theo khoá và đọc lại 24 giờ trước — dịch vụ nào còn giữ dữ liệu sau khi đã được đọc?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
 A food-delivery company streams courier location updates from its app. Three independent teams — dispatching, fraud analysis, and machine-learning features — must each read every update, in order for each courier, at their own pace. After deploying a bug fix, a team must be able to re-read the previous 24 hours of updates. The company wants a managed service with the LEAST operational overhead. Which solution will meet these requirements?
 

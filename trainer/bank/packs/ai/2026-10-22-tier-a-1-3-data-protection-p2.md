@@ -18,15 +18,14 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.3: O
 - services: S3
 - tags: s3-object-lock, s3-versioning, compliance
 - difficulty: medium
+- time: 105
 - skills: 1.3.k3, 1.3.s6
+- family: s3-retention-and-deletion
 - concept: Object Lock compliance mode prevents any user, including root, from deleting or overwriting a version during retention
 - refs: 02-storage-services.md
 - hint: Yêu cầu loại trừ cả root user — chế độ nào của Object Lock không ai bypass được?
-- family: s3-retention-and-deletion
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A mortgage lender stores signed loan documents in a new Amazon S3 bucket that has versioning enabled. Documents are uploaded once under unique keys and are never overwritten. Company policy sets a seven-year life for each document. No user, including the root user, may delete or overwrite a document during the seven years. Which solution will meet this requirement?
 
@@ -53,15 +52,14 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html
 - services: S3, IAM
 - tags: s3-object-lock, s3-versioning, compliance
 - difficulty: medium
+- time: 110
 - skills: 1.3.k3, 1.3.s6
+- family: s3-retention-and-deletion
 - concept: Governance mode protects against most users while permitting principals with s3:BypassGovernanceRetention to remove objects early
 - refs: 02-storage-services.md
 - hint: Một nhóm đặc quyền vẫn phải xoá được sớm — chế độ nào cho phép bypass bằng quyền riêng?
-- family: s3-retention-and-deletion
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A mortgage lender stores signed loan documents in a new Amazon S3 bucket that has versioning enabled. Documents are uploaded once under unique keys and are never overwritten. Company policy sets a seven-year life for each document. Most users must be unable to delete a document for seven years, but the compliance team must be able to remove one early when a customer withdraws consent. Which solution will meet these requirements?
 
@@ -94,7 +92,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-managing
 - concept: In a versioned bucket a lifecycle expiration only adds a delete marker; permanent deletion also needs noncurrent version expiration
 - refs: 02-storage-services.md
 - hint: Trong bucket bật versioning, hết hạn bản hiện tại chỉ tạo delete marker — bản cũ vẫn còn nếu không có quy tắc cho nó.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -128,7 +125,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/lifecycle-expire-gen
 - concept: A logically air-gapped vault holds immutable copies outside the source account's control and can be shared with a recovery account through AWS RAM
 - refs: 13-other-services.md, Q-service-comparisons.md
 - hint: Kẻ tấn công có quyền admin ở account production — bản sao phải nằm ngoài tầm với của account đó và khôi phục được từ account khác.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -162,7 +158,6 @@ Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedv
 - concept: Central backup governance combines an Organizations backup policy, cross-account backup enabled in the management account, and a destination vault access policy
 - refs: 13-other-services.md, A-nen-tang-kien-truc.md
 - hint: Ba mảnh ghép: định nghĩa tập trung cho cả OU, bật tính năng ở account quản lý, và vault đích phải cho phép ghi vào.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -198,7 +193,6 @@ Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/create-cross-accoun
 - concept: DynamoDB point-in-time recovery covers a short window; long-term retention uses AWS Backup plans with a retention period
 - refs: 03-database-services.md, 13-other-services.md
 - hint: PITR chỉ giữ được một khoảng ngắn — cần lịch backup tự động với thời hạn lưu trữ dài và tự hết hạn.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -232,7 +226,6 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Point-in-
 - concept: AWS Backup restore testing plans automatically restore sampled recovery points, measure restore time and clean up, giving audit evidence
 - refs: 13-other-services.md
 - hint: Bằng chứng khôi phục được phải sinh ra định kỳ và tự dọn tài nguyên thử — không muốn tự viết hay làm tay.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -266,7 +259,6 @@ Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.htm
 - concept: Compliance evidence combines Config organization conformance packs (what state and when) with an organization trail in CloudTrail (who changed it)
 - refs: 06-management-governance.md, B-bao-mat-compliance.md
 - hint: Hai câu hỏi kiểm toán khác nhau: trạng thái tuân thủ theo thời gian (kèm khắc phục) và ai đã đổi cấu hình, khi nào.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -301,7 +293,6 @@ Docs: https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs
 - concept: AWS Artifact gives on-demand AWS compliance reports and lets customers accept agreements such as the BAA
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Cần tài liệu tuân thủ do chính AWS phát hành và ký thỏa thuận trực tuyến — không phải kiểm tra tài nguyên của bạn.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -335,7 +326,6 @@ Docs: https://docs.aws.amazon.com/artifact/latest/ug/what-is-aws-artifact.html
 - concept: Macie automated sensitive data discovery with a delegated administrator classifies S3 data across an organization and emits findings to EventBridge
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Cần phân loại dữ liệu cá nhân trong S3 trên nhiều account, tự cập nhật bucket mới — không tự viết bộ quét.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -369,7 +359,6 @@ Docs: https://docs.aws.amazon.com/macie/latest/user/discovery-asdd.html
 - concept: Enforce TLS with aws:SecureTransport in the S3 bucket policy and the EFS file system policy; encryption at rest or private paths do not enforce TLS
 - refs: B-bao-mat-compliance.md, 02-storage-services.md
 - hint: Cần chính sách từ chối kết nối không dùng TLS ở cả hai nơi lưu trữ — mã hoá at rest hay đường đi riêng không thay thế được.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -404,7 +393,6 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/iam-access-control-nfs-efs.html
 - concept: ACM renews public certificates automatically when DNS validation records stay in place; imported certificates are not renewed by ACM
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Chứng chỉ import không được ACM tự gia hạn — loại xác thực nào cho phép gia hạn hoàn toàn tự động?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -438,7 +426,6 @@ Docs: https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html
 - concept: S3 Access Points give each team a dedicated policy and optional VPC restriction, replacing an ever-growing bucket policy
 - refs: 02-storage-services.md
 - hint: Mỗi nhóm cần chính sách và ràng buộc mạng riêng trên cùng một bucket dùng chung — endpoint truy cập nào mang policy riêng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -472,7 +459,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points.html
 - concept: Block unencrypted EBS volumes with an SCP on ec2:Encrypted and make encryption the default setting in each account and Region
 - refs: 02-storage-services.md, 05-security-services.md
 - hint: Cần vừa tự động mã hoá volume mới vừa chặn tạo volume không mã hoá ở mọi account — hai lớp khác nhau.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

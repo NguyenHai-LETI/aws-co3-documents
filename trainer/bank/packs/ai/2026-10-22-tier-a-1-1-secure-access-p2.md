@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.1, p
 - concept: An IAM OIDC identity provider lets an external CI platform assume a scoped role with temporary credentials instead of long-term keys
 - refs: 05-security-services.md
 - hint: Pipeline ngoài AWS cần bỏ khóa dài hạn và chỉ cho đúng repository/nhánh — cơ chế federation nào cấp credential tạm?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -56,7 +55,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create
 - concept: Shared responsibility evidence: AWS Artifact for AWS-side attestations, AWS Config conformance packs for the customer's own configuration
 - refs: A-nen-tang-kien-truc.md, B-bao-mat-compliance.md
 - hint: Một bằng chứng thuộc "bảo mật của đám mây" (phía AWS), một bằng chứng thuộc "bảo mật trong đám mây" (phía bạn) — công cụ nào cho từng loại?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -91,7 +89,6 @@ Docs: https://docs.aws.amazon.com/artifact/latest/ug/what-is-aws-artifact.html
 - concept: IAM Access Analyzer generates a least-privilege policy from the CloudTrail activity of a role
 - refs: 05-security-services.md
 - hint: Role đã chạy hai tháng với quyền quản trị — công cụ nào dựng chính sách chỉ gồm các hành động thực sự được gọi, dựa trên log?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -124,7 +121,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-policy-ge
 - concept: Attribute-based access control matches principal tags to resource tags so one policy scales to many projects
 - refs: 05-security-services.md
 - hint: Sáu mươi dự án, thêm mới mỗi tuần mà không viết policy mới — cần một điều kiện tự mở rộng theo dự án thay vì liệt kê từng tài nguyên.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -159,7 +155,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction_attribute-ba
 - concept: An SCP allow list works only when FullAWSAccess is replaced at that level; deny lists leave future services open
 - refs: 06-management-governance.md
 - hint: Đề chặn cả dịch vụ AWS ra mắt sau này — SCP kiểu allow hay deny làm được, và SCP mặc định đang gắn ở OU ảnh hưởng thế nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -193,7 +188,6 @@ Docs: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_pol
 - concept: A resource control policy restricts access to resources in member accounts by principals outside the organization, which SCPs cannot do
 - refs: 05-security-services.md, 06-management-governance.md
 - hint: Cần chặn principal bên ngoài tổ chức truy cập bucket kể cả khi dev tự thêm bucket policy — SCP chỉ kiểm soát principal bên trong.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -226,7 +220,6 @@ Docs: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_pol
 - concept: A resource-based policy grants cross-account access without the caller giving up its own permissions, unlike assuming a role
 - refs: 05-security-services.md
 - hint: Hàm Lambda phải đọc ở tài khoản A và ghi ở tài khoản B trong cùng một lần chạy — cách nào không bắt đổi danh tính?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -259,7 +252,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-acc
 - concept: S3 event notifications to SQS use the queue's resource policy for the S3 service principal, scoped with aws:SourceArn and aws:SourceAccount
 - refs: 05-security-services.md, 07-application-integration.md
 - hint: S3 giao thông báo với tư cách gì — và điều kiện nào ngăn bucket của tài khoản khác dùng hàng đợi (confused deputy)?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -294,7 +286,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/grant-destinations-p
 - concept: Qualifier reading: aws:PrincipalOrgID in a bucket policy minimizes operations, naming approved roles gives the tightest control
 - refs: 05-security-services.md
 - hint: Tài khoản mới tạo mỗi tuần và không muốn sửa policy mỗi lần — điều kiện nào theo ID của tổ chức?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -328,7 +319,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condit
 - concept: Qualifier reading: aws:PrincipalOrgID in a bucket policy minimizes operations, naming approved roles gives the tightest control
 - refs: 05-security-services.md
 - hint: Đề hỏi kiểm soát chặt nhất việc role nào được đọc — phương án nào chỉ định rõ từng role được phê duyệt?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -361,7 +351,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies-cross-acc
 - concept: A third-party cross-account role should require a vendor-generated external ID to prevent the confused deputy problem
 - refs: 05-security-services.md
 - hint: Nhà cung cấp phục vụ hàng trăm khách hàng dùng chung tài khoản AWS — giá trị nào trong trust policy ngăn khách khác lợi dụng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -395,7 +384,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios
 - concept: AWS Control Tower provides a landing zone, Account Factory and preventive controls with the least effort
 - refs: 06-management-governance.md
 - hint: Tạo tài khoản tự phục vụ, tự cài logging và vai trò nền, kế thừa guardrail — đội cloud nhỏ nên chọn dịch vụ dựng sẵn nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

@@ -18,14 +18,13 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.2: e
 - services: CloudFront, Lambda
 - tags: lambda-edge, serverless-cost
 - difficulty: medium
+- time: 105
 - skills: 4.2.k5
 - concept: Lightweight viewer-event logic (rewrites, headers, cache key normalization) is cheapest and fastest with CloudFront Functions, not Lambda@Edge
 - refs: 04-networking-services.md, C-kien-truc-web-app.md
 - hint: Logic vài dòng chạy trước khi tra cache, không gọi dịch vụ ngoài — loại hàm edge nào rẻ nhất cho hàng trăm triệu request?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A media company serves a marketing site and a product-image catalog through Amazon CloudFront, about 400 million requests a day. For every viewer request the company must rewrite legacy URL paths to new paths and normalize the query string to improve the cache hit ratio, and every response must carry security headers. The logic is a few lines of JavaScript, calls no external services, and must add minimal latency. Which solution will meet these requirements MOST cost-effectively?
 
@@ -52,14 +51,13 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/edge-fu
 - services: Outposts, ECS, EC2
 - tags: outposts, hybrid-compute
 - difficulty: medium
+- time: 105
 - skills: 4.2.k6
 - concept: Outposts servers (1U/2U) fit small sites that need local compute with Region APIs; racks are for larger capacity
 - refs: 13-other-services.md, D-kien-truc-luu-tru.md
 - hint: 250 địa điểm nhỏ, không có chỗ đặt tủ rack, cần chạy cục bộ khi mất WAN — form factor nào của Outposts?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A restaurant chain runs point-of-sale and kitchen-display applications in 250 locations. Each location needs a few containerized workloads that must respond within single-digit milliseconds to on-site devices and keep running when the WAN link to the AWS Region is down. The company wants the same AWS APIs and tooling it uses in the Region and AWS-managed hardware, but the restaurants have no space for full racks. Which solution will meet these requirements MOST cost-effectively?
 
@@ -91,7 +89,6 @@ Docs: https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.htm
 - concept: One ALB with host-based listener rules replaces many per-service ALBs; NLB cannot route by hostname and GWLB is for appliances
 - refs: 04-networking-services.md, C-kien-truc-web-app.md
 - hint: Nhiều tên miền HTTPS, mỗi dịch vụ một load balancer ít tải — loại LB nào định tuyến theo hostname trên một bộ cân bằng duy nhất?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -161,7 +158,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/introducti
 - concept: A mixed instances policy with an On-Demand base, diversified Spot, price-capacity-optimized allocation and Capacity Rebalancing cuts cost while keeping availability
 - refs: 01-compute-services.md, A-nen-tang-kien-truc.md
 - hint: Muốn rẻ nhưng không sập khi một pool Spot biến mất — cần nền On-Demand nhỏ, đa dạng loại instance/AZ và chiến lược cấp phát đúng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -195,7 +191,6 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.ht
 - concept: ECS capacity provider strategy with a Fargate base and Fargate Spot weight, plus SIGTERM handling for the two-minute Spot warning
 - refs: 01-compute-services.md, 07-application-integration.md
 - hint: Sáu task nền không được bị ngắt, phần còn lại rẻ nhất có thể — và task bị ngắt phải trả thông điệp về hàng đợi ngay.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -225,14 +220,13 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-capaci
 - services: EC2
 - tags: capacity-reservation, savings-plans, reserved-instances
 - difficulty: hard
+- time: 135
 - skills: 4.2.k4
 - concept: Savings Plans and regional RIs reserve no capacity; seasonal capacity assurance with no term uses On-Demand Capacity Reservations, discounted by a Savings Plan
 - refs: 01-compute-services.md, L-quyet-dinh-nhanh.md
 - hint: Phần mùa vụ cần đảm bảo có capacity nhưng huỷ được không phạt; phần nền cần giá rẻ và linh hoạt đổi họ instance.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A payments company runs a settlement platform on Amazon EC2 in a single Availability Zone because of a low-latency link to a partner. For three months each year volume doubles, and the company must be certain that the extra c6i capacity is available in that zone when it launches. Outside that period the extra capacity is not needed, and the company wants to release it without a termination penalty. The year-round baseline should be as inexpensive as possible, and the company may change instance families over the next three years. Which combination meets these requirements MOST cost-effectively?
 
@@ -264,7 +258,6 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-reservati
 - concept: Commit Savings Plans to the steady baseline and run fault-tolerant peaks on Spot; committing to peaks wastes the unused hours
 - refs: 01-compute-services.md, A-nen-tang-kien-truc.md, L-quyet-dinh-nhanh.md
 - hint: Savings Plans tính theo cam kết mỗi giờ và không chuyển giờ sau — cam kết ở mức nào, và phần đỉnh chạy trên gì?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -299,7 +292,6 @@ Docs: https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-applying.html
 - concept: Compute Optimizer analyzes memory only when the CloudWatch agent publishes it; detailed monitoring does not add memory metrics
 - refs: 06-management-governance.md
 - hint: Recommendation bỏ qua bộ nhớ vì EC2 mặc định không gửi metric bộ nhớ — cần thu thập bằng thành phần nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -333,7 +325,6 @@ Docs: https://docs.aws.amazon.com/compute-optimizer/latest/ug/ec2-metrics-analyz
 - concept: Graviton-based instances offer lower cost for portable workloads such as Java after arm64 validation
 - refs: A-nen-tang-kien-truc.md
 - hint: Ứng dụng Java chạy liên tục, bị giới hạn CPU, muốn giảm chi phí mà không viết lại — họ instance nào rẻ hơn cho cùng tải?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -367,7 +358,6 @@ Docs: https://aws.amazon.com/ec2/graviton/
 - concept: Idle-most-of-the-day bursty stateless work is cheapest on Lambda with on-demand concurrency; provisioned or always-on capacity pays for idle time
 - refs: 01-compute-services.md, L-quyet-dinh-nhanh.md
 - hint: Rảnh phần lớn thời gian rồi bùng nổ ngắn, request ngắn và chịu được khởi động chậm — trả tiền theo lần chạy hay theo thời gian chờ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -396,14 +386,13 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/lambda
 - services: EC2 Auto Scaling, EC2
 - tags: scaling-policies, reserved-instances
 - difficulty: medium
+- time: 130
 - skills: 4.2.s4, 4.2.k9
 - concept: Non-production workloads need lower availability: scale to zero off-hours and drop to one instance in one AZ rather than commit to idle capacity
 - refs: 01-compute-services.md, A-nen-tang-kien-truc.md
 - hint: Dev/test không cần HA như production và chỉ dùng giờ hành chính — cắt chi phí ở hai hướng: giờ chạy và mức dự phòng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A company's 10 non-production environments mirror production: each runs an Amazon EC2 Auto Scaling group with a minimum of three On-Demand instances spread across three Availability Zones, 24 hours a day. Developers use the environments on weekdays from 8 AM to 8 PM, and short interruptions are acceptable. Which TWO changes will reduce cost the MOST while still meeting the needs of non-production workloads? (Choose TWO)
 
@@ -436,7 +425,6 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-sch
 - concept: A Hibernated warm pool keeps RAM contents on EBS so slow-to-initialize instances enter service fast while compute is not billed
 - refs: 01-compute-services.md
 - hint: Khởi tạo mất 12 phút vì nạp dữ liệu vào RAM — trạng thái pool nào giữ lại RAM mà không tính tiền instance?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

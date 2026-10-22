@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.1"
 - concept: Only API Gateway REST API usage plans with API keys give per-customer throttling and monthly quotas; stage throttling, WAF rate rules, and HTTP API route throttling do not
 - refs: 11-api-integration.md
 - hint: Mỗi gói bán có tốc độ và hạn mức tháng riêng, phải nhận diện từng khách — loại API nào có API key và usage plan?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-r
 - concept: An API Gateway AWS service integration can write requests straight to SQS, so a burst is buffered without compute and the database is fed at a controlled rate
 - refs: 11-api-integration.md, 07-application-integration.md
 - hint: API phải xác nhận đơn tin cậy khi tải đột biến mà không thêm compute ở đường nhận — API Gateway có thể ghi thẳng vào dịch vụ nào để đệm?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -91,7 +89,6 @@ Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-a
 - concept: Write-through updates the cache on every database write so cached values are never stale, while a TTL still bounds cache size; shorter TTLs, audit streams, or a bigger cache do not remove staleness
 - refs: E-kien-truc-database.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Giá đổi hiếm nhưng khách vẫn thấy giá cũ tới hết TTL — chiến lược nào cập nhật cache cùng lúc với lần ghi vào CSDL?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -120,14 +117,13 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html
 - services: CloudFront, Global Accelerator, ALB, ElastiCache, Route 53
 - tags: caching-strategies, route53-routing
 - difficulty: medium
+- time: 140
 - skills: 2.1.k7, 2.1.k3
 - concept: A CDN caches per-article (not per-user) pages at the edge to cut latency and origin load; Global Accelerator does not cache and extra Regions or in-Region caches do not fix distance
 - refs: 04-networking-services.md, C-kien-truc-web-app.md
 - hint: Trang chỉ đổi khi xuất bản, độc giả khắp thế giới, tải đỉnh gấp bội — dịch vụ nào lưu bản sao gần người đọc và giảm tải máy gốc?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A news publisher serves article pages from an Application Load Balancer and an Auto Scaling group of EC2 instances in one Region. Pages are rendered per article, not per user, and change only when an editor publishes an update. During breaking news, traffic from readers around the world grows fiftyfold, the group scales out slowly, and distant readers see slow page loads while the oversized fleet drives up costs. The publisher wants lower latency for global readers and less load on the origin, with minimal changes to the application. Which solution will meet these requirements?
 
@@ -159,7 +155,6 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Introdu
 - concept: CloudFront accelerates cacheable HTTP content; Global Accelerator gives static anycast IPs and fast health-based failover for UDP/TCP endpoints; DNS routing and wrong pairings fail the stated constraints
 - refs: 04-networking-services.md, 14-so-sanh-services.md
 - hint: Một phần HTTPS cache được, một phần UDP cần IP cố định và chuyển vùng trong vài giây — mỗi loại traffic hợp dịch vụ tăng tốc biên nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -194,7 +189,6 @@ Docs: https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-comp
 - concept: Match storage types to workloads: object storage (S3) for HTTP-served images, a shared multi-AZ file system (EFS) for a common POSIX directory, block storage (EBS) for database data files
 - refs: D-kien-truc-luu-tru.md, 02-storage-services.md
 - hint: Ba kiểu lưu trữ ba workload — ảnh phục vụ qua HTTP, thư mục chung cho nhiều AZ, tệp dữ liệu của CSDL — mỗi cái hợp object, file hay block?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -230,7 +224,6 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
 - concept: Read replicas serve stale-tolerant reads for reporting and for users in another Region; a Multi-AZ standby cannot serve reads and Multi-AZ never spans Regions
 - refs: E-kien-truc-database.md, 03-database-services.md
 - hint: Báo cáo nặng và người dùng ở xa chấp nhận dữ liệu trễ vài giây — bản sao nào phục vụ đọc, còn standby Multi-AZ có đọc được không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -260,14 +253,13 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html
 - services: DynamoDB, RDS
 - tags: dynamodb-capacity, read-replicas, multi-az
 - difficulty: hard
+- time: 135
 - skills: 2.1.s6, 2.1.s7, 2.1.k15
 - concept: A write-heavy, key-based workload with unpredictable spikes fits DynamoDB on-demand; read replicas and Multi-AZ add no write capacity and vertical scaling needs planning
 - refs: E-kien-truc-database.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Vấn đề nằm ở ghi chứ không phải đọc, truy cập theo khoá, đột biến khó đoán — kiểu CSDL và chế độ dung lượng nào tự co giãn phần ghi?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A ride-sharing startup stores driver location pings in a single Amazon RDS for MySQL instance. Each ping is written once and read later by driver ID only; there are no joins or multi-row transactions. Write volume is highly unpredictable and spikes to many times the average during city events, causing write latency and timeouts. Reads are rare. The company wants to stop planning capacity for the write path and to handle spikes automatically at the lowest cost for this unpredictable load. Which solution will meet these requirements?
 
@@ -299,7 +291,6 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand
 - concept: Highly connected, multi-hop relationship queries belong in a purpose-built graph database (Neptune), not in recursive SQL joins, key-value traversals, or a data warehouse
 - refs: E-kien-truc-database.md
 - hint: Truy vấn quan hệ nhiều tầng qua hàng trăm triệu liên kết phải trả lời trong mili giây — kiểu CSDL nào sinh ra cho dữ liệu kết nối dày?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -333,7 +324,6 @@ Docs: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html
 - concept: AWS Transfer Family is the managed SFTP endpoint that keeps partners' existing clients and hostname and lands files in S3, replacing self-managed SFTP servers
 - refs: 10-migration-transfer.md
 - hint: Đối tác giữ nguyên SFTP client, hostname, thông tin đăng nhập; công ty bỏ quản trị máy chủ — dịch vụ nào cấp SFTP được quản lý, ghi vào S3?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -367,7 +357,6 @@ Docs: https://docs.aws.amazon.com/transfer/latest/userguide/what-is-aws-transfer
 - concept: Aurora Serverless v2 scales relational capacity in place within an ACU range with no outage; replicas add only reads, DynamoDB leaves PostgreSQL, and class changes cause outages
 - refs: E-kien-truc-database.md, 03-database-services.md
 - hint: Tải đỉnh lương gồm cả ghi, đổi instance class thì có gián đoạn — kiểu CSDL quan hệ nào tự co giãn dung lượng tại chỗ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

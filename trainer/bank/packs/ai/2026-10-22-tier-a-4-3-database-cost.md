@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.3"
 - concept: Cost allocation tags must be activated from the management account, and AWS Budgets filtered by the tag alerts on forecasted spend
 - refs: 06-management-governance.md
 - hint: Thẻ phân bổ chi phí chỉ kích hoạt được ở một loại tài khoản — và cảnh báo theo dự báo chi tiêu thuộc về công cụ nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -58,7 +57,6 @@ Docs: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-ta
 - concept: Lazy loading with a TTL caches only requested data, while write-through fills the cache with data that may never be read
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Bộ nhớ cache tốn tiền theo dung lượng — chiến lược nào chỉ nạp mục được đọc và cho phép dữ liệu cũ vài phút?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -87,14 +85,13 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html
 - services: DynamoDB
 - tags: dynamodb-capacity, rcu-wcu
 - difficulty: medium
+- time: 100
 - skills: 4.3.k5
 - concept: DynamoDB capacity units depend on item size rounding (4 KB reads, 1 KB writes) and read consistency
 - refs: 03-database-services.md
 - hint: Tính RCU/WCU: làm tròn kích thước mục lên 4 KB cho đọc và 1 KB cho ghi, và đọc nhất quán cuối cùng chỉ tốn một nửa.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 100
 
 A telemetry service stores device records in an Amazon DynamoDB table that uses provisioned capacity mode. Each record is 6 KB. At peak, the application performs 500 reads per second, which can use eventually consistent reads, and 120 writes per second. The team wants to provision just enough capacity to avoid throttling at peak, at the lowest cost. Which provisioned throughput settings will meet these requirements?
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/provision
 - concept: RDS Proxy pools connections so a small instance can serve many Lambda connections instead of scaling the instance up
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: CPU chỉ ~20% nhưng hết kết nối — vấn đề là số kết nối, không phải năng lực tính toán; đừng trả tiền cho instance lớn gấp đôi.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -160,7 +156,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 - concept: A heterogeneous migration needs schema and code conversion (DMS Schema Conversion) plus DMS full load and CDC for the data
 - refs: 03-database-services.md, 10-migration-transfer.md
 - hint: Đổi sang engine khác để bỏ phí bản quyền — dữ liệu và mã (stored procedure) cần hai công cụ khác nhau.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -194,7 +189,6 @@ Docs: https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html
 - concept: A read replica isolates reporting at low cost; replicas cannot be stopped and a Multi-AZ instance standby is not readable
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Muốn tách tải báo cáo rẻ nhất mà vẫn giữ failover tự động — bản dự phòng Multi-AZ có đọc được không, và replica có dừng được không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -228,7 +222,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.h
 - concept: For long retention, keep PITR for the short window and export month-end snapshots to S3 in Parquet with a Glacier lifecycle instead of keeping many snapshots
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Chỉ cần truy vấn SQL dữ liệu cũ vài lần mỗi năm, không khôi phục vào DB — có cách lưu rẻ hơn snapshot RDS giữ nhiều năm.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -262,7 +255,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ExportSnapshot
 - concept: PostgreSQL extensions such as PostGIS require a PostgreSQL engine, and Aurora Serverless v2 with 0 ACUs pauses compute when idle
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Ứng dụng cần extension chỉ có ở một engine và cơ sở dữ liệu không có kết nối ban đêm — cấu hình dung lượng tối thiểu nào cho phép tạm dừng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -296,7 +288,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-server
 - concept: Time series data fits a time series database and wide scans over few columns fit columnar storage such as Redshift
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Hai khối lượng công việc khác bản chất trên một RDS quá lớn — một dạng theo chuỗi thời gian, một dạng quét ít cột trên hàng tỷ dòng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -332,7 +323,6 @@ Docs: https://docs.aws.amazon.com/redshift/latest/dg/c_columnar_storage_disk_mem
 - concept: Provisioned capacity with auto scaling and scheduled scaling is cheapest for steady, high-utilization traffic with known spikes
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Tải ghi ổn định ở mức cao và đỉnh biết trước theo giờ — chế độ nào có giá đơn vị thấp hơn khi mức sử dụng cao và ổn định?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -367,7 +357,6 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/provision
 - concept: On-demand capacity mode has no capacity to manage and absorbs spikes up to double the previous peak
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Cùng tình huống nhưng tiêu chí là ít công vận hành nhất — chế độ nào không có cài đặt dung lượng hay chính sách scaling để duy trì?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -401,7 +390,6 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand
 - concept: Aurora I/O-Optimized for I/O-heavy clusters, upgrading past RDS Extended Support, and Database Savings Plans for flexible steady-state commitments
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Ba nguồn chi phí khác nhau: phí I/O của Aurora, phí hỗ trợ mở rộng của phiên bản cũ, và nhu cầu cam kết linh hoạt cho tải ổn định.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

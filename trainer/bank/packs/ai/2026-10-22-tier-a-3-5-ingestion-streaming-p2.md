@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.5: L
 - concept: Glue job bookmarks track already processed input so scheduled jobs process only new files
 - refs: 09-analytics-bigdata.md
 - hint: Mỗi lần chạy đều đọc lại toàn bộ file cũ — tính năng nào của Glue job nhớ dữ liệu đã xử lý ở các lần chạy trước?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html
 - concept: Lake Formation provides central column and row-level permissions with data filters and cross-account sharing of Data Catalog tables
 - refs: 09-analytics-bigdata.md
 - hint: Phân quyền theo cột và theo hàng, chia sẻ bảng cho tài khoản khác, quản lý tập trung — không viết bucket policy cho từng người.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -92,7 +90,6 @@ Docs: https://docs.aws.amazon.com/lake-formation/latest/dg/what-is-lake-formatio
 - concept: DataSync with an agent activated through a VPC endpoint and a scheduled task copies NFS data to S3 privately over Direct Connect with verification
 - refs: 10-migration-transfer.md
 - hint: Đã có Direct Connect, dữ liệu không được đi qua internet, cần đồng bộ thay đổi hằng ngày và kiểm tra toàn vẹn — dịch vụ chuyển dữ liệu nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/datasync/latest/userguide/datasync-network.htm
 - concept: Converting CSV to Parquet and partitioning by the filter column cuts the data Athena scans, lowering cost and runtime
 - refs: 09-analytics-bigdata.md
 - hint: Truy vấn luôn lọc theo ngày và chỉ đọc vài cột — hai thay đổi bố cục dữ liệu nào làm Athena quét ít byte hơn?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -161,7 +157,6 @@ Docs: https://docs.aws.amazon.com/athena/latest/ug/columnar-storage.html
 - concept: S3 File Gateway ingests continuously written SMB or NFS files to S3 within minutes with a local cache; DataSync schedules run at one-hour intervals at the shortest
 - refs: 10-migration-transfer.md
 - hint: Tệp phải lên S3 trong vài phút và nhân viên vẫn đọc nhanh tệp gần đây tại chỗ — lịch DataSync ngắn nhất là bao lâu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -195,7 +190,6 @@ Docs: https://docs.aws.amazon.com/filegateway/latest/files3/what-is-file-s3.html
 - concept: A transient EMR cluster with On-Demand primary and core nodes and Spot task nodes is the cost-effective, HDFS-safe layout for fault-tolerant nightly Spark jobs
 - refs: 09-analytics-bigdata.md
 - hint: Mất dữ liệu HDFS buộc chạy lại từ đầu — node loại nào được phép dùng Spot và cụm nên tồn tại bao lâu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -229,7 +223,6 @@ Docs: https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-plan-instances-
 - concept: Amazon Quick datasets on Athena with SPICE and row-level security via a permissions dataset give serverless dashboards restricted per region
 - refs: 09-analytics-bigdata.md
 - hint: Dashboard tương tác, mỗi quản lý chỉ thấy vùng của mình, không muốn quản lý server BI — dịch vụ BI serverless nào có row-level security?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -263,7 +256,6 @@ Docs: https://docs.aws.amazon.com/quicksight/latest/user/restrict-access-to-a-da
 - concept: Amazon AppFlow ingests SaaS data such as Salesforce into S3 on a schedule with filters and Parquet output and no code
 - refs: 07-application-integration.md
 - hint: Nguồn là ứng dụng SaaS, không có lập trình viên, cần lịch chạy, bộ lọc và định dạng Parquet — dịch vụ tích hợp nào không cần code?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -297,7 +289,6 @@ Docs: https://docs.aws.amazon.com/appflow/latest/userguide/what-is-appflow.html
 - concept: A once-a-day file calls for event-driven batch ETL, not an always-on streaming pipeline
 - refs: 09-analytics-bigdata.md
 - hint: Một file lớn mỗi đêm — tần suất thu thập này hợp với xử lý theo lô theo sự kiện hay với luồng chạy liên tục 24/7?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

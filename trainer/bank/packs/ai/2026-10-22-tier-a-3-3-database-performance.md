@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.3"
 - concept: RDS cannot autoscale read replicas, while Aurora Auto Scaling adds and removes Aurora Replicas behind the reader endpoint
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Cần số replica tự tăng giảm theo tải đọc — dịch vụ nào có chính sách tự động thêm/bớt replica, dịch vụ nào chỉ cho tạo thủ công?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Integr
 - concept: Aurora custom endpoints group chosen replicas so that application reads and heavy BI queries use different replicas; the reader endpoint balances across all replicas and promotion tiers do not steer reads
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Reader endpoint chia kết nối cho mọi replica — cần cơ chế nào gom một nhóm replica nhất định vào một tên kết nối riêng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -92,7 +90,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overvi
 - concept: A cluster can mix provisioned and Serverless v2 instances; Serverless v2 readers in promotion tier 2 or higher scale in place, independently of the writer, which makes only the spiky reader capacity elastic
 - refs: 03-database-services.md, R-performance-benchmarks.md
 - hint: Chỉ phần đọc phân tích bị đột biến ngắn, writer ổn định đã có Reserved Instance — làm sao chỉ reader co giãn tại chỗ, độc lập với writer?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-server
 - concept: RDS Proxy pools and reuses connections for bursts of short-lived Lambda functions and keeps client connections during failover while using Secrets Manager credentials
 - refs: 03-database-services.md, 01-compute-services.md
 - hint: Hàng nghìn hàm Lambda mở kết nối cùng lúc và failover làm treo ứng dụng — thành phần nào đứng giữa để gom và giữ kết nối khi chuyển DB?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -155,14 +151,13 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 - services: ElastiCache
 - tags: read-replicas, multi-az, redis-vs-memcached
 - difficulty: medium
+- time: 145
 - skills: 3.3.k7, 3.3.k2, 3.3.s5
 - concept: A replication group with replicas in other AZs and Multi-AZ automatic failover scales cache reads through the reader endpoint and survives a node loss; vertical sizing, extra shards and Memcached do neither
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Đọc làm nghẽn CPU của một node duy nhất và node hỏng làm mất sạch cache — thêm bản sao ở AZ khác và gửi lệnh đọc tới đúng endpoint.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A forum runs a single-node Amazon ElastiCache for Valkey cache in front of its database. Read commands now saturate the node's CPU, and a node failure empties the cache and sends a surge of queries to the database. The data set fits in one node's memory and the write volume is low. The company wants to scale read throughput and fail over automatically, with minimal application change. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -195,7 +190,6 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Replication.html
 - concept: A partition key that is the current date funnels all writes into one partition; write sharding with a suffix spreads them, whereas more capacity, on-demand mode or a GSI do not lift the per-partition limit
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Throttle dù dung lượng của bảng còn dư — giới hạn nằm ở đơn vị nào, và làm sao để các ghi không dồn vào cùng một giá trị khoá?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -224,15 +218,14 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partit
 - services: DAX, DynamoDB, ElastiCache, Aurora
 - tags: caching-strategies, dax
 - difficulty: medium
+- time: 120
 - skills: 3.3.s5, 3.3.k2
 - family: dynamodb-aurora-cache-choice
 - concept: DAX is API-compatible with DynamoDB and needs the fewest application changes, but it caches DynamoDB only
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Chỉ xét các lần đọc DynamoDB và muốn sửa ứng dụng ít nhất — loại cache nào dùng cùng API với DynamoDB?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A gaming company stores player profiles in an Amazon DynamoDB table and match catalogs in an Amazon Aurora MySQL database. A small set of popular streamer profiles accounts for most profile reads, and the same hot match-catalog queries repeat constantly, so both data stores are slowed by repeated reads. The profile reads are eventually consistent, and the application is written with the AWS SDK for DynamoDB and a MySQL driver. Which solution will reduce read latency for the profile reads with the LEAST application change?
 
@@ -265,7 +258,6 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DAX.html
 - concept: ElastiCache is a general-purpose cache usable with any data store, so one layer can serve both DynamoDB and Aurora; DAX caches DynamoDB only
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Đổi câu hỏi: một lớp cache chung cho cả DynamoDB lẫn Aurora — loại cache nào không bị ràng buộc vào một kho dữ liệu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -299,7 +291,6 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html
 - concept: Complex joins, multi-table ACID transactions and ad hoc SQL reporting call for a relational engine such as Aurora, not a key-value, document or wide-column store
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Truy vấn join phức tạp, giao dịch ACID nhiều bảng và báo cáo SQL tùy ý — nhóm cơ sở dữ liệu nào được thiết kế cho các yêu cầu đó?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -333,7 +324,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_AuroraOv
 - concept: Design the data layer from purpose-built engines: DynamoDB for key-value player data at scale, ElastiCache sorted sets for the leaderboard, and Aurora for ACID purchase transactions
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md, E-kien-truc-database.md
 - hint: Mỗi nhu cầu có một kiểu truy cập chiếm ưu thế (khoá–giá trị, xếp hạng trong bộ nhớ, giao dịch ACID) — ghép mỗi nhu cầu với một engine.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

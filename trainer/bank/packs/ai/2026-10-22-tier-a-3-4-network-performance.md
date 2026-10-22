@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.4"
 - concept: CloudFront Origin Shield consolidates duplicate requests from all caching layers before the origin and belongs in the Region with the lowest latency to the origin; origin groups and longer TTLs do not consolidate first requests
 - refs: 04-networking-services.md, 14-so-sanh-services.md
 - hint: Nhiều điểm biên cùng xin một đối tượng mới từ origin — thêm lớp cache nào gom các yêu cầu trùng, và đặt nó ở Region nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -58,7 +57,6 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-
 - concept: Static IP addresses plus layer 7 routing within Elastic Load Balancing means an NLB with Elastic IPs that registers an ALB as its target; an ALB cannot take Elastic IPs and an NLB alone has no path or host routing
 - refs: 04-networking-services.md, 14-so-sanh-services.md
 - hint: Đối tác chỉ cho phép vài địa chỉ IP cố định nhưng vẫn cần định tuyến theo đường dẫn và tên miền — loại ELB nào có IP tĩnh, loại nào hiểu L7?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -92,7 +90,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introducti
 - concept: Standard VPN tunnels are limited in throughput; aggregating several VPN connections needs a transit gateway with BGP and ECMP, which a virtual private gateway, static routing or acceleration cannot provide
 - refs: 04-networking-services.md, 14-so-sanh-services.md
 - hint: Mỗi tunnel VPN có trần băng thông — chỉ một loại gateway cộng gộp được nhiều tunnel, và nó đòi hỏi kiểu định tuyến nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-limits.html
 - concept: To place compute close to users in a metro area without on-premises hardware, extend the VPC to a Local Zone; Outposts needs on-site racks, Wavelength targets 5G mobile users, and Direct Connect cannot remove distance latency
 - refs: 13-other-services.md, 04-networking-services.md
 - hint: Cần độ trễ một chữ số mili giây tới người dùng trong một khu vực đô thị, không có chỗ đặt rack — hạ tầng AWS nào mở rộng Region ra gần họ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

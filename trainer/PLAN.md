@@ -110,7 +110,7 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | **9. Đo trung thực & quick wins (v4, đợt A + B của buổi brainstorm)** | #30–#43 §7.6 | ✅ v4 |
 | **10. Học mỗi ngày, bám ngày thi, chống học vẹt (v5, đợt C + D)** | #44–#59 §7.7 | ✅ v5 |
 | **11. Tiếp theo** | §7.8 | 💡 đề xuất |
-| **12. Ngân hàng chuẩn đề thật (v6)** | #60–#68 §7.9 | 🚧 v6 |
+| **12. Ngân hàng chuẩn đề thật (v6)** | #60–#68 §7.9 | ✅ v6 (nội dung: 261/280 tầng A, S3) |
 
 ## 7. Tính năng
 
@@ -322,6 +322,20 @@ Chỉ niêm phong (S3) câu đã qua đủ 5 cổng — sau khi niêm phong, ng�
 | Đáp án legacy / `stale-fact` mở | chưa đo | 0 | lint `oos-answer`, `stale-fact` |
 | Official Practice Exam | — | ≥ 800 / 1000 | `results/external/` |
 | Tutorials Dojo, lần làm đầu | — | ≥ 80 % | `results/external/` |
+
+**Kết quả thực hiện 2026-10-22** (13 agent viết code + câu song song, 2 agent soát code, 3 agent soát nội dung, 1 agent sửa câu nhập):
+
+| KPI | Đạt |
+|-----|-----|
+| Code v6 | gộp vào `main`; unit 449/450 (1 bỏ qua) · e2e 218/218; 2 agent rà soát độc lập → 6 lỗi đã sửa (lý do giải mù mang chữ cái đã xáo, timeout lượt dò, cảnh báo độ dài cho câu song sinh, coverage liệt kê service ngoài phạm vi, `created` theo từng câu, nhãn legacy) |
+| Câu tầng A | 262 câu mới (7 agent viết theo `coach/research/2026-10-22-tier-a-spec.md`; nguồn: `coach/research/2026-10-22-research.md`) + 18 câu cũ → **261 / 280** tầng A (D1 80 · D2 63 · D3 63 · D4 55); nhiều đáp án 26,4 % |
+| Giải mù | mọi câu nhập ngoài đề niêm phong (593 câu: 590 khớp · 0 lệch · 3 mơ hồ → đã sửa) và mọi câu tầng A (xáo phương án); 259/262 câu tầng A khớp → `active`; 3 câu (`a35-04`, `a35-07`, `a42-04`) còn `draft`, chờ duyệt |
+| Soát nội dung tầng A | 261 câu được 3 agent opus giải lại: không câu nào sai đáp án; 45 câu sửa (2 sai kiến thức, 3 đề thiếu ràng buộc, 2 trùng tình huống, 11 gợi ý lộ đáp án, 9 câu chưa có tiêu chí…) |
+| Câu nhập lỗi thời / legacy | 18 câu `retired`, 9 câu viết lại đáp án hiện hành, 63 câu cập nhật tên / trạng thái; `stale-fact` 52 → 1 (64 mục `currency:`), giải mù lại: tất cả khớp |
+| Mục đề cương chưa có câu | 47 → 7 |
+| Đề niêm phong | **S3 = 50 câu tầng A** (chưa từng gặp, đã giải mù khớp) + 15 câu thử nghiệm — để làm ~2026-11-08…09 |
+| Câu `cue` | 197/262 (75 %) → viết lại phương án nhiễu cho 196 câu → **187/262 (71 %)**: model rẻ vẫn nhận ra "thiết kế chuẩn AWS" từ phương án đầy đủ — đây phần lớn là kiến thức, không phải mẹo chữ; giữ làm chỉ số theo dõi, không chặn câu (chưa có mốc so với đề thật) |
+| Còn lại | 618 câu ôn nhanh (tầng C) giải thích ngắn → ENRICH dần (`enrich_after_analyze`, `idle_tasks`); D1 / D4 toàn ngân hàng vẫn thiếu so với trọng số (tầng A đã cân); việc của người học: Official Practice Question Set ngay, Official Practice Exam ~11/04–06, S3 ~11/08–09 |
 
 ## 8. Rủi ro & giảm thiểu
 

@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.1"
 - concept: S3 Requester Pays shifts request and data transfer charges to authenticated requesters while the owner pays only for storage
 - refs: 02-storage-services.md
 - hint: Chủ bucket muốn ngừng trả phí request và tải dữ liệu của người khác, nhưng vẫn chỉ cho đúng các tài khoản đối tác đọc.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets
 - concept: Batching many tiny writes into larger S3 objects cuts per-request charges (batch uploads versus individual uploads)
 - refs: 02-storage-services.md, 09-analytics-bigdata.md
 - hint: Hàng trăm triệu object nhỏ ghi riêng lẻ làm phí request chiếm phần lớn hoá đơn — cần giảm số lượng request, không phải số byte.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -91,7 +89,6 @@ Docs: https://docs.aws.amazon.com/firehose/latest/dev/basic-deliver.html
 - concept: Objects under 128 KB are not tiered by Intelligent-Tiering and are billed at a 128 KB minimum in IA and Glacier Instant Retrieval, so Standard is cheapest
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Kích thước từng object rất nhỏ — hãy nhớ quy tắc kích thước tối thiểu tính phí và điều kiện tự động chuyển tầng của từng lớp lưu trữ.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -125,7 +122,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.
 - concept: Lifecycle rules should expire noncurrent versions after the undo window and abort incomplete multipart uploads
 - refs: 02-storage-services.md
 - hint: Chi phí tăng do phiên bản cũ và các phần upload dang dở — hai loại dữ liệu này cần hai hành động lifecycle khác nhau.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -155,15 +151,14 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rule
 - services: S3, EFS, EBS, FSx
 - tags: storage-types, object-storage, s3-lifecycle
 - difficulty: medium
+- time: 135
 - skills: 4.1.k11, 4.1.k4, 4.1.s10
+- family: cms-media-storage
 - concept: Object storage (S3) is the cheapest shared store when the application supports it; file storage (EFS) costs more per GB
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Cả hai back end đều dùng được — loại lưu trữ nào rẻ nhất trên mỗi GB cho dữ liệu ít đọc, tự mở rộng, không cần cấp phát trước?
-- family: cms-media-storage
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A publishing company is moving its Linux-based content management system (CMS) from an on-premises NAS to Amazon EC2 instances in an Auto Scaling group across three Availability Zones. The CMS stores about 60 TB of images and PDFs that grow steadily, and every instance must read and write the same media library. The company does not want to provision capacity in advance. The CMS vendor supports two back ends: a shared POSIX file system mounted over NFS at the same path used today, or an S3 media plugin that is enabled with a configuration setting. Most files are rarely read after their first month. Which solution will meet these requirements MOST cost-effectively?
 
@@ -190,15 +185,14 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.
 - services: S3, EFS, EBS, FSx
 - tags: storage-types, file-storage, efs-lifecycle
 - difficulty: medium
+- time: 140
 - skills: 4.1.k11, 4.1.k4
+- family: cms-media-storage
 - concept: EFS provides shared POSIX file storage mounted at an existing path, so the application needs no configuration change
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Đề giữ nguyên bối cảnh nhưng yêu cầu thay đổi cấu hình CMS ít nhất — loại lưu trữ nào gắn như hệ thống tệp POSIX dùng chung?
-- family: cms-media-storage
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A publishing company is moving its Linux-based content management system (CMS) from an on-premises NAS to Amazon EC2 instances in an Auto Scaling group across three Availability Zones. The CMS stores about 60 TB of images and PDFs that grow steadily, and every instance must read and write the same media library. The company does not want to provision capacity in advance. The CMS vendor supports two back ends: a shared POSIX file system mounted over NFS at the same path used today, or an S3 media plugin that is enabled with a configuration setting. Most files are rarely read after their first month. Which solution will meet these requirements with the LEAST amount of change to the CMS configuration?
 
@@ -225,14 +219,13 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/lifecycle-management-efs.html
 - services: EBS
 - tags: ebs-volume-types, st1
 - difficulty: easy
+- time: 105
 - skills: 4.1.k6, 4.1.s10
 - concept: Throughput Optimized HDD (st1) is the cheapest block type for frequently read large sequential data; sc1 is for cold data and gp3/io2 cost more per GiB
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Luồng đọc tuần tự lớn, dữ liệu vẫn được đọc thường xuyên, không phải boot volume — HDD loại nào hướng tới thông lượng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 An analytics company runs a nightly log-processing job on a Linux Amazon EC2 instance. The job streams through about 8 TiB of sequential log files on a data volume and needs sustained throughput of about 300 MiB/s. Other batch jobs read the same files throughout the day, so the data is not cold. Random I/O is minimal and the volume is not the boot volume. The team wants to minimize storage cost. Which solution will meet these requirements MOST cost-effectively?
 
@@ -264,7 +257,6 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/hdd-vols.html
 - concept: EBS volumes cannot be shrunk and have no native auto scaling, so right-size by migrating to a smaller volume and automate growth with Elastic Volumes
 - refs: 02-storage-services.md
 - hint: EBS chỉ cho tăng dung lượng, không giảm và không tự mở rộng — cần cách thu nhỏ hiện tại và cách tự động hoá việc tăng sau này.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -294,14 +286,13 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modify-volume.html
 - services: AWS Backup, EBS
 - tags: snapshots, backup-lifecycle, cold-storage
 - difficulty: hard
+- time: 135
 - skills: 4.1.k5, 4.1.s6
 - concept: AWS Backup moves monthly EBS recovery points to cold storage (EBS Snapshots Archive) for long retention at lower cost
 - refs: 02-storage-services.md, 06-management-governance.md
 - hint: Điểm khôi phục hằng tháng giữ nhiều năm, hiếm khi khôi phục — snapshot EBS nằm trong lưu trữ do dịch vụ quản lý, không phải bucket của bạn.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A financial-services company uses AWS Backup to protect 300 Amazon EBS volumes with a daily rule that keeps recovery points for 35 days. Auditors now require one month-end recovery point for every volume to be kept for seven years. These recovery points will almost never be restored, and a restore time of up to three days is acceptable. The company wants the lowest storage cost for the seven-year retention with the LEAST operational effort. Which solution will meet these requirements?
 
@@ -333,7 +324,6 @@ Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/plan-options-and-co
 - concept: EFS lifecycle policies move cold files to IA and Archive, and Transition into Standard on first access returns reopened files to Standard
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Dự án cũ được mở lại và dùng dày đặc nhiều tuần — chính sách nào đưa tệp quay về lớp Standard khi được truy cập?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -367,7 +357,6 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/lifecycle-management-efs.html
 - concept: An organization-level S3 Storage Lens dashboard on the advanced tier gives prefix-level activity metrics and recommendations across accounts
 - refs: 02-storage-services.md, 06-management-governance.md
 - hint: Một khung nhìn cho cả tổ chức cần điều kiện gì ở AWS Organizations? Số liệu lượt request theo prefix có ở mọi bậc của công cụ không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

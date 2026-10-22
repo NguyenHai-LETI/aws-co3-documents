@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.1"
 - concept: gp3 (up to 80,000 IOPS and 2,000 MiB/s, independent of size) changed online with Elastic Volumes beats resizing gp2 or paying for io2 Block Express when the numbers fit gp3
 - refs: 02-storage-services.md, R-performance-benchmarks.md
 - hint: So IOPS và throughput cần có với giới hạn hiện hành của gp2, gp3, io2 — loại nào đủ, rẻ nhất và đổi được khi DB vẫn chạy?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html
 - concept: Local NVMe instance store gives the lowest latency and highest IOPS for scratch data that need not survive a stop or termination, at no extra storage cost
 - refs: 02-storage-services.md, 01-compute-services.md
 - hint: Dữ liệu tạm, đọc ngẫu nhiên, không cần sống sót sau khi dừng máy — loại lưu trữ nào gắn thẳng vào host và đã nằm trong giá instance?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -86,14 +84,13 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
 - services: EFS, EC2
 - tags: efs-throughput-modes, elastic-throughput
 - difficulty: medium
+- time: 140
 - skills: 3.1.s2, 3.1.k2
 - concept: A new EFS file system for spiky, unpredictable load uses Elastic throughput with General Purpose performance mode (Max I/O is unsupported with Elastic; One Zone is not AZ-resilient)
 - refs: 02-storage-services.md, R-performance-benchmarks.md
 - hint: Tải đột biến, khó dự báo, phải sống sót khi mất một AZ — hai thiết lập lúc tạo EFS nào cùng dùng được và khỏi phải đoán throughput?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A video-rendering company is moving its Linux render farm to AWS. Hundreds of Amazon EC2 instances in three Availability Zones will mount one shared POSIX file system. Throughput demand is unpredictable: the file system sits idle for hours and then drives large bursts when projects are submitted. The company wants performance to scale automatically without forecasting throughput, and the file system must remain available if one Availability Zone fails. Which combination of settings should a solutions architect choose when creating the Amazon EFS file system? (Choose TWO)
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/performance.html
 - concept: Only FSx for NetApp ONTAP serves the same data over NFS and SMB and keeps NetApp replication working; Lustre is Linux-only, OpenZFS is NFS-only, Windows File Server is SMB-only
 - refs: 02-storage-services.md, 10-migration-transfer.md
 - hint: Cùng một dữ liệu phải mở được bằng NFS lẫn SMB và còn dùng công cụ nhân bản của NetApp — mỗi loại FSx hỗ trợ giao thức nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -160,7 +156,6 @@ Docs: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html
 - concept: Long-distance uploads of very large objects: Transfer Acceleration for distance plus multipart upload for parallelism and partial retries
 - refs: 02-storage-services.md, R-performance-benchmarks.md
 - hint: Hai vấn đề tách biệt — khoảng cách địa lý tới bucket và file khổng lồ hay đứt giữa chừng; mỗi vấn đề có một tính năng riêng của S3.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -195,7 +190,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleratio
 - concept: S3 request rates scale per key prefix; 503 Slow Down on one hot prefix is fixed by spreading keys across many prefixes and parallelizing, not by quotas, acceleration or multipart
 - refs: 02-storage-services.md, R-performance-benchmarks.md
 - hint: Lỗi 503 Slow Down khi mọi khoá bắt đầu giống nhau — S3 mở rộng tốc độ request theo đơn vị nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -229,7 +223,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performan
 - concept: S3 Express One Zone directory buckets in the compute's Availability Zone give single-digit-millisecond request latency for small-object ML workloads when single-AZ storage is acceptable
 - refs: 02-storage-services.md, R-performance-benchmarks.md
 - hint: Điểm quyết định là độ trễ của từng request, không phải số request mỗi giây — đọc kỹ ràng buộc về AZ và khả năng tái tạo dữ liệu.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

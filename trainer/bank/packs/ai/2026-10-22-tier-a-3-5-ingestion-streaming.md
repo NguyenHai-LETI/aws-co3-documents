@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.5: K
 - concept: Aurora zero-ETL integration with Redshift replicates transactional data continuously without building or running ETL pipelines
 - refs: 09-analytics-bigdata.md
 - hint: Dữ liệu phải sang Redshift gần như tức thì mà không cần dựng hay bảo trì pipeline ETL — tính năng tích hợp nào của Aurora?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/redshift/latest/mgmt/zero-etl-using.html
 - concept: Firehose record format conversion (JSON to Parquet using a Glue Data Catalog schema) plus dynamic partitioning by record keys prepares streaming data for Athena
 - refs: 09-analytics-bigdata.md
 - hint: Hai yêu cầu, hai tính năng của Firehose: định dạng cột cho Athena và thư mục theo trường trong bản ghi — không viết code consumer.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -92,7 +90,6 @@ Docs: https://docs.aws.amazon.com/firehose/latest/dev/record-format-conversion.h
 - concept: Enhanced fan-out gives each registered consumer dedicated per-shard read throughput and push delivery, lowering propagation delay when several consumers share a stream
 - refs: 09-analytics-bigdata.md
 - hint: Nhiều consumer chia sẻ băng thông đọc của mỗi shard nên độ trễ tăng — cơ chế nào cấp băng thông đọc riêng cho từng consumer?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -161,7 +158,6 @@ Docs: https://docs.aws.amazon.com/transfer/latest/userguide/create-server-in-vpc
 - concept: A hot partition key can exceed one shard's limit; neither on-demand mode nor more shards fix it, so a higher-cardinality key that keeps per-entity order is needed
 - refs: 09-analytics-bigdata.md
 - hint: Một khoá phân vùng duy nhất vượt giới hạn của một shard — cần khoá có nhiều giá trị hơn mà vẫn giữ thứ tự theo từng xe.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -195,7 +191,6 @@ Docs: https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html
 - concept: Stateful windowed event-time aggregation over a stream with late events needs Managed Service for Apache Flink, not per-record Lambda or Firehose transformation
 - refs: 09-analytics-bigdata.md
 - hint: Cửa sổ trượt theo thời gian sự kiện, sự kiện đến muộn vẫn đúng — cần engine xử lý luồng có trạng thái, không chỉ xử lý từng bản ghi.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -264,7 +259,6 @@ Docs: https://docs.aws.amazon.com/transfer/latest/userguide/create-server-in-vpc
 - concept: MSK multi-VPC private connectivity (PrivateLink) with IAM access control and a cluster policy lets clients in other accounts connect privately, even with overlapping CIDRs
 - refs: 09-analytics-bigdata.md
 - hint: CIDR trùng nhau nên peering/TGW không dùng được; client nằm ở tài khoản khác, xác thực bằng IAM — tính năng riêng của MSK cho việc này.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -299,7 +293,6 @@ Docs: https://docs.aws.amazon.com/msk/latest/developerguide/aws-access-mult-vpc.
 - concept: A Lambda event source mapping on Kinesis processes records per shard in order for stateless per-record transformation; Firehose cannot deliver to DynamoDB
 - refs: 09-analytics-bigdata.md
 - hint: Xử lý độc lập từng bản ghi, giữ thứ tự theo tài xế, không quản lý server, đích là DynamoDB — Firehose có đích này không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -333,7 +326,6 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html
 - concept: Securing a Kinesis ingestion point privately: interface endpoint, endpoint policy limited to writes on one stream, and DNS resolution of the private IPs for on-premises producers
 - refs: 04-networking-services.md
 - hint: Producer ở VPC kín và ở on-premises qua Direct Connect đều phải dùng IP riêng; cần giới hạn endpoint chỉ ghi vào một stream.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

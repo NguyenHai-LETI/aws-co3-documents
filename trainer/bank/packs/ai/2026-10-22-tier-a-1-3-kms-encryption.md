@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.3: k
 - concept: Sharing an encrypted EBS snapshot needs a customer managed key (not aws/ebs), a key policy that admits the other account, and snapshot sharing
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Snapshot mã hoá bằng khoá do AWS quản lý không chia sẻ được — cần khoá nào và ai phải được phép dùng khoá đó?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -54,14 +53,13 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modifying-snapshot-pe
 - services: KMS, IAM
 - tags: iam-policies, least-privilege
 - difficulty: medium
+- time: 115
 - skills: 1.3.s4
 - concept: A KMS key policy must enable IAM policies (account root statement) before identity policies can grant access to the key
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Khác các resource policy khác, key policy không tự cấp quyền cho tài khoản — IAM policy chỉ hiệu lực khi key policy cho phép điều đó.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 Developers created a customer managed KMS key by calling the CreateKey API with a custom key policy that grants permissions only to a DevOps role. Application roles in the same account have IAM policies that allow kms:Decrypt on the key ARN, but every decrypt call fails with AccessDenied. The company wants to manage application access to the key through IAM policies from now on. Which solution will meet these requirements with the LEAST operational overhead?
 
@@ -93,7 +91,6 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-default.h
 - concept: Org-wide key sharing with aws:PrincipalOrgID plus kms:ViaService limits use to S3 without per-account policy edits
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Cần ba điều cùng lúc: mọi tài khoản trong tổ chức (kể cả tài khoản mới), chỉ qua S3, và không sửa key policy mỗi lần thêm tài khoản.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -127,7 +124,6 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/conditions-kms.html
 - concept: kms:CreateGrant with kms:GrantIsForAWSResource lets integrated services use a key on a user's behalf without letting the user delegate it arbitrarily
 - refs: 05-security-services.md
 - hint: EBS và RDS dùng grant thay mặt người dùng — cần cho phép tạo grant nhưng chỉ khi dịch vụ AWS thực hiện, không phải người dùng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -161,7 +157,6 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-default.h
 - concept: IAM Access Analyzer external access analyzer evaluates KMS key policies and grants and reports access from outside the zone of trust
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Cần công cụ phân tích chính sách (không phải phát hiện hành vi) và không viết code — vùng tin cậy là cả tổ chức.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -196,7 +191,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-resources
 - concept: S3 encrypts every new object with SSE-S3 by default at no cost, so no extra configuration is the cheapest compliant answer
 - refs: 02-storage-services.md, B-bao-mat-compliance.md
 - hint: S3 đã tự mã hoá mọi object mới từ lâu — nếu không có yêu cầu nào thêm thì cấu hình nào rẻ nhất?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -231,7 +225,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/default-encryption-f
 - concept: A customer managed KMS key gives key-policy control, disable switch and CloudTrail usage logs; AWS managed key policies are not editable
 - refs: 02-storage-services.md, 05-security-services.md
 - hint: Cần quyền sở hữu key policy và tắt khoá bất cứ lúc nào — khoá do AWS quản lý không cho sửa chính sách.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -266,7 +259,6 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html
 - concept: Keys that must live in single-tenant HSMs under exclusive customer control point to CloudHSM, not KMS standard keys
 - refs: B-bao-mat-compliance.md, Q-service-comparisons.md
 - hint: Quy định đòi HSM đơn khách hàng do công ty toàn quyền kiểm soát — KMS dùng HSM nhiều khách hàng do AWS vận hành.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -300,7 +292,6 @@ Docs: https://docs.aws.amazon.com/cloudhsm/latest/userguide/introduction.html
 - concept: KMS keys are Regional, so an encrypted cross-Region RDS read replica needs a KMS key from the destination Region
 - refs: 03-database-services.md, 05-security-services.md
 - hint: Khoá KMS gắn với một Region — replica ở Region khác phải mã hoá bằng khoá nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -329,14 +320,13 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.XRgn.
 - services: KMS, CloudTrail, S3, RDS
 - tags: key-rotation, encryption-at-rest, compliance
 - difficulty: medium
+- time: 115
 - skills: 1.3.s7, 1.3.k4
 - concept: Automatic rotation of a customer managed key supports a custom period (shorter than the default year) and keeps old key material for decryption
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Chu kỳ mặc định của xoay khoá tự động dài hơn yêu cầu — cấu hình nào cho phép tự đặt chu kỳ mà không cần mã hoá lại dữ liệu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A company encrypts data in Amazon S3 and Amazon RDS with symmetric customer managed KMS keys. Automatic rotation is currently disabled. A new policy requires rotating the key material every 180 days and producing evidence of each rotation. Application code and IAM policies reference the key ARNs and must not change, and previously encrypted data must stay readable without re-encryption. Which solution will meet these requirements with the LEAST operational overhead?
 
@@ -368,7 +358,6 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html
 - concept: Multi-Region keys let client-side encrypted data be decrypted in another Region by a local KMS call with the same key ID, without re-encryption
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Dữ liệu mã hoá phía client phải giải mã được ở Region khác bằng lời gọi KMS tại chỗ — khoá cùng ID và cùng key material ở mọi Region.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -403,7 +392,6 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/multi-region-keys-ov
 - concept: S3 default encryption and Bucket Keys affect only new objects; existing unencrypted objects need an S3 Batch Operations copy
 - refs: 02-storage-services.md, 05-security-services.md
 - hint: Mã hoá mặc định chỉ áp cho object ghi mới — object cũ cần thao tác riêng, và chi phí KMS giảm nhờ khoá cấp bucket.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -438,7 +426,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-key.html
 - concept: Crypto-shredding — scheduling deletion of a dedicated customer managed key irreversibly renders every encrypted copy unreadable; disabling is reversible
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Muốn mọi bản sao, kể cả backup, không đọc được vĩnh viễn mà không phải tìm từng bản — khoá giải mã là điểm chung.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -472,7 +459,6 @@ Docs: https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html
 - concept: ACM certificates for CloudFront must be in us-east-1, while the ALB origin certificate is requested in the load balancer's Region from a public CA
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Chứng chỉ cho CloudFront và chứng chỉ cho ALB origin nằm ở hai Region khác nhau — và origin phải dùng chứng chỉ từ CA đáng tin cậy.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

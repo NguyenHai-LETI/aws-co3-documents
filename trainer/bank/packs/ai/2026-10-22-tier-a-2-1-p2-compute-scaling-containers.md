@@ -18,15 +18,14 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.1"
 - services: ECS, Fargate, EKS, Lambda, EC2, SQS
 - tags: serverless-cost, spot-instances
 - difficulty: medium
+- time: 140
 - skills: 2.1.k14, 2.1.s4
 - family: route-service-container-platform
 - concept: Fargate removes instance patching and capacity management, so it has the least operational overhead for interruption-tolerant queue workers that outlast Lambda's time limit
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Đội nhỏ đang vá tay các máy EC2 — nền tảng container nào bỏ hẳn việc quản lý máy chủ mà vẫn chạy được job dài 25 phút?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A logistics company runs a stateless route-optimization service packaged as a Docker image. Each routing request arrives as a message on an Amazon SQS queue, and a container processes it for between 2 and 25 minutes. Any request can safely be retried if a container is interrupted. Request volume stays high throughout the business day and drops overnight. The service runs on a few always-on EC2 instances that the small platform team patches by hand, and the team also keeps Kubernetes manifests and Helm charts from an earlier on-premises deployment of the service. Which solution will meet these requirements with the LEAST operational overhead?
 
@@ -58,7 +57,6 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-auto-s
 - concept: Externalizing session state to a shared in-memory store makes web instances stateless and replaceable; stickiness, protected instances, and file-based session stores fail termination or latency needs
 - refs: C-kien-truc-web-app.md, E-kien-truc-database.md
 - hint: Giỏ hàng mất khi instance bị thay — dữ liệu phiên phải nằm ở đâu để mọi instance đều đọc được và instance dùng xong bỏ được?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -92,7 +90,6 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/elasticache-use-ca
 - concept: Match each tier to its scaling strategy: stateless web scales out on load per target, queue workers scale out on backlog per instance, and a single relational writer scales up (or uses Aurora Serverless v2)
 - refs: A-nen-tang-kien-truc.md, C-kien-truc-web-app.md, E-kien-truc-database.md
 - hint: Mỗi tầng một cách: web không trạng thái, worker theo hàng đợi, tầng ghi của CSDL — cái nào scale ngang được, cái nào chỉ scale dọc?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -128,7 +125,6 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - concept: A warm pool of Stopped, pre-initialized instances cuts scale-out latency for slow-booting instances at the cost of EBS only, unlike a Running warm pool, predictive scaling for unpredictable spikes, or larger instances
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Boot mất chừng mười phút, tải tăng bất ngờ nên không đặt lịch được và không muốn chạy sẵn cả ngày — làm sao có sẵn máy đã khởi tạo mà rẻ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -157,15 +153,14 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-war
 - services: ECS, Fargate, EKS, Lambda, EC2, SQS
 - tags: serverless-cost, spot-instances
 - difficulty: medium
+- time: 140
 - skills: 2.1.k14, 2.1.s4
 - family: route-service-container-platform
 - concept: ECS tasks on an Auto Scaling group capacity provider with Spot Instances are the cheapest option for steady, interruption-tolerant container work
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Việc chạy nền đều đặn cả ngày và thử lại được nếu bị ngắt — loại năng lực tính toán nào rẻ nhất cho tải chịu gián đoạn?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A logistics company runs a stateless route-optimization service packaged as a Docker image. Each routing request arrives as a message on an Amazon SQS queue, and a container processes it for between 2 and 25 minutes. Any request can safely be retried if a container is interrupted. Request volume stays high throughout the business day and drops overnight. The service runs on a few always-on EC2 instances that the small platform team patches by hand, and the team also keeps Kubernetes manifests and Helm charts from an earlier on-premises deployment of the service. Which solution will meet these requirements MOST cost-effectively?
 
@@ -197,7 +192,6 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/asg-capacity-p
 - concept: ALB slow start mode ramps a new target's share of requests gradually, unlike a launch lifecycle hook (full share after the wait), least outstanding requests routing, or default instance warmup
 - refs: C-kien-truc-web-app.md
 - hint: Instance mới nhận đủ phần tải ngay khi đăng ký và trả lỗi trong lúc khởi động — tham số nào của target group làm tải tăng dần?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -231,7 +225,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-t
 - concept: In microservices, keep a call synchronous when the caller needs the result now, and decouple the rest with SNS and per-service SQS queues so a slow dependency cannot fail the request
 - refs: A-nen-tang-kien-truc.md, 07-application-integration.md
 - hint: Kết quả thanh toán phải có ngay, còn kho và giao hàng làm chậm vài giây được — bước nào giữ đồng bộ, bước nào nên tách bằng thông điệp?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -266,7 +259,6 @@ Docs: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
 - concept: Moving a legacy app into containers without code changes: run the image on ECS with Fargate and mount EFS so every task shares a full POSIX directory (EBS is per task, Mountpoint for S3 cannot modify files, ECS on EC2 needs servers)
 - refs: 01-compute-services.md, D-kien-truc-luu-tru.md
 - hint: Không được sửa mã nguồn và vẫn cần thư mục ghi chung kiểu POSIX cho nhiều bản sao — loại lưu trữ nào gắn vào task được dùng chung?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -301,7 +293,6 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/efs-volumes.ht
 - concept: Bursty, rare, short work with no operations staff fits Lambda with API Gateway because it bills only while requests run and needs no capacity planning
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Tải rải rác theo đợt, mỗi lần chỉ vài giây, không có đội vận hành — mô hình tính phí nào chỉ trả khi có xử lý?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -330,15 +321,14 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
 - services: ECS, Fargate, EKS, Lambda, EC2, SQS
 - tags: serverless-cost, spot-instances
 - difficulty: medium
+- time: 140
 - skills: 2.1.k14, 2.1.s4
 - family: route-service-container-platform
 - concept: EKS is Kubernetes-conformant, so existing manifests and Helm charts run with the least rework compared with ECS or Lambda
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Đã có manifest và Helm chart của Kubernetes — nền tảng nào chạy chúng gần như nguyên vẹn, không phải viết lại định nghĩa triển khai?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A logistics company runs a stateless route-optimization service packaged as a Docker image. Each routing request arrives as a message on an Amazon SQS queue, and a container processes it for between 2 and 25 minutes. Any request can safely be retried if a container is interrupted. Request volume stays high throughout the business day and drops overnight. The service runs on a few always-on EC2 instances that the small platform team patches by hand, and the team also keeps Kubernetes manifests and Helm charts from an earlier on-premises deployment of the service. Which solution will meet these requirements with the LEAST rework of the team's existing deployment manifests?
 
@@ -370,7 +360,6 @@ Docs: https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html
 - concept: In a multi-tier design, give each tier its own Auto Scaling group and put an internal load balancer in private subnets between the web tier and the logic tier
 - refs: C-kien-truc-web-app.md, A-nen-tang-kien-truc.md
 - hint: Hai tầng phải scale riêng và tầng logic không được ra internet — thứ gì đặt giữa tầng web và tầng logic trong subnet riêng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -404,7 +393,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introd
 - concept: Scale queue workers with target tracking on a backlog-per-instance metric derived from acceptable latency and processing time, not on CPU, raw queue length, or a fixed schedule
 - refs: C-kien-truc-web-app.md, 07-application-integration.md
 - hint: CPU thấp vì worker chờ API ngoài trong khi hàng đợi dài ra — chỉ số nào tỉ lệ với việc đang chờ trên mỗi instance?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -438,7 +426,6 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - concept: Workers on long, non-resumable jobs call SetInstanceProtection to keep Auto Scaling from terminating them mid-job while dynamic scaling stays in place
 - refs: C-kien-truc-web-app.md
 - hint: Scale-in huỷ instance đang xuất file dở, việc không chạy lại được — cơ chế nào cho phép chính worker khoá instance của mình lúc đang làm?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -472,7 +459,6 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-ins
 - concept: ALB routes HTTP by path to containers and Lambda targets; NLB serves TCP at layer 4 with a static Elastic IP per Availability Zone for partner allow-lists
 - refs: C-kien-truc-web-app.md, 04-networking-services.md
 - hint: Một workload HTTP cần định tuyến theo đường dẫn, một workload TCP cần IP cố định cho đối tác — mỗi loại load balancer làm được việc nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

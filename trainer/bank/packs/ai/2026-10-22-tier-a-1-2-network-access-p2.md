@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.2: S
 - concept: Secrets Manager rotates credentials automatically and replicates the rotated value to replica Regions; Parameter Store has no native rotation or multi-Region replication
 - refs: 05-security-services.md
 - hint: Xoay mật khẩu tự động và đọc được bản sao ngay tại Region phụ — dịch vụ nào có sẵn cả hai, còn Parameter Store thì không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/replicate-secr
 - concept: Cross-account access to a secret needs a resource policy, an identity policy, and a customer managed KMS key because the aws/secretsmanager key policy cannot be changed
 - refs: 05-security-services.md
 - hint: Khoá KMS mặc định do AWS quản lý không cho sửa key policy — bí mật dùng chung giữa hai tài khoản cần loại khoá nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -91,7 +89,6 @@ Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-acces
 - concept: Cognito user pool authenticates users; an identity pool exchanges the token for temporary credentials scoped by an IAM role policy variable
 - refs: 05-security-services.md
 - hint: Một thành phần xác thực người dùng, thành phần khác đổi token thành thông tin xác thực tạm thời giới hạn theo từng người dùng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/cognito/latest/developerguide/iam-roles.html
 - concept: GuardDuty Malware Protection for S3 scans new uploads for malware; Macie discovers PII in S3 objects; Inspector and Security Hub do neither
 - refs: 05-security-services.md
 - hint: Hai nhu cầu khác nhau trên cùng bucket: tìm mã độc trong file mới tải lên và tìm dữ liệu cá nhân — mỗi nhu cầu một dịch vụ.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -161,7 +157,6 @@ Docs: https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.
 - concept: Amazon Inspector continuously scans EC2, ECR images, and Lambda functions for software vulnerabilities and can be activated organization-wide
 - refs: 05-security-services.md
 - hint: Cần phát hiện lỗ hổng phần mềm (CVE) mới công bố trên cả ba loại workload — liên tục, không lập lịch quét thủ công.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -195,7 +190,6 @@ Docs: https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html
 - concept: Security Hub aggregates findings from GuardDuty, Inspector, and Macie across accounts with a delegated administrator and across Regions with an aggregation Region
 - refs: 05-security-services.md
 - hint: Cần một chỗ tập trung xem finding của nhiều dịch vụ, nhiều tài khoản, nhiều Region — dịch vụ gom và chuẩn hoá finding.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -229,7 +223,6 @@ Docs: https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityh
 - concept: AWS WAF web ACLs attach to API Gateway REST API stages; managed SQL rule groups and rate-based rules block injection and abusive IPs
 - refs: 05-security-services.md
 - hint: Chặn SQL injection và IP gọi quá nhanh trước khi tới API, không sửa code — lớp L7 nào gắn được vào stage của API?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -263,7 +256,6 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-gro
 - concept: Shield Advanced adds the Shield Response Team (with Business or Enterprise Support) and cost protection; layer 7 floods are mitigated automatically by the AWS WAF Anti-DDoS managed rule group
 - refs: 05-security-services.md
 - hint: Cần chuyên gia DDoS 24/7, được hoàn chi phí scale do tấn công, và tự giảm thiểu L7 — gói nào của Shield, và cần gói Support nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -297,7 +289,6 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-l
 - concept: Firewall Manager needs a delegated administrator and AWS Config, and its WAF and Shield Advanced policies auto-protect new resources and accounts
 - refs: 05-security-services.md
 - hint: Cần bảo vệ cả tài nguyên tạo sau này ở mọi tài khoản — dịch vụ quản trị tập trung nào có điều kiện tiên quyết là tài khoản admin và Config?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -333,7 +324,6 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/fms-chapter.html
 - concept: Client VPN with SAML federation, group-based authorization rules per subnet, and connection logging fits remote workforce access
 - refs: 04-networking-services.md
 - hint: Người dùng từ xa, IdP SAML có MFA, mỗi nhóm chỉ vào subnet của mình, cần log kết nối — dịch vụ VPN dành cho người dùng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.2"
 - concept: Decouple a synchronous heavy task with S3 plus SQS and scale the worker group with target tracking on a backlog-per-instance metric, not on raw queue length
 - refs: 07-application-integration.md, 01-compute-services.md
 - hint: Hai tầng phải scale độc lập và không mất upload — chỉ số nào tăng/giảm tỉ lệ với số instance để target tracking hội tụ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -58,7 +57,6 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - concept: For an I/O-bound service whose CPU stays low, target tracking on ALBRequestCountPerTarget follows demand; load balancer RequestCount and CPU do not
 - refs: 01-compute-services.md, 04-networking-services.md
 - hint: Ứng dụng chủ yếu chờ dịch vụ ngoài nên CPU không phản ánh tải — chỉ số nào chia tải cho số target và đổi ngược chiều với số instance?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -87,14 +85,13 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scaling-target-tr
 - services: EC2 Auto Scaling, EC2
 - tags: scaling-policies, asg-warm-pool, asg-lifecycle-hooks
 - difficulty: hard
+- time: 165
 - skills: 3.2.s2, 3.2.k4
 - concept: Shifting cyclical load plus long instance initialization: predictive scaling launches capacity ahead of the forecast and a warm pool of pre-initialized stopped instances removes boot time from scale-out
 - refs: 01-compute-services.md
 - hint: Mẫu tải đổi theo chiến dịch và mỗi instance mất vài phút để sẵn sàng — cần vừa dự báo trước vừa rút ngắn thời gian khởi động.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 165
 
 A retail analytics company runs a web application on Amazon EC2 instances in an Auto Scaling group. Traffic follows daily and weekly patterns that shift as marketing campaigns change, so fixed schedules are frequently wrong. Each new instance needs about 8 minutes to boot and load a local data cache, so users see slow responses at the start of every busy period while the group scales out reactively. The company wants capacity to be ready before demand arrives while limiting the cost of idle capacity. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -128,7 +125,6 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-war
 - concept: For a Java Lambda function, SnapStart removes most of the cold-start delay at no additional charge, which beats provisioned concurrency on cost
 - refs: 01-compute-services.md, R-performance-benchmarks.md
 - hint: Runtime là Java và đề hỏi phương án tiết kiệm nhất — tính năng nào giảm khởi tạo mà không tính thêm phí cho Java?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -163,7 +159,6 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html
 - concept: When start-up latency must be the lowest and most predictable, provisioned concurrency (double-digit milliseconds) beats SnapStart (sub-second at best)
 - refs: 01-compute-services.md, R-performance-benchmarks.md
 - hint: Đổi qualifier: giờ cần độ trễ khởi động thấp và dễ đoán nhất — tính năng nào giữ sẵn môi trường đã khởi tạo thay vì khôi phục theo yêu cầu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -197,7 +192,6 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/snapstart.html
 - concept: Invoking a function asynchronously hands the event to Lambda's internal queue with automatic retries, decoupling the caller from a slow step, and an on-failure destination captures events that still fail
 - refs: 01-compute-services.md, 07-application-integration.md
 - hint: Bước biên lai chậm và hay lỗi làm checkout chậm theo — cách gọi hàm nào cho phép bên gọi trả lời ngay mà Lambda tự xếp hàng và thử lại?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -231,7 +225,6 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html
 - concept: Lambda allocates CPU in proportion to memory, so a CPU-bound function that uses little memory is sped up by raising the memory setting
 - refs: 01-compute-services.md, R-performance-benchmarks.md
 - hint: Hàm nặng CPU dù chỉ dùng ít bộ nhớ — Lambda chỉ cho một thiết lập duy nhất để điều chỉnh sức mạnh tính toán, đó là gì?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -265,7 +258,6 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/configuration-memory.html
 - concept: ECS service auto scaling adds tasks, but the container instances need an Auto Scaling group capacity provider with managed scaling so that tasks do not sit in PENDING
 - refs: 01-compute-services.md
 - hint: Task chờ ở trạng thái PENDING vì cụm hết chỗ — ai chịu trách nhiệm thêm instance khi không đặt được task?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -294,14 +286,13 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-auto-s
 - services: EKS, Fargate
 - tags: eks-auto-mode, node-autoscaling
 - difficulty: hard
+- time: 145
 - skills: 3.2.k6, 3.2.s3
 - concept: EKS Auto Mode provisions and removes right-sized nodes for unschedulable pods with the least operational overhead; Fargate has no GPUs, self-managed Karpenter adds ops, HPA scales pods not nodes
 - refs: 01-compute-services.md
 - hint: Pod chờ vì không có node đúng cỡ và đội vận hành nhỏ — giải pháp nào để AWS lo việc chọn cỡ và thêm/bớt node?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A company runs batch workloads on an Amazon EKS cluster that uses one managed node group of general purpose instances. Jobs arrive in bursts, and their pods request very different amounts of CPU, memory, and GPU. Pods wait for several minutes while the Cluster Autoscaler grows the node group, and many nodes sit mostly idle because the pod sizes do not fit the single instance type. The platform team is small. It wants nodes to be provisioned quickly, sized to the pending pods, and removed when unused, with the LEAST operational overhead. Which solution will meet these requirements?
 
@@ -333,7 +324,6 @@ Docs: https://docs.aws.amazon.com/eks/latest/userguide/automode.html
 - concept: Tightly coupled MPI jobs need a cluster placement group (one AZ, launched together) plus Elastic Fabric Adapter; spread and partition groups are for fault isolation and multiple AZs add latency
 - refs: 01-compute-services.md, R-performance-benchmarks.md
 - hint: Mục tiêu duy nhất là độ trễ và băng thông giữa các node — chiến lược đặt máy nào gom gần nhau, và card mạng nào bỏ qua kernel?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -368,7 +358,6 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/placement-strategies.h
 - concept: Pick the instance family by the dominant resource: memory optimized for in-memory data, compute optimized for CPU-bound encoding, accelerated computing for GPU training
 - refs: 01-compute-services.md, R-performance-benchmarks.md
 - hint: Với mỗi tầng, tìm tài nguyên chiếm ưu thế (RAM, CPU hay GPU) rồi chọn họ instance tương ứng — mỗi tầng chỉ có một lựa chọn đúng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -404,7 +393,6 @@ Docs: https://docs.aws.amazon.com/ec2/latest/instancetypes/instance-types.html
 - concept: Large numbers of independent, long-running containerized tasks fit AWS Batch (queue, automatic scaling, Spot); EMR targets Spark/Hadoop and Lambda has a runtime limit
 - refs: 01-compute-services.md, 09-analytics-bigdata.md
 - hint: Hàng nghìn tác vụ container độc lập, chạy hàng chục phút — dịch vụ nào có hàng đợi job và tự co giãn năng lực tính toán theo số job?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -433,14 +421,13 @@ Docs: https://docs.aws.amazon.com/batch/latest/userguide/what-is-batch.html
 - services: CloudFront, Lambda
 - tags: lambda-edge, edge-compute
 - difficulty: medium
+- time: 110
 - skills: 3.2.k2, 3.2.k5
 - concept: Edge logic that needs network access, the AWS SDK, or more than a few milliseconds belongs in Lambda@Edge; CloudFront Functions and KeyValueStore cannot call external services
 - refs: 04-networking-services.md, 01-compute-services.md
 - hint: Logic phải gọi API bên ngoài và AWS SDK ngay tại edge — loại edge function nào được phép truy cập mạng, loại nào thì không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 An online retailer serves its storefront through Amazon CloudFront. Before a request is forwarded to the origin, the retailer must validate a session token by calling an external identity API over HTTPS and must read a per-country pricing rule with the AWS SDK. The extra processing may take a few tens of milliseconds, and the retailer wants the logic to run close to viewers without managing servers. Which solution will meet these requirements?
 

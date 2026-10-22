@@ -1,0 +1,780 @@
+# v6: tầng A đã giải mù khớp đáp án → active (trước khi niêm phong S3)
+run_id: 2026-10-22_203000_tier-a-activate
+items:
+  - id: "ai-20261022-a11-16"
+    base: "a7df7f6f65"
+    status: active
+  - id: "ai-20261022-a11-17"
+    base: "9a18116bdb"
+    status: active
+  - id: "ai-20261022-a11-18"
+    base: "b0006c980f"
+    status: active
+  - id: "ai-20261022-a11-19"
+    base: "39a916fbac"
+    status: active
+  - id: "ai-20261022-a11-20"
+    base: "0ae3aeabf1"
+    status: active
+  - id: "ai-20261022-a11-21"
+    base: "723b086123"
+    status: active
+  - id: "ai-20261022-a11-22"
+    base: "45440699a1"
+    status: active
+  - id: "ai-20261022-a11-23"
+    base: "7f5b8a486d"
+    status: active
+  - id: "ai-20261022-a11-24"
+    base: "1a33992eac"
+    status: active
+  - id: "ai-20261022-a11-25"
+    base: "b055c2b99b"
+    status: active
+  - id: "ai-20261022-a11-26"
+    base: "8f9ad1cb2d"
+    status: active
+  - id: "ai-20261022-a11-27"
+    base: "43ce7a56de"
+    status: active
+  - id: "ai-20261022-a11-01"
+    base: "dafb1de450"
+    status: active
+  - id: "ai-20261022-a11-02"
+    base: "e22bdf6f7b"
+    status: active
+  - id: "ai-20261022-a11-03"
+    base: "a1c9e2a591"
+    status: active
+  - id: "ai-20261022-a11-04"
+    base: "18dc4bb448"
+    status: active
+  - id: "ai-20261022-a11-05"
+    base: "1001ffb6e2"
+    status: active
+  - id: "ai-20261022-a11-06"
+    base: "0c4f859006"
+    status: active
+  - id: "ai-20261022-a11-07"
+    base: "218d4adfdd"
+    status: active
+  - id: "ai-20261022-a11-08"
+    base: "b00148d8c2"
+    status: active
+  - id: "ai-20261022-a11-09"
+    base: "3fac735e79"
+    status: active
+  - id: "ai-20261022-a11-10"
+    base: "3186f5b73e"
+    status: active
+  - id: "ai-20261022-a11-11"
+    base: "d0d2a905c8"
+    status: active
+  - id: "ai-20261022-a11-12"
+    base: "20afad2874"
+    status: active
+  - id: "ai-20261022-a11-13"
+    base: "7880ea3b08"
+    status: active
+  - id: "ai-20261022-a11-14"
+    base: "fed2f615fe"
+    status: active
+  - id: "ai-20261022-a11-15"
+    base: "d4f01fccfc"
+    status: active
+  - id: "ai-20261022-a12-11"
+    base: "b43830a215"
+    status: active
+  - id: "ai-20261022-a12-12"
+    base: "2d729e9f9e"
+    status: active
+  - id: "ai-20261022-a12-13"
+    base: "afc0f54914"
+    status: active
+  - id: "ai-20261022-a12-14"
+    base: "d04cd213c8"
+    status: active
+  - id: "ai-20261022-a12-15"
+    base: "740999fff3"
+    status: active
+  - id: "ai-20261022-a12-16"
+    base: "61d1a3066d"
+    status: active
+  - id: "ai-20261022-a12-17"
+    base: "8ba83a03cd"
+    status: active
+  - id: "ai-20261022-a12-18"
+    base: "8589055dec"
+    status: active
+  - id: "ai-20261022-a12-19"
+    base: "3551b0ad95"
+    status: active
+  - id: "ai-20261022-a12-20"
+    base: "e58bcd5181"
+    status: active
+  - id: "ai-20261022-a12-01"
+    base: "553d6a9846"
+    status: active
+  - id: "ai-20261022-a12-02"
+    base: "47d5041f0e"
+    status: active
+  - id: "ai-20261022-a12-03"
+    base: "b91b09956b"
+    status: active
+  - id: "ai-20261022-a12-04"
+    base: "e3c40a0c65"
+    status: active
+  - id: "ai-20261022-a12-05"
+    base: "79f38cd302"
+    status: active
+  - id: "ai-20261022-a12-06"
+    base: "d0262ffa43"
+    status: active
+  - id: "ai-20261022-a12-07"
+    base: "cf62e02115"
+    status: active
+  - id: "ai-20261022-a12-08"
+    base: "9887ed045c"
+    status: active
+  - id: "ai-20261022-a12-09"
+    base: "72f8f19425"
+    status: active
+  - id: "ai-20261022-a12-10"
+    base: "fe23d79458"
+    status: active
+  - id: "ai-20261022-a13-15"
+    base: "b1e2fe7470"
+    status: active
+  - id: "ai-20261022-a13-16"
+    base: "5414806d5f"
+    status: active
+  - id: "ai-20261022-a13-17"
+    base: "245ecb760c"
+    status: active
+  - id: "ai-20261022-a13-18"
+    base: "0d7fe7b102"
+    status: active
+  - id: "ai-20261022-a13-19"
+    base: "8f05881a23"
+    status: active
+  - id: "ai-20261022-a13-20"
+    base: "f0e337cd82"
+    status: active
+  - id: "ai-20261022-a13-21"
+    base: "97f4a3a885"
+    status: active
+  - id: "ai-20261022-a13-22"
+    base: "ffbaccb04a"
+    status: active
+  - id: "ai-20261022-a13-23"
+    base: "28a26f86b1"
+    status: active
+  - id: "ai-20261022-a13-24"
+    base: "25dea1699d"
+    status: active
+  - id: "ai-20261022-a13-25"
+    base: "d93e715fc3"
+    status: active
+  - id: "ai-20261022-a13-26"
+    base: "46508d974a"
+    status: active
+  - id: "ai-20261022-a13-27"
+    base: "5c2261b21f"
+    status: active
+  - id: "ai-20261022-a13-28"
+    base: "a6ca6fffda"
+    status: active
+  - id: "ai-20261022-a13-01"
+    base: "cf8723ba88"
+    status: active
+  - id: "ai-20261022-a13-02"
+    base: "9ba8ee6fbb"
+    status: active
+  - id: "ai-20261022-a13-03"
+    base: "f9bd82975c"
+    status: active
+  - id: "ai-20261022-a13-04"
+    base: "05d83d72b6"
+    status: active
+  - id: "ai-20261022-a13-05"
+    base: "47d1d9f508"
+    status: active
+  - id: "ai-20261022-a13-06"
+    base: "5a7765071f"
+    status: active
+  - id: "ai-20261022-a13-07"
+    base: "2d331b0100"
+    status: active
+  - id: "ai-20261022-a13-08"
+    base: "e71e4be04b"
+    status: active
+  - id: "ai-20261022-a13-09"
+    base: "112b12e147"
+    status: active
+  - id: "ai-20261022-a13-10"
+    base: "4c398f0db5"
+    status: active
+  - id: "ai-20261022-a13-11"
+    base: "8cc69e48bf"
+    status: active
+  - id: "ai-20261022-a13-12"
+    base: "3f33bf4aa5"
+    status: active
+  - id: "ai-20261022-a13-13"
+    base: "369e8b6e7a"
+    status: active
+  - id: "ai-20261022-a13-14"
+    base: "05fa634291"
+    status: active
+  - id: "ai-20261022-a21-01"
+    base: "31020ca583"
+    status: active
+  - id: "ai-20261022-a21-02"
+    base: "7a8e66aaae"
+    status: active
+  - id: "ai-20261022-a21-03"
+    base: "c25b30f3d4"
+    status: active
+  - id: "ai-20261022-a21-04"
+    base: "a8e5c47d40"
+    status: active
+  - id: "ai-20261022-a21-05"
+    base: "5854a4a8c2"
+    status: active
+  - id: "ai-20261022-a21-06"
+    base: "4e06ed834a"
+    status: active
+  - id: "ai-20261022-a21-07"
+    base: "cf72574c10"
+    status: active
+  - id: "ai-20261022-a21-08"
+    base: "ce0ea14f5c"
+    status: active
+  - id: "ai-20261022-a21-09"
+    base: "a809c03375"
+    status: active
+  - id: "ai-20261022-a21-10"
+    base: "fda8377a5a"
+    status: active
+  - id: "ai-20261022-a21-11"
+    base: "926bd66002"
+    status: active
+  - id: "ai-20261022-a21-12"
+    base: "99caf8c19d"
+    status: active
+  - id: "ai-20261022-a21-13"
+    base: "4e9379d0ab"
+    status: active
+  - id: "ai-20261022-a21-14"
+    base: "8949277180"
+    status: active
+  - id: "ai-20261022-a21-15"
+    base: "5217e460a1"
+    status: active
+  - id: "ai-20261022-a21-16"
+    base: "d246379165"
+    status: active
+  - id: "ai-20261022-a21-17"
+    base: "465a823d73"
+    status: active
+  - id: "ai-20261022-a21-18"
+    base: "5d82b5d325"
+    status: active
+  - id: "ai-20261022-a21-19"
+    base: "405afa6c82"
+    status: active
+  - id: "ai-20261022-a21-20"
+    base: "319a35c0d7"
+    status: active
+  - id: "ai-20261022-a21-21"
+    base: "bc041c5377"
+    status: active
+  - id: "ai-20261022-a21-22"
+    base: "6c78d15351"
+    status: active
+  - id: "ai-20261022-a21-23"
+    base: "64d15d06f6"
+    status: active
+  - id: "ai-20261022-a21-24"
+    base: "9b7a2dc2dc"
+    status: active
+  - id: "ai-20261022-a21-25"
+    base: "7f06ed8ac4"
+    status: active
+  - id: "ai-20261022-a21-26"
+    base: "864795e7c1"
+    status: active
+  - id: "ai-20261022-a21-27"
+    base: "4658acb177"
+    status: active
+  - id: "ai-20261022-a21-28"
+    base: "7626f0f592"
+    status: active
+  - id: "ai-20261022-a21-29"
+    base: "c37cd3275d"
+    status: active
+  - id: "ai-20261022-a21-30"
+    base: "44e69b2365"
+    status: active
+  - id: "ai-20261022-a21-31"
+    base: "a052cb3eca"
+    status: active
+  - id: "ai-20261022-a21-32"
+    base: "89ba5690d2"
+    status: active
+  - id: "ai-20261022-a21-33"
+    base: "99448c9814"
+    status: active
+  - id: "ai-20261022-a21-34"
+    base: "f01bc15341"
+    status: active
+  - id: "ai-20261022-a21-35"
+    base: "56cc6a9623"
+    status: active
+  - id: "ai-20261022-a21-36"
+    base: "c7a3d32e82"
+    status: active
+  - id: "ai-20261022-a21-37"
+    base: "388bbf400f"
+    status: active
+  - id: "ai-20261022-a21-38"
+    base: "c623cf7559"
+    status: active
+  - id: "ai-20261022-a21-39"
+    base: "5dac03fb89"
+    status: active
+  - id: "ai-20261022-a22-01"
+    base: "2422f878f3"
+    status: active
+  - id: "ai-20261022-a22-02"
+    base: "4191aef355"
+    status: active
+  - id: "ai-20261022-a22-03"
+    base: "53221c926b"
+    status: active
+  - id: "ai-20261022-a22-04"
+    base: "7d653a8275"
+    status: active
+  - id: "ai-20261022-a22-05"
+    base: "4e904b35fb"
+    status: active
+  - id: "ai-20261022-a22-06"
+    base: "395dcd8788"
+    status: active
+  - id: "ai-20261022-a22-07"
+    base: "6b354c0fca"
+    status: active
+  - id: "ai-20261022-a22-08"
+    base: "1f6f41ee77"
+    status: active
+  - id: "ai-20261022-a22-09"
+    base: "ec3601852f"
+    status: active
+  - id: "ai-20261022-a22-10"
+    base: "ff82fd9df2"
+    status: active
+  - id: "ai-20261022-a22-11"
+    base: "58f961e777"
+    status: active
+  - id: "ai-20261022-a22-12"
+    base: "492d9ce6d5"
+    status: active
+  - id: "ai-20261022-a22-13"
+    base: "4f3a7c4834"
+    status: active
+  - id: "ai-20261022-a22-14"
+    base: "c4611d293b"
+    status: active
+  - id: "ai-20261022-a22-15"
+    base: "9b11abca20"
+    status: active
+  - id: "ai-20261022-a22-16"
+    base: "514971898c"
+    status: active
+  - id: "ai-20261022-a22-17"
+    base: "76dbd9fa83"
+    status: active
+  - id: "ai-20261022-a22-18"
+    base: "e7246e55dc"
+    status: active
+  - id: "ai-20261022-a22-19"
+    base: "9f94456f26"
+    status: active
+  - id: "ai-20261022-a22-20"
+    base: "cc32b734d5"
+    status: active
+  - id: "ai-20261022-a22-21"
+    base: "6f84cca37f"
+    status: active
+  - id: "ai-20261022-a22-22"
+    base: "3779d2df5e"
+    status: active
+  - id: "ai-20261022-a22-23"
+    base: "3e618fdf39"
+    status: active
+  - id: "ai-20261022-a22-24"
+    base: "2462a480a1"
+    status: active
+  - id: "ai-20261022-a22-25"
+    base: "226c5304b1"
+    status: active
+  - id: "ai-20261022-a22-26"
+    base: "7ef1987a16"
+    status: active
+  - id: "ai-20261022-a22-27"
+    base: "f3711368c8"
+    status: active
+  - id: "ai-20261022-a22-28"
+    base: "f65bec8eb4"
+    status: active
+  - id: "ai-20261022-a22-29"
+    base: "f7cc927522"
+    status: active
+  - id: "ai-20261022-a22-30"
+    base: "cb0bf9838a"
+    status: active
+  - id: "ai-20261022-a22-31"
+    base: "c537ebca77"
+    status: active
+  - id: "ai-20261022-a22-32"
+    base: "ca5be5fe4d"
+    status: active
+  - id: "ai-20261022-a22-33"
+    base: "cff44d584a"
+    status: active
+  - id: "ai-20261022-a22-34"
+    base: "d18a7e32e2"
+    status: active
+  - id: "ai-20261022-a31-01"
+    base: "2d6cabf583"
+    status: active
+  - id: "ai-20261022-a31-02"
+    base: "88fd202dbd"
+    status: active
+  - id: "ai-20261022-a31-03"
+    base: "e9ca42ea54"
+    status: active
+  - id: "ai-20261022-a31-04"
+    base: "6ffce573a2"
+    status: active
+  - id: "ai-20261022-a31-05"
+    base: "cf3daa6062"
+    status: active
+  - id: "ai-20261022-a31-06"
+    base: "952e2b1815"
+    status: active
+  - id: "ai-20261022-a31-07"
+    base: "24910dcfd2"
+    status: active
+  - id: "ai-20261022-a32-01"
+    base: "3a2f9b1c38"
+    status: active
+  - id: "ai-20261022-a32-02"
+    base: "d56e7cad09"
+    status: active
+  - id: "ai-20261022-a32-03"
+    base: "e815986e36"
+    status: active
+  - id: "ai-20261022-a32-04"
+    base: "76b056e31e"
+    status: active
+  - id: "ai-20261022-a32-05"
+    base: "8f5abca0ee"
+    status: active
+  - id: "ai-20261022-a32-06"
+    base: "201c3f75d9"
+    status: active
+  - id: "ai-20261022-a32-07"
+    base: "118d1d1de6"
+    status: active
+  - id: "ai-20261022-a32-08"
+    base: "62599a9e65"
+    status: active
+  - id: "ai-20261022-a32-09"
+    base: "02c5eedc4b"
+    status: active
+  - id: "ai-20261022-a32-10"
+    base: "55002ddacc"
+    status: active
+  - id: "ai-20261022-a32-11"
+    base: "c7b38c78a2"
+    status: active
+  - id: "ai-20261022-a32-12"
+    base: "79d248b72b"
+    status: active
+  - id: "ai-20261022-a32-13"
+    base: "527bfa64b5"
+    status: active
+  - id: "ai-20261022-a33-11"
+    base: "8c2db035ed"
+    status: active
+  - id: "ai-20261022-a33-12"
+    base: "1a779410ab"
+    status: active
+  - id: "ai-20261022-a33-13"
+    base: "e716b7a7c5"
+    status: active
+  - id: "ai-20261022-a33-14"
+    base: "b58351c2b2"
+    status: active
+  - id: "ai-20261022-a33-15"
+    base: "e55b169089"
+    status: active
+  - id: "ai-20261022-a33-16"
+    base: "a38d1ffc45"
+    status: active
+  - id: "ai-20261022-a33-17"
+    base: "d670d5722d"
+    status: active
+  - id: "ai-20261022-a33-01"
+    base: "2f5624473e"
+    status: active
+  - id: "ai-20261022-a33-02"
+    base: "8a03802863"
+    status: active
+  - id: "ai-20261022-a33-03"
+    base: "c838503071"
+    status: active
+  - id: "ai-20261022-a33-04"
+    base: "93674f1d01"
+    status: active
+  - id: "ai-20261022-a33-05"
+    base: "4c578077e8"
+    status: active
+  - id: "ai-20261022-a33-06"
+    base: "920f383ce5"
+    status: active
+  - id: "ai-20261022-a33-07"
+    base: "1465d2d941"
+    status: active
+  - id: "ai-20261022-a33-08"
+    base: "707c9b011f"
+    status: active
+  - id: "ai-20261022-a33-09"
+    base: "2cca7a0bda"
+    status: active
+  - id: "ai-20261022-a33-10"
+    base: "0e26c658dd"
+    status: active
+  - id: "ai-20261022-a34-01"
+    base: "59d810bd2d"
+    status: active
+  - id: "ai-20261022-a34-02"
+    base: "d9ba853671"
+    status: active
+  - id: "ai-20261022-a34-03"
+    base: "ec86ba6e21"
+    status: active
+  - id: "ai-20261022-a34-04"
+    base: "7357f3ea69"
+    status: active
+  - id: "ai-20261022-a35-11"
+    base: "793abd8a7a"
+    status: active
+  - id: "ai-20261022-a35-12"
+    base: "1b05b9f174"
+    status: active
+  - id: "ai-20261022-a35-13"
+    base: "d3703a6c2e"
+    status: active
+  - id: "ai-20261022-a35-14"
+    base: "85f91d8857"
+    status: active
+  - id: "ai-20261022-a35-15"
+    base: "ce994c83b2"
+    status: active
+  - id: "ai-20261022-a35-16"
+    base: "f74087d81e"
+    status: active
+  - id: "ai-20261022-a35-17"
+    base: "8fc68ddc18"
+    status: active
+  - id: "ai-20261022-a35-18"
+    base: "fe1b9cb5ba"
+    status: active
+  - id: "ai-20261022-a35-19"
+    base: "367d80a668"
+    status: active
+  - id: "ai-20261022-a35-01"
+    base: "0985559b9f"
+    status: active
+  - id: "ai-20261022-a35-02"
+    base: "bff1dd059b"
+    status: active
+  - id: "ai-20261022-a35-03"
+    base: "4295fe8077"
+    status: active
+  - id: "ai-20261022-a35-05"
+    base: "16242685b4"
+    status: active
+  - id: "ai-20261022-a35-06"
+    base: "57efc7099c"
+    status: active
+  - id: "ai-20261022-a35-08"
+    base: "b093de430f"
+    status: active
+  - id: "ai-20261022-a35-09"
+    base: "b84b2bef63"
+    status: active
+  - id: "ai-20261022-a35-10"
+    base: "4d2db9a432"
+    status: active
+  - id: "ai-20261022-a41-12"
+    base: "a87b4ce849"
+    status: active
+  - id: "ai-20261022-a41-13"
+    base: "fa5239cf17"
+    status: active
+  - id: "ai-20261022-a41-14"
+    base: "32b13a0d32"
+    status: active
+  - id: "ai-20261022-a41-15"
+    base: "70d0fd1b31"
+    status: active
+  - id: "ai-20261022-a41-16"
+    base: "379092332e"
+    status: active
+  - id: "ai-20261022-a41-17"
+    base: "cf1108bd49"
+    status: active
+  - id: "ai-20261022-a41-18"
+    base: "95c1e7b05a"
+    status: active
+  - id: "ai-20261022-a41-19"
+    base: "6a9ed174c6"
+    status: active
+  - id: "ai-20261022-a41-01"
+    base: "96da6312f3"
+    status: active
+  - id: "ai-20261022-a41-02"
+    base: "c60100e550"
+    status: active
+  - id: "ai-20261022-a41-03"
+    base: "a98b9f1f59"
+    status: active
+  - id: "ai-20261022-a41-04"
+    base: "e4795bf9d1"
+    status: active
+  - id: "ai-20261022-a41-05"
+    base: "51dd10c5ac"
+    status: active
+  - id: "ai-20261022-a41-06"
+    base: "4c0d7374f0"
+    status: active
+  - id: "ai-20261022-a41-07"
+    base: "a56ce9a5ab"
+    status: active
+  - id: "ai-20261022-a41-08"
+    base: "e09c1b831b"
+    status: active
+  - id: "ai-20261022-a41-09"
+    base: "20a45d206c"
+    status: active
+  - id: "ai-20261022-a41-10"
+    base: "8a6ba051fc"
+    status: active
+  - id: "ai-20261022-a41-11"
+    base: "3616bc04b6"
+    status: active
+  - id: "ai-20261022-a42-01"
+    base: "29f9a1f7ef"
+    status: active
+  - id: "ai-20261022-a42-02"
+    base: "db002a8a27"
+    status: active
+  - id: "ai-20261022-a42-03"
+    base: "5f88a01d19"
+    status: active
+  - id: "ai-20261022-a42-05"
+    base: "b2fc41ee62"
+    status: active
+  - id: "ai-20261022-a42-06"
+    base: "73ce365193"
+    status: active
+  - id: "ai-20261022-a42-07"
+    base: "34d990bb5b"
+    status: active
+  - id: "ai-20261022-a42-08"
+    base: "3953a848cb"
+    status: active
+  - id: "ai-20261022-a42-09"
+    base: "531c481192"
+    status: active
+  - id: "ai-20261022-a42-10"
+    base: "204ba68cfd"
+    status: active
+  - id: "ai-20261022-a42-11"
+    base: "d6c691441c"
+    status: active
+  - id: "ai-20261022-a42-12"
+    base: "47f2972c99"
+    status: active
+  - id: "ai-20261022-a42-13"
+    base: "6f8e086dd8"
+    status: active
+  - id: "ai-20261022-a43-01"
+    base: "72eb8f6067"
+    status: active
+  - id: "ai-20261022-a43-02"
+    base: "932b2b6a2d"
+    status: active
+  - id: "ai-20261022-a43-03"
+    base: "0caed57f5a"
+    status: active
+  - id: "ai-20261022-a43-04"
+    base: "d4792b516a"
+    status: active
+  - id: "ai-20261022-a43-05"
+    base: "b96e4adabc"
+    status: active
+  - id: "ai-20261022-a43-06"
+    base: "3a0457650b"
+    status: active
+  - id: "ai-20261022-a43-07"
+    base: "5fee711d8c"
+    status: active
+  - id: "ai-20261022-a43-08"
+    base: "18682ded5f"
+    status: active
+  - id: "ai-20261022-a43-09"
+    base: "8fb01e2c11"
+    status: active
+  - id: "ai-20261022-a43-10"
+    base: "b993ee5be8"
+    status: active
+  - id: "ai-20261022-a43-11"
+    base: "152b6a14ff"
+    status: active
+  - id: "ai-20261022-a43-12"
+    base: "c4340cca8b"
+    status: active
+  - id: "ai-20261022-a44-01"
+    base: "9ef9aeb7c2"
+    status: active
+  - id: "ai-20261022-a44-02"
+    base: "afc4b07794"
+    status: active
+  - id: "ai-20261022-a44-03"
+    base: "14536550a7"
+    status: active
+  - id: "ai-20261022-a44-04"
+    base: "b70499aa74"
+    status: active
+  - id: "ai-20261022-a44-05"
+    base: "9c46b24f38"
+    status: active
+  - id: "ai-20261022-a44-06"
+    base: "076438611f"
+    status: active
+  - id: "ai-20261022-a44-07"
+    base: "2dfc03fd37"
+    status: active
+  - id: "ai-20261022-a44-08"
+    base: "ad26a982fc"
+    status: active
+  - id: "ai-20261022-a44-09"
+    base: "0f4863a381"
+    status: active
+  - id: "ai-20261022-a44-10"
+    base: "1325535c74"
+    status: active

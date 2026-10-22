@@ -24,7 +24,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.2"
 - concept: Pilot light is the cheapest DR strategy that meets an RPO of seconds when the RTO allows an hour of downtime
 - refs: A-nen-tang-kien-truc.md, P-architecture-diagrams.md
 - hint: RPO vài giây loại được phương án nào? Với RTO một giờ, thành phần nào thật sự phải chạy sẵn ở Region DR, và tiền nằm ở đâu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -53,15 +52,14 @@ Docs: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads
 - services: DynamoDB, EC2 Auto Scaling, ALB, Route 53, AWS Backup, CloudFormation
 - tags: dr-warm-standby, dr-pilot-light, rto-rpo, dynamodb-global-tables
 - difficulty: hard
+- time: 160
 - skills: 2.2.k4, 2.2.s6
+- family: dr-strategy-qualifier
 - concept: Warm standby (scaled-down but running) can serve traffic immediately, unlike pilot light, and costs less than active-active
 - refs: A-nen-tang-kien-truc.md, P-architecture-diagrams.md
 - hint: Điểm khác nhau nằm ở câu hỏi cuối: DR Region phải phục vụ được ngay sau failover nhưng vẫn không muốn trả tiền cho công suất đầy đủ.
-- family: dr-strategy-qualifier
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 160
 
 A ride-sharing company runs its trip-booking API in us-east-1 on an Auto Scaling group of Amazon EC2 instances fronted by an Application Load Balancer, with trip data in an Amazon DynamoDB table. Client traffic is routed by Amazon Route 53. The company is designing disaster recovery in us-west-2 in case us-east-1 becomes unavailable. The business accepts up to one hour of downtime but only a few seconds of data loss. The application tier is stateless, and its AMIs and infrastructure are defined in AWS CloudFormation templates. Which solution meets these requirements MOST cost-effectively while letting the DR Region serve requests immediately after failover?
 
@@ -88,15 +86,14 @@ Docs: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads
 - services: DynamoDB, EC2 Auto Scaling, ALB, Route 53, AWS Backup, CloudFormation
 - tags: dr-multi-site, rto-rpo, dynamodb-global-tables, route53-routing
 - difficulty: medium
+- time: 145
 - skills: 2.2.k4, 2.2.k6
+- family: dr-strategy-qualifier
 - concept: Multi-site active-active has the lowest RTO because both Regions already serve traffic and no failover steps remain
 - refs: A-nen-tang-kien-truc.md, P-architecture-diagrams.md
 - hint: Câu hỏi cuối đổi sang thời gian khôi phục thấp nhất — phương án nào không còn bước bật hay mở rộng nào sau thảm hoạ?
-- family: dr-strategy-qualifier
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A ride-sharing company runs its trip-booking API in us-east-1 on an Auto Scaling group of Amazon EC2 instances fronted by an Application Load Balancer, with trip data in an Amazon DynamoDB table. Client traffic is routed by Amazon Route 53. The company is designing disaster recovery in us-west-2 in case us-east-1 becomes unavailable. The business accepts up to one hour of downtime but only a few seconds of data loss. The application tier is stateless, and its AMIs and infrastructure are defined in AWS CloudFormation templates. Which solution meets these requirements with the LOWEST recovery time?
 
@@ -128,7 +125,6 @@ Docs: https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads
 - concept: AWS Elastic Disaster Recovery gives low-cost continuous replication, drills, and failback for on-premises servers that cannot change
 - refs: 13-other-services.md, A-nen-tang-kien-truc.md
 - hint: Cần sao chép liên tục (RPO giây) nhưng không trả tiền cho đội máy chạy nhàn rỗi, lại phải chạy diễn tập và failback về data center.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -162,7 +158,6 @@ Docs: https://docs.aws.amazon.com/drs/latest/userguide/what-is-drs.html
 - concept: Aurora Global Database plus a managed failover and the global writer endpoint gives Regional DR with an RPO of seconds
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Mất cả Region, RPO giây, đội nhỏ không muốn tự cấu hình sao chép — cần bước tạo bản sao cấp lưu trữ và bước chuyển vai khi có sự cố.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -192,14 +187,13 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - services: DynamoDB
 - tags: dynamodb-global-tables, multi-region, rto-rpo
 - difficulty: hard
+- time: 130
 - skills: 2.2.k11, 2.2.s2
 - concept: DynamoDB global tables with multi-Region strong consistency give an RPO of zero; the default eventual-consistency mode does not
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Không được mất giao dịch nào đã commit và đọc nhất quán mạnh ở mọi Region — chế độ mặc định của bảng toàn cầu có đủ không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A payments company is building a new service that stores account balances in Amazon DynamoDB. Regulators require that no committed balance update is lost if an AWS Region fails, and that a strongly consistent read of a balance in any Region returns the latest committed write. The application will run in us-east-1, us-east-2, and us-west-2, and the team wants no custom code to copy data between Regions and the lowest operational effort. Which solution will meet these requirements?
 
@@ -231,7 +225,6 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globalt
 - concept: S3 Replication Time Control gives an SLA-backed 15-minute window for new objects, while Batch Replication copies existing objects
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Hai yêu cầu độc lập: đối tượng mới phải có cam kết thời gian có SLA, còn đối tượng đã tồn tại thì replication trực tiếp không chạm tới.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -261,14 +254,13 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-con
 - services: S3
 - tags: s3-replication, s3-versioning, compliance
 - difficulty: medium
+- time: 110
 - skills: 2.2.k11, 2.2.s5
 - concept: Same-Region Replication to another account with replica owner override keeps an independent copy inside the Region
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Dữ liệu không được rời Region nhưng cần bản sao độc lập ở tài khoản khác, tự động khi đối tượng đến — loại sao chép nào giữ nguyên Region?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A healthcare company stores audit logs in an Amazon S3 bucket in its production account in ap-southeast-2. Regulations require that all data stay in that Region. Auditors also require an independent copy of every new log object in a separate backup account, owned by that account, so that compromised production credentials cannot delete the copy. The copy must be created automatically as objects arrive. Which solution will meet these requirements?
 
@@ -300,7 +292,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html
 - concept: AWS Backup Organizations policies, cross-account backup, and a logically air-gapped vault protect backups from a compromised account
 - refs: 13-other-services.md, B-bao-mat-compliance.md
 - hint: Cần ba mảnh ghép: chính sách áp tự động cho cả tổ chức, cho phép chép sang tài khoản khác, và kho đích mà tài khoản bị chiếm không xoá được.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -336,7 +327,6 @@ Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedv
 - concept: Multi-AZ and read replicas replicate logical errors; point-in-time recovery restores to a new instance from before the mistake
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Xoá nhầm dữ liệu được sao chép sang mọi bản sao gần như tức thì — cần quay về một thời điểm trước lỗi chứ không phải chuyển sang bản sao.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -370,7 +360,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIT.html
 - concept: A Multi-AZ DB cluster has readable standbys, lower write latency and faster failover than a Multi-AZ DB instance deployment
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Standby của Multi-AZ instance không đọc được; cần chế độ Multi-AZ khác có standby phục vụ đọc mà vẫn là RDS PostgreSQL.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -404,7 +393,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/multi-az-db-cluster
 - concept: Surviving the loss of one Availability Zone needs a Multi-AZ design inside the Region, not Multi-Region, when data must stay in the Region
 - refs: A-nen-tang-kien-truc.md, 14-so-sanh-services.md
 - hint: Chỉ cần chịu mất một AZ và dữ liệu bị giữ trong một Region — Multi-AZ trong Region là đủ, đừng trả thêm cho Multi-Region.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

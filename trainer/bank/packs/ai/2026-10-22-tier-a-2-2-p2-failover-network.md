@@ -24,7 +24,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.2 �
 - concept: Route 53 failover alias records with Evaluate Target Health are the cheapest automatic active-passive Regional failover
 - refs: 04-networking-services.md
 - hint: Ba yêu cầu: tự động, không phụ thuộc Region chính, rẻ nhất — với mỗi phương án, hỏi: tốn phí gì, chuyển được loại request nào, logic chạy ở đâu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -53,15 +52,14 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover-typ
 - services: Route 53, ALB, Global Accelerator, CloudFront
 - tags: route53-routing, multi-region, high-availability
 - difficulty: hard
+- time: 140
 - skills: 2.2.k6, 2.2.s2
+- family: regional-failover-qualifier
 - concept: Global Accelerator moves traffic between Regions without DNS answers, so resolver caching beyond the TTL cannot delay failover
 - refs: 04-networking-services.md, 14-so-sanh-services.md
 - hint: Điểm khác nằm ở câu hỏi cuối: nhiều resolver giữ cache DNS lâu hơn TTL — cơ chế nào không dựa vào việc client phân giải lại tên?
-- family: regional-failover-qualifier
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A gaming company serves a REST API at api.example.com from Application Load Balancers in two Regions: us-east-1 is primary and eu-west-1 is a warm standby. Most requests are HTTPS POST calls. The company wants traffic to move to the standby Region automatically when the primary Region's load balancer becomes unhealthy, and the move must not depend on any resource in the primary Region. Which solution completes the move fastest for clients whose resolvers cache DNS answers beyond the record TTL?
 
@@ -88,14 +86,13 @@ Docs: https://docs.aws.amazon.com/global-accelerator/latest/dg/what-is-global-ac
 - services: Route 53, ALB, CloudWatch, EC2
 - tags: route53-health-checks, route53-routing, high-availability
 - difficulty: hard
+- time: 160
 - skills: 2.2.k1, 2.2.k6
 - concept: Route 53 health checkers cannot reach private endpoints, so private resources need a health check that monitors a CloudWatch alarm
 - refs: 04-networking-services.md, 06-management-governance.md
 - hint: Bộ kiểm tra của Route 53 nằm ngoài VPC và không chạm được IP private — tín hiệu sức khoẻ phải đến từ bên trong.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 160
 
 A company runs an internal claims application on Amazon EC2 instances behind an internal Application Load Balancer in us-east-1. The instances have only private IP addresses, and security policy forbids adding public ones. A standby copy runs in us-west-2. The company created Route 53 failover records in a private hosted zone, but the endpoint health checks for the primary always report unhealthy even though the application works. Which combination of steps will make failover work with the LEAST operational effort? (Choose TWO)
 
@@ -128,7 +125,6 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover-pri
 - concept: Latency alias records with Evaluate Target Health route each user to the fastest healthy Region
 - refs: 04-networking-services.md
 - hint: Cần theo người dùng chứ không theo tỉ lệ hay vị trí địa lý cố định, và tự bỏ Region lỗi — chọn chính sách định tuyến phù hợp.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -162,7 +158,6 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-l
 - concept: A CloudFront origin group with a replicated second bucket fails over per request with unchanged URLs and no DNS logic
 - refs: 02-storage-services.md, 04-networking-services.md
 - hint: Cần failover tự động mà URL không đổi và không viết logic DNS — thành phần nào của CloudFront chuyển sang nguồn thứ hai theo từng request?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -196,7 +191,6 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/high_av
 - concept: An Auto Scaling group ignores load balancer health by default; turning on ELB health checks lets it replace instances the ALB reports unhealthy
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Status check của EC2 vẫn đạt nên nhóm không thấy lỗi — cần để Auto Scaling dùng thêm một nguồn báo sức khoẻ khác.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -230,7 +224,6 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overvi
 - concept: A load balancer routes only to targets in Availability Zones that are enabled for it, so a new zone needs a subnet added to the ALB
 - refs: 04-networking-services.md, C-kien-truc-web-app.md
 - hint: Instance ở AZ mới đã đăng ký nhưng ở trạng thái unused — tầng nào quyết định AZ nào được nhận traffic?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -264,7 +257,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elas
 - concept: A zonal NAT gateway is resilient only inside its Availability Zone, so each zone needs its own gateway and a route table pointing to it (a regional NAT gateway is the newer multi-AZ alternative)
 - refs: 04-networking-services.md
 - hint: NAT gateway kiểu zonal chỉ dự phòng trong AZ của nó — mỗi AZ cần gì, và bảng định tuyến của từng subnet nên trỏ về đâu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -299,7 +291,6 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-scenarios.htm
 - concept: A standby Region needs raised Regional service quotas and On-Demand Capacity Reservations before a disaster, not just a larger Auto Scaling maximum
 - refs: 01-compute-services.md, A-nen-tang-kien-truc.md
 - hint: Hai lỗi khác nhau: một là giới hạn vCPU của tài khoản theo Region, một là AWS hết công suất — mỗi lỗi cần biện pháp riêng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -329,14 +320,13 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-reservati
 - services: Route 53, ALB, Lambda, CloudWatch
 - tags: route53-routing, route53-health-checks, dr-warm-standby, multi-region
 - difficulty: medium
+- time: 120
 - skills: 2.2.k1, 2.2.k6
 - concept: Weighted alias records with health checks send a small share of real traffic to a warm standby and still shift traffic automatically on failure
 - refs: 04-networking-services.md, P-architecture-diagrams.md
 - hint: Muốn chứng minh bản dự phòng chạy được bằng traffic thật nhưng chỉ một phần nhỏ, và vẫn tự chuyển khi một Region lỗi.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A logistics company runs its tracking API in us-east-1 and keeps a scaled-down warm standby in eu-west-1. Management wants continuous proof that the standby can serve real production requests without risking the customer experience. About 5 percent of live traffic must be served from eu-west-1 under normal conditions, traffic must return to us-east-1 automatically if the standby becomes unhealthy, and all traffic must move to eu-west-1 automatically if us-east-1 fails. Which Route 53 configuration will meet these requirements?
 
@@ -363,14 +353,13 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-w
 - services: Direct Connect, Site-to-Site VPN, VPC
 - tags: dx-resiliency, high-availability
 - difficulty: medium
+- time: 110
 - skills: 2.2.k3, 2.2.s4
 - concept: A Site-to-Site VPN on the same virtual private gateway is the cheapest automatic backup for a single Direct Connect connection because BGP prefers Direct Connect
 - refs: 04-networking-services.md
 - hint: Sự cố ở cả địa điểm Direct Connect, chấp nhận băng thông thấp hơn khi lỗi, chi phí thấp nhất — đường dự phòng độc lập rẻ nhất là gì?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A manufacturing company connects its data center to a VPC with a single AWS Direct Connect connection and a private virtual interface to a virtual private gateway. A power failure at the Direct Connect location disconnected the plants from the ERP system for nine hours. The company wants automatic failover at the LEAST additional cost, accepts reduced bandwidth during a failure, and wants traffic to use Direct Connect under normal conditions. Which solution will meet these requirements?
 

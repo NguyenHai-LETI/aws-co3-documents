@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.4"
 - concept: User-defined tags must be activated as cost allocation tags from the management account before Cost Explorer can group by them
 - refs: 06-management-governance.md
 - hint: Thẻ đã gắn nhiều tuần nhưng chưa xuất hiện để nhóm chi phí — thẻ phải được kích hoạt ở đâu, bởi tài khoản nào trong tổ chức?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -52,14 +51,13 @@ Docs: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-ta
 - services: NAT Gateway, VPC
 - tags: nat-gateway, single-nat, data-transfer-cost
 - difficulty: medium
+- time: 120
 - skills: 4.4.k4, 4.4.s1
 - concept: A non-production VPC can share one NAT gateway across AZs to avoid per-AZ hourly charges when brief outages are acceptable
 - refs: 04-networking-services.md, L-quyet-dinh-nhanh.md
 - hint: Môi trường dev chấp nhận mất kết nối ngắn khi một AZ lỗi và không muốn quản lý instance NAT — một NAT gateway chung hay mỗi AZ một cái?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A company runs a development and test environment in a VPC with private subnets in three Availability Zones. The EC2 instances download packages and container images from the internet over IPv4 and accept no inbound connections. Outbound traffic averages about 40 GB per day. The environment is used during business hours, and a brief loss of internet access during an Availability Zone failure is acceptable. The team has no capacity to patch or operate NAT instances. Which solution will meet these requirements MOST cost-effectively?
 
@@ -90,7 +88,6 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-comparison.html
 - concept: Enabling cross-zone load balancing on an NLB incurs inter-AZ data transfer charges; disabling it keeps traffic within each AZ
 - refs: 04-networking-services.md
 - hint: Client đã chia đều ba AZ — phí truyền dữ liệu giữa AZ phát sinh ở chặng nào của đường đi client → NLB → target?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -123,7 +120,6 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-targe
 - concept: Review network cost with CUR resource-level line items queried in Athena plus VPC Flow Logs to find traffic sources
 - refs: 06-management-governance.md, 04-networking-services.md
 - hint: Cần biết NAT gateway nào tốn nhất và lưu lượng đi đâu — một nguồn cho dữ liệu chi phí theo resource ID, một nguồn cho luồng mạng.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -157,7 +153,6 @@ Docs: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
 - concept: A Direct Connect hosted connection sized to need beats internet or oversized ports on cost and consistent latency for steady heavy traffic
 - refs: 04-networking-services.md, L-quyet-dinh-nhanh.md
 - hint: Truyền dữ liệu ra nhiều TB mỗi tháng, cần độ trễ ổn định, chỉ cần dưới 1 Gbps — kết nối riêng cỡ nào và loại nào rẻ nhất?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -185,14 +180,13 @@ Docs: https://docs.aws.amazon.com/directconnect/latest/UserGuide/hosted_connecti
 - services: Site-to-Site VPN, Direct Connect, Transit Gateway
 - tags: vpn, bandwidth, direct-connect
 - difficulty: medium
+- time: 105
 - skills: 4.4.s7, 4.4.k5
 - concept: A single Site-to-Site VPN connection already supports up to 1.25 Gbps per tunnel, so moderate bandwidth needs do not justify multiple VPNs or Direct Connect
 - refs: 04-networking-services.md
 - hint: Nhu cầu khoảng 700 Mbps, cần triển khai trong vài ngày với chi phí thấp nhất — một kết nối VPN có đủ băng thông không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A company's data center must exchange about 700 Mbps of steady traffic with workloads in a single VPC for the next year. The traffic must be encrypted, the connection must survive the loss of one tunnel endpoint, the link must be running within a few days, and the company wants the LOWEST cost. The customer gateway device supports IPsec and BGP. Which solution will meet these requirements?
 
@@ -218,14 +212,13 @@ Docs: https://docs.aws.amazon.com/vpn/latest/s2svpn/vpn-limits.html
 - services: Transit Gateway, VPC Peering, Direct Connect
 - tags: transit-gateway, vpc-peering, data-transfer-cost
 - difficulty: hard
+- time: 135
 - skills: 4.4.k6, 4.4.s3
 - concept: Peering avoids Transit Gateway data processing charges for a high-volume pair, while the Transit Gateway hub still serves on-premises access
 - refs: 04-networking-services.md, Q-service-comparisons.md
 - hint: Hai VPC trao đổi hàng trăm TB mỗi tháng nên tính phí xử lý theo GB của Transit Gateway rất lớn — nhưng vẫn cần một trung tâm cho on-premises.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A company runs 12 VPCs in one Region and none of the CIDR blocks overlap. An ingestion VPC and an analytics VPC exchange about 200 TB of data every month. The other ten VPCs need occasional low-volume access to a shared-services VPC. All 12 VPCs must also reach the company's data center through a single Direct Connect connection. The company wants private connectivity with the LOWEST total network cost. Which solution will meet these requirements?
 
@@ -256,7 +249,6 @@ Docs: https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
 - concept: Resolver endpoints are billed per ENI-hour, so centralize one outbound endpoint and share forwarding rules through AWS RAM
 - refs: 04-networking-services.md
 - hint: Phí Resolver endpoint tính theo ENI-giờ ở từng VPC — làm sao để 40 VPC dùng chung đường chuyển tiếp DNS mà PHZ và tên dịch vụ AWS vẫn như cũ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -290,7 +282,6 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-rules-m
 - concept: CloudFront caches static downloads at the edge, cutting S3 data transfer out and latency while the bucket stays private through origin access control
 - refs: 04-networking-services.md
 - hint: Tệp ít thay đổi, người dùng toàn cầu, hoá đơn chủ yếu là truyền dữ liệu ra — lớp đệm nào ở biên giảm cả chi phí lẫn độ trễ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -323,7 +314,6 @@ Docs: https://aws.amazon.com/cloudfront/pricing/pay-as-you-go/
 - concept: API Gateway usage plans with API keys throttle and cap each client by tier, protecting backend cost without code changes
 - refs: 11-api-integration.md, 04-networking-services.md
 - hint: Mỗi gói đối tác cần tốc độ và hạn mức tháng khác nhau — tính năng nào của API Gateway giới hạn theo từng khách hàng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

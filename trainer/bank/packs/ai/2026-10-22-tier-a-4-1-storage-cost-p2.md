@@ -18,14 +18,13 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.1 �
 - services: DataSync, S3, Direct Connect, Storage Gateway, Snow Family
 - tags: data-transfer-cost, datasync
 - difficulty: medium
+- time: 125
 - skills: 4.1.s3, 4.1.s7, 4.1.k8
 - concept: AWS DataSync over an existing network link is the lowest-cost managed method when bandwidth and time allow, with no new circuit or devices
 - refs: 10-migration-transfer.md, 02-storage-services.md
 - hint: Đường truyền hiện có còn dư băng thông và chưa có hạn chót gần — phương pháp nào không cần mua thêm kết nối hay thiết bị?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
 A manufacturing company must copy 45 TB of historical sensor archives from an on-premises NFS server to Amazon S3 once, and then keep the bucket updated with about 200 GB of weekly changes. The company's 1 Gbps internet link has plenty of spare capacity, and no deadline falls within the next three months. Transfers must be verified for integrity, must resume automatically after interruptions, and must run on a schedule without custom scripting. The company wants the lowest-cost transfer method. Which solution will meet these requirements?
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/datasync/latest/userguide/what-is-datasync.htm
 - concept: AWS Transfer Family provides managed SFTP endpoints backed by S3, and Route 53 maps the existing hostname so partner clients stay unchanged
 - refs: 10-migration-transfer.md
 - hint: Nhà cung cấp dùng SFTP cố định và hostname cũ, đội IT nhỏ — cần máy chủ SFTP không phải quản trị và cách giữ nguyên hostname.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -92,7 +90,6 @@ Docs: https://docs.aws.amazon.com/transfer/latest/userguide/what-is-aws-transfer
 - concept: Tape Gateway presents an iSCSI virtual tape library and archives virtual tapes to S3 Glacier Deep Archive without changing the backup software
 - refs: 02-storage-services.md
 - hint: Phần mềm sao lưu ghi qua thư viện băng ảo iSCSI và không được đổi — loại gateway nào thay thế băng vật lý và lưu trữ lạnh?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -126,7 +123,6 @@ Docs: https://docs.aws.amazon.com/storagegateway/latest/tgw/WhatIsStorageGateway
 - concept: FSx for Windows File Server cost levers are HDD storage for low-I/O shares and Data Deduplication, while Multi-AZ stays for availability
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Chia sẻ tệp ít I/O và nhiều tệp trùng lặp, vẫn phải chịu được lỗi một AZ — hai tuỳ chọn cấu hình nào giảm chi phí lưu trữ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -161,7 +157,6 @@ Docs: https://docs.aws.amazon.com/fsx/latest/WindowsGuide/managing-storage-confi
 - concept: RDS storage autoscaling with a maximum threshold lets storage start small and grow, because allocated storage cannot be reduced later
 - refs: 03-database-services.md
 - hint: Dung lượng RDS đã cấp phát không giảm lại được — cần bắt đầu vừa đủ và tự mở rộng có giới hạn trên.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -195,7 +190,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIOPS.Autoscal
 - concept: S3 cost allocation tags apply to buckets only, so per-project costs in Cost Explorer need a bucket per project with an activated tag
 - refs: 06-management-governance.md, 02-storage-services.md
 - hint: Thẻ phân bổ chi phí của S3 gắn ở cấp nào — object, prefix hay bucket? Cost Explorer chỉ nhóm theo thẻ đã kích hoạt.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -229,7 +223,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/CostAllocTagging.htm
 - concept: Glacier Flexible Retrieval has free Bulk retrievals and Expedited retrievals in minutes, which beats Instant Retrieval on retrieval cost and Deep Archive on speed
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
 - hint: Tổng chi phí gồm cả phí truy xuất — lớp nào có truy xuất hàng loạt miễn phí và vẫn có lựa chọn lấy tệp trong vài phút?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -263,7 +256,6 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/restoring-objects-re
 - concept: Consolidated billing in AWS Organizations combines usage across accounts so that volume pricing tiers and shared discounts apply
 - refs: 06-management-governance.md
 - hint: Mỗi tài khoản riêng lẻ chưa đủ lớn để vào bậc giá thấp hơn — tính năng nào gộp mức sử dụng của nhiều tài khoản mà không đổi kiến trúc?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

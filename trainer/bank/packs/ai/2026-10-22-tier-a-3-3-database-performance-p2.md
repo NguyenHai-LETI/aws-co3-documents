@@ -18,14 +18,13 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.3"
 - services: DocumentDB, DynamoDB, Aurora
 - tags: purpose-built, sharding
 - difficulty: hard
+- time: 130
 - skills: 3.3.k8, 3.3.s4
 - concept: DocumentDB elastic clusters shard collections to scale writes horizontally behind a MongoDB-compatible API, whereas replicas of an instance-based cluster only scale reads
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Điểm nghẽn là một primary duy nhất nhận mọi lệnh ghi — loại cluster nào chia dữ liệu theo shard mà vẫn dùng API MongoDB?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A mobile-games company keeps player profiles in a self-managed MongoDB replica set on Amazon EC2. The application uses MongoDB drivers and queries, and profile traffic is growing toward millions of writes per second, which the single primary of the replica set cannot sustain even on the largest instances. The company wants a managed service that scales writes horizontally through sharding, keeps the MongoDB API, and requires minimal application changes. Which solution will meet these requirements?
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/documentdb/latest/developerguide/docdb-using-e
 - concept: Amazon Keyspaces runs existing Cassandra workloads serverlessly with CQL and Cassandra drivers, billed by reads and writes in on-demand mode
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Mã dùng CQL và driver Cassandra, muốn bỏ quản lý node và trả theo lượt đọc/ghi — dịch vụ nào tương thích Cassandra mà không có node?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -91,7 +89,6 @@ Docs: https://docs.aws.amazon.com/keyspaces/latest/devguide/what-is-keyspaces.ht
 - concept: Amazon Timestream for InfluxDB is the managed option for existing InfluxDB workloads, with single-digit-millisecond queries and Multi-AZ failover
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Dữ liệu chuỗi thời gian đang dùng InfluxDB và Telegraf — dịch vụ nào chạy chính engine đó dưới dạng được quản lý?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -125,7 +122,6 @@ Docs: https://docs.aws.amazon.com/timestream/latest/developerguide/timestream-fo
 - concept: Full-text search with relevance ranking and typo tolerance, plus interactive log analytics, is the use case of Amazon OpenSearch Service rather than relational LIKE queries
 - refs: 03-database-services.md, 09-analytics-bigdata.md
 - hint: Tìm kiếm văn bản có xếp hạng độ liên quan, chịu lỗi gõ, và phân tích log tương tác — loại dịch vụ nào là công cụ tìm kiếm chuyên dụng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -159,7 +155,6 @@ Docs: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-
 - concept: A homogeneous RDS for MySQL to Aurora MySQL move uses an Aurora read replica that is promoted once writes stop and lag is zero; SCT and DMS are for different engines and a dump-and-import needs long downtime
 - refs: 03-database-services.md, 10-migration-transfer.md
 - hint: Cùng họ engine MySQL nên không cần chuyển đổi schema — cách nào cho phép sao chép nền rồi chỉ ngừng ghi vài phút khi chuyển?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -194,7 +189,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.M
 - concept: An Aurora global database with a secondary cluster gives local low-latency reads in another Region, and write forwarding lets that Region keep one local endpoint for writes too
 - refs: 03-database-services.md, E-kien-truc-database.md
 - hint: Cần đọc cục bộ độ trễ thấp ở Region thứ hai và vẫn ghi được qua cùng endpoint cục bộ — hai thành phần của Aurora nào phối hợp?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -229,7 +223,6 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - concept: ElastiCache Serverless scales memory, compute, and network automatically with no capacity planning, whereas replicas copy the whole dataset, scheduled resizing still forecasts, and DAX only fronts DynamoDB
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Bộ nhớ đầy gây evict và mỗi chiến dịch phải ước lượng rồi đổi cỡ node — hình thức cache nào không cần lập kế hoạch dung lượng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.2: N
 - concept: Network ACLs are stateless; return traffic uses ephemeral destination ports, so response rules must allow the ephemeral range, not the service port
 - refs: 04-networking-services.md
 - hint: ACL không nhớ trạng thái — gói trả lời của kết nối TCP đi tới cổng đích nào, và rule hiện tại có cho phép cổng đó không?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -57,7 +56,6 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/custom-network-acl.html
 - concept: Public subnets route to an internet gateway, private app subnets use a public NAT gateway placed in a public subnet, database subnets keep only the local route
 - refs: 04-networking-services.md
 - hint: Mỗi tầng cần bảng định tuyến khác nhau: tầng nào có đường ra IGW, tầng nào chỉ ra ngoài qua NAT, tầng nào không có đường nào?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -93,7 +91,6 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/vpc-nat-gateway.html
 - concept: A gateway endpoint policy limits which buckets a VPC can reach (exfiltration control); a bucket policy with aws:SourceVpce limits who can reach a bucket
 - refs: 04-networking-services.md
 - hint: Cần chặn đường ra tới bucket của người khác, không phải chặn người lạ vào bucket của mình — kiểm soát phải đặt ở phía nào của kết nối?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -122,14 +119,13 @@ Docs: https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html
 - services: EC2, VPC
 - tags: bastion-host, iam-roles
 - difficulty: medium
+- time: 130
 - skills: 1.2.k4, 1.2.s2
 - concept: EC2 Instance Connect Endpoint gives IAM-authorized, CloudTrail-logged SSH to private instances without bastion, public IPs or SSM Agent
 - refs: 04-networking-services.md
 - hint: Instance cũ không có SSM Agent nên Session Manager loại — cần tunnel do IAM cấp quyền, không IP public, không bastion.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A software company's QA environment has about 30 Linux EC2 instances in private subnets of a VPC that has no NAT gateway. Engineers reach the instances through a public bastion host with an Elastic IP address that the platform team patches monthly. Security wants to retire the bastion host, avoid public IPv4 addresses, authorize access through IAM, and record every connection attempt in AWS CloudTrail. Engineers already hold SSH key pairs for the instances. The instances use an older AMI without the Systems Manager Agent, and rebuilding images is out of scope. Which solution meets these requirements with the LEAST operational overhead?
 
@@ -161,7 +157,6 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/connect-with-ec2-insta
 - concept: Session Manager in a VPC without internet needs an instance profile and interface endpoints for the Systems Manager services
 - refs: 06-management-governance.md
 - hint: Session Manager chỉ cần kết nối đi ra tới dịch vụ SSM và quyền IAM cho instance — không mở cổng vào.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -196,7 +191,6 @@ Docs: https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-create-
 - concept: Origin access control supports SSE-KMS objects (OAI does not); the KMS key policy must also allow the CloudFront service principal for the distribution
 - refs: 04-networking-services.md
 - hint: OAI không giải mã được object SSE-KMS — cơ chế nào thay thế và quyền KMS nào phải bổ sung?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -225,14 +219,13 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private
 - services: CloudFront, ALB, VPC
 - tags: cloudfront-origin-security
 - difficulty: medium
+- time: 145
 - skills: 1.2.k4, 1.2.s2
 - concept: CloudFront VPC origins let a distribution reach an internal ALB in private subnets, removing public exposure and header-secret management
 - refs: 04-networking-services.md
 - hint: ALB không được có IP public và không muốn xoay secret header — CloudFront cần cách tới origin nằm trong subnet private.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A ticketing company hosts a web application on EC2 instances behind an internet-facing Application Load Balancer. It is placing Amazon CloudFront and AWS WAF in front of the application to absorb traffic spikes. Security requires that the load balancer have no public IP addresses and that no path other than CloudFront can reach it. The team wants the LEAST operational overhead and does not want to rotate custom header secrets. Which combination of steps will meet these requirements? (Choose TWO)
 
@@ -265,7 +258,6 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private
 - concept: ALB authenticate-cognito offloads sign-up and sign-in (including social IdPs) and passes verified claims to targets
 - refs: 05-security-services.md
 - hint: Người dùng tự đăng ký + đăng nhập Google, không sửa code — cần user directory đứng sau action xác thực của ALB.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -294,15 +286,14 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listen
 - services: Site-to-Site VPN, Direct Connect, Client VPN
 - tags: dx-resiliency
 - difficulty: medium
+- time: 110
 - skills: 1.2.s4
+- family: hybrid-encrypted-link
 - concept: At low traffic volume a Site-to-Site VPN is the cheapest encrypted hybrid link; Direct Connect alone is not encrypted
 - refs: 04-networking-services.md
 - hint: Lưu lượng nhỏ, bắt buộc mã hoá — phương án nào vừa mã hoá vừa không phải trả cổng và cross-connect Direct Connect?
-- status: draft
-- family: hybrid-encrypted-link
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A pharmaceutical company must connect its data center to a VPC to exchange clinical-study reports that total a few gigabytes per day. Compliance requires that all traffic between the data center and AWS be encrypted in transit. The company has no existing connectivity to AWS, and its edge routers support IPsec. Which solution will meet these requirements MOST cost-effectively?
 
@@ -335,7 +326,6 @@ Docs: https://docs.aws.amazon.com/directconnect/latest/UserGuide/encryption-in-t
 - concept: Private IP VPN over a Direct Connect transit virtual interface gives IPsec encryption and an end-to-end private path
 - refs: 04-networking-services.md
 - hint: Mã hoá IPsec mà vẫn không đi qua internet và không dùng IP public — kết hợp nào cho đường riêng đã mã hoá?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 

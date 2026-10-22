@@ -23,7 +23,6 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.1"
 - concept: IAM Identity Center with an external IdP (SAML + SCIM) is the managed way to give a workforce access to many accounts
 - refs: 05-security-services.md
 - hint: Đề cần SSO nhiều tài khoản từ IdP bên ngoài, nhóm tự đồng bộ, không IAM user — dịch vụ nào quản lý truy cập đa tài khoản tập trung?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -56,7 +55,6 @@ Docs: https://docs.aws.amazon.com/singlesignon/latest/userguide/provision-automa
 - concept: An SCP with aws:RequestedRegion (and NotAction for global services) restricts Regions for every principal in member accounts, including root
 - refs: 06-management-governance.md, A-nen-tang-kien-truc.md
 - hint: Cần chặn mọi principal, kể cả root của tài khoản thành viên, ở Region ngoài danh sách — nhưng IAM và CloudFront vẫn phải chạy.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -84,14 +82,13 @@ Docs: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_pol
 - services: Fargate, ECS
 - tags: shared-responsibility
 - difficulty: medium
+- time: 110
 - skills: 1.1.k5
 - concept: With AWS Fargate, AWS owns host OS patching and server management, shifting responsibility compared with ECS on EC2
 - refs: A-nen-tang-kien-truc.md, 01-compute-services.md
 - hint: Kiểm toán xem vá hệ điều hành máy chủ là trách nhiệm của khách hàng — loại launch type nào bỏ hẳn phần đó mà không viết lại ứng dụng?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A healthcare company runs containerized APIs on Amazon ECS with EC2 container instances that its team patches every month. During a compliance audit, the assessors point out that unpatched host operating systems are the customer's responsibility under the AWS shared responsibility model. The company wants to stop being responsible for patching host operating systems and managing the underlying servers, without rewriting the containerized applications. Which solution will meet these requirements?
 
@@ -122,7 +119,6 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.ht
 - concept: Cross-account role access needs a trust policy in the target account and sts:AssumeRole permission in the source account
 - refs: 05-security-services.md
 - hint: Truy cập chéo tài khoản bằng role cần hai phía: ai được phép đảm nhận role, và ai được phép gọi hành động đảm nhận.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -156,7 +152,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/tutorial_cross-account-wi
 - concept: Cognito identity pools exchange Google/Apple sign-in for temporary AWS credentials scoped per user
 - refs: 05-security-services.md
 - hint: Hàng triệu người dùng ứng dụng di động đăng nhập bằng tài khoản mạng xã hội cần credential tạm của AWS — thành phần nào cấp credential?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -189,7 +184,6 @@ Docs: https://docs.aws.amazon.com/cognito/latest/developerguide/identity-pools.h
 - concept: Protect the root user: phishing-resistant MFA, no root access keys, monitored contact email
 - refs: 05-security-services.md, B-bao-mat-compliance.md
 - hint: Root user có toàn quyền — hãy chọn ba biện pháp bảo vệ chuẩn: xác thực nhiều lớp, khóa truy cập, và kênh liên lạc.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -224,7 +218,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.
 - concept: AZ names map to different physical AZs per account; AZ IDs are consistent across accounts
 - refs: A-nen-tang-kien-truc.md, 04-networking-services.md
 - hint: Tên AZ như us-east-1a không trùng vị trí vật lý giữa các tài khoản — dùng định danh nào để phối hợp AZ giữa hai tài khoản?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -252,15 +245,14 @@ Docs: https://docs.aws.amazon.com/ram/latest/userguide/working-with-az-ids.html
 - services: IAM
 - tags: mfa, iam-users
 - difficulty: medium
+- time: 105
 - skills: 1.1.s1
 - family: iam-mfa-device-choice
 - concept: Qualifier reading: the cheapest valid MFA device is a virtual authenticator app, the most phishing-resistant is a FIDO2 security key
 - refs: 05-security-services.md
 - hint: Đề hỏi chi phí thấp nhất — thiết bị MFA nào miễn phí phần cứng và vẫn được IAM hỗ trợ?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A company's 25 cloud administrators sign in to the AWS Management Console with IAM users in a single account. The company will require MFA for every administrator. The administrators work from company laptops and carry personal phones, each administrator already has a console password, and the company has no existing MFA infrastructure. Which solution will meet these requirements MOST cost-effectively?
 
@@ -286,15 +278,14 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html
 - services: IAM
 - tags: mfa, iam-users
 - difficulty: medium
+- time: 110
 - skills: 1.1.s1
 - family: iam-mfa-device-choice
 - concept: Qualifier reading: the cheapest valid MFA device is a virtual authenticator app, the most phishing-resistant is a FIDO2 security key
 - refs: 05-security-services.md
 - hint: Đề hỏi khả năng chống phishing mạnh nhất — loại xác thực nào dựa trên khóa công khai FIDO?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A company's 25 cloud administrators sign in to the AWS Management Console with IAM users in a single account. The company will require MFA for every administrator. The administrators work from company laptops and carry personal phones, each administrator already has a console password, and the company has no existing MFA infrastructure. Which solution will meet these requirements and provide the STRONGEST protection against phishing attacks?
 
@@ -325,7 +316,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html
 - concept: ECS task roles give each service its own least-privilege credentials instead of the shared instance profile
 - refs: 05-security-services.md, 01-compute-services.md
 - hint: Mọi container dùng chung instance profile nên quyền là hợp của tất cả dịch vụ — cơ chế nào gắn quyền riêng cho từng task?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -358,7 +348,6 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles
 - concept: AD Connector proxies authentication to on-premises AD without caching; IAM Identity Center assigns AD groups to accounts
 - refs: 05-security-services.md
 - hint: Xác thực phải do domain controller tại chỗ thực hiện, không sao chép mật khẩu lên AWS — thành phần nào chỉ chuyển tiếp yêu cầu?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -387,14 +376,13 @@ Docs: https://docs.aws.amazon.com/singlesignon/latest/userguide/manage-your-iden
 - services: RDS, EC2
 - tags: shared-responsibility
 - difficulty: easy
+- time: 85
 - skills: 1.1.k5
 - concept: On managed RDS AWS runs the host and engine patching, while the customer still controls network access and database users
 - refs: A-nen-tang-kien-truc.md, 03-database-services.md
 - hint: Khi chuyển sang dịch vụ được quản lý, phần nào nằm "trong" đám mây vẫn thuộc về bạn: truy cập mạng và tài khoản database.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 85
 
 A company is migrating a self-managed MySQL database from Amazon EC2 instances to Amazon RDS for MySQL. The security team is updating its responsibility matrix for the AWS shared responsibility model so that auditors know which controls the company must still operate after the migration. Which task will remain the company's responsibility after the migration?
 
@@ -425,7 +413,6 @@ Docs: https://aws.amazon.com/compliance/shared-responsibility-model/
 - concept: Centralized root access management removes member-account root credentials and offers short-term privileged root sessions
 - refs: 05-security-services.md, 06-management-governance.md
 - hint: Cần xoá hẳn thông tin đăng nhập root của 300 tài khoản thành viên mà vẫn làm được vài tác vụ chỉ root làm được — không vào từng tài khoản.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -458,7 +445,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#id_root
 - concept: Delegated role creation is limited by requiring the permissions boundary through the iam:PermissionsBoundary condition key
 - refs: 05-security-services.md
 - hint: Boundary đặt trên chính nhà phát triển không tự truyền sang role họ tạo — điều kiện nào buộc mọi role mới phải mang boundary?
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
@@ -491,7 +477,6 @@ Docs: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundarie
 - concept: IAM is global while KMS keys and security groups are Regional resources that must exist in each Region
 - refs: A-nen-tang-kien-truc.md, 05-security-services.md
 - hint: Tài nguyên toàn cầu dùng lại được ở mọi Region, còn tài nguyên theo Region phải tạo lại — hãy phân loại từng loại.
-- status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
 
