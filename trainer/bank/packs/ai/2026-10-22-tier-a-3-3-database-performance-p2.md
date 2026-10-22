@@ -29,7 +29,7 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.3"
 
 A mobile-games company keeps player profiles in a self-managed MongoDB replica set on Amazon EC2. The application uses MongoDB drivers and queries, and profile traffic is growing toward millions of writes per second, which the single primary of the replica set cannot sustain even on the largest instances. The company wants a managed service that scales writes horizontally through sharding, keeps the MongoDB API, and requires minimal application changes. Which solution will meet these requirements?
 
-- A. Migrate to an Amazon DocumentDB instance-based cluster and add replicas so that the replicas share the write load with the primary instance.
+- A. Migrate to an Amazon DocumentDB instance-based cluster and add replicas so that the replicas share the writes with the primary instance.
 - B. Migrate to Amazon DynamoDB and rewrite the data access layer to use the DynamoDB API for the profile data, with a high-cardinality partition key.
 - C. Migrate to an Amazon DocumentDB elastic cluster and create the profile collections with a shard key so that writes are spread across shards.
 - D. Migrate to Amazon Aurora PostgreSQL with JSONB columns and rewrite the MongoDB queries as SQL statements for the new engine.
@@ -165,17 +165,17 @@ Docs: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-
 A company runs a 3 TiB Amazon RDS for MySQL database and wants to move it to Amazon Aurora MySQL for better read scaling and storage. The application can be offline for no more than a few minutes during the cutover, the copy can run in the background for hours, and the team does not want to convert schemas or rewrite queries. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Create an Aurora MySQL read replica of the RDS for MySQL instance and let it replicate the changes while the application keeps running.
-- B. Run AWS Schema Conversion Tool to convert the schema and use AWS DMS to copy the data into a new Aurora MySQL cluster.
+- B. Run AWS Schema Conversion Tool against the RDS for MySQL schema and use AWS DMS to copy the data into a new Aurora MySQL cluster.
 - C. Stop the application's writes, wait until the replica lag reaches zero, promote the Aurora replica, and point the application at its endpoint.
-- D. Export the database with mysqldump to Amazon S3 and import the dump into Aurora MySQL while the application is stopped.
+- D. Export the RDS for MySQL database with mysqldump to Amazon S3 and read the dump into Aurora MySQL while the application is stopped.
 - E. Promote the Aurora replica immediately while the application keeps writing to the source instance, and then switch the application to the new cluster.
 
 **Answer:** A, C
 
-**Explanation:** An Aurora read replica of an RDS for MySQL instance copies the data in the background and keeps replicating changes; after writes stop and the lag reaches zero, promotion makes it a standalone Aurora cluster, so downtime is brief and no schema conversion is needed.
-- SCT plus DMS: built for moving between different engines, which adds tooling this same-engine move does not need (tốn vận hành hơn)
-- mysqldump export and import: the application stays offline for the entire export and import (vi phạm ràng buộc)
-- Immediate promotion: writes made to the source afterward are lost to the new cluster (dùng sai tính năng)
+**Explanation:** An Aurora read replica of an RDS for MySQL instance copies data in the background and keeps replicating; once writes stop and lag reaches zero, promotion makes it a standalone cluster, so downtime is brief with no schema conversion.
+- SCT plus DMS: built for different engines, which this same-engine move does not need (tốn vận hành hơn)
+- mysqldump export and import: the application stays offline throughout (vi phạm ràng buộc)
+- Immediate promotion: later writes to the source never reach the new cluster (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Migrating.RDSMySQL.Replica.html
 > 🇻🇳 RDS MySQL → Aurora MySQL (cùng engine): tạo Aurora read replica, dừng ghi, chờ lag = 0 rồi promote; SCT/DMS dành cho khác engine.
 
@@ -234,7 +234,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 A retail company caches product-detail data in an Amazon ElastiCache for Valkey cluster with one shard, while the products themselves live in Amazon Aurora. Before each seasonal campaign, engineers estimate the data set size and resize the node type by hand because evictions rise when memory fills and the node's network saturates. Between campaigns the cache is mostly idle. The company wants the cache to adapt its memory, compute, and network capacity to demand automatically, with no capacity forecasting and the LEAST operational overhead. Which solution will meet these requirements?
 
 - A. Create an ElastiCache Serverless cache for Valkey and point the application at its endpoint instead of the cluster endpoint.
-- B. Add more read replicas to the existing shard so that each replica holds a share of the data set and the evictions stop.
+- B. Add more read replicas to the existing ElastiCache for Valkey shard so that each replica holds a share of the data set and the evictions stop.
 - C. Schedule an AWS Lambda function that raises the node type before each campaign and lowers it again after the campaign ends.
 - D. Replace the cluster with Amazon DynamoDB Accelerator (DAX) so that the cache capacity grows together with the database.
 

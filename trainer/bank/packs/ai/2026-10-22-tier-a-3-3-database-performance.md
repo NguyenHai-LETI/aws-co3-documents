@@ -165,17 +165,17 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 
 A trading-education platform keeps course prices in Amazon RDS for PostgreSQL and caches them in Amazon ElastiCache. Almost every price is read many times a minute, and prices change a few times a day. After a price change commits, users must never see the old price, and the application must still answer quickly after a cache node is replaced and starts empty. Which combination of actions will meet these requirements? (Choose TWO)
 
-- A. Cache each price with a time to live of 24 hours and rely on expiration to remove outdated prices.
-- B. Update the cached price in the same code path that writes the new price to the database, so that the cache does not lag behind.
-- C. Remove the cache and read every price from a read replica of the database so that the data stays current.
-- D. Fall back to loading a missing price from the database and storing it in the cache, so that a replaced node refills itself.
-- E. Configure the cache to acknowledge price changes immediately and copy them to the database afterward.
+- A. Cache each price with a time to live of 24 hours and rely on expiration to remove outdated prices after each change.
+- B. Update the cached price in the same code path that writes the new price to the database, so the cache cannot lag.
+- C. Remove the cache and read every price from a read replica of the database so that the data stays current for readers.
+- D. Load a missing price from the database and store it in the cache when it is requested, so that a replaced node refills itself.
+- E. Configure the cache node to acknowledge price changes immediately and copy them to the database afterward, even if the node is replaced.
 
 **Answer:** B, D
 
-**Explanation:** Write-through updates the cache whenever the database is written, so readers never see a stale price, and lazy loading as a fallback reloads missing prices after a node replacement, which covers the gap that write-through leaves.
+**Explanation:** Write-through updates the cache whenever the database is written, so readers never see a stale price, and lazy loading as a fallback reloads missing prices after a node replacement, covering write-through's gap.
 - Long time to live: leaves the old price visible for hours after a change (vi phạm ràng buộc)
-- Read replica without a cache: replication is asynchronous, so reads can lag the primary, and the speed benefit is lost (giải bài toán khác)
+- Read replica without a cache: replication is asynchronous, so reads can lag the primary (giải bài toán khác)
 - Write-behind to the database: ElastiCache does not write changes back to a database (cấu hình không tồn tại)
 Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html
 > 🇻🇳 Không bao giờ thấy giá cũ → write-through; node mới rỗng → thêm lazy loading làm dự phòng (TTL dài gây dữ liệu cũ).
@@ -339,7 +339,7 @@ Docs: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html
 A game studio is designing the data layer for a global online game that expects millions of concurrent players. Player profiles and inventories are read and written by player ID at very high request rates and must scale horizontally with single-digit millisecond latency. A live leaderboard must rank millions of players and refresh in under a millisecond. Purchase transactions require ACID guarantees across multiple related tables. The team wants to use purpose-built managed databases. Which combination of designs will meet these requirements? (Choose THREE)
 
 - A. Store the player profiles and inventories on a single Amazon RDS for MySQL instance that is sized for the peak load.
-- B. Store the player profiles and inventories in Amazon DynamoDB with on-demand capacity so that throughput follows the request rate.
+- B. Store the player profiles and inventories in Amazon DynamoDB with on-demand capacity so that throughput follows demand.
 - C. Compute the leaderboard by scanning the DynamoDB profile table and sorting the scores in the application on every request.
 - D. Compute the leaderboard with sorted sets in Amazon ElastiCache for Valkey and update the scores after each match result.
 - E. Store the purchase transactions in Amazon Neptune as graph edges that connect each player to the items that the player bought.
