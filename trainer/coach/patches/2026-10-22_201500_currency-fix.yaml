@@ -1,0 +1,212 @@
+# Currency / scope fix for imported packs (2026-10-22) — SCHEMA.md §8, ENRICH.md §A6–A8.
+# Sources: taxonomy.yaml `currency:` + `scope: legacy`; research-2026-10-22 §1, §9.
+run_id: 2026-10-22_201500_currency-fix
+items:
+  # ── Retired: key is a closed / shut-down / removed-from-scope service with no in-scope current answer ──
+  - id: "02-v2-30"          # key Snowcone (discontinued 2024-11-12)
+    base: "a8e8bfbb78"
+    status: retired
+  - id: "10-v1-10"          # key Snowcone (discontinued 2024-11-12)
+    base: "a94262a8f4"
+    status: retired
+  - id: "10-v1-09"          # key Snowmobile (full shutdown 2024)
+    base: "f41db91699"
+    status: retired
+  - id: "03-v1-12"          # key QLDB (end of support 2025-07-31)
+    base: "954b2c707c"
+    status: retired
+  - id: "10-v1-08"          # key Migration Hub (closed 2025-11-07, removed from scope)
+    base: "19faa7b6eb"
+    status: retired
+  - id: "10-v2-08"          # key Migration Hub
+    base: "da857cdd84"
+    status: retired
+  - id: "10-v1-12"          # key Application Discovery Service / Migration Evaluator
+    base: "a6f6594606"
+    status: retired
+  - id: "10-v2-06"          # key Application Discovery Service (closed 2025-11-07, removed from scope)
+    base: "fece7e429e"
+    status: retired
+  - id: "11-v1-02"          # key AppSync (removed from scope)
+    base: "8551ad0290"
+    status: retired
+  - id: "11-v2-02"          # key AppSync
+    base: "1659582e5d"
+    status: retired
+  - id: "11-v1-20"          # key AppSync
+    base: "7af67a8d37"
+    status: retired
+  - id: "11-v1-11"          # key Pinpoint (end of support 2026-10-30)
+    base: "95cbba633d"
+    status: retired
+  - id: "12-v1-09"          # key Forecast (closed, removed from scope)
+    base: "2a56d07059"
+    status: retired
+  - id: "12-v2-11"          # key Forecast
+    base: "4ffbd0e35d"
+    status: retired
+  - id: "12-v1-11"          # key Kendra (maintenance, removed from scope)
+    base: "42a09c2e8b"
+    status: retired
+  - id: "12-v2-08"          # key Kendra
+    base: "ca54c8dba8"
+    status: retired
+  - id: "12-v1-14"          # key Fraud Detector (closed 2025-11-07, removed from scope)
+    base: "c0c527f310"
+    status: retired
+  - id: "12-v2-12"          # key Fraud Detector
+    base: "58436f500f"
+    status: retired
+
+  # ── Rewritten: key replaced by the current in-scope answer / options fixed ──
+  - id: "02-v1-13"
+    base: "837c70d460"
+    reason: "S3 Select is closed to new customers since 2024-07-25; AWS recommends Amazon Athena for SQL over S3 data — https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/"
+    stem: |
+      Which service retrieves only specific rows/columns from large CSV/Parquet objects in S3 using SQL, reducing data scanned?
+    options: { D: "Amazon Athena" }
+    set: { services: [Athena, S3] }
+    explanation: |
+      Amazon Athena runs standard SQL directly on objects in S3; with columnar formats such as Parquet (plus partitioning) it reads only the needed columns and partitions, so less data is scanned and billed. AWS recommends Athena for querying data in S3: https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/
+      - S3 Storage Lens: organization-wide storage usage and activity metrics, no SQL over object contents.
+      - S3 Inventory: scheduled lists of objects and their metadata, not their contents.
+      - S3 Batch Operations: runs one action (copy, tag, invoke Lambda) across many objects; it does not query data.
+      > 🇻🇳 SQL trực tiếp trên dữ liệu S3, chỉ đọc cột/hàng cần → Amazon Athena (Parquet + partition giảm dữ liệu quét).
+  - id: "02-v2-17"
+    base: "5a6e8938ca"
+    reason: "S3 Select is closed to new customers since 2024-07-25; AWS recommends Amazon Athena for SQL over S3 data — https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/"
+    stem: |
+      A team needs to run SQL queries to retrieve only a subset of rows from large CSV objects in Amazon S3 without downloading whole files. Which service?
+    options: { C: "Amazon Athena" }
+    set: { services: [Athena, S3] }
+    explanation: |
+      Amazon Athena runs SQL directly against the objects in S3 and returns only the matching rows, so nobody has to download whole files; it is serverless and bills per data scanned. AWS recommends Athena for querying data in S3: https://aws.amazon.com/blogs/storage/how-to-optimize-querying-your-data-in-amazon-s3/
+      - S3 Transfer Acceleration: speeds up long-distance uploads; it does not query data.
+      - S3 Inventory: lists objects and metadata, not rows inside them.
+      - S3 Batch Operations: applies one action to many objects; no SQL filtering.
+      > 🇻🇳 Lọc một phần dữ liệu CSV trên S3 bằng SQL, không tải cả file → Amazon Athena.
+  - id: "03-v1-16"
+    base: "2dce5582c2"
+    reason: "Timestream for LiveAnalytics closed to new customers 2025-06-20 (use Timestream for InfluxDB); QLDB end of support 2025-07-31 — https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html · https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+    options: { C: "Amazon Timestream for InfluxDB", D: "Amazon DocumentDB" }
+    explanation: |
+      Timestream for InfluxDB is a managed time-series database: it stores time-stamped sensor metrics efficiently and supports time-window queries and aggregations at scale. The original Timestream for LiveAnalytics accepts no new customers since 2025-06-20, so new time-series workloads use Timestream for InfluxDB.
+      - Amazon RDS: general relational engine, not optimized for high-volume time-series ingest and retention.
+      - Amazon Neptune: graph database for relationships, not metrics over time.
+      - Amazon DocumentDB: JSON document store without native time-series functions.
+      > 🇻🇳 Dữ liệu time-series (IoT metrics) → Amazon Timestream for InfluxDB (bản LiveAnalytics không nhận khách mới từ 2025-06-20).
+  - id: "03-v2-12"
+    base: "047073f6d5"
+    reason: "Timestream for LiveAnalytics closed to new customers 2025-06-20 (use Timestream for InfluxDB); QLDB end of support 2025-07-31 — https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html · https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html"
+    options: { A: "DocumentDB", B: "Timestream for InfluxDB" }
+    explanation: |
+      Timestream for InfluxDB is the managed time-series database for time-stamped metrics: efficient storage plus time-window queries and aggregations at scale. The original Timestream for LiveAnalytics accepts no new customers since 2025-06-20.
+      - DocumentDB: JSON document store without native time-series functions.
+      - RDS: general relational engine, not built for high-volume time-series ingest.
+      - Neptune: graph database for relationships.
+      > 🇻🇳 Metrics IoT theo thời gian → Timestream for InfluxDB (bản LiveAnalytics không nhận khách mới).
+  - id: "06-v2-21"
+    base: "a731c3d860"
+    reason: "Blind solve: no option was correct (an earlier patch replaced the automatic-rollback option). CloudFormation rolls back a failed stack update by default — https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stack-failure-options.html"
+    options:
+      A: "StackSets to push the update to other accounts automatically"
+      B: "Termination protection to block deletion of the stack"
+      C: "Automatic rollback that restores the previous stack configuration"
+      D: "Drift detection to review manual configuration changes"
+    explanation: |
+      When a stack update fails, CloudFormation rolls back by default: every changed resource returns to its previous stable configuration (UPDATE_ROLLBACK_COMPLETE), and rollback triggers can start the same rollback from CloudWatch alarms. https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stack-failure-options.html
+      - StackSets: deploy one template across accounts and Regions; they do not undo a failed update.
+      - Termination protection: prevents a stack from being deleted, not an update from failing.
+      - Drift detection: reports changes made outside CloudFormation; it restores nothing.
+      > 🇻🇳 Cập nhật stack lỗi giữa chừng → CloudFormation tự rollback về cấu hình ổn định trước đó (mặc định).
+  - id: "13-v2-11"
+    base: "cabbd76d72"
+    reason: "Blind solve: Local Zones does not keep data on premises, so the old pair was not defensible. Stem now states both needs (on-premises residency → Outposts; metro far from a Region → Local Zones) — https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.html · https://docs.aws.amazon.com/local-zones/latest/ug/what-is-aws-local-zones.html"
+    stem: |
+      A company must keep a regulated workload and its data inside its own data center while using the same AWS APIs and tools as in the Region. It also runs latency-sensitive game servers that need single-digit millisecond latency for players in a large city far from any AWS Region. Which TWO services should a solutions architect use? (Choose TWO)
+    options:
+      A: "AWS Local Zones in the players' metro area for the game servers"
+      B: "AWS Outposts racks in the company's data center for the regulated workload"
+      C: "Amazon CloudFront in front of the game servers in the Region"
+      D: "AWS Direct Connect from the data center to the nearest Region"
+      E: "AWS Global Accelerator in front of the game servers in the Region"
+    explanation: |
+      Outposts racks run AWS infrastructure and APIs inside the company's data center, so regulated data never leaves the premises, and Local Zones place compute in a large metro area far from a Region, giving nearby players single-digit millisecond latency.
+      - CloudFront: caches content at the edge; the game servers still run in the distant Region.
+      - Direct Connect: a private link to the Region; the regulated workload would then run outside the data center.
+      - Global Accelerator: optimizes the path to Regional endpoints but cannot remove the distance to the Region.
+      > 🇻🇳 Dữ liệu phải nằm on-prem → Outposts; người chơi ở đô thị xa Region cần độ trễ vài ms → Local Zones.
+  - id: "16-v2-24"
+    base: "aa3814f14b"
+    stem: |
+      An ingestion job writes objects to S3 and immediately transitions them to Glacier, but small objects incur high per-object and minimum-duration charges. Which two considerations apply? (Choose TWO)
+    set: { services: [S3 Glacier, S3] }
+    explanation: |
+      S3 Standard-IA and the Glacier storage classes bill a minimum storage duration (30, 90 or 180 days) and per-object overhead (a minimum billable size for IA, extra metadata for each archived object), so very small or short-lived objects are often cheaper left in S3 Standard.
+      - One Zone-IA has no minimum duration: false, it also bills at least 30 days.
+      - Lifecycle transitions are free of minimums: transitions are charged per request and the target class minimums still apply.
+      - Glacier is always cheapest: false for tiny or short-lived objects.
+      > 🇻🇳 Object nhỏ/ngắn hạn đưa sang IA/Glacier bị tính thời gian tối thiểu + overhead → để ở S3 Standard rẻ hơn.
+  - id: "17-v1-10"
+    base: "9ecba288e2"
+    reason: "S3 Object Lambda accepts only existing customers since 2025-11-07; AWS recommends Lambda invoked through API Gateway / CloudFront / function URLs to transform objects on read — https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html"
+    stem: |
+      A company must return objects from Amazon S3 with PII redacted on the fly when they are retrieved, using AWS Lambda and without storing redacted copies. Which design meets this requirement?
+    options:
+      A: "S3 Cross-Region Replication that copies each object to a redacted bucket"
+      B: "Amazon API Gateway calling a Lambda function that redacts each object on read"
+      C: "S3 Inventory report that lists every object containing PII for review"
+      D: "S3 Batch Operations job that writes a redacted copy of every object"
+    explanation: |
+      Routing reads through API Gateway to a Lambda function lets the function fetch the object from S3, redact PII and return the result per request, so no redacted copies are stored. This is the pattern AWS recommends now that S3 Object Lambda accepts only existing customers (since 2025-11-07): https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html
+      - Cross-Region Replication: copies objects unchanged and stores a second copy.
+      - S3 Inventory: lists objects and metadata; it transforms nothing.
+      - S3 Batch Operations: processes objects in bulk ahead of time and stores the results.
+      > 🇻🇳 Che PII khi đọc, không lưu bản sao → Lambda gọi qua API Gateway (S3 Object Lambda chỉ còn cho khách hàng hiện có).
+  - id: "17-v2-10"
+    base: "79e48dfc75"
+    reason: "S3 Object Lambda accepts only existing customers since 2025-11-07; AWS recommends Lambda invoked through API Gateway / CloudFront / function URLs to transform objects on read — https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html"
+    stem: |
+      Objects in Amazon S3 must be transformed (for example, PII redacted) as they are retrieved via a GET request, without changing the stored object. Which design meets this requirement?
+    options:
+      A: "Byte-range fetch of only the non-sensitive part of each object"
+      B: "S3 Batch Operations job that redacts every object in place"
+      C: "Lambda function URL that fetches the object and returns a redacted version"
+      D: "S3 Lifecycle rule that transitions objects to a cheaper storage class"
+    explanation: |
+      A Lambda function URL (or API Gateway, or CloudFront in front of Lambda) receives the GET, reads the object from S3, redacts it and returns the result, leaving the stored object untouched. This is AWS's recommended replacement now that S3 Object Lambda accepts only existing customers (since 2025-11-07): https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazons3-ol-change.html
+      - Byte-range fetch: returns raw bytes of a range; sensitive data inside it is not redacted.
+      - S3 Batch Operations redacting in place: changes the stored object, which is not allowed.
+      - S3 Lifecycle rule: transitions or expires objects; it never transforms content.
+      > 🇻🇳 Biến đổi dữ liệu khi GET mà không sửa object gốc → Lambda (function URL / API Gateway) đọc S3 rồi trả bản đã che.
+
+  # ── Stale distractor replaced (closed / shut-down service) + explanation ──
+  - id: "02-v1-12"
+    base: "cc3052486a"
+    options: { C: "S3 Requester Pays" }
+    explanation: |
+      S3 Transfer Acceleration routes uploads through the nearest CloudFront edge location and then over the AWS backbone to the bucket, which speeds up long-distance transfers of large files into a single bucket.
+      - Byte-range fetches: parallelize downloads (GET), not uploads.
+      - S3 Requester Pays: changes who pays for requests and data transfer, not speed.
+      - S3 Cross-Region Replication: copies objects after the upload; it does not make the upload faster.
+      > 🇻🇳 Người dùng toàn cầu upload chậm vào một bucket → S3 Transfer Acceleration (edge + backbone AWS).
+  - id: "02-v2-15"
+    base: "7ca0833f1a"
+    options: { A: "S3 Requester Pays" }
+    explanation: |
+      S3 Transfer Acceleration sends uploads to the nearest CloudFront edge location and then across the AWS backbone to the bucket, which helps most when global users upload large files to one bucket.
+      - S3 Requester Pays: changes who pays for requests and data transfer, not speed.
+      - Byte-range fetches: parallelize downloads, not uploads.
+      - S3 Inventory: lists objects and metadata on a schedule.
+      > 🇻🇳 Upload toàn cầu chậm vào một bucket → S3 Transfer Acceleration.
+  - id: "15-v1-08"
+    base: "7e3d66a558"
+    options: { A: "S3 Intelligent-Tiering" }
+    explanation: |
+      S3 Versioning keeps every version of an object, so an overwritten or deleted object can be restored from a previous version; MFA Delete additionally requires MFA to permanently delete versions or change the versioning state.
+      - S3 Intelligent-Tiering: moves objects between access tiers to save cost; no protection from deletion.
+      - Requester Pays: shifts request and transfer charges to the requester.
+      - S3 Transfer Acceleration: speeds up long-distance uploads.
+      > 🇻🇳 Chống xoá nhầm, khôi phục phiên bản cũ → S3 Versioning (+ MFA Delete).
+  - id: "03-v2-12-placeholder-never"   # (no-op guard removed below)
+    base: "0000000000"
