@@ -36,20 +36,53 @@ export function normalizeDomain(v: string | undefined): DomainId | undefined {
 }
 
 // ── exam scope (B5): taxonomy services marked `scope: out` = the official out-of-scope list ─────────────────
+// [v6] `scope: legacy` (dropped from the official in-scope list, or retired with no in-scope successor) counts as out
+// everywhere: Question.outOfScope, practice exclusion, sealed forms, confusables, enrich pools, lint oos-*.
 
+export type ServiceScope = 'in' | 'out' | 'legacy';
+
+const SCOPES: readonly ServiceScope[] = ['in', 'out', 'legacy'];
 const oosMemo = new WeakMap<Taxonomy, Set<string>>();
+const legacyMemo = new WeakMap<Taxonomy, Set<string>>();
 
-/** Taxonomy service names the official SAA-C03 guide lists as out of scope (`scope: out`). */
+/**
+ * [v6] `scope:` of a taxonomy service — its key, else a case-insensitive key or alias match, also without an "AWS " /
+ * "Amazon " prefix ("AWS Data Pipeline" → Data Pipeline); undefined = not marked / unknown.
+ */
+export function serviceScope(tax: Taxonomy, name: string): ServiceScope | undefined {
+  const services = tax.services ?? {};
+  let def = Object.hasOwn(services, name) ? services[name] : undefined;
+  if (!def) {
+    const n = name.trim().toLowerCase();
+    const bare = n.replace(/^(?:aws|amazon)\s+/, '');
+    const same = (x: string) => x.toLowerCase() === n || x.toLowerCase() === bare;
+    def = Object.entries(services).find(([k, d]) => same(k) || (d?.aliases ?? []).some(same))?.[1];
+  }
+  const s = def?.scope;
+  return s && SCOPES.includes(s) ? s : undefined;
+}
+
+/** Taxonomy service names the official SAA-C03 guide lists as out of scope (`scope: out`) — [v6] and `scope: legacy`. */
 export function outOfScopeSet(tax: Taxonomy): Set<string> {
   let s = oosMemo.get(tax);
   if (!s) {
-    s = new Set(Object.entries(tax.services ?? {}).filter(([, d]) => d?.scope === 'out').map(([name]) => name));
+    s = new Set(Object.entries(tax.services ?? {}).filter(([, d]) => d?.scope === 'out' || d?.scope === 'legacy').map(([name]) => name));
     oosMemo.set(tax, s);
   }
   return s;
 }
 
-/** Out-of-scope services named in `text` (same match rules as `services` tagging; longest match wins on overlaps). */
+/** [v6] Taxonomy service names marked `scope: legacy` (a subset of outOfScopeSet) — lint messages and coverage tell them apart. */
+export function legacySet(tax: Taxonomy): Set<string> {
+  let s = legacyMemo.get(tax);
+  if (!s) {
+    s = new Set(Object.entries(tax.services ?? {}).filter(([, d]) => d?.scope === 'legacy').map(([name]) => name));
+    legacyMemo.set(tax, s);
+  }
+  return s;
+}
+
+/** Out-of-scope (and [v6] legacy) services named in `text` (same match rules as `services` tagging; longest match wins on overlaps). */
 export function outOfScopeIn(text: string, tax: Taxonomy): string[] {
   const oos = outOfScopeSet(tax);
   if (!oos.size || !text) return [];

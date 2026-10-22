@@ -8,6 +8,7 @@
 //   node trainer/scripts/coach-run.ts --enrich --ids 03-v2-01,05-v1-12 [--tasks distractors] [--note "…"]
 //   node trainer/scripts/coach-run.ts --longform [--count 5]
 //   node trainer/scripts/coach-run.ts --verify [--ids a,b | --pack <pack-id> | --scope unverified-ai|new|changed|audit|grounded]
+//   node trainer/scripts/coach-run.ts --verify --scope cues [--ids a,b | --pack <pack-id>]   # [v6] choices-only cue probe
 //   node trainer/scripts/coach-run.ts --twins [--count 10] [--ids a,b --kind surface|contrast]
 //   node trainer/scripts/coach-run.ts --family [--count 2] [--topic database] [--task 2.2] [--requirement cost]
 //   node trainer/scripts/coach-run.ts --generate --skills 3.5.s7,4.4.k2 [--count 6]   |   --longform --skills 2.2.s3
@@ -140,6 +141,11 @@ const batches = task === 'enrich' && flag('enrich') && !opt('ids') ? int(opt('ba
 
 if (task === 'verify') {
   // a typo must not look like "nothing to verify" (exit 0) or silently become another scope
+  if (flag('scope') && !opt('scope')) {
+    // [v6] "--scope --ids a,b" must not silently become a blind solve of those ids
+    console.error(`[${stamp()}] ✗ --scope cần một giá trị: ${VERIFY_SCOPES.join(' | ')}`);
+    process.exit(2);
+  }
   if (opt('scope') && !(VERIFY_SCOPES as readonly string[]).includes(opt('scope')!)) {
     console.error(`[${stamp()}] ✗ --scope không hợp lệ: ${opt('scope')} (${VERIFY_SCOPES.join(' | ')})`);
     process.exit(2);

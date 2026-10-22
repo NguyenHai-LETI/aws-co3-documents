@@ -1,7 +1,8 @@
 // Playwright smoke test of the web UI against a sandbox server (temp TRAINER_HOME + seeded history, free port).
 // Checks: every page renders without page errors / console errors / failing API calls; a test can be created,
 // answered and submitted through the UI; a submit without connection waits as "⏳ chờ nộp" and goes through once the
-// server answers again (exactly one result); no horizontal overflow at 390 px; dark theme renders.
+// server answers again (exactly one result); no horizontal overflow at 390 px; dark theme renders; [v6] the 🏷️ tier card
+// opens the list filtered by tier, the test builder shows its tier controls.
 // Run: npm run test:ui   (Chromium once: npx playwright install chromium — checked first, exit code 2 with the fix)
 // Env: SMOKE_OUT=<dir> screenshots (default: temp dir) · HEADED=1 show the browser · PLAYWRIGHT_BROWSERS_PATH as usual.
 import { chromium } from 'playwright';
@@ -70,6 +71,8 @@ async function launchOrExplain() {
 const OUT = path.resolve(process.env.SMOKE_OUT || fs.mkdtempSync(path.join(os.tmpdir(), 'trainer-smoke-')));
 fs.mkdirSync(OUT, { recursive: true });
 const BANK_GUIDE = '/bank?tab=quality&sec=guide'; // [v5 γ1] exam-guide coverage map
+const BANK_QUALITY = '/bank?tab=quality'; // [v6] quality overview with the 🏷️ Tầng câu hỏi card
+const NEW_CUSTOM = '/new?mode=custom'; // [v6] 🛠️ Tùy chỉnh: tier chips
 const PAGES = [
   ['/', 'dashboard'],
   ['/new', 'new-test'],
@@ -241,7 +244,7 @@ try {
   await w.waitForTimeout(1500);
   // every page once: a page importing a dependency not optimized yet makes Vite reload the tab, which would drop the
   // key presses of a recorded step that happens to run right then
-  for (const [hash] of [...PAGES, ['/run'], ['/listen'], ['/notes'], [BANK_GUIDE], ['/new?mode=today']]) {
+  for (const [hash] of [...PAGES, ['/run'], ['/listen'], ['/notes'], [BANK_GUIDE], [BANK_QUALITY], [NEW_CUSTOM], ['/new?mode=today']]) {
     await open(w, srv.base, hash);
     await w.locator('main > *, .runner > *').first().waitFor({ timeout: 45_000 }).catch(() => undefined);
     await w.waitForTimeout(400);
@@ -327,6 +330,25 @@ try {
   });
 
   // [v5 γ1] Quality → 🗺️ Đề cương
+  // [v6] 🏷️ tiers: the quality card opens the list filtered by tier; 🛠️ Tùy chỉnh has tier chips; 🎯 Thi thử the tier-A option
+  await step('desktop 🏷️ tier card → list filtered by tier', p, async () => {
+    await open(p, srv.base, BANK_QUALITY);
+    await rendered(p);
+    await p.getByRole('heading', { name: /Tầng câu hỏi/ }).waitFor({ timeout: 30_000 });
+    await p.getByRole('button', { name: /^Xem Tầng A/ }).click();
+    const tier = p.getByRole('combobox', { name: 'Tầng câu hỏi' });
+    await tier.waitFor({ timeout: 10_000 });
+    if ((await tier.inputValue()) !== 'A') throw new Error(`tier filter after the card: ${JSON.stringify(await tier.inputValue())}`);
+  });
+  await step('desktop new test: tier chips (custom) + tier-A mock option (exam)', p, async () => {
+    await open(p, srv.base, NEW_CUSTOM);
+    await rendered(p);
+    await p.getByRole('button', { name: /Tầng A · giống đề thật/ }).waitFor({ timeout: 10_000 });
+    await open(p, srv.base, '/new?mode=exam');
+    await rendered(p);
+    await p.getByText('Chỉ dùng câu tầng A').waitFor({ timeout: 10_000 });
+  });
+
   await step('desktop bank exam-guide map', p, async () => {
     await open(p, srv.base, BANK_GUIDE);
     await rendered(p);
@@ -403,6 +425,17 @@ try {
     await takeTestThroughUi(m, srv.base, 'mode=quick', 2);
     await noOverflow(m);
   });
+  for (const [hash, name] of [
+    [BANK_QUALITY, 'bank quality overview'], // [v6] 🏷️ Tầng câu hỏi card
+    [NEW_CUSTOM, 'new test custom'], // [v6] tier chips
+  ]) {
+    await step(`390px ${name}`, m, async () => {
+      await open(m, srv.base, hash);
+      await rendered(m);
+      if (hash === BANK_QUALITY) await m.getByRole('heading', { name: /Tầng câu hỏi/ }).waitFor({ timeout: 30_000 });
+      await noOverflow(m);
+    });
+  }
   await step('390px bank exam-guide map', m, async () => {
     await open(m, srv.base, BANK_GUIDE);
     await rendered(m);

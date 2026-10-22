@@ -21,8 +21,8 @@ coach:
   claude_bin: ""            # đường dẫn Claude Code CLI nếu app không tự tìm thấy
   use_api_key: false        # false = luôn dùng đăng nhập claude.ai (bỏ ANTHROPIC_API_KEY khỏi môi trường của coach)
   structured_output: true   # sinh câu / ENRICH / câu dài trả JSON (--json-schema), app tự kiểm tra rồi ghi file — AI không cần quyền ghi
-  enrich_after_analyze: false   # sau mỗi lượt phân tích, ENRICH thêm ~10 câu bạn sắp gặp (tốn thêm quota)
-  idle_tasks: [enrich]      # lượt theo lịch không có bài mới → làm việc đầu tiên còn việc: enrich | longform | twins | audit | notebook (tốn quota)
+  enrich_after_analyze: true    # sau mỗi lượt phân tích, ENRICH thêm ~10 câu bạn sắp gặp (tốn thêm quota)
+  idle_tasks: [audit, longform, enrich]   # lượt theo lịch không có bài mới → làm việc đầu tiên còn việc: enrich | longform | twins | audit | notebook (tốn quota)
   twins_per_run: 10         # số câu song sinh (diễn đạt lại / tương phản) mỗi lượt "twins"
   tutor_daily_turns: 40     # 🧑‍🏫 Gia sư: số lượt AI trả lời mỗi ngày, tính cả câu hỏi mở đầu (0 = tắt)
   verify:
@@ -31,6 +31,7 @@ coach:
     batch_size: 10          # số câu mỗi lần gọi model kiểm tra
     grounded: true          # câu bị nghi sai / kiến thức cũ: kiểm chứng bằng tài liệu AWS (chỉ đọc docs.aws.amazon.com, aws.amazon.com)
     local_model: ""         # model Ollama trò chuyện cho phiếu thứ ba (khác hãng, không tốn quota); "" = tắt
+    probe_model: "haiku"    # phép thử chỉ nhìn phương án (--verify --scope cues): model rẻ đoán đáp án khi không có đề; "" = dùng models.verify
 
 srs:
   algorithm: fsrs           # fsrs (khuyến nghị) | leitner
@@ -72,7 +73,8 @@ quality:
   ollama_url: "http://127.0.0.1:11434"
   embedding_model: embeddinggemma   # ollama pull embeddinggemma (hoặc nomic-embed-text)
   semantic_threshold: 0.88  # độ tương đồng cosine ≥ ngưỡng = nghi trùng
-  longform_target_per_task: 12   # số câu tình huống dài chuẩn đề mong muốn cho mỗi task 1.1–4.4
+  longform_target_per_task: 20   # số câu tình huống dài chuẩn đề mong muốn cho mỗi task 1.1–4.4 (14 task × 20 ≈ mục tiêu 280 câu tầng A)
+  exam_spec_since: "2026-10-22"  # câu AI / từ tài liệu (medium, hard) tạo từ ngày này bị lint theo chuẩn tầng A (SCHEMA §6b); "" = tắt
 
 server:
   lan: false                # true = mở cho điện thoại trong cùng mạng Wi-Fi (cần mã truy cập, xem trang 🧰 Công cụ)

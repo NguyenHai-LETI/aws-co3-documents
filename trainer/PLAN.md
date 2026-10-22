@@ -110,6 +110,7 @@ xáo đáp án · cắm cờ / “chưa chắc” · tạm dừng (trừ thi th�
 | **9. Đo trung thực & quick wins (v4, đợt A + B của buổi brainstorm)** | #30–#43 §7.6 | ✅ v4 |
 | **10. Học mỗi ngày, bám ngày thi, chống học vẹt (v5, đợt C + D)** | #44–#59 §7.7 | ✅ v5 |
 | **11. Tiếp theo** | §7.8 | 💡 đề xuất |
+| **12. Ngân hàng chuẩn đề thật (v6)** | #60–#68 §7.9 | 🚧 v6 |
 
 ## 7. Tính năng
 
@@ -236,11 +237,97 @@ song song trong một git worktree riêng (để app đang dùng và tự đồn
 6. **Nhiều kỳ thi** (DVA-C02, SOA-C02, SAP-C02) — taxonomy theo `exam`.
 7. **“Giải thích lại” (explain-back)** — người học tự giải thích, AI chấm mức hiểu; PWA cho điện thoại.
 
+### 7.9 Ngân hàng chuẩn đề thật (v6)
+
+**Vấn đề** (đo ngày 2026-10-22 trên 764 câu active, đối chiếu exam guide + đề mẫu chính thức lấy cùng ngày): đề trung vị **18 từ** (đề
+mẫu ~62, 33–97); chỉ **18 câu (2,4 %)** giống đề thật; **73 %** câu có phương án là tên service trơn; **30 %** có qualifier; câu nhiều
+đáp án **8,5 %** (đề mẫu 3/10); giải thích trung vị **9 từ**; domain **21/26/41/11 %** so với trọng số 30/26/24/20; **47/189** mục đề
+cương chưa có câu; mới **~55 câu** được giải mù. Ngày thi **2026-11-13**, mục tiêu **800** — điểm luyện hiện tại đo trí nhớ câu ngắn,
+không đo khả năng làm đề thật. Nguồn chuẩn: exam guide + đề mẫu / Official Practice Question Set của AWS (chỉ đo dạng câu, không chép),
+nguyên tắc viết câu trắc nghiệm (Haladyna, Downing & Rodriguez 2002; NBME Item-Writing Guide), nghiên cứu câu trắc nghiệm do LLM viết
+(câu dễ hơn, nhiều manh mối, đoán được chỉ nhờ phương án — Balepur et al. 2024). **Không dùng dump** (AWS Certification Program
+Agreement §2.2: huỷ kết quả, cấm thi); đề bên thứ ba chỉ làm mốc đo, không chép.
+
+**Mô hình tầng** (`shared/tier.ts`, tự tính, không ghi vào file — SCHEMA §6b):
+
+| Tầng | Định nghĩa | Dùng ở |
+|------|-----------|--------|
+| **A** — giống đề thật | đề ≥ 55 từ, phương án trung bình ≥ 8 từ **và** có tiêu chí quyết định (qualifier trong `requirements`, hoặc câu hỏi cuối “…meet these requirements?”) | thi thử, đề niêm phong, mức sẵn sàng |
+| **B** — tình huống ngắn | đề ≥ 30 từ, phương án ≥ 5 từ; hoặc giống đề thật nhưng thiếu tiêu chí | luyện theo chủ đề, củng cố, Học hôm nay |
+| **C** — câu ôn nhanh | còn lại (đề một dòng, phương án là tên service) | ôn ngắt quãng, flashcard / Anki, Nghe |
+
+| # | Tính năng | Cách làm |
+|---|-----------|----------|
+| 60 | Tầng câu A/B/C | `Question.tier`, bộ lọc `tiers` (Ngân hàng, 🛠️ Tùy chỉnh), huy hiệu “Tầng A/B/C”, thẻ Chất lượng → 🏷️ Tầng câu hỏi; thi thử ưu tiên tầng A rồi câu giống đề thật, tuỳ chọn “🏷️ Chỉ dùng câu tầng A” (cần ≥ 65 câu tầng A khác cụm; thiếu thì bù tầng khác kèm ghi chú); thi thử không bao giờ lấy câu có đáp án ngoài phạm vi / legacy |
+| 61 | Chuẩn câu tầng A (SCHEMA §6b) | đề 55–130 từ (công ty → hiện trạng → 2–4 ràng buộc cứng → qualifier → câu hỏi đóng), tiêu chí ≥ 90 %, phủ định ≤ 3 % viết HOA; phương án 8–35 từ là hành động hoàn chỉnh, song song, đáp án dài nhất ≤ 25 % mỗi pack; nhiều đáp án 25–30 % (Choose THREE ≤ 5 %); mỗi phương án nhiễu sai vì đúng một lý do, có **nhãn** (vi phạm ràng buộc · dùng sai tính năng · cấu hình không tồn tại · đặt sai chỗ · giải bài toán khác · tốn vận hành/chi phí hơn · đúng một phần), gieo từ nhầm lẫn thật; đáp án là service trong phạm vi còn mở cho khách mới, tên theo exam guide, tính năng GA ≥ 3 tháng, con số phải có URL; giải thích 50–120 từ + 🇻🇳 + URL tài liệu AWS; độ khó 55/35/10; nguồn chỉ notes + tài liệu AWS + exam guide. GENERATE, câu dài, họ câu, câu song sinh của câu tầng A và câu mới của coach viết theo chuẩn này |
+| 62 | Lint chuẩn đề | câu AI / tài liệu `medium`/`hard` tạo từ `quality.exam_spec_since`: `stem-short`, `options-bare`, `no-criterion`, `explanation-coverage` (vừa) · `doc-url-missing`, `options-nonparallel` (nhẹ) — cảnh báo, không chặn ghi; cảnh báo cấp pack (≥ 8 câu): nhiều đáp án < 20 %, đáp án dài nhất > 25 %; nhận cả “(Select TWO.)” |
+| 63 | Giải mù xáo phương án | thứ tự phương án xáo tất định theo hash câu + số lần đã giải (lần giải lại thấy thứ tự khác) để bỏ thiên lệch vị trí; `picked` / `key` vẫn theo chữ cái ngân hàng, `order` ghi thứ tự model đã thấy |
+| 64 | Phép thử chỉ nhìn phương án | `npm run coach -- --verify --scope cues [--ids … \| --pack …]`: model rẻ (`coach.verify.probe_model`, mặc định haiku) chỉ thấy phương án, đoán 2 lần với 2 thứ tự xáo; trúng cả hai → `cue` (dòng 🎯 `"probe":"choices-only"` trong `verify.md`) → viết lại phương án; không bao giờ tính là giải mù, chỉ chạy khi bấm |
+| 65 | Phạm vi legacy + kiến thức hiện hành | taxonomy `scope: legacy` (bị gỡ khỏi danh sách in-scope, hoặc ngừng mà không có kế nhiệm trong phạm vi) xử lý như `out` ở mọi nơi (`outOfScope`, luyện, thi thử, niêm phong, lint `oos-*` ghi rõ legacy); ~30–40 mục `currency:` mới (thay đổi 2022 → 10/2026, đối chiếu trang live, ba danh sách vòng đời maintenance / sunset / full shutdown) |
+| 66 | Độ phủ theo tầng | `npm run coverage`: mục tầng câu theo domain / task — mục tiêu **280 câu tầng A** (D1 84 · D2 73 · D3 67 · D4 56, chia cho task theo số mục đề cương) — và mục legacy; `quality.longform_target_per_task: 20` |
+| 67 | Đề niêm phong tầng A | `npm run seal -- --add --tier A [--size 50] [--allow-short]`: thêm **một** đề khi các đề khác còn niêm phong (tối đa 5), chỉ câu chưa từng gặp, câu AI phải giải mù khớp; domain thiếu câu → báo thiếu bao nhiêu; tạo đề thường cũng ưu tiên tầng A |
+| 68 | Vận hành AI | `coach.idle_tasks: [audit, longform, enrich]` (lịch rảnh: kiểm toán câu nhập → câu dài tầng A → ENRICH), `coach.enrich_after_analyze: true`; prompt GENERATE / ENRICH / FAMILY / TWINS / COACH và skill `/trainer-generate`, `/trainer-enrich`, `/trainer-review` (rubric tầng A), `/trainer-coverage` (nhắm chỗ thiếu tầng A) theo §6b |
+
+**Cổng chất lượng** cho câu tầng A (theo thứ tự; app tự kiểm cổng 1–2, cổng 3–5 là quy trình):
+
+1. **Lint** — lỗi nặng bị từ chối khi ghi; lint chuẩn đề + cảnh báo cấp pack phải sạch trước khi coi là tầng A.
+2. **Giải mù xáo phương án** (model thứ hai, khác model viết câu) — lệch / mơ hồ → `draft` chờ duyệt.
+3. **Phép thử chỉ nhìn phương án** — `cue` → ENRICH `distractors` / `balance` rồi dò lại.
+4. **Kiểm chứng có nguồn** (`coach.verify.grounded`, chỉ docs.aws.amazon.com / aws.amazon.com) cho câu bị nghi hoặc có `stale-fact`.
+5. **Soát độc lập** `/trainer-review` với rubric tầng A: một đáp án, nhãn lý do sai hợp lệ, có tiêu chí, kiến thức hiện hành / legacy, URL.
+
+Chỉ niêm phong (S3) câu đã qua đủ 5 cổng — sau khi niêm phong, người học không thấy câu cho tới khi làm đề.
+
+**Mục tiêu nội dung** (đến **2026-11-12**):
+
+- **≥ 280 câu tầng A** `active` (D1 84 · D2 73 · D3 67 · D4 56), mỗi câu qua đủ 5 cổng.
+- **Đề niêm phong S3 gồm 65 câu tầng A** chưa gặp (`npm run seal -- --add --tier A`), tạo ngay khi mọi domain đủ câu đã soát.
+- **Mọi câu nhập** (practice-exams V1/V2) được kiểm toán giải mù (lịch rảnh `audit` trước; `--verify --scope audit`).
+- **Legacy / kiến thức cũ đã xử lý**: 0 câu active có đáp án legacy (`oos-answer`), 0 cờ `stale-fact` chưa sửa hoặc chưa retire.
+
+**Đo bên ngoài (hiệu chỉnh)** — mỗi điểm ghi vào `results/external/` (app so với mức sẵn sàng cùng ngày → mức sẵn sàng hiệu chỉnh):
+
+| Khi nào | Nguồn | Ghi chú |
+|---------|-------|---------|
+| Ngay (10/22–10/24) | AWS **Official Practice Question Set** (20 câu, miễn phí, cập nhật 17/7/2026) | mốc đầu; đọc feedback từng phương án |
+| ~2026-11-04…06 (T−9…T−7) | AWS **Official Practice Exam** (65 câu / 130′, chấm thang điểm; Skill Builder 29 USD/tháng) | “same question style and rigor” — mốc gần đề thật nhất, mục tiêu ≥ 800 |
+| T−14…T−4 | **Tutorials Dojo** (đề chưa gặp) | sẵn sàng = **≥ 80 % ở lần làm đầu**; điểm làm lại (mốc 90 % của nhà cung cấp) bị thổi phồng; 720 thang điểm ≠ 72 % điểm thô |
+
+**Lộ trình tới ngày thi**:
+
+| Ngày | Việc |
+|------|------|
+| 10/22–10/24 (T−22…T−20) | v6 vào app; số liệu gốc (`coverage` mục tầng câu, lint chuẩn đề); sửa / retire câu legacy và `stale-fact`; Official Practice Question Set; đề niêm phong S1 (gợi ý T−21) |
+| 10/25–11/02 | Sinh câu tầng A ~20–25 câu/ngày, task thiếu nhiều nhất trước (✨ Sinh cho ô trống, câu dài, họ câu) → qua đủ cổng; lịch rảnh audit → longform → enrich; Tutorials Dojo đề 1 (từ 10/30) |
+| ~11/02–11/04 | ≥ 200 câu tầng A đã soát → tạo S3 (`seal --add --tier A`) |
+| 11/04–11/06 (T−9…T−7) | Official Practice Exam; đề niêm phong S2 (gợi ý T−7); giai đoạn Củng cố bắt đầu (không đưa câu mới vào luyện) |
+| 11/07–11/10 (T−6…T−3) | bổ sung tầng A còn thiếu (cho thi thử, không ép học); Tutorials Dojo đề 2; làm **S3** trước T−3 — điểm hiệu chỉnh cuối |
+| 11/11–11/12 (T−2…T−1) | Nhẹ (≤ 30′/ngày, không thi thử dài); chốt ≥ 280 tầng A |
+| 11/13 | Thi |
+
+**KPI**:
+
+| KPI | Gốc 2026-10-22 | Mục tiêu 2026-11-12 | Đo ở |
+|-----|----------------|---------------------|------|
+| Câu tầng A `active` | ≤ 18 (2,4 % giống đề thật) | ≥ 280 — D1 84 · D2 73 · D3 67 · D4 56 | `npm run coverage` (tầng câu), 🏷️ Tầng câu hỏi |
+| Domain của câu tầng A | toàn ngân hàng 21/26/41/11 % | 30/26/24/20 % | `npm run coverage` |
+| Phương án tên service trơn | 73 % câu | 0 câu mới (`options-bare`) | lint chuẩn đề |
+| Câu có tiêu chí | 30 % | ≥ 90 % câu AI mới (`no-criterion`) | lint chuẩn đề |
+| Câu nhiều đáp án | 8,5 % | 25–30 % câu tầng A | cảnh báo cấp pack, `coverage` mục 5 |
+| Đáp án đúng là phương án dài nhất | — | ≤ 25 % mỗi pack | cảnh báo cấp pack |
+| Giải thích | trung vị 9 từ | câu tầng A 50–120 từ, đủ dòng + nhãn + URL (`explanation-coverage`, `doc-url-missing` = 0 ở câu mới) | lint chuẩn đề |
+| Mục đề cương chưa có câu | 47/189 | 0 | `coverage` mục 5, 🗺️ Đề cương |
+| Câu đã giải mù | ~55 | mọi câu tầng A + mọi câu nhập | Chất lượng → 🧪 |
+| Câu `cue` (lộ đáp án qua phương án) | chưa đo | 0 trong S3; mọi câu `cue` được viết lại | `verify.md` (🎯) |
+| Đáp án legacy / `stale-fact` mở | chưa đo | 0 | lint `oos-answer`, `stale-fact` |
+| Official Practice Exam | — | ≥ 800 / 1000 | `results/external/` |
+| Tutorials Dojo, lần làm đầu | — | ≥ 80 % | `results/external/` |
+
 ## 8. Rủi ro & giảm thiểu
 
 | Rủi ro | Giảm thiểu |
 |--------|-----------|
-| AI sinh câu sai kiến thức / sai đáp án | bắt buộc bám notes; checklist chất lượng SCHEMA §6; nút báo lỗi → AI kiểm tra lại; `retired`; mọi thay đổi xem/revert bằng git |
+| AI sinh câu sai kiến thức / sai đáp án | bắt buộc bám notes; checklist chất lượng SCHEMA §6; nút báo lỗi → AI kiểm tra lại; `retired`; mọi thay đổi xem/revert bằng git; [v6] chuẩn tầng A §6b + 5 cổng chất lượng (§7.9) |
 | AI ghi sai định dạng | parser nghiêm ngặt + `validate.ts --fill-time` trong quy trình; câu lỗi tự bị loại; tab “Kiểm tra định dạng” |
 | Ngân hàng phình/trùng | giới hạn biến thể; giảm sinh khi còn nhiều câu AI chưa làm; (P2) phát hiện trùng |
 | Tốn token khi chạy định kỳ | bỏ qua khi không có dữ liệu mới; snapshot tính sẵn; chọn `model`/`effort` trong `config.yaml` |

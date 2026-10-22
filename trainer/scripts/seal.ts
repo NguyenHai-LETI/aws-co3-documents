@@ -3,6 +3,14 @@
 // Usage:
 //   npm run seal                                     status (same as --status)
 //   npm run seal -- --forms 2 --size 50              create forms (only while no form is sealed; numbering continues)
+//   npm run seal -- --add [--tier A] [--size 50] [--allow-short]
+//                                                    [v6] add ONE form, also while others are sealed (at most 5 sealed;
+//                                                    numbering continues). Only never-seen, in-scope (not out / legacy)
+//                                                    questions of no earlier form, AI-written ones with a verified key;
+//                                                    --tier A: tier A only. Domain-weighted (config exam.sealed_size or
+//                                                    --size). A domain short of such questions → refused, with how many
+//                                                    are missing per domain; --allow-short → the largest smaller form
+//                                                    every domain can fill (same exam weights, ≥ 10 questions).
 //   npm run seal -- --release S1                     open a form early: its questions return to practice, no sealed score
 //   npm run seal -- --reset [--forms N] [--size M]   forget every form, then create new ones (config exam.* or the flags;
 //                                                    --forms 0 = none). Attempt files keep their sealed_form.
@@ -11,8 +19,8 @@
 import { loadConfig } from '../server/config.ts';
 import { loadBank } from '../server/lib/bank.ts';
 import { loadAttempts } from '../server/lib/results.ts';
-import { SealedError, createForms, releaseForm, resetSealed, sealedError, sealedStatus, type CreateResult } from '../server/lib/sealed.ts';
-import type { SealedFormSummary } from '../shared/types.ts';
+import { SealedError, addForm, createForms, releaseForm, resetSealed, sealedError, sealedStatus, type AddResult, type CreateResult } from '../server/lib/sealed.ts';
+import type { SealedFormSummary, Tier } from '../shared/types.ts';
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(`--${name}`);
@@ -32,8 +40,20 @@ const num = (name: string): number | undefined => {
 };
 
 function usage(msg: string): never {
-  console.error(`✗ ${msg}\n  Dùng: npm run seal -- [--status] [--forms N --size M] [--release S1] [--reset]`);
+  console.error(`✗ ${msg}\n  Dùng: npm run seal -- [--status] [--forms N --size M] [--add [--tier A] [--size M] [--allow-short]] [--release S1] [--reset]`);
   process.exit(2);
+}
+
+/** [v6] `--tier A|B|C` (only with --add). */
+function tierOpt(): Tier | undefined {
+  const v = opt('tier');
+  if (v === undefined) {
+    if (flag('tier')) usage('--tier cần A, B hoặc C');
+    return undefined;
+  }
+  const t = v.toUpperCase();
+  if (t !== 'A' && t !== 'B' && t !== 'C') usage(`--tier phải là A, B hoặc C (nhận "${v}")`);
+  return t;
 }
 
 const STATUS: Record<SealedFormSummary['status'], string> = { sealed: '🔒 niêm phong', used: '✅ đã làm   ', released: '🔓 đã mở sớm' };
@@ -63,7 +83,17 @@ function printStatus() {
 
 function printCreated(r: CreateResult) {
   const x = r.excluded;
-  console.log(`✓ Đã tạo ${r.created.join(', ')} từ ${r.pool} câu đủ điều kiện (loại: ${x.outOfScope} ngoài phạm vi · ${x.siblings} có câu anh em · ${x.quality} chất lượng chưa ổn · ${x.unverified} câu AI chưa giải mù khớp · ${x.earlier} thuộc đề cũ · ${x.inactive} draft/retired).`);
+  console.log(`✓ Đã tạo ${r.created.join(', ')} từ ${r.pool} câu đủ điều kiện (loại: ${x.outOfScope} ngoài phạm vi / legacy · ${x.siblings} có câu anh em · ${x.quality} chất lượng chưa ổn · ${x.unverified} câu AI chưa giải mù khớp · ${x.earlier} thuộc đề cũ · ${x.inactive} draft/retired).`);
+  for (const n of r.notes) console.log(`  ⚠️ ${n}`);
+}
+
+/** [v6] --add: the new form, its size and why the other questions were not eligible (never an id). */
+function printAdded(r: AddResult, tier: Tier | undefined) {
+  const x = r.excluded;
+  console.log(
+    `✓ Đã thêm ${r.created[0]} (${r.size} câu${tier ? `, tầng ${tier}` : ''}) từ ${r.pool} câu đủ điều kiện (loại: ${x.seen} đã gặp khi luyện${tier ? ` · ${x.tier} không phải tầng ${tier}` : ''} · ` +
+      `${x.outOfScope} ngoài phạm vi / legacy · ${x.siblings} có câu anh em · ${x.quality} chất lượng chưa ổn · ${x.unverified} câu AI chưa giải mù khớp · ${x.earlier} thuộc đề cũ · ${x.inactive} draft/retired).`,
+  );
   for (const n of r.notes) console.log(`  ⚠️ ${n}`);
 }
 
@@ -72,7 +102,14 @@ try {
   if (flag('release') && !release) usage('--release cần mã đề, vd --release S1');
   const forms = num('forms');
   const size = num('size');
-  if (release) {
+  const tier = tierOpt();
+  const add = flag('add');
+  if (!add && (tier || flag('allow-short'))) usage('--tier / --allow-short chỉ dùng cùng --add');
+  if (add && (release || flag('reset') || forms !== undefined)) usage('--add tạo đúng một đề — không dùng cùng --forms, --release hay --reset');
+  if (add) {
+    const cfg = loadConfig();
+    printAdded(addForm(loadBank(), loadAttempts(cfg), cfg, { size, tier, allowShort: flag('allow-short') }), tier);
+  } else if (release) {
     const f = releaseForm(release);
     console.log(`✓ Đã mở sớm ${f.id}: ${f.ids.length} câu trở lại các chế độ luyện (không có điểm niêm phong).`);
   } else if (flag('reset')) {

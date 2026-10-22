@@ -42,3 +42,13 @@ export function questionTier(q: TierQuestion, tax?: RealismTaxonomy): Tier {
   const options = q.options.length ? q.options.reduce((s, o) => s + countWords(o.text), 0) / q.options.length : 0;
   return stem >= TIER_B_STEM_WORDS && options >= TIER_B_OPTION_WORDS ? 'B' : 'C';
 }
+
+/** [v6] The computed Question.tier, else (older payload, hand-built question) the rule itself. */
+export function tierOf(q: TierQuestion & { tier?: Tier }, tax?: RealismTaxonomy): Tier {
+  return q.tier ?? questionTier(q, tax);
+}
+
+/** [v6] Preference of mocks and sealed forms: 0 = tier A, 1 = the other exam-like questions, 2 = the rest. */
+export function examRank(q: TierQuestion & { tier?: Tier }, tax?: RealismTaxonomy): 0 | 1 | 2 {
+  return tierOf(q, tax) === 'A' ? 0 : isExamLike(q, tax) ? 1 : 2;
+}

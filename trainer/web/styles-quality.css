@@ -334,3 +334,31 @@
   .gd-kpis { grid-template-columns: 1fr 1fr; }
 }
 .gd-why { overflow-wrap: anywhere; min-width: 0; }
+
+/* ── [v6] 🏷️ Tầng câu hỏi (TierCard): ordinal ramp, one hue light → dark — A strongest. Steps validated per theme
+   (light: seq-4 / seq-3 / seq-1 on --surface, dark: seq-5 / seq-3 / seq-2 on the dark --surface). ── */
+:root {
+  --tier-a: var(--seq-4);
+  --tier-b: var(--seq-3);
+  --tier-c: var(--seq-1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    --tier-a: var(--seq-5);
+    --tier-b: var(--seq-3);
+    --tier-c: var(--seq-2);
+  }
+}
+:root[data-theme='dark'] {
+  --tier-a: var(--seq-5);
+  --tier-b: var(--seq-3);
+  --tier-c: var(--seq-2);
+}
+.tier-body { display: grid; gap: 18px; }
+@media (min-width: 900px) {
+  .tier-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+}
+.tier-doms { display: grid; gap: 12px; }
+.tier-dom { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; }
+.tier-dom .meter, .tier-dom-bc { grid-column: 1 / -1; }
+.tier-dom-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

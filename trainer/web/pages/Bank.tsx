@@ -18,10 +18,13 @@ import { ScopeSection } from '../components/quality/ScopeSection.tsx';
 import { QuestionQuality } from '../components/quality/QuestionQuality.tsx';
 import { QuestionRelations } from '../components/quality/QuestionRelations.tsx';
 import { GuideSection } from '../components/quality/GuideSection.tsx';
+import { TierCard } from '../components/quality/TierCard.tsx';
 import { startVerify, useAiReady } from '../components/quality/common.tsx';
+import { TIERS, TIER_INFO, TierBadge, isTier, tierReason } from '../components/TierBadge.tsx';
 import { applyFilters, isDueState, isMasteredState } from '../../shared/filters.ts';
+import { tierOf } from '../../shared/tier.ts';
 import { countWords } from '../../shared/timing.ts';
-import type { BankQuality, DuplicatePair, IssueItem, PackOrigin, Question, QuestionState, SelectionFilters } from '../../shared/types.ts';
+import type { BankQuality, DomainId, DuplicatePair, IssueItem, PackOrigin, Question, QuestionState, SelectionFilters, Tier } from '../../shared/types.ts';
 import type { Meta } from '../lib/store.tsx';
 
 type Tab = 'questions' | 'packs' | 'quality' | 'health' | 'issues';
@@ -206,6 +209,7 @@ function QuestionDrawer({ q, onClose, onIssue, onAsk }: { q: Question | undefine
           <div>
             Đề {q.words ?? countWords(q.stem)} từ{q.longForm ? ' · 📜 câu dài (giống đề thật)' : ''} · gợi ý: {q.hint ? 'có' : 'chưa'} · ENRICH: {q.enriched ?? 'chưa'}
           </div>
+          <div>🏷️ {tierReason(q, meta)}</div>
           {q.variantOf.some((v) => !sealed.has(v)) && (
             <div>
               Biến thể của:{' '}
@@ -297,6 +301,7 @@ function QualityTab({
   onRule,
   selected,
   onFeature,
+  onTier,
   onOpenPair,
   onOpen,
   onIssue,
@@ -307,6 +312,7 @@ function QualityTab({
   onRule: (code?: string) => void;
   selected: string[];
   onFeature: (f: Feature) => void;
+  onTier: (tier: Tier, domain?: DomainId) => void;
   onOpenPair: (p: DuplicatePair) => void;
   onOpen: (id: string) => void;
   onIssue: (id: string) => void;
@@ -344,7 +350,7 @@ function QualityTab({
           </Chip>
         ))}
       </div>
-      {sec === 'overview' && <QualityOverview qd={qd} onFeature={onFeature} onSec={onSec} />}
+      {sec === 'overview' && <QualityOverview qd={qd} onFeature={onFeature} onTier={onTier} onSec={onSec} />}
       {sec === 'lint' && <LintSection lint={qd.lint} rule={rule} onRule={onRule} onOpen={onOpen} />}
       {sec === 'distractors' && <DistractorSection report={qd.distractors} onOpen={onOpen} onIssue={onIssue} />}
       {sec === 'dups' && <DuplicateSection pairs={qd.duplicates} semantic={qd.semantic} onOpenPair={onOpenPair} onChanged={reload} />}
@@ -355,7 +361,17 @@ function QualityTab({
   );
 }
 
-function QualityOverview({ qd, onFeature, onSec }: { qd: BankQuality; onFeature: (f: Feature) => void; onSec: (s: QSec) => void }) {
+function QualityOverview({
+  qd,
+  onFeature,
+  onTier,
+  onSec,
+}: {
+  qd: BankQuality;
+  onFeature: (f: Feature) => void;
+  onTier: (tier: Tier, domain?: DomainId) => void;
+  onSec: (s: QSec) => void;
+}) {
   const { meta, byId } = useData();
   const { byQid } = useRatings();
   if (!meta) return null;
@@ -431,7 +447,7 @@ function QualityOverview({ qd, onFeature, onSec }: { qd: BankQuality; onFeature:
           <QTile
             label="🧪 Giải mù"
             value={vs ? vs.review : '—'}
-            sub={vs ? `chờ duyệt · ${vs.verified} câu đã kiểm · ${vs.ok} khớp` : 'server chưa hỗ trợ'}
+            sub={vs ? `chờ duyệt · ${vs.verified} câu đã kiểm · ${vs.ok} khớp${vs.cues?.cue ? ` · 🕵️ ${vs.cues.cue} câu lộ đáp án` : ''}` : 'server chưa hỗ trợ'}
             status={vs?.review ? 'warn' : undefined}
             onClick={() => onSec('verify')}
           />
@@ -444,6 +460,8 @@ function QualityOverview({ qd, onFeature, onSec }: { qd: BankQuality; onFeature:
           />
         </div>
       </div>
+
+      <TierCard onTier={onTier} />
 
       <div className="grid c2">
         <ChartCard
@@ -662,7 +680,8 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   const [lintCode, setLintCode] = useState<string | undefined>(qLint ?? undefined); // question list filtered by a lint rule
   const qSkill = query.get('skill');
   const [skill, setSkill] = useState<string | undefined>(qSkill ?? undefined); // [v5 γ1] questions of one exam-guide bullet
-  const [filters, setFilters] = useState<SelectionFilters>(() => (qTask ? { tasks: [qTask] } : {}));
+  const qTier = query.get('tier')?.toUpperCase(); // [v6] ?tier=A
+  const [filters, setFilters] = useState<SelectionFilters>(() => ({ ...(qTask ? { tasks: [qTask] } : {}), ...(isTier(qTier) ? { tiers: [qTier] } : {}) }));
   const [status, setStatus] = useState<'active' | 'draft' | 'retired' | 'all'>('active');
   const [progress, setProgress] = useState<Progress>('');
   const [feature, setFeature] = useState<Feature>(() => (FEATURES.some((f) => f.id === qFeature) ? (qFeature as Feature) : ''));
@@ -718,6 +737,12 @@ export function BankPage({ query }: { query: URLSearchParams }) {
       setTab('questions');
     }
   }, [qTask]);
+  useEffect(() => {
+    if (isTier(qTier)) {
+      setFilters((f) => ({ ...f, tiers: [qTier] }));
+      setTab('questions');
+    }
+  }, [qTier]);
 
   const states = state?.states ?? {};
   // [γ] sealed questions are hidden from every list until their form is taken or opened early (only their count shows)
@@ -725,9 +750,11 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   const list = useMemo(() => {
     let qs = (bank?.questions ?? []).filter((q) => !sealedSet.has(q.id));
     if (status !== 'all') qs = qs.filter((q) => q.status === status);
-    qs = applyFilters(qs, { ...filters, tasks: undefined }); // tasks handled below (supports "none")
+    qs = applyFilters(qs, { ...filters, tasks: undefined, tiers: undefined }); // tasks (supports "none") and tiers handled below
     const taskSel = filters.tasks ?? [];
     if (taskSel.length) qs = qs.filter((q) => (taskSel.includes('none') ? !q.task : !!q.task && taskSel.includes(q.task)));
+    const tierSel = filters.tiers ?? [];
+    if (tierSel.length) qs = qs.filter((q) => tierSel.includes(tierOf(q, meta))); // Question.tier, else the shared rule
     if (feature) qs = qs.filter(FEATURE_TEST[feature]);
     if (lintCode && lintIds) qs = qs.filter((q) => lintIds.has(q.id));
     if (skill) qs = qs.filter((q) => q.skills?.includes(skill));
@@ -755,6 +782,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
     filters.packs?.length ||
     filters.origins?.length ||
     filters.tasks?.length ||
+    filters.tiers?.length ||
     feature ||
     progress ||
     lintCode ||
@@ -766,6 +794,17 @@ export function BankPage({ query }: { query: URLSearchParams }) {
   const openFromQuality = (id: string) => navigate(`${qualityPath()}&q=${encodeURIComponent(id)}`);
   const goFeature = (f: Feature) => {
     setFeature(f);
+    setTab('questions');
+    window.scrollTo({ top: 0 });
+  };
+  // [v6] 🏷️ Tầng câu hỏi card → exactly the questions it counted (active, one tier, optionally one domain)
+  const goTier = (t: Tier, d?: DomainId) => {
+    setFilters({ tiers: [t], ...(d ? { domains: [d] } : {}) });
+    setFeature('');
+    setProgress('');
+    setStatus('active');
+    setLintCode(undefined);
+    setSkill(undefined);
     setTab('questions');
     window.scrollTo({ top: 0 });
   };
@@ -844,6 +883,14 @@ export function BankPage({ query }: { query: URLSearchParams }) {
               {Object.entries(ORIGIN_LABEL).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
+                </option>
+              ))}
+            </select>
+            <select value={filters.tiers?.[0] ?? ''} onChange={(e) => set({ tiers: isTier(e.target.value) ? [e.target.value] : [] })} aria-label="Tầng câu hỏi" title="A giống đề thật · B tình huống ngắn · C câu ôn nhanh">
+              <option value="">Mọi tầng</option>
+              {TIERS.map((t) => (
+                <option key={t} value={t}>
+                  🏷️ {TIER_INFO[t].label} — {TIER_INFO[t].short}
                 </option>
               ))}
             </select>
@@ -951,6 +998,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
                                   📋 {q.task}
                                 </span>
                               )}
+                              <TierBadge q={q} />
                               {q.longForm && (
                                 <span className="badge" title="Câu dài, giống đề thật">
                                   📜
@@ -1057,6 +1105,7 @@ export function BankPage({ query }: { query: URLSearchParams }) {
           onRule={setRule}
           selected={selected}
           onFeature={goFeature}
+          onTier={goTier}
           onOpenPair={setPair}
           onOpen={openFromQuality}
           onIssue={setIssueFor}

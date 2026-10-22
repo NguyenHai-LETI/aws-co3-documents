@@ -939,6 +939,39 @@ export interface VerifyVerdict {
   citations?: VerifyCitation[]; // grounded: documentation quotes backing `fact`
   grounded?: VerifyVerdict; // shown verdicts (latestVerdicts, review queue): the newest grounded fact-check of the question — compare `hash`
   local?: VerifyVerdict; // shown verdicts: the newest local-model vote — compare `hash`
+  order?: string; // [v6] blind solve: the shuffled order the solver saw, as bank letters ("CADB" = its A was option C …); picked / key stay bank letters
+}
+
+/** [v6] Choices-only cue probe: `cue` = the options alone (no stem) gave the key away — two shuffled runs both picked exactly the key. */
+export type ProbeOutcome = 'cue' | 'clean';
+
+/**
+ * [v6] A cue-probe line of bank/verify.md (`"probe":"choices-only"` in its JSON). Kept apart from VerifyVerdict: never a
+ * blind-solve result (verified counts, review queue, auto-draft / reactivation, sealed eligibility, readiness, targets).
+ */
+export interface CueProbe {
+  line?: number; // line in bank/verify.md
+  date: string; // YYYY-MM-DD
+  at?: string; // ISO time
+  qid: string;
+  hash: string; // Question.hash the probe applies to
+  probe: 'choices-only';
+  outcome: ProbeOutcome;
+  picks: string[]; // bank letters each run picked, e.g. ["B", "B"]; one entry when the first run already missed the key
+  key?: string; // answer key at probe time
+  model?: string;
+  runId?: string;
+  orders?: string[]; // option order of each run as bank letters (the key sits on other letters in run 2)
+  reason?: string; // cue: what gave the key away, options named by content
+}
+
+/** [v6] Probe results of the current versions (not retired, not sealed) — VerifySummary.cues, present once something was probed. */
+export interface CueSummary {
+  probed: number; // questions probed for their current version
+  cue: number; // …whose options give the key away
+  clean: number;
+  stale: number; // probed for an older version only (edited since)
+  items: CueProbe[]; // current-version `cue` results, newest first — what to fix (the giveaway option / distractors)
 }
 
 /** [v5] Grounded fact-check verdict on the bank's key: correct · wrong (another option is right) · outdated (fact changed since) · ambiguous. */
@@ -968,6 +1001,7 @@ export interface VerifySummary {
   groundedQueue?: string[]; // [v5] questions waiting for a grounded fact-check (review queue, open wrong-key / outdated issues, local-model disagreements, stale facts)
   groundedEnabled?: boolean; // [v5] coach.verify.grounded
   audit?: AuditStatus; // [v5] import audit
+  cues?: CueSummary; // [v6] choices-only cue probe (verify scope 'cues') — never counted above
 }
 
 /** Extra fields of an AI run record (`/api/coach` runs, coach/runs/<id>.json) beyond CoachRunInfo. */
@@ -991,6 +1025,7 @@ export interface CoachRunOutcome {
   // [v5] γ2
   grounded?: { checked: number; correct: number; wrong: number; outdated: number; ambiguous: number; error: number; citations: number }; // fact-check against AWS documentation
   local?: { checked: number; disagree: number; error?: string }; // coach.verify.local_model votes (tie-breaker)
+  cues?: { checked: number; cue: number; clean: number; error: number; flagged: string[]; remaining?: number }; // [v6] choices-only cue probe (flagged = cue ids, sealed left out)
   families?: number; // family task: qualifier families written (questions = members)
   undo?: UndoResult & { at: string; qid?: string }; // the last "↩️ Hoàn tác" of this run
 }

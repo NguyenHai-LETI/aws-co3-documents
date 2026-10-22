@@ -18,6 +18,9 @@
 // and `audit` (imported questions, + an optional local-model vote, + a grounded check of what looks wrong). File-mode
 // runs capture every block first so "↩️ Hoàn tác" can restore what the AI edited in place (undo.ts). The idle chooser
 // (coach.idle_tasks) picks what a scheduled run without new results does.
+// [v6] The blind solver sees the options shuffled (verify.ts blindOrders; picks mapped back to bank letters). Verify scope
+// `cues` = the choices-only cue probe (coach.verify.probe_model, default haiku): options only, no stem — manual only
+// (`--verify --scope cues`, POST /api/verify/run {scope: 'cues'}); it never drafts, reactivates or counts as verified.
 import { execFile, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
@@ -63,10 +66,37 @@ import {
 import { sealedIds } from './sealed.ts';
 import { loadIssues } from './issues.ts';
 import { lintQuestion } from './lint.ts';
-import { MAX_VERIFY, VERIFY_SCHEMA, appendVerdicts, auditTargets, autoDraft, draftCandidates, groundedTargets, latestVerdicts, reactivate, verdictsFor, verifyBatches, verifyPrompt, verifyTargets } from './verify.ts';
+import {
+  CUE_LABEL,
+  MAX_VERIFY,
+  PROBE_SCHEMA,
+  VERIFY_SCHEMA,
+  appendProbes,
+  appendVerdicts,
+  auditTargets,
+  autoDraft,
+  blindOrders,
+  cueTargets,
+  draftCandidates,
+  groundedTargets,
+  latestVerdicts,
+  probeAnswers,
+  probeAttempts,
+  probeCost,
+  probeLabel,
+  probeOrders,
+  probePrompt,
+  probeRecord,
+  reactivate,
+  verdictsFor,
+  verifyBatches,
+  verifyPrompt,
+  verifyTargets,
+  type ProbeRun,
+} from './verify.ts';
 import { contextStats } from '../context.ts';
 import type { QuestionDraft } from './pack-format.ts';
-import type { Bucket, ClaudeStatus, CoachEvent, CoachRunInfo, CoachRunOutcome, CoachTask, CostSummary, Question, VerifyVerdict } from '../../shared/types.ts';
+import type { Bucket, ClaudeStatus, CoachEvent, CoachRunInfo, CoachRunOutcome, CoachTask, CostSummary, CueProbe, Question, VerifyVerdict } from '../../shared/types.ts';
 
 const LOCK_FILE = path.join(COACH_DIR, '.lock');
 const RUN_TIMEOUT_MS = 40 * 60_000; // main + repair phases
@@ -125,6 +155,12 @@ export function verdictLogLine(v: Pick<VerifyVerdict, 'qid' | 'outcome' | 'picke
   }
   const what = v.outcome === 'mismatch' ? `model chọn ${v.picked}, đáp án ${v.key}` : v.outcome === 'ambiguous' ? `mơ hồ (model chọn ${v.picked ?? '—'})` : v.outcome === 'ok' ? 'khớp' : 'không trả lời được';
   return `${icon} ${v.qid}: ${what}${v.reason ? ` — ${v.reason.slice(0, 200)}` : ''}`;
+}
+
+/** [v6] A `cue` probe result as a run-log line; a sealed question shows no id, key or giveaway (like verdictLogLine). */
+export function cueLogLine(p: Pick<CueProbe, 'qid' | 'key' | 'picks' | 'reason'>, sealed: ReadonlySet<string>): string {
+  if (sealed.has(p.qid)) return `🎯 1 câu đang niêm phong: ${CUE_LABEL} (chi tiết ẩn tới khi bạn làm đề hoặc mở sớm)`;
+  return `🎯 ${p.qid}: ${CUE_LABEL} (${p.picks.length} lần đều chọn ${p.key ?? '—'})${p.reason ? ` — ${p.reason.slice(0, 200)}` : ''}`;
 }
 
 // ── locating the CLI ────────────────────────────────────────────────────────
@@ -351,6 +387,11 @@ export function modelFor(task: CoachTask | 'ask' | 'tutor' | 'notebook', cfg: Ap
   if (task === 'verify') return String(cfg.coach.models?.verify || DEFAULT_VERIFY_MODEL).trim();
   const key = task === 'longform' ? 'enrich' : task === 'twins' || task === 'family' ? 'generate' : task; // [v5] twins / family write like generate
   return String(cfg.coach.models?.[key] || cfg.coach.model || '').trim();
+}
+
+/** [v6] Model of the choices-only cue probe: coach.verify.probe_model (default haiku), '' = the verify model. */
+export function probeModel(cfg: AppConfig): string {
+  return String(cfg.coach.verify?.probe_model ?? '').trim() || modelFor('verify', cfg);
 }
 
 export function resolvedModels(cfg: AppConfig): { analyze: string; generate: string; enrich: string; ask: string; verify: string } {
@@ -703,6 +744,36 @@ export function verifyArgs(prompt: string, cfg: AppConfig): string[] {
 }
 
 /**
+ * [v6] Choices-only cue probe call: like the blind solve (no tools at all, no MCP, no session kept, `--json-schema`,
+ * sonnet as fallback) with the probe model. No `--effort`: a guess from the options needs no long thinking, and the
+ * default probe model (haiku) does not take every effort level.
+ */
+export function probeArgs(prompt: string, cfg: AppConfig): string[] {
+  const model = probeModel(cfg);
+  const args = [
+    '-p',
+    prompt,
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--strict-mcp-config',
+    '--json-schema',
+    JSON.stringify(PROBE_SCHEMA),
+    '--tools',
+    '',
+    '--permission-mode',
+    'dontAsk',
+    '--permission-prompts',
+    'none',
+    '--no-session-persistence',
+  ];
+  if (model && !/sonnet/i.test(model)) args.push('--fallback-model', 'sonnet');
+  if (model) args.push('--model', model);
+  if (cfg.coach.max_budget_usd > 0) args.push('--max-budget-usd', String(cfg.coach.max_budget_usd));
+  return args;
+}
+
+/**
  * [v5] Grounded fact-check call: the model may only search / read AWS documentation — built-in tools limited to
  * WebFetch + WebSearch, WebFetch allowed on docs.aws.amazon.com / aws.amazon.com only (dontAsk denies anything else), no
  * file access, no write tool, no session kept; the verify model (sonnet fallback).
@@ -929,6 +1000,12 @@ function prepare(task: CoachTask, runId: string, params: Record<string, unknown>
       if (!t.ids.length) throw new NothingToDoError('Đã kiểm toán hết câu nhập (mỗi câu đã có kết quả giải mù cho phiên bản hiện tại) 🎉');
       return { params: { scope: 'audit', ids: t.ids, count: t.ids.length, ...(t.total > t.ids.length ? { remaining: t.total - t.ids.length } : {}) } };
     }
+    if (params.scope === 'cues') {
+      // [v6] choices-only cue probe: explicit ids / a pack, else the exam-grade AI questions not probed for their version
+      const t = cueTargets(loadBank(), params, { since: cfg.quality.exam_spec_since });
+      if (!t.ids.length) throw new NothingToDoError('Không có câu nào cần dò phương án lộ đáp án (câu AI mới đều đã dò cho phiên bản hiện tại) 🎉');
+      return { params: { scope: 'cues', ids: t.ids, count: t.ids.length, ...(t.total > t.ids.length ? { remaining: t.total - t.ids.length } : {}) } };
+    }
     const t = verifyTargets(loadBank(), params);
     if (!t.ids.length) throw new NothingToDoError('Không có câu nào cần giải mù (mọi câu trong phạm vi này đã có kết quả cho phiên bản hiện tại) 🎉');
     return { params: { ids: t.ids, count: t.ids.length, ...(t.total > t.ids.length ? { remaining: t.total - t.ids.length } : {}) } };
@@ -1119,7 +1196,7 @@ const sizeLabel = (info: RunInfo) => {
   const p = info.params ?? {};
   if (info.task === 'enrich') return ` · ${String(p.size)} câu`;
   if (info.task === 'family') return ` · ${String(p.count)} họ`;
-  if (info.task === 'verify') return ` · ${String(p.count)} câu${p.scope === 'grounded' ? ' · 🔗 kiểm chứng tài liệu AWS' : p.scope === 'audit' ? ' · 🧾 kiểm toán câu nhập' : ''}`;
+  if (info.task === 'verify') return ` · ${String(p.count)} câu${p.scope === 'grounded' ? ' · 🔗 kiểm chứng tài liệu AWS' : p.scope === 'audit' ? ' · 🧾 kiểm toán câu nhập' : p.scope === 'cues' ? ' · 🎯 dò phương án lộ đáp án' : ''}`;
   return info.task === 'longform' || info.task === 'twins' ? ` · ${String(p.count)} câu` : '';
 };
 
@@ -1205,7 +1282,7 @@ export class CoachRunner extends EventEmitter {
       evOut.write(JSON.stringify(ev) + '\n');
       this.emit('event', ev);
     };
-    const model = modelFor(task, cfg);
+    const model = task === 'verify' && params.scope === 'cues' ? probeModel(cfg) : modelFor(task, cfg); // [v6] the probe has its own model
     const shownPath = claude.path.startsWith(os.homedir() + path.sep) ? `~/${rel(claude.path, os.homedir())}` : claude.path;
     emit('start', `${TASK_LABEL[task]}${sizeLabel(info)} · Claude Code ${claude.version?.split(' ')[0] ?? ''}${model ? ` · model ${model}` : ''}${structured ? ' · JSON' : ''} · ${shownPath}`);
     if (info.params?.batch) emit('start', `Lô câu hỏi: ${String(info.params.batch)}`);
@@ -1252,6 +1329,7 @@ export class CoachRunner extends EventEmitter {
       const ids = Array.isArray(info.params?.ids) ? (info.params!.ids as string[]) : [];
       if (task === 'verify' && info.params?.scope === 'grounded') await this.groundedPhase(st, ids, {});
       else if (task === 'verify' && info.params?.scope === 'audit') await this.auditPhase(st, ids);
+      else if (task === 'verify' && info.params?.scope === 'cues') await this.cuePhase(st, ids);
       else if (task === 'verify') await this.verifyPhase(st, ids, new Set());
       else await this.mainPhase(st);
     } catch (e) {
@@ -2011,8 +2089,9 @@ export class CoachRunner extends EventEmitter {
     const model = modelFor('verify', cfg);
     const sealed = sealedIds(); // the log (Coach → Xem log) never shows a sealed question's pick, key or reason
     const batches = verifyBatches(qs, cfg.coach.verify.batch_size);
+    const orders = blindOrders(qs); // [v6] options shuffled per question (hash + earlier answers); picks mapped back to bank letters
     const deadline = Date.now() + VERIFY_TIMEOUT_MS;
-    emit('start', `🧪 Giải mù ${qs.length} câu · model ${model}${/sonnet/i.test(model) ? '' : ' (dự phòng sonnet)'} · ${batches.length} lượt gọi — model chỉ thấy đề + lựa chọn`);
+    emit('start', `🧪 Giải mù ${qs.length} câu · model ${model}${/sonnet/i.test(model) ? '' : ' (dự phòng sonnet)'} · ${batches.length} lượt gọi — model chỉ thấy đề + lựa chọn (đã xáo thứ tự)`);
     const verdicts: VerifyVerdict[] = [];
     for (const [i, batch] of batches.entries()) {
       if (info.status !== 'running') return; // cancelled
@@ -2023,14 +2102,14 @@ export class CoachRunner extends EventEmitter {
         emit('stderr', `⏱ Hết ${fmtLimit(VERIFY_TIMEOUT_MS)} giải mù — ${rest} câu chưa giải, để lượt sau (--scope unverified-ai / changed).`);
         break;
       }
-      const r = await this.runPhase(st, verifyArgs(verifyPrompt(batch, info.id), cfg), 'verify', deadline);
+      const r = await this.runPhase(st, verifyArgs(verifyPrompt(batch, info.id, orders), cfg), 'verify', deadline);
       if (info.status !== 'running') return;
       const out = structuredOutput(r.result);
       if (!out || r.error || r.result?.is_error) {
         emit('stderr', `🧪 Lượt ${i + 1}/${batches.length}: không có kết quả JSON${r.error ? ` (${r.error})` : ''} — ${batch.length} câu chưa được giải.`);
         continue;
       }
-      const vs = verdictsFor(batch, out, { model: r.model ?? model, runId: info.id });
+      const vs = verdictsFor(batch, out, { model: r.model ?? model, runId: info.id, orders });
       appendVerdicts(vs);
       verdicts.push(...vs);
       for (const v of vs) {
@@ -2064,6 +2143,94 @@ export class CoachRunner extends EventEmitter {
         st.result = 'success';
         info.summary = line;
       } else this.fail(st, 'Không giải được câu nào (xem log).');
+    }
+  }
+
+  // ── [v6] choices-only cue probe ───────────────────────────────────────────
+
+  /**
+   * Verify scope 'cues': the probe model (coach.verify.probe_model) sees only each question's options — no stem, no id, no
+   * metadata — shuffled, and guesses; the questions it got exactly right are asked once more with another order (the key
+   * on other letters). Right both times = the options give the key away (`cue`), else `clean`. Lines → bank/verify.md
+   * with `"probe":"choices-only"`: nothing is drafted, reactivated or counted as verified. Sealed questions: details hidden.
+   */
+  private async cuePhase(st: RunState, ids: string[]) {
+    const { info, cfg, emit } = st;
+    const isTask = info.task === 'verify';
+    const bank = loadBank();
+    const all = ids.map((id) => bank.byId.get(id)).filter((q): q is Question => !!q && q.status !== 'retired');
+    const qs = all.slice(0, MAX_VERIFY);
+    const sum: NonNullable<RunOutcome['cues']> = { checked: 0, cue: 0, clean: 0, error: 0, flagged: [] };
+    let left = all.length - qs.length + (isTask && typeof info.params?.remaining === 'number' ? info.params.remaining : 0); // capped at MAX_VERIFY
+    if (!qs.length) {
+      if (isTask) this.fail(st, 'Không còn câu nào để dò (đã xoá hoặc retired).');
+      return;
+    }
+    const model = probeModel(cfg);
+    const sealed = sealedIds(); // the log never shows a sealed question's id, key or giveaway
+    const seen = probeAttempts(qs); // a re-probe of the same version gets other shuffles
+    const plan = qs.map((q, i) => ({ q, n: i + 1, key: [...q.answer].sort().join(''), orders: probeOrders(q, seen.get(q.id) ?? 0), runs: [] as (ProbeRun | undefined)[], model, done: false }));
+    const deadline = Date.now() + VERIFY_TIMEOUT_MS;
+    emit('start', `🎯 Dò phương án lộ đáp án ${qs.length} câu · model ${model}${/sonnet/i.test(model) ? '' : ' (dự phòng sonnet)'} — model chỉ thấy các phương án (không đề, không id, đã xáo thứ tự); câu đoán trúng được hỏi lại với thứ tự khác`);
+    let late = false;
+    for (const run of [1, 2] as const) {
+      // run 2 only for the questions whose first guess was exactly the key — for the others the outcome is already 'clean'
+      const todo = run === 1 ? plan : plan.filter((p) => !p.done && p.runs[0]?.picked === p.key);
+      const byId = new Map(todo.map((p) => [p.q.id, p]));
+      const batches = verifyBatches(todo.map((p) => p.q), cfg.coach.verify.batch_size, probeCost);
+      for (const [i, batch] of batches.entries()) {
+        if (info.status !== 'running') return; // cancelled
+        if (Date.now() >= deadline) {
+          late = true; // out of time: do not start a call that would be killed at once
+          break;
+        }
+        const items = batch.map((q) => ({ q, label: probeLabel(run, byId.get(q.id)!.n), order: byId.get(q.id)!.orders[run - 1] }));
+        const r = await this.runPhase(st, probeArgs(probePrompt(items, info.id), cfg), 'verify', deadline);
+        if (info.status !== 'running') return;
+        const out = structuredOutput(r.result);
+        if (!out || r.error || r.result?.is_error) {
+          emit('stderr', `🎯 Lần ${run} · lượt ${i + 1}/${batches.length}: không có kết quả JSON${r.error ? ` (${r.error})` : ''} — ${batch.length} câu chưa dò xong.`);
+          continue;
+        }
+        const got = probeAnswers(items, out);
+        for (const it of items) {
+          const p = byId.get(it.q.id)!;
+          p.runs[run - 1] = got.get(it.q.id) ?? { picked: '', order: it.order };
+          p.model = r.model ?? model;
+        }
+      }
+      // what this run settled goes to the ledger right away (a cancel or timeout later keeps it)
+      const settled: CueProbe[] = [];
+      for (const p of plan) {
+        const rec = p.done ? undefined : probeRecord(p.q, p.runs, { model: p.model, runId: info.id });
+        if (!rec) continue;
+        p.done = true;
+        settled.push(rec);
+      }
+      appendProbes(settled);
+      for (const rec of settled) {
+        sum.checked++;
+        sum[rec.outcome]++;
+        if (rec.outcome !== 'cue') continue;
+        if (!sealed.has(rec.qid)) sum.flagged.push(rec.qid);
+        emit('result', cueLogLine(rec, sealed));
+      }
+      if (late) break;
+    }
+    const open = plan.filter((p) => !p.done).length;
+    if (late && open) {
+      left += open;
+      emit('stderr', `⏱ Hết ${fmtLimit(VERIFY_TIMEOUT_MS)} dò phương án — ${open} câu chưa dò xong, để lượt sau (--scope cues).`);
+    } else sum.error = open;
+    if (left > 0) sum.remaining = left;
+    info.outcome = { ...info.outcome, cues: sum };
+    const line = `🎯 Dò ${sum.checked}/${qs.length} câu chỉ bằng phương án: ${sum.cue} lộ đáp án · ${sum.clean} không lộ${sum.error ? ` · ${sum.error} lỗi` : ''}${sum.remaining ? ` · còn ${sum.remaining} câu cho lượt sau` : ''}${sum.cue ? ' — sửa phương án ở Ngân hàng → Chất lượng → 🧪' : ''}`;
+    emit('result', line);
+    if (isTask) {
+      if (sum.checked) {
+        st.result = 'success';
+        info.summary = line;
+      } else this.fail(st, 'Không dò được câu nào (xem log).');
     }
   }
 

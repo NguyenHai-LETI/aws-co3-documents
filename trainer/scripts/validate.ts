@@ -5,11 +5,13 @@
 //   - --fill-time inserts "- time: N" (SCHEMA.md §4 rubric) into questions that have no time
 //   - --lint also checks item-writing flaws (server/lib/lint.ts): summary per rule + the flagged questions
 //     (high + medium; low too with --warnings or a path filter); --lint=stem-echo,longest-correct limits the rules
+//   - [v6] packs with ≥ 8 exam-spec questions (AI / document, medium / hard, created ≥ quality.exam_spec_since) get ⚠️
+//     lines when < 20 % of them are multiple-response or the key is strictly the longest option in > 25 % (never an error)
 import fs from 'node:fs';
 import path from 'node:path';
 import { TRAINER_DIR } from '../server/config.ts';
 import { loadBank } from '../server/lib/bank.ts';
-import { LINT_RULES, lintContext, lintQuestion } from '../server/lib/lint.ts';
+import { LINT_RULES, examSpecSince, isExamSpec, lintContext, lintQuestion, packSpecWarnings } from '../server/lib/lint.ts';
 import type { LintFlaw, LintSeverity } from '../shared/types.ts';
 
 const args = process.argv.slice(2);
@@ -56,6 +58,11 @@ const errors = problems.filter((p) => p.level === 'error');
 const warnings = problems.filter((p) => p.level === 'warning');
 const packs = bank.packs.filter((p) => match(p.file));
 
+// ── [v6] exam-spec questions (active, selected files) and the pack-level checks ──
+const since = examSpecSince();
+const examSpec = bank.questions.filter((q) => q.status === 'active' && match(q.file) && isExamSpec(q, since));
+const packWarnings = packs.flatMap((p) => packSpecWarnings(examSpec.filter((q) => q.file === p.file)).map((message) => ({ file: p.file, pack: p.id, message })));
+
 // ── lint (active questions of the selected files) ──
 interface LintRow {
   id: string;
@@ -68,7 +75,7 @@ const lintRows: LintRow[] = [];
 if (lintArg) {
   for (const q of bank.questions) {
     if (q.status !== 'active' || !match(q.file)) continue;
-    const flaws = lintQuestion(q, bank.taxonomy, lintContext(bank, q)).filter((f) => !lintCodes.length || lintCodes.includes(f.code));
+    const flaws = lintQuestion(q, bank.taxonomy, { ...lintContext(bank, q), examSpecSince: since }).filter((f) => !lintCodes.length || lintCodes.includes(f.code));
     if (flaws.length) lintRows.push({ id: q.id, file: q.file, line: q.line, flaws });
   }
 }
@@ -76,11 +83,12 @@ const lintCount = (code: string) => lintRows.filter((r) => r.flaws.some((f) => f
 const checked = bank.questions.filter((q) => q.status === 'active' && match(q.file)).length;
 
 if (asJson) {
-  const out: Record<string, unknown> = { packs: packs.length, questions: packs.reduce((s, p) => s + p.count, 0), errors, warnings };
+  const out: Record<string, unknown> = { packs: packs.length, questions: packs.reduce((s, p) => s + p.count, 0), errors, warnings, packWarnings };
   if (lintArg) {
     out.lint = {
       checked,
       flagged: lintRows.length,
+      examSpec: { since, questions: examSpec.length }, // [v6]
       rules: LINT_RULES.filter((r) => !lintCodes.length || lintCodes.includes(r.code)).map((r) => ({ ...r, count: lintCount(r.code) })),
       questions: lintRows,
     };
@@ -89,6 +97,7 @@ if (asJson) {
 } else {
   for (const p of errors) console.log(`❌ ${p.file}:${p.line}${p.qid ? ` [${p.qid}]` : ''} ${p.message}`);
   if (showWarnings || filters.length) for (const p of warnings) console.log(`⚠️  ${p.file}:${p.line}${p.qid ? ` [${p.qid}]` : ''} ${p.message}`);
+  for (const w of packWarnings) console.log(`⚠️  ${w.file}: ${w.message}`); // [v6] few: only packs with ≥ 8 exam-spec questions
   if (lintArg) {
     const showLow = showWarnings || filters.length > 0 || lintCodes.length > 0;
     let hiddenLow = 0;
@@ -102,7 +111,14 @@ if (asJson) {
     for (const rule of LINT_RULES) {
       if (lintCodes.length && !lintCodes.includes(rule.code)) continue;
       const n = lintCount(rule.code);
-      console.log(`  ${rule.severity.padEnd(6)} ${rule.code.padEnd(20)} ${String(n).padStart(4)}  ${rule.label}${n ? ` — ${rule.fix}` : ' ✓'}`);
+      console.log(`  ${rule.severity.padEnd(6)} ${rule.code.padEnd(20)} ${String(n).padStart(4)}  ${rule.label}${rule.examSpec ? ' [chuẩn đề]' : ''}${n ? ` — ${rule.fix}` : ' ✓'}`);
+    }
+    if (!lintCodes.length || LINT_RULES.some((r) => r.examSpec && lintCodes.includes(r.code))) {
+      console.log(
+        since
+          ? `  [chuẩn đề] chỉ áp cho câu AI / tài liệu, medium / hard, tạo từ ${since} (quality.exam_spec_since): ${examSpec.length} câu active`
+          : '  [chuẩn đề] đang tắt (quality.exam_spec_since rỗng)',
+      );
     }
     const worst = (sev: LintSeverity) => lintRows.filter((r) => r.flaws[0].severity === sev).length; // flaws are sorted worst first
     console.log(

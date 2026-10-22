@@ -93,9 +93,9 @@ export function Seg<T extends string>({ value, onChange, items }: { value: T; on
   );
 }
 
-export function Chip({ on, onClick, children, count }: { on?: boolean; onClick?: () => void; children: ReactNode; count?: number }) {
+export function Chip({ on, onClick, children, count, title }: { on?: boolean; onClick?: () => void; children: ReactNode; count?: number; title?: string }) {
   return (
-    <button type="button" className={`chip ${on ? 'on' : ''}`} onClick={onClick} aria-pressed={!!on}>
+    <button type="button" className={`chip ${on ? 'on' : ''}`} onClick={onClick} aria-pressed={!!on} title={title}>
       {children}
       {count !== undefined && <span className="n">{count}</span>}
     </button>

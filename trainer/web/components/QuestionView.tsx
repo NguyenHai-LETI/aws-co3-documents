@@ -4,6 +4,7 @@ import { useData } from '../lib/store.tsx';
 import { href } from '../lib/router.ts';
 import { highlightWithCategories, keywordLabel } from '../lib/keywords.ts';
 import { multiLabel } from '../../shared/scoring.ts';
+import { TierBadge } from './TierBadge.tsx';
 import type { Question } from '../../shared/types.ts';
 
 export function letterFor(index: number): string {
@@ -57,6 +58,7 @@ export function QuestionMeta({ q, extra, task }: { q: Question; extra?: React.Re
         </span>
       )}
       <span className="badge">{diff}</span>
+      <TierBadge q={q} />
       <span className="badge" title="Thời gian chuẩn ước lượng">⏱ {q.time}s</span>
       {q.origin !== 'imported' && <span className="badge accent">{q.origin === 'ai' ? '🤖 AI' : q.origin === 'doc' ? '📄 Tài liệu' : '✍️ Thủ công'}</span>}
       {q.variantOf.length > 0 && <span className="badge accent" title={`Biến thể của ${q.variantOf.join(', ')}`}>↻ biến thể</span>}

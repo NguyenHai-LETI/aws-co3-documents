@@ -7,6 +7,8 @@
 // keeps one per cluster without burying); sibling substitution in srs + today (ref.for). "Học hôm nay" = today.ts;
 // discriminate / qualifier / yesterday / retest = select-modes.ts. Mocks take ≥ 50 % exam-like questions per domain when
 // the pool allows (C5). Practice-feedback sessions get in-session relearning (session.relearn, practice.relearn).
+// [v6] Mocks prefer tier A (shared/tier.ts), then the other exam-like questions; a mock never serves an out-of-scope or
+// legacy answer, whatever practice.exclude_out_of_scope says; a tier filter on a mock is topped up from the other tiers.
 import crypto from 'node:crypto';
 import { HttpError } from '../http.ts';
 import { isMastered, isParkedLeech, reviewQueue } from './stats.ts';
@@ -18,6 +20,7 @@ import { MODE_INFO, REQUIREMENT_INFO } from '../../shared/labels.ts';
 import { EXAM_PACE_PRESETS, computeTimeLimit, defaultTimingPreset } from '../../shared/timing.ts';
 import { applyFilters, hasFilters, newOrder, retestIds, stableHash, taskQuotas } from '../../shared/filters.ts';
 import { isExamLike, testRealism } from '../../shared/realism.ts';
+import { examRank, tierOf } from '../../shared/tier.ts';
 import {
   depsOf,
   goalOf,
@@ -53,6 +56,7 @@ import type {
   SelectionFilters,
   Taxonomy,
   TestSession,
+  Tier,
   TodayMix,
 } from '../../shared/types.ts';
 
@@ -111,6 +115,27 @@ export function domainQuotas(n: number, domains: DomainDef[]): Map<string, numbe
   return new Map(quotas.map((q) => [q.id, q.want]));
 }
 
+/**
+ * [v6] What mocks draw from (exam mode, the pilots of a sealed exam): the in-scope pool, and never an out-of-scope or
+ * legacy answer even with practice.exclude_out_of_scope off — the real exam never asks them (like sealed forms).
+ */
+function mockScope(inScope: Question[]): Question[] {
+  return inScope.filter((q) => !q.outOfScope);
+}
+
+/** [v6] Note of a mock with a tier filter that took questions of other tiers (undefined = every question is of the chosen tiers). */
+function tierTopUpNote(picked: Question[], tiers: Tier[], tax: Taxonomy): string | undefined {
+  const others = picked.filter((q) => !tiers.includes(tierOf(q, tax)));
+  if (!others.length) return undefined;
+  const chosen = `tầng ${tiers.join('/')}`;
+  const used = (['A', 'B', 'C'] as const).filter((t) => others.some((q) => tierOf(q, tax) === t));
+  const added = `${others.length} câu tầng ${used.join('/')} cùng bộ lọc`;
+  const inTier = picked.length - others.length;
+  return inTier
+    ? `Ngân hàng chưa đủ câu ${chosen} cho bài thi thử: ${inTier}/${picked.length} câu là ${chosen}, ${added} được thêm vào (ưu tiên câu giống đề thật, giữ trọng số domain).`
+    : `Chưa có câu ${chosen} nào khớp bộ lọc — bài thi thử dùng ${added} (ưu tiên câu giống đề thật, giữ trọng số domain).`;
+}
+
 /** Day number of the last answer (-1 = never seen). */
 function seenDayOf(states: Ctx['states'], q: Question): number {
   const s = states.get(q.id);
@@ -121,13 +146,16 @@ interface PickOptions {
   taken?: Question[]; // questions already in the test (their clusters are excluded)
   deterministic?: boolean; // stable hash tie-breaks instead of random ones (previews)
   key?: (q: Question) => string; // sibling cluster of a question (default: its variant family)
+  tiers?: Tier[]; // [v6] a mock with a tier filter: the pool holds every tier, these fill each domain quota first
 }
 
 /**
  * Picks questions per domain proportionally to exam weights. Inside a domain quota, at least EXAM_LIKE_SHARE of it goes to
  * exam-like questions (long scenario stem, full-sentence options — shared/realism.ts) when the pool has them; then the
- * general preference: never seen, then exam-like, then least recently seen (by day), then long-form stems; random among
- * equals. Never two questions of one sibling cluster (an original and its variant, two rephrasings).
+ * general preference: never seen, then [v6] tier A, the other exam-like questions, the rest (examRank), then least
+ * recently seen (by day), then [v6] short scenarios (tier B) before drills, then long-form stems; random among equals.
+ * Never two questions of one sibling cluster (an original and its variant, two rephrasings). [v6] `tiers`: the chosen
+ * tiers fill each domain quota first (exam-like share included); the other tiers only make up what they cannot.
  */
 function examPick(pool: Question[], n: number, ctx: Ctx, opts: PickOptions = {}): Question[] {
   const tax = ctx.bank.taxonomy;
@@ -136,9 +164,18 @@ function examPick(pool: Question[], n: number, ctx: Ctx, opts: PickOptions = {})
   const ties = opts.deterministic ? (list: Question[]) => [...list].sort((a, b) => stableHash(a.id, 'exam') - stableHash(b.id, 'exam')) : shuffle;
   const preferred = (list: Question[]) =>
     ties(list)
-      .map((q) => ({ q, seen: seenDayOf(ctx.states, q), exam: isExamLike(q, tax) }))
-      .sort((a, b) => Number(a.seen >= 0) - Number(b.seen >= 0) || Number(b.exam) - Number(a.exam) || a.seen - b.seen || Number(b.q.longForm) - Number(a.q.longForm))
+      .map((q) => ({ q, seen: seenDayOf(ctx.states, q), rank: examRank(q, tax), drill: tierOf(q, tax) === 'C' }))
+      .sort(
+        (a, b) =>
+          Number(a.seen >= 0) - Number(b.seen >= 0) ||
+          a.rank - b.rank ||
+          a.seen - b.seen ||
+          Number(a.drill) - Number(b.drill) ||
+          Number(b.q.longForm) - Number(a.q.longForm),
+      )
       .map((e) => e.q);
+  const tiers = opts.tiers?.length ? opts.tiers : undefined;
+  const chosen = (q: Question) => !tiers || tiers.includes(tierOf(q, tax));
   const picked: Question[] = [];
   const used = new Set<string>();
   const usedFamilies = new Set((opts.taken ?? []).map(family));
@@ -156,13 +193,19 @@ function examPick(pool: Question[], n: number, ctx: Ctx, opts: PickOptions = {})
   };
   for (const [domain, want] of domainQuotas(n, tax.domains)) {
     const inDomain = preferred(pool.filter((x) => x.domain === domain));
-    const examLike = take(
-      inDomain.filter((q) => isExamLike(q, tax)),
+    const first = tiers ? inDomain.filter(chosen) : inDomain;
+    let k = take(
+      first.filter((q) => isExamLike(q, tax)),
       Math.ceil(want * EXAM_LIKE_SHARE),
     );
-    take(inDomain, want - examLike);
+    k += take(first, want - k);
+    if (tiers) take(inDomain, want - k); // [v6] a domain short of the chosen tiers keeps its quota
   }
-  if (picked.length < n) take(preferred(pool.filter((q) => !used.has(q.id))), n - picked.length);
+  if (picked.length < n) {
+    const rest = preferred(pool.filter((q) => !used.has(q.id)));
+    if (tiers) take(rest.filter(chosen), n - picked.length);
+    take(rest, n - picked.length);
+  }
   return opts.deterministic ? picked : shuffle(picked);
 }
 
@@ -305,13 +348,14 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
   const sealedMode = mode === 'sealed';
   const pearson = sealedMode || (!!req.pearson && mode === 'exam');
   const { active, practice, inScope, held } = pools(ctx);
+  const mocks = mockScope(inScope);
   const rules = sessionRules(ctx);
   const key = (q: Question) => rules.key(q.id);
   const unburied = (list: Question[]) => list.filter((q) => !rules.buried(q.id));
   /** Design C3: siblings of today's answers buried, one question per cluster (first = preferred). */
   const ruled = (list: Question[]) => onePerCluster(unburied(list), key);
-  // explicit packs keep out-of-scope questions; the other filter-based modes draw from the in-scope pool
-  const pool = applyFilters(mode === 'pack' ? practice : inScope, req.filters);
+  // explicit packs keep out-of-scope questions; the other filter-based modes draw from the in-scope pool ([v6] mocks: never)
+  const pool = applyFilters(mode === 'pack' ? practice : mode === 'exam' ? mocks : inScope, req.filters);
   const defaultCount =
     mode === 'exam'
       ? tax.exam.questions
@@ -349,9 +393,17 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
   const lastAtDesc = (a: Question, b: Question) => (states.get(b.id)?.lastAt ?? '').localeCompare(states.get(a.id)?.lastAt ?? '');
 
   switch (mode) {
-    case 'exam':
-      picked = examPick(unburied(pool), count, ctx, { key });
+    case 'exam': {
+      // [v6] a tier filter is a preference in a mock: the other tiers of the same filters make up what the bank lacks, so
+      // the mock keeps its length and domain mix — with a note saying how many questions came from other tiers
+      const tiers = req.filters?.tiers?.length ? req.filters.tiers : undefined;
+      picked = examPick(unburied(tiers ? applyFilters(mocks, { ...req.filters, tiers: [] }) : pool), count, ctx, { key, tiers });
+      if (tiers) {
+        const note = tierTopUpNote(picked, tiers, tax);
+        if (note) notes.push(note);
+      }
       break;
+    }
     case 'sealed': {
       // the form's questions are the scored items; pilots come from the practice pool like the real exam's 15
       const form = chooseForm(ctx, typeof req.form === 'string' && req.form.trim() ? req.form.trim().slice(0, 40) : undefined);
@@ -359,7 +411,7 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
       const lost = new Set(form.ids).size - scored.length;
       if (!scored.length) throw new HttpError(409, `Đề niêm phong ${form.id} không còn câu nào dùng được (đã bị xoá, chuyển draft hoặc retired).`);
       if (lost) notes.push(`${lost} câu của đề ${form.id} không còn dùng được (đã bị xoá, chuyển draft hoặc retired) — đề còn ${scored.length} câu tính điểm.`);
-      const pilots = examPick(unburied(inScope), sealedPilotCount(scored.length, tax), ctx, { taken: scored, key });
+      const pilots = examPick(unburied(mocks), sealedPilotCount(scored.length, tax), ctx, { taken: scored, key });
       picked = shuffle([...scored, ...pilots]);
       unscored = pilots.map((q) => q.id);
       sealedForm = form.id;
@@ -544,7 +596,8 @@ export function buildTest(req: BuildTestRequest, ctx: Ctx): TestSession {
   }
   const wanted = pearson ? count : req.count;
   if (countNote && wanted && picked.length < wanted) notes.push(`Chỉ có ${picked.length} câu phù hợp (bạn yêu cầu ${wanted}).`);
-  if (!pool.length && !UNFILTERED.includes(mode)) notes.push('Bộ lọc không khớp câu nào.');
+  // [v6] `!picked.length`: a mock with a tier filter may be filled from the other tiers (tierTopUpNote says so)
+  if (!pool.length && !picked.length && !UNFILTERED.includes(mode)) notes.push('Bộ lọc không khớp câu nào.');
   // say so when a filter the learner chose lost questions to practice.exclude_out_of_scope (unfiltered modes stay quiet)
   if (inScope !== practice && !['pack', 'ids', 'coach', 'sealed'].includes(mode) && !UNFILTERED.includes(mode) && hasFilters(req.filters)) {
     const dropped = applyFilters(practice, req.filters).filter((q) => q.outOfScope).length;
@@ -612,6 +665,7 @@ function describeSelection(base: string, mode: string, req: BuildTestRequest, ct
   if (f.domains?.length) parts.push(f.domains.map((d) => tax.domains.find((x) => x.id === d)?.code ?? d).join('+'));
   if (f.tasks?.length) parts.push(`task ${f.tasks.slice(0, 4).join(', ')}`);
   if (f.requirements?.length) parts.push(f.requirements.map((r) => REQUIREMENT_INFO[r]?.label ?? r).join('/'));
+  if (f.tiers?.length) parts.push(`tầng ${f.tiers.join('/')}`); // [v6]
   if (f.services?.length) parts.push(f.services.slice(0, 3).join(', '));
   if (f.tags?.length) parts.push(f.tags.slice(0, 3).join(', '));
   if (f.difficulties?.length) parts.push(f.difficulties.map((d) => tax.difficulties.find((x) => x.id === d)?.label ?? d).join('/'));
@@ -621,13 +675,14 @@ function describeSelection(base: string, mode: string, req: BuildTestRequest, ct
   return parts.length ? `${base}: ${parts.join(' · ')}` : base;
 }
 
-/** Realism + Σ estimates of a previewed selection as `<key>.items|words|total|estimate[|pilots]` counters. */
+/** Realism + Σ estimates of a previewed selection as `<key>.items|words|total|estimate|tierA[|pilots]` counters. */
 function addPreview(out: Record<string, number>, key: string, qs: Question[], tax: Taxonomy, pilots = 0): void {
   const r = testRealism(qs, tax);
   out[`${key}.items`] = r.items;
   out[`${key}.words`] = r.words;
   out[`${key}.total`] = r.total;
   out[`${key}.estimate`] = qs.reduce((s, q) => s + q.time, 0);
+  out[`${key}.tierA`] = qs.filter((q) => tierOf(q, tax) === 'A').length; // [v6]
   if (pilots) out[`${key}.pilots`] = pilots;
 }
 
@@ -638,9 +693,10 @@ const countsMemo = new WeakMap<Ctx, { key: string; counts: Record<string, number
  * questions excluded everywhere). `srs` = due questions offered today (after srs.daily_limit and the sibling rules),
  * `backlog` = the rest of the due questions, `srsRemaining` = reviews still allowed today (pass to
  * `modePool(…, { srsLimit })` on the web). `sealed` / `outOfScope` = active questions held back / left out; `examLike` =
- * exam-like questions in the pool.
+ * exam-like questions in the pool; [v6] `tierA` / `tierB` / `tierC` = the pool by tier (shared/tier.ts).
  * Previews (stable tie-breaks): `exam.*` = what a full mock would serve now, `sealed.<form>.*` = each form still sealed
- * with its pilots — `.items` exam-like, `.words` to read, `.total` questions, `.estimate` Σ seconds, `.pilots`.
+ * with its pilots — `.items` exam-like, `.words` to read, `.total` questions, `.estimate` Σ seconds, `.pilots`, [v6]
+ * `.tierA` tier A questions (a `tiers` filter is a preference in the mock preview, as in buildTest).
  * [v5] `yesterday` = what mode 'yesterday' serves (≤ YESTERDAY_MAX; `.all` uncapped, `.estimate` Σ s) · `qualifier` =
  * family members + requirement questions available (`.families`) · `discriminate` = confusable groups · `retest` = the
  * correction set of the latest attempt. Unfiltered counts are memoized per data state (context.ts) and day.
@@ -673,6 +729,8 @@ export function modeCounts(ctx: Ctx, filters?: SelectionFilters): Record<string,
   const familyMembers = [...families.values()].reduce((n, m) => n + m.length, 0);
   let latest: (typeof ctx.attempts & {})[number] | undefined;
   for (const a of ctx.attempts ?? []) if (!a.rushed && (!latest || a.finished > latest.finished)) latest = a;
+  const tiers: Record<Tier, number> = { A: 0, B: 0, C: 0 };
+  for (const q of pool) tiers[tierOf(q, tax)]++;
   const out: Record<string, number> = {
     all: pool.length,
     'retry-wrong': pool.filter((q) => s.get(q.id)?.lastOk === false).length,
@@ -686,6 +744,10 @@ export function modeCounts(ctx: Ctx, filters?: SelectionFilters): Record<string,
     sealed: active.length - practice.length,
     outOfScope: practice.length - inScope.length,
     examLike: pool.filter((q) => isExamLike(q, tax)).length,
+    // [v6]
+    tierA: tiers.A,
+    tierB: tiers.B,
+    tierC: tiers.C,
     // [v5]
     yesterday: Math.min(YESTERDAY_MAX, yesterday.length),
     'yesterday.all': yesterday.length,
@@ -695,12 +757,16 @@ export function modeCounts(ctx: Ctx, filters?: SelectionFilters): Record<string,
     discriminate: deps.confusableGroups(ctx.bank).length,
     retest: latest ? retestIds(latest.answers).length : 0,
   };
-  addPreview(out, 'exam', examPick(unburied(pool), tax.exam.questions, ctx, { deterministic: true, key }), tax);
+  // the mock previews draw from what buildTest's mocks draw from ([v6] mockScope; a tier filter is a preference there)
+  const mocks = mockScope(inScope);
+  const tierPref = filters?.tiers?.length ? filters.tiers : undefined;
+  const mockPool = applyFilters(mocks, tierPref ? { ...filters, tiers: [] } : filters);
+  addPreview(out, 'exam', examPick(unburied(mockPool), tax.exam.questions, ctx, { deterministic: true, key, tiers: tierPref }), tax);
   if (held.size) {
     for (const form of sealedForms(ctx)) {
       if (form.status !== 'sealed') continue;
       const scored = formQuestions(ctx, form);
-      const pilots = examPick(unburied(inScope), sealedPilotCount(scored.length, tax), ctx, { taken: scored, deterministic: true, key });
+      const pilots = examPick(unburied(mocks), sealedPilotCount(scored.length, tax), ctx, { taken: scored, deterministic: true, key });
       addPreview(out, `sealed.${form.id}`, [...scored, ...pilots], tax, pilots.length);
     }
   }

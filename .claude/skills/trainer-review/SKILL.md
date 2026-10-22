@@ -24,7 +24,9 @@ Skill này **chỉ soát**: không sửa pack, không retire câu, không sửa 
    c. Câu có `- enriched:` từ mốc trở đi (giải thích / gợi ý vừa viết lại).
    Tìm bằng Grep `^- (created|enriched): ` trong `trainer/bank/packs` rồi lọc theo ngày; pack mới chưa commit: `git ls-files --others --exclude-standard trainer/bank/packs`.
    Gồm cả pack câu song sinh / họ câu (`*-twins-*`, câu có `- family:`) và patch `*_twins*` / `*_family*` của v5.
-3. Tối đa ~40 câu mỗi lượt (a → b → c). Phần còn lại ghi vào báo cáo, mục *Để lượt sau*.
+3. Tối đa ~40 câu mỗi lượt (a → b → c; trong mỗi nhóm, câu **tầng A** trước — đề ≥ 55 từ, phương án là câu đầy đủ, có tiêu chí: chúng
+   vào thi thử và đề niêm phong, nên phải được soát **trước** khi người học chạy `npm run seal -- --add --tier A`). Phần còn lại ghi vào
+   báo cáo, mục *Để lượt sau*.
 4. **Bỏ qua câu đang niêm phong**: id nằm trong một form `status: sealed` của `trainer/results/sealed.md`. Đừng soát, đừng ghi issue,
    **không bao giờ nêu id hay nội dung** các câu đó ở issues.md hay báo cáo (cả hai được đồng bộ và người học đọc được) — báo cáo chỉ ghi
    *"N câu niêm phong bỏ qua"*. Chúng được soát sau khi form được dùng hoặc mở sớm.
@@ -42,7 +44,25 @@ Skill này **chỉ soát**: không sửa pack, không retire câu, không sửa 
    - `explanation`: giải thích sai sự thật, con số sai, lý do loại distractor không đúng, hoặc gọi lựa chọn bằng chữ cái (app xáo thứ tự đáp án).
    - `other`: `hint` lộ đáp án (nêu tên service/tính năng của đáp án đúng), distractor là dịch vụ không tồn tại, đáp án đúng dài hơn hẳn mọi distractor.
    - `metadata`: domain/task sai rõ ràng (ENRICH vẫn sẽ phân loại lại — chỉ ghi khi sai nặng).
-3. **Chỉ ghi issue khi chắc chắn**, có lý do cụ thể và nguồn (file notes, tài liệu AWS). Nghi ngờ nhưng chưa chắc → ghi vào báo cáo mục
+3. **Rubric câu tầng A** ([v6], câu `medium`/`hard` AI viết theo `trainer/bank/SCHEMA.md` §6b — đề dài, phương án là hành động hoàn
+   chỉnh). Ngoài bước 1–2, đánh dấu từng mục; mục sai chắc chắn = một issue với loại ghi trong ngoặc:
+   - [ ] **Một đáp án**: đúng một phương án tốt nhất (hoặc đúng N với “Choose / Select N”); mỗi phương án nhiễu thua **vì dữ kiện có
+     trong đề**, không phương án nào cũng đúng khi đọc kỹ (`ambiguous` / `wrong-key`).
+   - [ ] **Nhãn lý do sai hợp lệ**: mỗi phương án nhiễu có một dòng trong giải thích kèm một nhãn của §6b (vi phạm ràng buộc · dùng sai
+     tính năng · cấu hình không tồn tại · đặt sai chỗ · giải bài toán khác · tốn vận hành/chi phí hơn · đúng một phần), nhãn **đúng sự
+     thật** (“cấu hình không tồn tại” mà cấu hình đó có thật, “vi phạm ràng buộc” mà ràng buộc không có trong đề → sai) và phương án sai
+     vì đúng một lý do (`explanation`).
+   - [ ] **Có tiêu chí**: đề nêu qualifier (*MOST cost-effective*, *LEAST operational overhead*…) hoặc câu hỏi cuối “…meet these
+     requirements?”, và tiêu chí đó đủ để phân định đáp án (`ambiguous`).
+   - [ ] **Kiến thức hiện hành / legacy**: đáp án đúng không phải service `scope: out` / `scope: legacy` (`trainer/bank/taxonomy.yaml`) hay
+     đã đóng với khách hàng mới, không vướng mục `currency:`; tên service như exam guide; tính năng đã GA ≥ 3 tháng; con số có nguồn
+     (`outdated`).
+   - [ ] **URL**: có ≥ 1 URL `https://docs.aws.amazon.com/…` / `https://aws.amazon.com/…`, đúng service / tính năng được hỏi và ủng hộ đáp
+     án (`explanation`); URL nghi không tồn tại mà không kiểm được → *Cần người xem*, không ghi issue.
+   - [ ] Dòng 🎯 `cue` của câu trong `trainer/bank/verify.md` (phép thử chỉ nhìn phương án): chỉ ra manh mối (đáp án chi tiết / “nghe đúng”
+     hơn hẳn, lặp từ đề…) và đề nghị viết lại phương án (`other`).
+   Độ dài đề / phương án / giải thích, câu nhiều đáp án, phương án song song: lint chuẩn đề đã đo — chỉ nhắc trong báo cáo, không ghi issue.
+4. **Chỉ ghi issue khi chắc chắn**, có lý do cụ thể và nguồn (file notes, tài liệu AWS). Nghi ngờ nhưng chưa chắc → ghi vào báo cáo mục
    *Cần người xem*, không ghi issue. Câu đúng → không ghi gì ngoài danh sách đã soát.
 
 ## 3. Ghi kết quả
@@ -64,7 +84,7 @@ Skill này **chỉ soát**: không sửa pack, không retire câu, không sửa 
    issues: [id2]
    ---
    # 🔎 Soát câu hỏi — <ngày giờ>
-   ## Tóm tắt            (số câu soát theo nhóm a/b/c, số lỗi theo loại)
+   ## Tóm tắt            (số câu soát theo nhóm a/b/c, số câu tầng A và số đạt đủ rubric, số lỗi theo loại)
    ## Lỗi đã ghi vào issues.md   (bảng: Câu | Loại | Vấn đề | Nguồn)
    ## Cần người xem      (nghi ngờ chưa chắc, kèm lý do)
    ## Để lượt sau        (ứng viên chưa soát)

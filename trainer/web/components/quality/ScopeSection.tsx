@@ -1,6 +1,8 @@
 // [γ] Bank → 📐 Chất lượng → 🎯 Phạm vi đề thi: questions naming services the official SAA-C03 guide lists as out of scope
 // (taxonomy `scope: out`). A correct option out of scope = the exam never asks it → retire (POST /api/quality/retire for the
 // versions shown); only distractors out of scope = easy give-aways → ENRICH "distractors" with explicit ids.
+// [v6] Services marked `scope: legacy` (dropped from the official in-scope list, or retired with no in-scope successor) count
+// as out of scope; the report labels them "bị gỡ khỏi phạm vi" (ScopeReport.services[].scope).
 import { useState } from 'react';
 import { api } from '../../lib/api.ts';
 import { useData } from '../../lib/store.tsx';
@@ -11,12 +13,17 @@ import type { ScopeReport } from '../../../shared/types.ts';
 const GUIDE = 'https://docs.aws.amazon.com/aws-certification/latest/solutions-architect-associate-03/saa-03-out-of-scope-services.html';
 const ENRICH_MAX = 20;
 const RETIRE_MAX = 60;
+const OUT_TITLE = 'Dịch vụ ngoài phạm vi đề thi SAA-C03';
+const LEGACY_TITLE = 'Bị gỡ khỏi phạm vi: không còn trong danh sách dịch vụ thuộc phạm vi của đề cương SAA-C03 (hoặc đã ngừng, không có dịch vụ thay thế trong phạm vi) — coi như ngoài phạm vi';
 
-function ServiceBadges({ services }: { services: string[] }) {
+/** A service of the report; [v6] `scope: 'legacy'` = removed from the official in-scope list (older servers: no field). */
+type ScopeService = ScopeReport['services'][number] & { scope?: 'out' | 'legacy' };
+
+function ServiceBadges({ services, legacy }: { services: string[]; legacy: ReadonlySet<string> }) {
   return (
     <>
       {services.map((s) => (
-        <span key={s} className="badge warn" title="Dịch vụ ngoài phạm vi đề thi SAA-C03">
+        <span key={s} className="badge warn" title={legacy.has(s) ? LEGACY_TITLE : OUT_TITLE}>
           ⛔ {s}
         </span>
       ))}
@@ -37,7 +44,8 @@ export function ScopeSection({ report, onOpen, onChanged }: { report?: ScopeRepo
   const allA = report.answer.map((x) => x.id);
   const allD = report.distractor.map((x) => x.id);
   const used = report.services.filter((s) => s.answers || s.distractors);
-  const shownServices = allServices ? report.services : used;
+  const shownServices: ScopeService[] = allServices ? report.services : used;
+  const legacy = new Set((report.services as ScopeService[]).filter((s) => s.scope === 'legacy').map((s) => s.name));
 
   const retire = async () => {
     const ids = pickA.slice(0, RETIRE_MAX);
@@ -80,8 +88,15 @@ export function ScopeSection({ report, onOpen, onChanged }: { report?: ScopeRepo
         </div>
         <div className="small dim stack sm">
           <span>
-            Đề thật SAA-C03 không hỏi các dịch vụ nằm trong danh sách <b>ngoài phạm vi</b> chính thức (taxonomy <code>scope: out</code>). Câu có đáp án là dịch vụ
-            đó luyện sai trọng tâm; dùng chúng làm phương án nhiễu thì quá dễ loại.
+            Đề thật SAA-C03 không hỏi các dịch vụ nằm trong danh sách <b>ngoài phạm vi</b> chính thức (taxonomy <code>scope: out</code>)
+            {legacy.size > 0 && (
+              <>
+                {' '}
+                và {legacy.size} dịch vụ đã <b>bị gỡ khỏi phạm vi</b> (<code>scope: legacy</code> — bỏ khỏi danh sách dịch vụ thuộc phạm vi, hoặc đã ngừng mà không có
+                dịch vụ thay thế)
+              </>
+            )}
+            . Câu có đáp án là dịch vụ đó luyện sai trọng tâm; dùng chúng làm phương án nhiễu thì quá dễ loại.
           </span>
           <span>
             {report.answer.length ? (
@@ -103,8 +118,14 @@ export function ScopeSection({ report, onOpen, onChanged }: { report?: ScopeRepo
         {shownServices.length > 0 && (
           <div className="row sc-services" role="list" aria-label="Dịch vụ ngoài phạm vi">
             {shownServices.map((s) => (
-              <span key={s.name} role="listitem" className="sc-service small" title={s.aliases?.length ? `Tên chính thức: ${s.aliases.join(', ')}` : undefined}>
+              <span
+                key={s.name}
+                role="listitem"
+                className="sc-service small"
+                title={[s.scope === 'legacy' ? LEGACY_TITLE : '', s.aliases?.length ? `Tên chính thức: ${s.aliases.join(', ')}` : ''].filter(Boolean).join('\n') || undefined}
+              >
                 <b>{s.name}</b>
+                {s.scope === 'legacy' && <span className="dim"> · bị gỡ khỏi phạm vi</span>}
                 {s.answers || s.distractors ? (
                   <span className="muted">
                     {s.answers ? ` · ${s.answers} đáp án` : ''}
@@ -144,7 +165,7 @@ export function ScopeSection({ report, onOpen, onChanged }: { report?: ScopeRepo
                 {report.answer.map((x) => (
                   <div key={x.id} className="qq-item qq-check">
                     <input type="checkbox" checked={pickA.includes(x.id)} onChange={() => toggle(pickA, setPickA, x.id)} aria-label={`Chọn ${x.id}`} />
-                    <QRef id={x.id} onOpen={onOpen} extra={<ServiceBadges services={x.services} />} />
+                    <QRef id={x.id} onOpen={onOpen} extra={<ServiceBadges services={x.services} legacy={legacy} />} />
                   </div>
                 ))}
               </div>
@@ -179,7 +200,7 @@ export function ScopeSection({ report, onOpen, onChanged }: { report?: ScopeRepo
                       <QRef id={x.id} onOpen={onOpen} />
                       {x.options.map((o) => (
                         <OptionLine key={o.key} q={byId.get(x.id)} k={o.key}>
-                          <ServiceBadges services={o.services} />
+                          <ServiceBadges services={o.services} legacy={legacy} />
                         </OptionLine>
                       ))}
                     </div>

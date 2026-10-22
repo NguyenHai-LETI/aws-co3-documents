@@ -54,7 +54,8 @@ snapshot (Grep trong packs), kiểm tra id đó không nằm trong `trainer/resu
 
 **🎯 Phạm vi đề thi:** service có `scope: out` trong `taxonomy.yaml` (danh sách ngoài phạm vi chính thức của SAA-C03 —
 CodeCommit, CodeBuild, CodeDeploy, CDK, Lightsail, Personalize, IoT…) không có trong đề thật → không viết câu mới / biến thể có
-đáp án **hoặc** phương án nhiễu là các service đó; câu cũ có đáp án ngoài phạm vi (§14) không viết thêm biến thể.
+đáp án **hoặc** phương án nhiễu là các service đó; câu cũ có đáp án ngoài phạm vi (§14) không viết thêm biến thể. [v6] `scope: legacy`
+(bị gỡ khỏi danh sách trong phạm vi / đã ngừng không có kế nhiệm trong phạm vi — vd Data Pipeline, QLDB) xử lý y như `out`.
 
 **Công cụ:** đọc file bằng Read/Grep/Glob (không dùng `cat`/`ls`/`head` qua Bash). Bash **chỉ** được phép 3 lệnh
 — chạy riêng từng lệnh, không nối bằng `;`/`&&`/`|`:
@@ -144,23 +145,27 @@ Sửa câu có sẵn: sửa tại chỗ (giữ id, giữ nguyên các dòng meta
   `hint` (1 dòng tiếng Việt, không lộ đáp án), `skills` (1–3 mục đề cương mà câu thật sự kiểm tra, id trong
   `trainer/bank/exam-guide/SAA-C03.yaml`, vd `skills: 2.2.s3`).
 - **Kiến thức hiện hành:** tên dịch vụ, giới hạn, con số theo tài liệu AWS hiện hành (`taxonomy.yaml → currency:` liệt kê các điểm
-  đã đổi — vd Kinesis Data Firehose → Amazon Data Firehose, giới hạn SQS mới). Viết “tên mới (tên cũ)” khi đề thật có thể dùng tên
-  cũ; không đưa dịch vụ đã ngừng làm đáp án đúng; không có nguồn chắc chắn → không đưa con số vào câu.
+  đã đổi — vd Kinesis Data Firehose → Amazon Data Firehose, giới hạn SQS mới). Đề và phương án dùng tên như exam guide
+  (`bank/exam-guide/SAA-C03.yaml → in_scope`), tên mới / tên cũ khác ghi ở giải thích; không đưa dịch vụ đã ngừng, `legacy` hay đã
+  đóng với khách hàng mới làm đáp án đúng; tính năng GA ≥ 3 tháng; không có nguồn chắc chắn (URL tài liệu AWS) → không đưa con số vào câu.
 - Câu anh em / họ câu viết trong lượt này: biến thể giữ `variant_of`; họ câu (cùng tình huống + **cùng bộ lựa chọn**, câu hỏi cuối
   khác yêu cầu, đáp án khác nhau) ghi cùng `family: <id>` trên mọi câu — nhưng ưu tiên giao cho tác vụ riêng (`TWINS.md`,
   `FAMILY.md`) trong mục 4 của kế hoạch.
-- Câu `medium`/`hard` ưu tiên **dạng câu dài** (đề 60–120 từ, nhiều ràng buộc — SCHEMA §4). 4 lựa chọn **dài tương đương**
-  (đáp án đúng không dài nhất), giải thích theo định dạng SCHEMA §3, **không nhắc chữ cái** đáp án.
+- Câu `medium`/`hard` viết theo **chuẩn tầng A** (SCHEMA §6b): đề 55–130 từ (bối cảnh → hiện trạng → 2–4 ràng buộc → qualifier →
+  câu hỏi đóng), phương án 8–35 từ là hành động hoàn chỉnh, song song, **dài tương đương** (đáp án đúng không dài nhất), ~25–30 % câu
+  nhiều đáp án `(Choose TWO)` với 5 lựa chọn; giải thích 50–120 từ theo định dạng SCHEMA §3 + nhãn lý do sai cho mọi phương án nhiễu +
+  ≥ 1 URL tài liệu AWS, **không nhắc chữ cái** đáp án. Phương án nhiễu lấy từ chính nhầm lẫn của người học (🗣️, §9 cặp hay nhầm).
 - §14 “Vẫn sai sau biến thể”: đừng viết thêm biến thể na ná — đổi góc (contrast, câu hỏi ngược, giải thích bằng ví dụ khác).
 - **Bám notes**: trước khi viết về một topic, Grep/đọc đoạn liên quan trong file notes của topic
   (`taxonomy.yaml → topics[].notes`). Không chắc một con số/giới hạn → không đưa vào câu.
-- Tuân thủ checklist chất lượng SCHEMA §6 (1 đáp án tốt nhất, distractor có thật & hợp lý, văn phong SAA-C03,
+- Tuân thủ checklist chất lượng SCHEMA §6 + §6b (1 đáp án tốt nhất, distractor có thật & hợp lý, văn phong SAA-C03,
   phân bố đáp án đúng đều A–D, đề tiếng Anh). Mỗi câu mới sẽ được model thứ hai **giải mù** — đề phải chứa đủ dữ kiện để chỉ
   một lựa chọn đúng; câu lệch / mơ hồ bị chuyển `status: draft` (ra khỏi các chế độ test) cho tới khi được duyệt — đừng đưa câu
   `draft` vào `questions` của kế hoạch.
 
-**3e. Kiểm tra định dạng:** chạy `node trainer/scripts/validate.ts packs/ai/<tên-file> --fill-time`
-(tự điền `time` theo rubric nếu thiếu) và sửa **mọi lỗi ❌** (và cảnh báo về chữ cái / độ dài đáp án) cho tới khi sạch;
+**3e. Kiểm tra định dạng:** chạy `node trainer/scripts/validate.ts packs/ai/<tên-file> --fill-time --lint`
+(tự điền `time` theo rubric nếu thiếu) và sửa **mọi lỗi ❌** (và cảnh báo về chữ cái / độ dài đáp án, [v6] lint chuẩn đề của câu
+`medium`/`hard` — SCHEMA §6b) cho tới khi sạch;
 nếu đã sửa câu có sẵn thì chạy thêm validator cho pack đó. Không chạy được lệnh
 (vd Cowork không có Node) → tự soát kỹ theo SCHEMA; app sẽ báo lỗi ở *Ngân hàng → Kiểm tra định dạng*.
 

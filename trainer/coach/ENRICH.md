@@ -11,7 +11,7 @@ gợi ý không lộ đáp án, phân loại đúng exam guide, đáp án không
 học — giải thích phải đầy đủ ngay từ lần đó. Có hai loại lượt chạy:
 
 - **A. Lô bảo trì** (`enrich`): sửa câu có sẵn theo ngữ nghĩa **patch YAML** (SCHEMA §8) — *không* sửa trực tiếp file pack.
-- **B. Câu dài chuẩn đề thi** (`longform`): viết pack mới gồm các biến thể dài (60–120 từ) của câu ngắn.
+- **B. Câu dài chuẩn đề thi** (`longform`): viết pack mới gồm các biến thể **tầng A** (đề 55–130 từ — SCHEMA §6b) của câu ngắn.
 
 ## Chế độ chạy — đọc thông tin lượt chạy để biết mình ở chế độ nào
 
@@ -40,7 +40,7 @@ học — giải thích phải đầy đủ ngay từ lần đó. Có hai loại
 | `trainer/coach/enrich/<run_id>-batch.md` | **Đọc đầu tiên, toàn bộ.** Lô câu hỏi: `base` hash, metadata, đề, lựa chọn (✅ = đúng, ⟨n⟩ = số ký tự), giải thích hiện tại, todo, khung patch |
 | `trainer/bank/taxonomy.yaml` | tên service chuẩn (`services:`), tag gợi ý (`features:`) — Grep tên cần tìm, đừng đọc hết |
 | notes `*.md` ở gốc repo | nguồn kiến thức — Grep theo service/khái niệm (file gợi ý ghi ở từng câu); đừng đọc hết file lớn |
-| `trainer/bank/SCHEMA.md` | chỉ khi cần chi tiết định dạng (các quy tắc cần thiết đã có ở đây) |
+| `trainer/bank/SCHEMA.md` | chỉ khi cần chi tiết định dạng (các quy tắc cần thiết đã có ở đây) — [v6] phần B và câu tầng A: đọc **§6b** (chuẩn tầng A, nhãn lý do sai, ví dụ) |
 
 | Được ghi (chỉ chế độ tương tác) | Khi nào |
 |----------|---------|
@@ -59,8 +59,10 @@ sai rõ ràng, và không bao giờ dùng câu niêm phong làm nguồn cho câu
 
 **🎯 Phạm vi đề thi:** service có `scope: out` trong `taxonomy.yaml` (danh sách ngoài phạm vi chính thức: CodeCommit,
 CodeBuild, CodeDeploy, CodeArtifact, CDK, CloudShell, Lightsail, Personalize, mọi service IoT…) không xuất hiện trong đề thật —
-không dùng làm đáp án hay phương án nhiễu khi viết lại / viết mới. Tên service theo taxonomy; tên chính thức mới ghi ở `aliases`
-(vd QuickSight → Amazon Quick, SageMaker → Amazon SageMaker AI).
+không dùng làm đáp án hay phương án nhiễu khi viết lại / viết mới. [v6] `scope: legacy` (bị gỡ khỏi danh sách trong phạm vi hoặc đã
+ngừng mà không có service kế nhiệm trong phạm vi — vd Data Pipeline, QLDB) xử lý y như `out`; service đã **đóng với khách hàng mới**
+(`currency:` — vd Snowball Edge, S3 Select) không làm đáp án đúng của câu mới. Tên service theo taxonomy; tên chính thức mới ghi ở
+`aliases` (vd QuickSight → Amazon Quick, SageMaker → Amazon SageMaker AI).
 
 ---
 
@@ -111,6 +113,9 @@ Multi-AZ keeps a synchronous standby in another AZ and fails over automatically 
   `option B`, `answer C`, `choice D`, `đáp án A`, `phương án B`, `lựa chọn C`, “đáp án đúng là B” — **cả trong dòng 🇻🇳** —,
   `= A`, `(B)`. Viết lại câu cho tránh các mẫu đó.
 - 35–90 từ. Một dòng cho mỗi distractor *đáng bàn* (≥ 2 dòng với câu 4 lựa chọn); bỏ distractor vô lý.
+- [v6] Câu **tầng A** (đề ≥ 55 từ, phương án dài, có tiêu chí — SCHEMA §6b): 50–120 từ, **mọi** distractor một dòng kèm nhãn lý do sai
+  `(<nhãn> "<cụm trong đề>")` (vi phạm ràng buộc · dùng sai tính năng · cấu hình không tồn tại · đặt sai chỗ · giải bài toán khác · tốn
+  vận hành/chi phí hơn · đúng một phần), và ≥ 1 URL tài liệu AWS (link Markdown cuối đoạn đầu, chỉ URL chắc chắn tồn tại).
 - Câu nhiều đáp án: nêu vai trò của **từng** lựa chọn đúng, rồi các dòng distractor.
 - Câu có dòng 🗣️ (người học tự ghi vì sao chọn sai): dòng distractor tương ứng phải **gỡ đúng hiểu lầm đó** (nói rõ điều người học tin là sai ở đâu).
 - Giữ ý hay/ghi chú đúng của giải thích cũ (vd “(notes ghi …, thực tế …)”). Không heading `#`/`##`; được **đậm** từ khoá.
@@ -150,7 +155,10 @@ từng câu cho biết số lần mỗi phương án nhiễu được **chọn**
 chưa ai chọn nhưng hay bị gạch — người học loại ngay nên câu hỏi thành dễ. Lô gửi từ mục *🎯 Phạm vi đề thi* (ghi chú của người học
 nêu rõ) = phương án nhiễu nêu service **ngoài phạm vi** (lint `oos-distractor`): thay bằng service **trong phạm vi** hay bị nhầm.
 - Viết lại các phương án nhiễu yếu (và distractor vô lý khác) thành lựa chọn **hợp lý**: service/tính năng AWS có thật, hay bị
-  nhầm với đáp án đúng (Read Replica ↔ Multi-AZ, SQS ↔ SNS, Gateway ↔ Interface endpoint…), **sai vì một chi tiết cụ thể** của đề.
+  nhầm với đáp án đúng (Read Replica ↔ Multi-AZ, SQS ↔ SNS, Gateway ↔ Interface endpoint…), **sai vì một chi tiết cụ thể** của đề —
+  [v6] đúng **một** lý do thuộc một nhãn của SCHEMA §6b (ghi nhãn ở dòng tương ứng trong giải thích khi câu là tầng A).
+  Câu bị phép thử chỉ nhìn phương án đánh `cue` (đoán được đáp án mà không đọc đề — ghi chú của lô nêu rõ): làm phương án nhiễu
+  “nghe đúng” ngang đáp án (cùng độ chi tiết, cùng từ vựng của đề) thay vì chỉ đổi độ dài.
 - Cùng “dáng” và độ dài với đáp án đúng (±15 %); không dùng từ tuyệt đối (“always”, “only”, “never”) hay “All/None of the above”.
 - **Giữ nguyên đáp án đúng và ý của câu** (không đổi khoá, không đổi đáp án, không làm distractor vô tình đúng); sửa các dòng
   distractor trong `explanation` cho khớp nội dung mới.
@@ -207,27 +215,34 @@ items:
 
 ## B. Câu dài chuẩn đề thi — `longform`
 
-App chọn câu gốc: câu ngắn hay gặp/hay sai, **ưu tiên task còn thiếu câu chuẩn thi** (`quality.longform_target_per_task`, Chất lượng
-→ 🗺️ Đề cương); lượt từ nút “✨ Sinh cho ô trống” chỉ chọn câu gốc thuộc các mục đề cương được yêu cầu (`skills`).
+App chọn câu gốc: câu ngắn hay gặp/hay sai, **ưu tiên task còn thiếu câu chuẩn thi** (`quality.longform_target_per_task`, mặc định 20
+câu/task — 14 task ≈ mục tiêu 280 câu tầng A; Chất lượng → 🗺️ Đề cương); lượt từ nút “✨ Sinh cho ô trống” chỉ chọn câu gốc thuộc các
+mục đề cương được yêu cầu (`skills`).
 
-Đề thật SAA-C03 thường dài 60–150 từ với nhiều ràng buộc; người học quen câu ngắn dễ bị “ngợp” khi thi. File batch liệt kê các
-**câu gốc ngắn** người học gặp/sai nhiều, domain trọng số cao, chưa có biến thể dài (app đã loại câu đang niêm phong và câu có
-đáp án ngoài phạm vi — chỉ viết biến thể cho đúng các câu gốc trong file batch).
+Đề thật SAA-C03 thường dài 60–150 từ với nhiều ràng buộc (đề mẫu chính thức 33–97 từ, trung vị ~62); người học quen câu ngắn dễ bị
+“ngợp” khi thi. File batch liệt kê các **câu gốc ngắn** người học gặp/sai nhiều, domain trọng số cao, chưa có biến thể dài (app đã loại
+câu đang niêm phong và câu có đáp án ngoài phạm vi / legacy — chỉ viết biến thể cho đúng các câu gốc trong file batch). Mỗi câu mới phải
+đạt **tầng A** — đặc tả đầy đủ, nhãn lý do sai và ví dụ ở **SCHEMA §6b**.
 
 1. Đọc toàn bộ file batch (tên pack, pack id, tiền tố id câu nằm ở front matter/đầu file).
 2. Với **mỗi** câu gốc viết **một** câu mới cùng điểm quyết định (cùng khái niệm), nhưng là tình huống thật:
-   - **Stem 60–120 từ** (tiếng Anh): công ty/ngành + kiến trúc hiện tại + 2–3 yêu cầu/ràng buộc cụ thể (số người dùng, RPO/RTO,
-     ngân sách, tuân thủ, đội vận hành nhỏ…) + **qualifier** rõ (*MOST cost-effective*, *LEAST operational overhead*, *MOST secure*…),
-     kết thúc bằng câu hỏi (“Which solution will meet these requirements …?”). Có thể thêm chi tiết gây nhiễu hợp lý.
-   - **4 lựa chọn** (1 đáp án) là giải pháp hoàn chỉnh dạng “Use … to …”, **dài tương đương nhau (±20 %)**, đáp án đúng *không*
-     phải dài nhất; distractor là service có thật, sai vì một ràng buộc cụ thể trong đề. Câu `hard` có thể là 5 lựa chọn + `(Choose TWO)`
-     (tối đa 1 câu như vậy mỗi pack).
+   - **Stem 55–130 từ** (tiếng Anh): công ty/ngành → kiến trúc hiện tại → **2–4 ràng buộc cứng** (số người dùng, RPO/RTO, ngân sách,
+     tuân thủ, không đi qua internet, đội vận hành nhỏ…) → **qualifier** rõ (*MOST cost-effective*, *LEAST operational overhead*, *MOST
+     secure*…) → câu hỏi đóng (“Which solution will meet these requirements?”). Được **một** chi tiết không liên quan.
+   - **Lựa chọn 8–35 từ**, mỗi lựa chọn là giải pháp hoàn chỉnh (service + cấu hình), **song song** cùng dáng câu, **dài tương đương
+     nhau (±20 %)**, đáp án đúng *không* phải dài nhất (cả pack: ≤ 25 % số câu); distractor là service có thật, sai vì **đúng một**
+     ràng buộc / chi tiết trong đề, gieo từ nhầm lẫn thật của người học (dòng 🗣️ / 📊 / ⚠️ của câu gốc trong file batch).
+   - **Nhiều đáp án:** khoảng **1/4 số câu** của pack (5 câu → 1–2 câu) là `(Choose TWO)` với 5 lựa chọn khi điểm quyết định có hai
+     bước bổ trợ nhau (vd ghi qua writer endpoint + đọc qua reader endpoint); `(Choose THREE)` với 6 lựa chọn hiếm (≤ 5 %).
    - Vị trí đáp án đúng: rải đều A–D trong pack, khác vị trí ở câu gốc.
+   - Kiến thức: tên service như exam guide (tên mới ghi ở giải thích); đáp án đúng không bao giờ là service `out` / `legacy` hay đã
+     đóng với khách hàng mới (`currency:`); tính năng GA ≥ 3 tháng.
    - Metadata đủ: `domain, task, topic, services, tags, difficulty` (medium/hard), `variant_of: <id gốc>`, `concept`, `refs` (notes đã dùng),
      `skills` (mục đề cương của câu gốc, hoặc các mục file batch yêu cầu — file batch ghi “Mục đề cương cần phủ” khi lượt nhắm đề cương),
      `hint` (A3), `created` + `enriched` (ngày hôm nay). **Bỏ trống `time`** — validator tự điền.
-   - `**Explanation:**` theo định dạng A2 (không chữ cái).
-3. Kiểm chứng kiến thức bằng notes (Grep) trước khi viết; không chắc một con số → không đưa vào.
+   - `**Explanation:**` theo định dạng A2 cho câu tầng A: 50–120 từ, ràng buộc → tính năng thoả nó, **mọi** distractor một dòng kèm
+     nhãn `(<nhãn> "<cụm trong đề>")`, dòng 🇻🇳, ≥ 1 URL tài liệu AWS (không chữ cái).
+3. Kiểm chứng kiến thức bằng notes (Grep) trước khi viết; không chắc một con số → không đưa vào (con số chỉ khi có URL tài liệu AWS xác nhận).
    **Chế độ app (JSON)**: dừng ở đây — trả `pack` (`slug`, `title` = tên chủ đề) + `questions` (mỗi câu gốc một câu,
    `variant_of: [id gốc]`, `options` là mảng nội dung không tiền tố “A.”) + `summary`; app gán id, tính `time`, ghi pack và
    chạy kiểm tra (đề < 55 từ, variant_of không thuộc lô, chữ cái trong giải thích… là lỗi → gửi lại một lần để sửa).
@@ -242,12 +257,13 @@ App chọn câu gốc: câu ngắn hay gặp/hay sai, **ưu tiên task còn thi�
    created: <YYYY-MM-DD>
    generated_by: <run_id>
    source: <đường dẫn file batch>
-   description: "Biến thể dài (60–120 từ) của các câu ngắn hay gặp/hay sai"
+   description: "Biến thể tầng A (55–130 từ) của các câu ngắn hay gặp/hay sai"
    ---
    ```
    Thân pack: `# <title>`, rồi các block `## Q <id>` (định dạng SCHEMA §3), phân cách bằng dòng `---`.
-5. Chế độ tương tác: chạy `node trainer/scripts/validate.ts packs/ai/<tên-file> --fill-time` và sửa **mọi ❌** (cả ⚠️ về chữ cái/độ dài
-   đáp án) cho tới khi sạch.
+5. Chế độ tương tác: chạy `node trainer/scripts/validate.ts packs/ai/<tên-file> --fill-time --lint` và sửa **mọi ❌** (cả ⚠️ về chữ
+   cái/độ dài đáp án, lint chuẩn đề `stem-short` / `options-bare` / `no-criterion` / `explanation-coverage` / `doc-url-missing` /
+   `options-nonparallel` và cảnh báo cấp pack) cho tới khi sạch.
 
 ---
 

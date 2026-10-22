@@ -4,12 +4,14 @@
 // Works while [D]'s /api/verify endpoints are missing (404): the summary shows zeros and the buttons explain why.
 // [v5] γ2: 🔗 fact-checks against AWS documentation (verdict + quotes + links) shown on the cards, "🔗 Kiểm chứng có nguồn"
 // for the grounded queue or one card, and the import audit (progress, next questions, "🧾 Kiểm toán 10 câu nhập").
+// [v6] 🕵️ Phương án lộ đáp án: the choices-only cue probe (VerifySummary.cues, verify scope 'cues') — counts, the questions
+// whose options alone gave the key away, "🧹 Viết lại phương án nhiễu" (ENRICH distractors) and a probe run.
 import { useState } from 'react';
 import { useData, useShared } from '../../lib/store.tsx';
 import { fmtDate } from '../../lib/format.ts';
 import { Empty } from '../ui.tsx';
 import { OptionLine, QRef, decideVerdict, startEnrich, startVerify, useAiReady } from './common.tsx';
-import type { FactVerdict, VerifyOutcome, VerifySummary, VerifyVerdict } from '../../../shared/types.ts';
+import type { CueProbe, CueSummary, FactVerdict, Question, VerifyOutcome, VerifySummary, VerifyVerdict } from '../../../shared/types.ts';
 
 interface VerifyApi extends VerifySummary {
   latest: Record<string, VerifyVerdict>;
@@ -57,6 +59,144 @@ function AuditCard({ s, disabled, why, onRun, onOpen }: { s: VerifySummary; disa
 /** Latest verdict per question (GET /api/verify, shared by every section); undefined while unsupported. */
 export function useVerifyLatest(): Record<string, VerifyVerdict> | undefined {
   return useShared<VerifyApi>('/api/verify').data?.latest;
+}
+
+/** [v6] The cue-probe result of this version of a question when its options gave the key away (only `cue` results are listed). */
+export function useCue(q: Pick<Question, 'id' | 'hash'>): CueProbe | undefined {
+  return useShared<VerifyApi>('/api/verify').data?.cues?.items.find((p) => p.qid === q.id && p.hash === q.hash);
+}
+
+const CUE_SHOWN = 40; // cue results listed, newest first
+const CUE_ENRICH_MAX = 20; // questions per "🧹 Viết lại phương án nhiễu" run
+const CUE_NOTE =
+  'Phương án lộ đáp án: chỉ nhìn các phương án (không có đề), model vẫn chọn đúng đáp án cả hai lần. Viết lại phương án nhiễu cho hợp lý ngang đáp án (độ dài, độ chi tiết, cùng loại dịch vụ), giữ nguyên đáp án đúng.';
+
+/**
+ * [v6] Choices-only cue probe: a cheap model sees only the options — no stem — in two shuffled orders; right both times =
+ * the options give the key away. Never a blind-solve verdict (not in the counts above). Fix = ENRICH "distractors".
+ */
+function CueCard({
+  c,
+  selected,
+  disabled,
+  why,
+  onRun,
+  onOpen,
+  onFix,
+}: {
+  c?: CueSummary;
+  selected: number;
+  disabled: boolean;
+  why?: string;
+  onRun: (selectedOnly: boolean) => void;
+  onOpen: (id: string) => void;
+  onFix: (ids: string[]) => void;
+}) {
+  const { byId } = useData();
+  const items = c?.items ?? [];
+  const fixIds = items.slice(0, CUE_ENRICH_MAX).map((p) => p.qid);
+  return (
+    <div className="card stack sm">
+      <div className="card-head qq-head" style={{ marginBottom: 0 }}>
+        <h2>🕵️ Phương án lộ đáp án</h2>
+        {c && (
+          <span className="small muted num">
+            {c.cue}/{c.probed} câu đã dò
+          </span>
+        )}
+      </div>
+      <div className="small dim ins-wrap">
+        Một model rẻ chỉ nhìn các phương án — không có đề — và đoán, hai lần với thứ tự xáo khác nhau. Trúng đáp án cả hai lần nghĩa là phương án tự lộ đáp án (đáp án
+        dài hoặc chi tiết hơn hẳn, phương án nhiễu vô lý…): người học đoán được mà không cần đọc tình huống. Không tính vào kết quả giải mù.
+      </div>
+      {c && (
+        <div className="ins-qkpis qq-vkpis">
+          <div className="kpi">
+            <div className="label">Đã dò</div>
+            <div className="value num">{c.probed}</div>
+            <div className="sub">câu, phiên bản hiện tại</div>
+          </div>
+          <div className="kpi">
+            <div className="label">🕵️ Lộ đáp án</div>
+            <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
+              <span className="value num">{c.cue}</span>
+              {c.cue > 0 && <span className="badge warn">⚠ cần sửa</span>}
+            </div>
+            <div className="sub">chỉ nhìn phương án vẫn đoán trúng</div>
+          </div>
+          <div className="kpi">
+            <div className="label">✓ Không lộ</div>
+            <div className="value num">{c.clean}</div>
+            <div className="sub">{c.probed ? `${Math.round((100 * c.clean) / c.probed)}% số câu đã dò` : '—'}</div>
+          </div>
+          <div className="kpi">
+            <div className="label">Kết quả cũ</div>
+            <div className="value num">{c.stale}</div>
+            <div className="sub">câu đã sửa sau lần dò</div>
+          </div>
+        </div>
+      )}
+      <div className="row">
+        <button className="btn sm" disabled={disabled} title={why ?? 'Các câu AI / tài liệu viết chưa dò, mới nhất trước (tối đa 60 câu mỗi lượt)'} onClick={() => onRun(false)}>
+          🕵️ Dò phương án lộ đáp án
+        </button>
+        {selected > 0 && (
+          <button className="btn sm" disabled={disabled} title={why} onClick={() => onRun(true)}>
+            ☑ Dò {Math.min(60, selected)} câu đang chọn
+          </button>
+        )}
+        {fixIds.length > 0 && (
+          <button className="btn primary sm" disabled={disabled} title={why ?? `ENRICH “distractors” cho ${fixIds.length} câu đầu danh sách`} onClick={() => onFix(fixIds)}>
+            🧹 Viết lại phương án nhiễu ({fixIds.length} câu)
+          </button>
+        )}
+      </div>
+      {!c ? (
+        <div className="small muted">Chưa dò câu nào.</div>
+      ) : !items.length ? (
+        <div className="small muted">✓ Trong các câu đã dò, không câu nào lộ đáp án qua phương án.</div>
+      ) : (
+        <div className="qq-list">
+          {items.slice(0, CUE_SHOWN).map((p) => {
+            const q = byId.get(p.qid);
+            return (
+              <div key={`${p.qid}-${p.line ?? p.at ?? p.date}`} className="qq-item stack sm">
+                <QRef
+                  id={p.qid}
+                  onOpen={onOpen}
+                  extra={
+                    <span className="badge warn" title="Chỉ nhìn phương án (không có đề), model vẫn chọn đúng đáp án ở cả hai lần xáo">
+                      🕵️ lộ đáp án
+                    </span>
+                  }
+                />
+                {q && (
+                  <div className="qq-opts">
+                    {q.options.map((o) => (
+                      <OptionLine key={o.key} q={q} k={o.key}>
+                        {q.answer.includes(o.key) && <span className="badge good">✓ đáp án</span>}
+                      </OptionLine>
+                    ))}
+                  </div>
+                )}
+                {p.reason && (
+                  <div className="small ins-wrap">
+                    <b>Vì sao lộ:</b> {p.reason}
+                  </div>
+                )}
+                <div className="tiny muted">{[p.model, p.picks.length ? `model đoán ${p.picks.join(' rồi ')}` : '', p.key ? `đáp án ${p.key}` : '', fmtDate(p.at ?? p.date)].filter(Boolean).join(' · ')}</div>
+              </div>
+            );
+          })}
+          {items.length > CUE_SHOWN && (
+            <div className="tiny muted">
+              Hiện {CUE_SHOWN}/{items.length} câu dò gần nhất.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const OUTCOME: Record<VerifyOutcome, { icon: string; label: string; cls: string }> = {
@@ -211,9 +351,14 @@ export function VerifySection({
   const queue = s.groundedQueue ?? [];
   const unsupported = api.status === 404;
   const packs = (bank?.packs ?? []).filter((p) => p.activeCount > 0);
-  const run = async (params: { ids?: string[]; pack?: string; scope?: string }, label: string) => {
+  const run = async (params: { ids?: string[]; pack?: string; scope?: string }, label: string, what?: string) => {
     setBusy(true);
-    if (await startVerify(params, label)) ai.reload();
+    if (await startVerify(params, label, what)) ai.reload();
+    setBusy(false);
+  };
+  const fixCues = async (ids: string[]) => {
+    setBusy(true);
+    if (await startEnrich(ids, 'distractors', CUE_NOTE)) ai.reload();
     setBusy(false);
   };
   const done = () => {
@@ -337,6 +482,22 @@ export function VerifySection({
           </div>
         )}
       </div>
+
+      {!unsupported && (
+        <CueCard
+          c={s.cues}
+          selected={selected.length}
+          disabled={disabled}
+          why={ai.why}
+          onRun={(own) =>
+            void (own
+              ? run({ ids: selected.slice(0, 60), scope: 'cues' }, `phương án lộ đáp án ở ${Math.min(60, selected.length)} câu đang chọn`, 'dò')
+              : run({ scope: 'cues' }, 'phương án lộ đáp án', 'dò'))
+          }
+          onOpen={onOpen}
+          onFix={(ids) => void fixCues(ids)}
+        />
+      )}
 
       <AuditCard s={s} disabled={disabled} why={ai.why} onRun={() => void run({ scope: 'audit' }, '10 câu nhập')} onOpen={onOpen} />
     </div>

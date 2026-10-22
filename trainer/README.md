@@ -15,6 +15,10 @@
 - **Học mỗi ngày & bám ngày thi** (v5): ▶ **Học hôm nay** theo quỹ phút, dừng sớm không bị phạt, lịch ôn và các giai đoạn bám ngày
   thi, chống học vẹt bằng cụm câu anh em / câu song sinh, 🔀 phân biệt dịch vụ dễ nhầm, 🩹 chữa bài từng bước, 🗺️ đề cương chính thức,
   🧑‍🏫 gia sư, 📒 sổ lỗi, 🎧 nghe, lá chắn thống kê; câu hỏi nhanh trong Claude Code, hỏi bài qua MCP, cài như app, điện thoại an toàn hơn.
+- **Ngân hàng chuẩn đề thật** (v6): mỗi câu có **tầng** — 🏷️ A giống đề thật (tình huống dài, phương án là câu đầy đủ, có tiêu chí như
+  MOST cost-effective), B tình huống ngắn, C câu ôn nhanh; thi thử và đề niêm phong ưu tiên tầng A; câu AI viết theo **chuẩn tầng A**
+  (`bank/SCHEMA.md §6b`), qua lint chuẩn đề, giải mù với phương án xáo và phép thử chỉ nhìn phương án; dịch vụ **legacy** bị loại như
+  dịch vụ ngoài phạm vi.
 
 ```
  ┌──────────── bank/packs/*.md ◄─────────────────────────────────────────────┐
@@ -79,8 +83,8 @@ trainer/
 
 | Chế độ | Lấy câu nào |
 |--------|-------------|
-| 🎯 Thi thử SAA-C03 | 65 câu theo trọng số domain 30/26/24/20, ưu tiên câu chưa gặp, rồi câu giống đề thật; không bao giờ lấy cả câu gốc lẫn biến thể của nó. **Mô phỏng Pearson VUE**: 15 câu thử nghiệm không tính điểm (chỉ lộ sau khi nộp), màn hình Review cuối bài, không tạm dừng, cảnh báo 15′/5′, phân tích sức bền theo từng phần tư. Đồng hồ mặc định **theo tải đọc đề thật** (xem dưới) |
-| 🔒 Đề niêm phong | 50 câu **chưa từng xuất hiện khi luyện** + 15 câu thử nghiệm, mô phỏng Pearson; chỉ **lần nộp đầu tiên** của mỗi đề là **điểm trên câu mới** (điểm hiệu chỉnh nội bộ) — làm lại = luyện thường (🔁). 2 đề được giữ riêng từ trước buổi luyện đầu tiên (`exam.sealed_forms`, `exam.sealed_size`); câu do AI viết chỉ được chọn khi model thứ hai đã giải mù khớp đáp án; gợi ý làm ≈ 3 tuần và ≈ 1 tuần trước ngày thi |
+| 🎯 Thi thử SAA-C03 | 65 câu theo trọng số domain 30/26/24/20, ưu tiên câu chưa gặp, rồi câu **tầng A** và câu giống đề thật (tuỳ chọn **🏷️ Chỉ dùng câu tầng A** khi ngân hàng có ≥ 65 câu tầng A khác cụm); không bao giờ lấy cả câu gốc lẫn biến thể của nó, không bao giờ lấy câu có đáp án ngoài phạm vi / legacy. **Mô phỏng Pearson VUE**: 15 câu thử nghiệm không tính điểm (chỉ lộ sau khi nộp), màn hình Review cuối bài, không tạm dừng, cảnh báo 15′/5′, phân tích sức bền theo từng phần tư. Đồng hồ mặc định **theo tải đọc đề thật** (xem dưới) |
+| 🔒 Đề niêm phong | 50 câu **chưa từng xuất hiện khi luyện** + 15 câu thử nghiệm, mô phỏng Pearson; chỉ **lần nộp đầu tiên** của mỗi đề là **điểm trên câu mới** (điểm hiệu chỉnh nội bộ) — làm lại = luyện thường (🔁). 2 đề được giữ riêng từ trước buổi luyện đầu tiên (`exam.sealed_forms`, `exam.sealed_size`); câu do AI viết chỉ được chọn khi model thứ hai đã giải mù khớp đáp án; gợi ý làm ≈ 3 tuần và ≈ 1 tuần trước ngày thi. `npm run seal -- --add --tier A` thêm **một** đề chỉ gồm câu tầng A chưa gặp (vd S3) kể cả khi còn đề đang niêm phong |
 | 🧭 Chẩn đoán đầu vào | 2 câu cho mỗi mục exam guide 1.1–4.4 (28 câu, chia được 2 × 14), ưu tiên câu chưa gặp, không xét đạt/chưa đạt → **Bản đồ xuất phát** |
 | 📚 Theo chủ đề | chọn 1+ chủ đề (+ domain, độ khó) |
 | 📦 Theo bộ đề | làm lại nguyên 1 pack |
@@ -88,10 +92,11 @@ trainer/
 | 🔁 Làm lại câu sai | câu mà lần gần nhất trả lời sai |
 | 💪 Củng cố điểm yếu | lấy mẫu có trọng số: topic/tag/service tỉ lệ thấp, câu sai, câu “chưa chắc” |
 | 🆕 Câu chưa làm · 🚩 Cờ/chưa chắc · 🐢 Tốc độ · ⚡ Luyện nhanh | như tên (🆕 đi theo thứ tự cố định, cân theo domain) |
-| 🛠️ Tùy chỉnh | lọc tự do: domain, **mục exam guide**, chủ đề, độ khó, nguồn, service, tag, **tiêu chí đề** (Chi phí, Vận hành, Sẵn sàng cao, Hiệu năng, Bảo mật, Phủ định), từ khoá |
+| 🛠️ Tùy chỉnh | lọc tự do: domain, **mục exam guide**, chủ đề, độ khó, nguồn, service, tag, **tiêu chí đề** (Chi phí, Vận hành, Sẵn sàng cao, Hiệu năng, Bảo mật, Phủ định), **tầng câu** (A giống đề thật · B tình huống ngắn · C câu ôn nhanh), từ khoá |
 | 🤖 Kế hoạch AI Coach · 📌 Danh sách | phiên của coach · danh sách chọn tay / “làm lại N câu sai” (câu đang chờ duyệt — draft — luôn bị bỏ qua) |
 
-Câu đang niêm phong và câu có đáp án là dịch vụ **ngoài phạm vi đề** (CodeCommit, IoT…, `practice.exclude_out_of_scope`) không xuất hiện
+Câu đang niêm phong và câu có đáp án là dịch vụ **ngoài phạm vi đề** (CodeCommit, IoT…, `practice.exclude_out_of_scope`) hoặc **legacy**
+(bị gỡ khỏi danh sách in-scope / đã ngừng mà không có kế nhiệm, vd Data Pipeline, QLDB — `scope: legacy`) không xuất hiện
 trong các chế độ luyện (trừ khi chọn hẳn bộ đề / danh sách id). Mọi bài có huy hiệu **“Giống đề thật a/N · w/W từ”** (câu dài ≥ 55 từ,
 phương án đủ câu; đề thật ≈ 115 từ/câu) và cảnh báo **“điểm lạc quan”** khi thấp.
 
@@ -261,12 +266,17 @@ Pearson hoặc đề niêm phong cuối tuần; ghi `coach/plans/<ngày>-onboard
 **Ngân hàng → 📐 Chất lượng** có 5 mục:
 
 - **📐 Tổng quan**: phân bố vị trí đáp án đúng, “đáp án đúng dài nhất”, độ dài đề, câu dài chuẩn thi thật, giải thích ngắn, gợi ý, mục exam
-  guide, câu bị đánh giá thấp, hiệu quả câu biến thể, tiến độ ENRICH + ô **Việc cần làm**.
+  guide, câu bị đánh giá thấp, hiệu quả câu biến thể, tiến độ ENRICH + ô **Việc cần làm**; thẻ **🏷️ Tầng câu hỏi** (số câu tầng A / B / C
+  theo domain — bấm để xem đúng các câu đó; định nghĩa ở `bank/SCHEMA.md §6b`).
 - **🩺 Lỗi viết câu** (lint tự động theo nguyên tắc viết câu trắc nghiệm): đáp án đúng dài nhất, đáp án đúng lặp từ của đề, từ tuyệt đối
   (“always/only…”) ở phương án nhiễu, câu phủ định không nhấn NOT/EXCEPT/LEAST, “All/None of the above”, phương án trùng/chồng lấn,
   mạo từ a/an lộ đáp án, “(Choose N)” sai số đáp án, giải thích nhắc chữ cái / quá ngắn. Mức **nặng** (trùng phương án, All/None,
   Choose N, nhắc chữ cái) → mọi sửa đổi của AI làm phát sinh lỗi nặng mới đều bị từ chối. Bấm một luật để xem câu, lọc tab Câu hỏi
   (`#/bank?lint=<luật>`) hoặc gửi ENRICH sửa. Lệnh: `npm run validate -- --lint` (`--lint=stem-echo`, `--warnings`, `--json`).
+  **Lint chuẩn đề** (v6, chỉ câu AI / từ tài liệu mức medium–hard tạo từ `quality.exam_spec_since`): đề ngắn (`stem-short`), phương án
+  trơn (`options-bare`), thiếu tiêu chí (`no-criterion`), giải thích bỏ sót phương án nhiễu (`explanation-coverage`), thiếu link tài liệu
+  AWS (`doc-url-missing`), phương án khác dạng (`options-nonparallel`); `validate` cảnh báo thêm cấp pack (câu nhiều đáp án < 20 %, đáp án
+  đúng dài nhất > 25 %). “(Select TWO.)” được chấp nhận như “(Choose TWO)”.
 - **🎯 Phương án nhiễu** (từ chính bài làm của bạn, chỉ tính phiên bản hiện tại của câu): phương án chưa ai chọn mà hay bị gạch ✕ →
   **🧹 Viết lại phương án nhiễu** (ENRICH `distractors`); cùng một phương án sai được chọn chắc chắn nhiều lần → **🔎 Giải mù** /
   **🚩 Báo lỗi đáp án**.
@@ -275,11 +285,14 @@ Pearson hoặc đề niêm phong cuối tuần; ghi `coach/plans/<ngày>-onboard
   dữ liệu ra ngoài; `config.yaml → quality.*`).
 - **🧪 Giải mù bằng model thứ hai**: kết quả `bank/verify.md`, hàng chờ duyệt (đề + phương án, đáp án ✓, lựa chọn của model 🤖, lý do) →
   👍 Duyệt · 🧹 Sửa bằng ENRICH · 🚩 Báo lỗi · 🗑️ Loại; chạy cho câu AI chưa kiểm, câu đã sửa, một bộ đề hoặc các câu đang chọn
-  (tab Câu hỏi → “🔎 Giải mù N câu”).
+  (tab Câu hỏi → “🔎 Giải mù N câu”). Từ v6 model giải mù thấy phương án **đã xáo thứ tự** (chống thiên lệch vị trí). **🎯 Phép thử chỉ nhìn
+  phương án** (`npm run coach -- --verify --scope cues`, model rẻ `coach.verify.probe_model`): model chỉ thấy các phương án, không có đề —
+  đoán trúng cả hai lần = phương án tự lộ đáp án (`cue`) → viết lại phương án; dòng 🎯 trong `verify.md` không bao giờ được tính là giải mù.
 
 - **🎯 Phạm vi đề thi**: dịch vụ ngoài phạm vi theo danh sách chính thức của AWS (CodeCommit/CodeBuild/CodeDeploy, IoT, Lightsail…) và tên
   mới của dịch vụ đã đổi tên; câu có đáp án ngoài phạm vi (luật lint `oos-answer`) bị bỏ khỏi các chế độ luyện, có nút loại câu hoặc gửi ENRICH
-  thay phương án nhiễu (`oos-distractor`).
+  thay phương án nhiễu (`oos-distractor`). v6: dịch vụ **legacy** (`scope: legacy` — bị gỡ khỏi danh sách in-scope hoặc đã ngừng mà không
+  có kế nhiệm trong phạm vi) được xử lý y như ngoài phạm vi, thông báo lint ghi rõ “đã bị gỡ khỏi danh sách in-scope”.
 
 Khung chi tiết câu hỏi hiện lỗi viết câu và kết quả giải mù của câu đó (câu đang niêm phong chỉ hiện 🔒). AI Coach đọc các phần này trong snapshot.
 Migration đã áp cho bộ đề gốc: `npm run rebalance` (cân vị trí đáp án — kết quả cũ được tự chuyển đổi theo `bank/migrations/`) và
@@ -291,9 +304,9 @@ Migration đã áp cho bộ đề gốc: `npm run rebalance` (cân vị trí đ�
 |--------|--------|--------|
 | **Phân tích** (🔍 Phân tích ngay) | đọc snapshot (gồm lý do chọn sai, đáp án gạch nhầm, câu hỏi AI, đánh giá 👎, câu trùng, lỗi viết câu, phương án nhiễu, hàng chờ giải mù) → sửa issue → sinh câu biến thể/contrast/mở rộng → kế hoạch → hồ sơ người học | `coach/COACH.md` |
 | **ENRICH** (🧹 bảo trì ngân hàng) | theo lô N câu (hoặc danh sách id): giải thích EN theo nội dung từng đáp án + tóm tắt 🇻🇳, gợi ý, phân loại domain/task/tag, cân độ dài đáp án, **viết lại phương án nhiễu** (`distractors`) | `coach/ENRICH.md` |
-| **Câu dài** (long-form) | sinh phiên bản đề dài chuẩn thi thật (60–120 từ) cho khái niệm cốt lõi | `coach/ENRICH.md` |
-| **Sinh từ tài liệu** | đọc notes/inbox → pack mới trong `packs/docs/` | `coach/GENERATE.md` |
-| **🧪 Giải mù** | model thứ hai (`coach.models.verify`, mặc định opus) giải câu **không xem đáp án/giải thích** → `bank/verify.md` | — |
+| **Câu dài** (long-form) | sinh phiên bản **tầng A** (đề 55–130 từ, chuẩn `bank/SCHEMA.md §6b`) cho khái niệm cốt lõi | `coach/ENRICH.md` |
+| **Sinh từ tài liệu** | đọc notes/inbox → pack mới trong `packs/docs/`; câu medium/hard theo chuẩn tầng A (§6b) | `coach/GENERATE.md` |
+| **🧪 Giải mù** | model thứ hai (`coach.models.verify`, mặc định opus) giải câu **không xem đáp án/giải thích**, phương án xáo → `bank/verify.md`; 🎯 phép thử chỉ nhìn phương án (`--scope cues`, `coach.verify.probe_model`) | — |
 | **Hỏi AI** | hỏi tiếp về 1 câu (“vì sao không phải C?”) — chỉ đọc tài liệu ôn ở thư mục gốc (không đọc `trainer/`, `practice-exams/`), lưu vào `coach/qa/<id>.md` | — |
 
 **AI trả JSON, app tự kiểm tra** (`coach.structured_output: true`, mặc định): Sinh câu, ENRICH và Câu dài chạy Claude **chỉ đọc**
@@ -301,7 +314,8 @@ Migration đã áp cho bộ đề gốc: `npm run rebalance` (cân vị trí đ�
 task cùng domain, chữ cái đáp án trong giải thích, gợi ý lộ đáp án, “Choose N”, lint lỗi nặng). Câu lỗi được gửi lại **một lần** trong cùng
 phiên (`--resume`) để AI sửa; còn lỗi thì bỏ qua và ghi log. Mọi patch (ENRICH, coach, `npm run apply-patch`) đều chạy lint sau từng item.
 **ENRICH ưu tiên câu sắp gặp**: câu đến hạn ngày mai, các câu "chưa làm" kế tiếp và câu trong phiên kế hoạch được làm giàu giải thích trước
-(lần gặp đầu là lúc phản hồi đáng giá nhất); `coach.enrich_after_analyze: true` chạy thêm một lô 10 câu sau mỗi lượt phân tích (tốn thêm quota).
+(lần gặp đầu là lúc phản hồi đáng giá nhất); `coach.enrich_after_analyze: true` (mặc định từ v6) chạy thêm một lô 10 câu sau mỗi lượt phân
+tích (tốn thêm quota).
 Câu đang niêm phong không bao giờ được dùng làm nguồn câu biến thể / câu dài.
 **Giải mù tự động** (`coach.verify.auto`): sau mỗi lượt AI có câu mới hoặc câu bị đổi đề/phương án/đáp án, model thứ hai giải các câu đó;
 câu do AI viết bị **lệch đáp án / mơ hồ** tự chuyển `draft` (`coach.verify.auto_draft`) chờ bạn duyệt — câu đề gốc không bao giờ tự bị chuyển draft.
@@ -310,8 +324,8 @@ câu do AI viết bị **lệch đáp án / mơ hồ** tự chuyển `draft` (`c
 | Cách chạy | Lệnh / thao tác |
 |-----------|-----------------|
 | Nút trong app | AI Coach (Phân tích, ✨ Sinh câu, 🧹 ENRICH, câu dài) · Ngân hàng → Chất lượng (lint, phương án nhiễu, giải mù) · Hỏi AI ở kết quả/ngân hàng |
-| Lịch tự động (macOS/Linux/Windows) | `npm run schedule -- install` (giờ trong `config.yaml → coach.schedule`; `status`, `run`, `uninstall`). Không có dữ liệu mới → chạy 1 lô ENRICH thay vì phân tích (`coach.enrich_on_idle`) |
-| Terminal | `npm run coach` · `-- --force` · `-- --enrich --size 20 --batches 3` · `-- --enrich --ids a,b --tasks distractors --note "…"` · `-- --longform --count 5` · `-- --generate --sources 03-database-services.md --count 15` · `-- --verify [--ids a,b \| --pack <id> \| --scope unverified-ai\|new\|changed]` |
+| Lịch tự động (macOS/Linux/Windows) | `npm run schedule -- install` (giờ trong `config.yaml → coach.schedule`; `status`, `run`, `uninstall`). Không có dữ liệu mới → làm việc đầu tiên còn việc trong `coach.idle_tasks` thay vì phân tích (mặc định v6: kiểm toán câu nhập → câu dài tầng A → ENRICH; `coach.enrich_on_idle: false` = không làm gì) |
+| Terminal | `npm run coach` · `-- --force` · `-- --enrich --size 20 --batches 3` · `-- --enrich --ids a,b --tasks distractors --note "…"` · `-- --longform --count 5` · `-- --generate --sources 03-database-services.md --count 15` · `-- --verify [--ids a,b \| --pack <id> \| --scope unverified-ai\|new\|changed\|audit\|grounded]` · `-- --verify --scope cues [--ids a,b \| --pack <id>]` (🎯 phép thử chỉ nhìn phương án) |
 | Claude Cowork | dán prompt từ nút **📋 Prompt cho Claude Cowork**; định kỳ: **Scheduled → New task → Set up manually** (task dùng file local chỉ chạy khi máy bật, Claude Desktop mở) |
 | Claude Code | `/trainer-coach` · `/trainer-generate <tham số>` · `/trainer-enrich` — vận hành: `/trainer [start\|stop\|restart\|status]` · `/trainer-import` (đề mới trong practice-exams/) · `/trainer-review` (soát độc lập câu AI → issues.md) · `/trainer-coverage` (độ phủ so với exam guide) · `/trainer-quiz` (hỏi bài qua MCP) |
 
@@ -391,12 +405,12 @@ App tự nạp lại khi file thay đổi. Câu lỗi định dạng bị loại
 | `npm run rebalance [-- --apply]` · `npm run classify-tasks [-- --apply]` | migration: cân vị trí đáp án · gắn mục exam guide |
 | `npm run apply-patch -- <patch.yaml> [--dry-run]` · `npm run enrich-batch [-- --status \| --longform \| --ids a,b --tasks distractors]` | áp patch AI · xem lô ENRICH kế tiếp / tiến độ / ứng viên câu dài |
 | `npm run import -- --merge [--dry-run] [--only <chương>]` | thêm câu mới từ `practice-exams/` vào pack imported (không ghi đè; báo câu cũ khác nguồn) |
-| `npm run coverage [-- --json]` | độ phủ ngân hàng: domain so với trọng số đề, task 1.1–4.4, service chưa có câu, câu nghi phân loại sai, mục đề cương chính thức chưa có câu |
+| `npm run coverage [-- --json]` | độ phủ ngân hàng: domain so với trọng số đề, task 1.1–4.4, service chưa có câu, câu nghi phân loại sai, mục đề cương chính thức chưa có câu, tầng câu A/B/C so với mục tiêu 280 câu tầng A, câu dùng dịch vụ legacy |
 | `npm run snapshot` | cập nhật `coach/snapshot.md` |
 | `npm run coach [-- …]` | chạy AI 1 lần (xem bảng trên, gồm `--verify`) |
 | `npm run schedule -- install\|status\|run\|uninstall` | lịch chạy tự động (launchd / crontab / Task Scheduler) |
 | `npm run sync [-- --dry-run \| --status \| --force]` | đồng bộ dữ liệu học qua git (xem trước · trạng thái · chạy cả khi coach đang chạy) |
-| `npm run seal [-- --status \| --release S1 \| --forms N --size M \| --reset]` | đề niêm phong: trạng thái · mở sớm · tạo · tạo lại |
+| `npm run seal [-- --status \| --release S1 \| --forms N --size M \| --add --tier A [--size 50] \| --reset]` | đề niêm phong: trạng thái · mở sớm · tạo · thêm một đề (chỉ câu tầng A chưa gặp, kể cả khi còn đề đang niêm phong) · tạo lại |
 | `npm run service -- install\|uninstall\|status\|print` | chạy trainer nền khi đăng nhập (tự khởi động lại khi cập nhật / lỗi) |
 | `npm run mcp` · `npm run coach -- --twins \| --family` | MCP server cho Claude (hỏi bài qua chat) · sinh câu song sinh / họ câu |
 | `npm run typecheck` · `npm test` · `npm run test:e2e` · `npm run test:ui` | kiểm tra kiểu · unit · e2e API · UI smoke (Playwright; thiếu trình duyệt → in lệnh `npx playwright install chromium`) |

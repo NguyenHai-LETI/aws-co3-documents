@@ -10,6 +10,9 @@
 > giải mù bằng model thứ hai — `bank/verify.md` (§9).
 > v4: app tự tính `requirements` (tiêu chí đề) và `outOfScope` (§3); service có `scope: out` / `aliases` trong taxonomy;
 > lint `oos-answer` / `oos-distractor`; đề niêm phong — `results/sealed.md` (§10).
+> v6: **tầng câu** A (giống đề thật) / B (tình huống ngắn) / C (câu ôn nhanh) — `tier` tự tính, bộ lọc `tiers`, thi thử ưu tiên tầng A;
+> **chuẩn câu tầng A** cho câu AI viết + lint chuẩn đề (§6b); service `scope: legacy` (§3); giải mù xáo phương án + phép thử chỉ nhìn
+> phương án `--scope cues` (§9); thêm đề niêm phong tầng A `seal --add --tier A` (§10).
 
 ---
 
@@ -142,7 +145,7 @@ Which TWO actions should a solutions architect take? (Choose TWO)
 | Metadata | mỗi dòng `- key: value`, ngay dưới heading, trước đề bài. Danh sách = phân tách bằng dấu phẩy |
 | Đề bài | Markdown tự do (nhiều đoạn OK). Không dùng heading `#`/`##` bên trong |
 | Lựa chọn | mỗi dòng `- A. text` (hoặc `A)`), chữ cái liên tục từ A. 4 lựa chọn cho câu 1 đáp án; 5–6 cho câu nhiều đáp án. Dòng tiếp nối thụt ≥ 2 space. Các lựa chọn **dài tương đương nhau** (§6) |
-| Đáp án | `**Answer:** B` hoặc `**Answer:** A, C`. Câu nhiều đáp án **phải** có `(Choose TWO)` / `(Choose THREE)` trong đề và số đáp án khớp |
+| Đáp án | `**Answer:** B` hoặc `**Answer:** A, C`. Câu nhiều đáp án **phải** có `(Choose TWO)` / `(Choose THREE)` trong đề và số đáp án khớp ([v6] cách viết của đề mẫu chính thức `(Select TWO.)` / `(Select THREE.)` cũng được chấp nhận) |
 | Giải thích | `**Explanation:** …` — Markdown, có thể nhiều dòng/danh sách tới hết block. Không dùng `#`/`##` (dùng `###` hoặc chữ đậm). **Không nhắc chữ cái đáp án** (xem dưới) |
 | Phân cách | Dòng `---` giữa các câu (có dòng trống phía trên) — tuỳ chọn, giúp dễ đọc |
 
@@ -153,6 +156,7 @@ Which TWO actions should a solutions architect take? (Choose TWO)
 
 **Định dạng giải thích khuyến nghị** (ENRICH dùng định dạng này): 1–2 câu tiếng Anh vì sao đáp án đúng thoả yêu cầu + mỗi
 distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuối `> 🇻🇳 <tóm tắt tiếng Việt>`; 35–90 từ.
+[v6] Câu tầng A (§6b): 50–120 từ, **mọi** phương án nhiễu một dòng kèm nhãn lý do sai, ≥ 1 URL tài liệu AWS.
 
 ### Metadata
 
@@ -163,14 +167,14 @@ distractor hấp dẫn một dòng `- <nội dung>: <vì sao sai>` + dòng cuố
 | `difficulty` | ✅ | `easy` (1 khái niệm, nhận diện trực tiếp) · `medium` (tình huống áp dụng, 2 đáp án gần đúng) · `hard` (kết hợp nhiều khái niệm, bẫy, multi-response) |
 | `time` | ✅ | giây, số nguyên — tính theo rubric §4 |
 | `task` | khuyến nghị | task statement của exam guide trong `taxonomy.yaml → tasks`: `1.1`–`1.3` (secure), `2.1`–`2.2` (resilient), `3.1`–`3.5` (performance), `4.1`–`4.4` (cost) — **phải cùng domain** (ghi trong ngoặc kép nếu viết trong YAML: `"2.2"`) |
-| `services` | khuyến nghị | tên chuẩn trong `taxonomy.yaml → services` (vd `RDS Proxy`, `S3`, `Transit Gateway`). Service mới → thêm vào taxonomy. Service có `scope: out` (danh sách **ngoài phạm vi** chính thức của SAA-C03) không dùng cho câu mới — kể cả làm phương án nhiễu |
+| `services` | khuyến nghị | tên chuẩn trong `taxonomy.yaml → services` (vd `RDS Proxy`, `S3`, `Transit Gateway`). Service mới → thêm vào taxonomy. Service có `scope: out` (danh sách **ngoài phạm vi** chính thức của SAA-C03) hoặc [v6] `scope: legacy` không dùng cho câu mới — kể cả làm phương án nhiễu |
 | `tags` | khuyến nghị | khái niệm kebab-case, ưu tiên tag có sẵn trong `taxonomy.yaml → features` (vd `multi-az`, `s3-lifecycle`) |
 | `variant_of` | khi là biến thể | id câu gốc (có thể nhiều, phân tách dấu phẩy) |
 | `skills` | khuyến nghị (AI) | [v5] mục đề cương chính thức mà câu kiểm tra: `<task>.k<n>` (Knowledge of) / `<task>.s<n>` (Skills in) theo `bank/exam-guide/SAA-C03.yaml`, vd `3.5.s7, 3.5.k4` (ENRICH classify ghi). Không ghi → app **đoán** bằng từ khoá (`SAA-C03-cues.yaml`, chỉ trong `task` của câu) và không bao giờ ghi lại bản đoán vào file |
 | `family` | khi là họ câu | [v5] id họ câu “cùng tình huống, đổi yêu cầu” (kebab-case): các câu cùng họ dùng **y nguyên một bộ phương án** và chỉ khác câu hỏi cuối (MOST cost-effective / LEAST operational overhead …) — lint `family-options` |
 | `concept` | khuyến nghị (AI) | 1 câu ngắn mô tả khái niệm được kiểm tra — AI Coach dùng để gom nhóm điểm yếu |
 | `hint` | khuyến nghị | **một dòng** tiếng Việt (≤ 140 ký tự) hiện khi người học bấm “💡 Gợi ý” ở chế độ luyện tập: hướng tới yêu cầu/từ khoá quyết định, **không lộ đáp án** (không nêu tên đáp án đúng, không chữ cái) |
-| `refs` | tuỳ chọn | file notes liên quan, vd `03-database-services.md` hoặc `03-database-services.md#rds-proxy` |
+| `refs` | tuỳ chọn | file notes liên quan, vd `03-database-services.md` hoặc `03-database-services.md#rds-proxy` (app mở như link notes — [v6] URL tài liệu AWS của câu tầng A đặt trong giải thích, §6b) |
 | `status` | tuỳ chọn | `active` (mặc định) · `draft` (chưa dùng trong test) · `retired` (ngừng dùng — **không xoá câu**) |
 | `created` | tuỳ chọn | `YYYY-MM-DD` |
 | `enriched` | tự động | `YYYY-MM-DD` lần cuối ENRICH (patch AI) cải thiện/duyệt câu — app dùng để biết câu nào còn cần bảo trì |
@@ -184,9 +188,11 @@ App tự tính thêm (không ghi vào file): `words` (số từ của đề), `l
   cho câu hỏi phủ định (NOT/EXCEPT viết hoa trong câu hỏi, “LEAST likely/suitable…”; “LEAST operational overhead” là `ops`, không
   phải phủ định). Không có tiêu chí nào → `[]`. Dùng cho bộ lọc “tiêu chí đề” và thống kê “Theo tiêu chí đề”.
 - `outOfScope` — `true` khi một phương án **đúng** nêu service có `scope: out` trong taxonomy (danh sách ngoài phạm vi chính thức
-  của SAA-C03, đối chiếu 2026-10-20). `practice.exclude_out_of_scope: true` (mặc định) loại các câu này khỏi mọi chế độ luyện trừ
-  “Theo bộ đề” và danh sách id; đề niêm phong không bao giờ chọn chúng. Lint: `oos-answer` (mức vừa) cho đáp án,
-  `oos-distractor` (mức nhẹ) cho phương án nhiễu nêu service ngoài phạm vi.
+  của SAA-C03, đối chiếu 2026-10-20) hoặc [v6] `scope: legacy`. `practice.exclude_out_of_scope: true` (mặc định) loại các câu này khỏi
+  mọi chế độ luyện trừ “Theo bộ đề” và danh sách id; đề niêm phong và [v6] thi thử không bao giờ chọn chúng (kể cả khi tắt tuỳ chọn đó).
+  Lint: `oos-answer` (mức vừa) cho đáp án, `oos-distractor` (mức nhẹ) cho phương án nhiễu nêu service ngoài phạm vi / legacy.
+- `tier` — [v6] **tầng câu**: `A` chuẩn đề (giống đề thật + có tiêu chí quyết định) · `B` tình huống ngắn · `C` ôn nhanh — định nghĩa
+  và nơi dùng ở §6b (`shared/tier.ts`). Bộ lọc `tiers` (Tùy chỉnh, thi thử); tính lại mỗi khi đề / phương án đổi.
 
 - `cluster` — [v5] nhóm **câu anh em** (`server/lib/clusters.ts`, chỉ có khi nhóm ≥ 2 câu, id nhóm = id nhỏ nhất): `variant_of` hai
   chiều ∪ câu gần trùng chữ / theo nghĩa ∪ cùng chủ đề + cùng đáp án đúng + đề giống ≥ 0,25 ∪ đề giống ≥ 0,5 khi cùng chủ đề hoặc cùng
@@ -197,7 +203,11 @@ App tự tính thêm (không ghi vào file): `words` (số từ của đề), `l
 **Taxonomy — kiến thức đã thay đổi (`currency:`, [v5]):** mỗi mục `{id, pattern, unless?, fact, since, url}` — `pattern` (regex,
 không phân biệt hoa thường) trên đề + phương án + giải thích nói kiến thức cũ, `unless` = câu đã dùng cách viết hiện hành thì bỏ qua.
 Lint `stale-fact` (mức vừa) báo câu cần cập nhật kèm URL. **Chỉ thêm mục đã đối chiếu trên trang chính thức của AWS** (docs / blog /
-What's New), ghi URL — không thêm từ trí nhớ. Sửa câu: viết “tên mới (tên cũ)” hoặc giới hạn mới.
+What's New), ghi URL — không thêm từ trí nhớ. Sửa câu: viết “tên mới (tên cũ)” hoặc giới hạn mới. [v6] Đợt đối chiếu 2026-10-22 thêm
+các thay đổi 2022 → 10/2026 (dịch vụ đóng với khách mới, giới hạn mới, đổi tên); soát định kỳ theo ba danh sách vòng đời chính thức:
+[maintenance](https://docs.aws.amazon.com/general/latest/gr/maintenance_services.html) ·
+[sunset](https://docs.aws.amazon.com/general/latest/gr/sunset_services.html) ·
+[full shutdown](https://docs.aws.amazon.com/general/latest/gr/full_shutdown_services.html).
 
 **Đề cương (`bank/exam-guide/`, [v5]):** `SAA-C03.yaml` = đề cương chính thức chép **nguyên văn** (189 mục, URL + ngày lấy) — không
 sửa tay, muốn cập nhật thì lấy lại trang và chép lại cả file; `SAA-C03-cues.yaml` = từ khoá đoán mục (của app, được sửa).
@@ -205,6 +215,11 @@ sửa tay, muốn cập nhật thì lấy lại trang và chép lại cả file;
 **Taxonomy — phạm vi đề thi:** mỗi service có thể ghi `scope: out` (ngoài phạm vi) và `aliases: [...]` (tên chính thức hiện tại /
 tên mới, vd `QuickSight` → `Amazon Quick`; chỉ để hiển thị — muốn nhận diện tên đó trong câu hỏi thì thêm vào `match`). Không ghi
 `scope` = trong phạm vi hoặc chưa được liệt kê (danh sách chính thức không đầy đủ) — không bị loại.
+[v6] `scope: legacy` = service **bị gỡ khỏi danh sách trong phạm vi** chính thức (vd Data Pipeline, QLDB) hoặc **đã ngừng mà không có
+service kế nhiệm trong phạm vi** (vd Elastic Transcoder — MediaConvert ngoài phạm vi). Xử lý **như `scope: out`** ở mọi nơi:
+`outOfScope`, loại khỏi luyện / thi thử / đề niêm phong, lint `oos-answer` / `oos-distractor` (thông báo ghi rõ “legacy”), độ phủ có
+mục riêng. Service còn trong phạm vi nhưng đã **đóng với khách hàng mới** (Snowball Edge, S3 Glacier vault API, S3 Select…) không
+nhất thiết là `legacy`, nhưng §6b vẫn cấm dùng chúng làm đáp án đúng cho câu mới (mục `currency:` ghi ngày đóng + URL).
 
 ## 4. Rubric thời gian (`time`) & câu dài chuẩn đề thi
 
@@ -229,9 +244,10 @@ time   = làm tròn tới bội số 5 của (read + think + bonus), kẹp trong
 > Không muốn tự đếm từ? Bỏ trống `time` rồi chạy `node trainer/scripts/validate.ts <file> --fill-time`
 > — script tự chèn `- time: N` theo đúng rubric (tham số nằm ở `taxonomy.yaml → timing`).
 
-**Câu dài (long-form).** Đề thật thường 60–150 từ với nhiều ràng buộc. Câu có đề ≥ 55 từ được tính là *câu dài*: mức sẵn sàng
-cho câu dài trọng số cao hơn, thi thử ưu tiên câu dài. Khi viết câu mới mức `medium`/`hard`, ưu tiên đề **60–120 từ**: bối cảnh
-công ty + kiến trúc hiện tại + 2–3 ràng buộc cụ thể + qualifier rõ ràng, 4 lựa chọn là giải pháp hoàn chỉnh dài tương đương nhau.
+**Câu dài (long-form).** Đề thật thường 60–150 từ với nhiều ràng buộc (đề mẫu chính thức: 33–97 từ, trung vị ~62). Câu có đề ≥ 55 từ
+được tính là *câu dài*: mức sẵn sàng cho câu dài trọng số cao hơn, thi thử ưu tiên câu dài. Khi viết câu mới mức `medium`/`hard`, viết
+theo **chuẩn tầng A (§6b)**: đề **55–130 từ** — bối cảnh công ty + kiến trúc hiện tại + 2–4 ràng buộc cụ thể + qualifier rõ ràng —,
+các lựa chọn là giải pháp hoàn chỉnh 8–35 từ, dài tương đương nhau.
 
 ## 5. Id & vòng đời câu hỏi
 
@@ -242,6 +258,9 @@ công ty + kiến trúc hiện tại + 2–3 ràng buộc cụ thể + qualifier
 
 ## 6. Tiêu chuẩn chất lượng (bắt buộc với câu AI viết)
 
+Áp dụng cho mọi câu. [v6] Câu `medium`/`hard` AI viết mới còn phải đạt **chuẩn tầng A (§6b)** — chuẩn đó siết thêm các mục dưới đây
+(đề 55–130 từ, phương án 8–35 từ, giải thích 50–120 từ có nhãn lý do sai + URL tài liệu AWS, 25–30 % câu nhiều đáp án…).
+
 1. **Một đáp án tốt nhất duy nhất** (hoặc đúng N đáp án với `Choose N`) — kiểm tra lại từng distractor.
 2. Văn phong SAA-C03: tình huống doanh nghiệp + yêu cầu + từ khoá quyết định (*MOST cost-effective, LEAST operational overhead, highly available, MOST secure…*).
 3. Distractor **hợp lý**: service/tính năng AWS có thật, hay bị nhầm (vd Read Replica ↔ Multi-AZ, SQS ↔ SNS, Gateway ↔ Interface endpoint). Không dùng "All of the above"/"None of the above".
@@ -250,7 +269,114 @@ công ty + kiến trúc hiện tại + 2–3 ràng buộc cụ thể + qualifier
 6. Giải thích 35–90 từ theo định dạng khuyến nghị ở §3: vì sao đáp án đúng + 1 dòng cho mỗi distractor quan trọng + tóm tắt 🇻🇳 — **gọi lựa chọn bằng nội dung, không bằng chữ cái**.
 7. Có `task` (cùng domain) và `hint` (một dòng, không lộ đáp án).
 8. Đáp án đúng phân bố đều A/B/C/D — tránh dồn vào B.
-9. Đề bài tiếng Anh (giống đề thật); câu `medium`/`hard` ưu tiên dạng câu dài (§4).
+9. Đề bài tiếng Anh (giống đề thật); câu `medium`/`hard` ưu tiên dạng câu dài (§4) — câu AI viết mới: chuẩn tầng A (§6b).
+
+## 6b. Chuẩn câu tầng A (exam-grade) — [v6]
+
+> **Vì sao.** Đo ngày 2026-10-22 trên 764 câu active: đề trung vị **18 từ** (đề mẫu chính thức ~62, 33–97); chỉ **18 câu (2,4 %)** giống
+> đề thật; **73 %** câu có phương án là tên service trơn; **30 %** có qualifier; **8,5 %** câu nhiều đáp án (đề mẫu 3/10); giải thích
+> trung vị **9 từ**. Luyện trên câu như vậy đo trí nhớ câu ngắn, không đo khả năng làm đề thật. Chuẩn dưới đây lấy từ exam guide + đề
+> mẫu chính thức (tự đo, không chép), nguyên tắc viết câu trắc nghiệm (Haladyna, Downing & Rodriguez 2002; NBME Item-Writing Guide) và
+> nghiên cứu về câu trắc nghiệm do LLM viết (câu dễ hơn đề thật, nhiều manh mối, đoán được chỉ nhờ phương án).
+
+**Áp dụng cho:** mọi câu `medium`/`hard` AI viết mới — sinh từ tài liệu (GENERATE), câu dài (ENRICH phần B), câu mới của AI Coach, họ
+câu (FAMILY), câu song sinh của câu tầng A (TWINS) — và là đích khi ENRICH viết lại câu tầng A. Câu `easy` và câu song sinh của câu
+ngắn giữ dáng câu gốc (không bắt buộc tầng A). Mọi quy tắc §6 vẫn áp dụng.
+
+### Tầng câu (`tier`, app tự tính — `shared/tier.ts`, không ghi vào file)
+
+| Tầng | Điều kiện | Dùng ở |
+|------|-----------|--------|
+| **A** — giống đề thật (exam-grade) | **giống đề thật** (đề ≥ `timing.long_form_min_words` = 55 từ **và** phương án trung bình ≥ 8 từ) **và** có **tiêu chí quyết định**: `requirements` khác rỗng (qualifier *MOST cost-effective*, *LEAST operational overhead*, *highly available*…, §3) hoặc câu hỏi cuối nêu yêu cầu (“Which solution will meet these **requirements**?”) | 🎯 thi thử (ưu tiên tầng A; tuỳ chọn “🏷️ Chỉ dùng câu tầng A”), 🔒 đề niêm phong (ưu tiên tầng A; `seal --add --tier A`, §10), mức sẵn sàng sát đề thật |
+| **B** — tình huống ngắn | đề ≥ 30 từ **và** phương án trung bình ≥ 5 từ; hoặc giống đề thật nhưng thiếu tiêu chí | 📚 luyện theo chủ đề, 💪 củng cố điểm yếu, ▶ Học hôm nay |
+| **C** — câu ôn nhanh (drill) | còn lại: đề một dòng, phương án là tên service | 🧠 ôn ngắt quãng, flashcard / Anki, 🎧 Nghe, ☕ câu hỏi nhanh |
+
+Bộ lọc `tiers` (Ngân hàng, 🛠️ Tùy chỉnh, thi thử), huy hiệu “Tầng A/B/C”, thẻ *Chất lượng → 🏷️ Tầng câu hỏi*, độ phủ theo tầng
+(`npm run coverage`: mục tiêu **280 câu tầng A** — D1 84 · D2 73 · D3 67 · D4 56, chia cho từng task theo số mục đề cương của task).
+
+### Đặc tả
+
+| Phần | Chuẩn tầng A |
+|------|--------------|
+| **Đề** | **55–130 từ**, tiếng Anh, theo thứ tự: công ty / bối cảnh → **hiện trạng** (kiến trúc, dữ liệu, quy mô) → **2–4 ràng buộc cứng** (không đi qua internet, không downtime, giữ khoá on-premises, RPO/RTO, đội vận hành nhỏ…) → **qualifier** → **câu hỏi đóng** “Which solution will meet these requirements?” (hoặc “…MOST cost-effectively?”). Được phép **một** chi tiết không liên quan. Che các phương án đi, đọc đề + câu hỏi cuối vẫn biết cần loại giải pháp nào |
+| **Tiêu chí** | ≥ 90 % câu của một pack có tiêu chí quyết định (như tầng A). Câu phủ định ≤ 3 %, viết HOA (NOT, EXCEPT, LEAST likely) |
+| **Phương án** | **hành động hoàn chỉnh** (service + cấu hình), **8–35 từ**, **song song** (cùng dáng câu, cùng loại giải pháp) và **đồng nhất** (xếp hạng được trên cùng một chiều). Đáp án đúng là phương án dài nhất (dài hơn mọi phương án khác) ở **không quá 25 %** số câu của pack. Không All/None of the above, không từ tuyệt đối ở phương án nhiễu |
+| **Nhiều đáp án** | **25–30 %** số câu của pack: `(Choose TWO)` với 5 phương án; `(Choose THREE)` với 6 phương án ≤ 5 %. `(Select TWO.)` cũng được chấp nhận |
+| **Phương án nhiễu** | mỗi phương án nhiễu sai vì **đúng một** lý do — thường là một ràng buộc / yêu cầu nêu trong đề —, thuộc một **nhãn** ở bảng dưới, ghi ở cuối dòng của nó trong giải thích. **Gieo từ nhầm lẫn thật**: cặp dịch vụ dễ nhầm (🔀 Phân biệt, snapshot §9, notes so sánh `14-so-sanh-services.md`, `Q-service-comparisons.md`, `F-so-sanh-database-theo-dac-diem.md`), lý do người học chọn sai (🗣️), phương án nhiễu được chọn nhiều (📊) |
+| **Kiến thức** | đáp án đúng là service **trong phạm vi và còn mở cho khách hàng mới** — **không bao giờ** là service `scope: out` / `scope: legacy` hay đã đóng với khách mới (`currency:`). Đề và phương án dùng **tên như exam guide** (`bank/exam-guide/SAA-C03.yaml → in_scope`, vd Amazon Data Firehose, AWS Application Migration Service); tên mới / tên cũ khác ghi ở giải thích. Tính năng đã GA ≥ 3 tháng. Không đưa con số / giới hạn trừ khi đã đối chiếu tài liệu AWS có URL |
+| **Giải thích** | **50–120 từ**: **ràng buộc → tính năng thoả nó** (vì sao đúng) · **mỗi phương án nhiễu một dòng** nêu ràng buộc nó phá + nhãn · dòng `> 🇻🇳 …` · **≥ 1 URL tài liệu AWS** (docs.aws.amazon.com / aws.amazon.com — chỉ URL chắc chắn tồn tại), khuyến nghị dạng link Markdown cuối đoạn đầu (`refs` vẫn là file notes) |
+| **Độ khó (pack)** | medium 55 % · hard 35 % · easy 10 % |
+| **Nguồn** | chỉ notes trong repo + tài liệu AWS + exam guide (`bank/exam-guide/`). **Không bao giờ** chép hay diễn đạt lại câu của đề mẫu, Official Practice Question Set / Practice Exam, đề bên thứ ba (Tutorials Dojo, Udemy…) hay “dump” (dùng dump vi phạm AWS Certification Program Agreement) |
+
+**Nhãn lý do sai** (một nhãn cho mỗi phương án nhiễu):
+
+| Nhãn | Phương án nhiễu… | Ví dụ |
+|------|------------------|-------|
+| `vi phạm ràng buộc` | chạy được nhưng phá một ràng buộc cứng của đề | thêm Lambda@Edge khi đề cấm chạy thêm compute |
+| `dùng sai tính năng` | đúng service, nhưng tính năng đó không làm việc đề cần | Read Replica để failover tự động |
+| `cấu hình không tồn tại` | quyền / thiết lập / tích hợp không có thật (lý do là chính AWS, không cần cụm trong đề) | security group gắn vào S3 bucket |
+| `đặt sai chỗ` | thành phần đúng nhưng sai vị trí / định tuyến (sai Region, VPC, subnet, sai phía của kết nối) | gateway endpoint ở VPC khác, đi qua VPC peering |
+| `giải bài toán khác` | tốt cho một vấn đề khác (tốc độ thay vì riêng tư, mã hoá thay vì kiểm soát truy cập…) | chỉ ép HTTPS khi đề cần chặn truy cập thẳng vào bucket |
+| `tốn vận hành/chi phí hơn` | đáp ứng mọi ràng buộc nhưng thua ở qualifier | interface endpoint thay vì gateway endpoint khi đề hỏi rẻ nhất |
+| `đúng một phần` (chỉ câu nhiều đáp án) | một bước hợp lý nhưng không đủ / không thuộc bộ đáp án tốt nhất | thêm Aurora Replica nhưng vẫn đọc qua writer endpoint |
+
+Dòng phương án nhiễu: `- <nội dung, rút gọn>: <vì sao sai> (<nhãn> "<cụm ràng buộc / yêu cầu trong đề>")`.
+
+**Ví dụ câu tầng A** (73 từ đề · phương án 22–26 từ, đáp án đúng không dài nhất · giải thích 112 từ · lint sạch):
+
+```markdown
+## Q doc-cloudfront-oac-04
+- domain: secure
+- task: 1.3
+- topic: networking
+- services: CloudFront, S3
+- tags: cloudfront-origin-security, s3-block-public-access
+- skills: 1.3.s6, 1.3.k1
+- difficulty: medium
+- time: 120
+- concept: CloudFront origin access control + bucket policy (no compute) vs Lambda@Edge, SecureTransport, security groups for locking an S3 origin
+- refs: 04-networking-services.md
+- hint: Đề có hai ràng buộc: chặn truy cập thẳng vào bucket và không chạy thêm compute — phương án nào thoả cả hai?
+
+A company hosts a static marketing website in an Amazon S3 bucket and serves it to users worldwide through an Amazon
+CloudFront distribution. A security audit found that users can bypass CloudFront and download objects directly from the
+S3 bucket URL. The company must block direct access to the bucket while keeping the website available through
+CloudFront, and the team wants to avoid running any additional compute. Which solution will meet these requirements?
+
+- A. Add a Lambda@Edge function on origin requests that signs each request to the bucket with SigV4, and turn on S3 Block Public Access for the bucket.
+- B. Add a bucket policy statement that denies any request where aws:SecureTransport is false, and keep the distribution's HTTPS-only viewer protocol policy.
+- C. Create an origin access control for the S3 origin, turn on S3 Block Public Access, and grant the distribution read access in the bucket policy.
+- D. Create a security group that allows HTTPS from the CloudFront origin-facing managed prefix list, and associate the security group with the S3 bucket.
+
+**Answer:** C
+
+**Explanation:** Origin access control signs CloudFront requests to the S3 origin; a bucket policy that grants reads to that distribution, with Block Public Access on, rejects direct requests without extra compute ([AWS docs](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html)).
+- Lambda@Edge signing: works, but adds compute to run (vi phạm ràng buộc "avoid running any additional compute").
+- Deny when aws:SecureTransport is false: enforces HTTPS only; direct HTTPS requests still succeed (giải bài toán khác "block direct access to the bucket").
+- Security group on the bucket: S3 has no security groups; the prefix list suits ALB or EC2 origins (cấu hình không tồn tại).
+> 🇻🇳 Chỉ CloudFront được đọc bucket, không thêm compute → OAC + bucket policy + Block Public Access.
+```
+
+### Lint chuẩn đề (exam-spec) — `server/lib/lint.ts`
+
+Chỉ áp dụng cho câu **`origin: ai | doc`**, **`medium`/`hard`**, **`created` ≥ `quality.exam_spec_since`** (mặc định `2026-10-22`; `""` = tắt).
+Câu nhập, câu tự viết, câu `easy` và câu cũ không bị bắt (vẫn được xếp tầng). Mức vừa / nhẹ → `⚠️` (không chặn ghi), hiện ở
+*Chất lượng → 🩺 Lỗi viết câu* và `npm run validate -- --lint`; ngưỡng cụ thể nằm trong `server/lib/lint.ts`.
+
+| Mã | Mức | Bắt khi |
+|----|-----|---------|
+| `stem-short` | vừa | đề ngắn hơn chuẩn tầng A (< 55 từ) |
+| `options-bare` | vừa | phương án quá ngắn (tên service trơn, trung bình < 8 từ) |
+| `no-criterion` | vừa | không có tiêu chí quyết định (không qualifier trong `requirements`, câu hỏi cuối không nêu “requirements”) |
+| `explanation-coverage` | vừa | số dòng `- <nội dung>: …` trong giải thích ít hơn số phương án nhiễu |
+| `doc-url-missing` | nhẹ | không có URL `https://docs.aws.amazon.com/…` / `https://aws.amazon.com/…` trong giải thích hoặc `refs` |
+| `options-nonparallel` | nhẹ | đáp án đúng mở đầu bằng động từ hành động (“Use…”, “Configure…”) còn ≥ 2 phương án nhiễu là cụm danh từ — hoặc ngược lại |
+
+Cảnh báo **cấp pack** (`validate`, pack có ≥ 8 câu thuộc phạm vi lint chuẩn đề): câu nhiều đáp án < 20 %, hoặc đáp án đúng dài hơn mọi
+phương án khác ở > 25 % số câu.
+
+**Phép thử chỉ nhìn phương án** (`--verify --scope cues`, §9) bắt loại manh mối mà lint không thấy: phương án đúng “nghe đúng” hơn hẳn
+dù không đọc đề → viết lại phương án (ENRICH `balance` / `distractors`) trước khi câu vào đề niêm phong.
 
 ## 7. Kiểm tra
 
@@ -258,6 +384,7 @@ công ty + kiến trúc hiện tại + 2–3 ràng buộc cụ thể + qualifier
 node trainer/scripts/validate.ts                         # toàn bộ ngân hàng
 node trainer/scripts/validate.ts packs/ai/2026-10-16     # chỉ file khớp chuỗi (in cả cảnh báo)
 node trainer/scripts/validate.ts <file> --fill-time      # tự điền time còn thiếu
+node trainer/scripts/validate.ts <file> --lint           # + lỗi viết câu (gồm lint chuẩn đề §6b) và cảnh báo cấp pack
 node trainer/scripts/apply-patch.ts <patch.yaml> --dry-run   # thử một patch AI mà không ghi (§8)
 ```
 
@@ -299,6 +426,8 @@ items:
   câu; lỗi **mới** (câu cũ chưa có) mức cao — `duplicate-options`, `all-none-above`, `choose-count`, `letter-ref` — → item bị từ chối
   và hoàn tác (`❌ lint (mức cao): … [mã]`); lỗi mới mức vừa/thấp (vd `longest-correct`, `absolute-terms`, `stem-echo`,
   `short-explanation`) → `⚠️ lint: …`. Áp dụng cho mọi đường: ENRICH, patch của coach, `apply-patch` CLI, quyết định giải mù.
+  [v6] Câu thuộc phạm vi lint chuẩn đề (§6b) còn được kiểm `stem-short`, `options-bare`, `no-criterion`, `explanation-coverage` (vừa),
+  `doc-url-missing`, `options-nonparallel` (nhẹ) → `⚠️`, không chặn ghi.
 
 ### Chế độ app (JSON) — structured output
 
@@ -332,6 +461,17 @@ cần chọn** — không thấy đáp án, giải thích, gợi ý hay metadata
   phân tích — như pha thứ hai của cùng lượt chạy (chung khoá, log, chi phí; `coach.verify.auto`); hoặc khi bấm “🧪 Giải mù” ở *Ngân hàng →
   Chất lượng* / `npm run coach -- --verify [--ids a,b | --pack <id> | --scope unverified-ai|new|changed]` (tối đa 60 câu/lượt, mỗi lần
   gọi `coach.verify.batch_size` câu).
+- [v6] **Phương án được xáo**: model giải mù thấy các phương án theo thứ tự xáo (chữ cái gán lại A, B, C…; tất định theo hash câu + số
+  lần đã giải phiên bản đó, nên lần giải lại thấy thứ tự khác) — LLM hay thiên về một số vị trí, và vị trí đáp án do người viết chọn có
+  thể lệch. Lựa chọn của model được đổi về chữ cái trong file: `picked` / `key` luôn là chữ cái của ngân hàng, `order` ghi thứ tự model
+  đã thấy.
+- [v6] **Phép thử chỉ nhìn phương án** (`npm run coach -- --verify --scope cues [--ids a,b | --pack <id>]`, model
+  `coach.verify.probe_model`, mặc định `haiku`; chỉ chạy khi bấm / gõ lệnh): một model rẻ chỉ thấy **các phương án** (không có đề, không
+  có id) và đoán đáp án, hai lần với hai thứ tự xáo khác nhau. Đúng **cả hai** lần → `cue`: phương án tự lộ đáp án (dài / chi tiết /
+  “nghe đúng” hơn hẳn, lặp ý…) → viết lại phương án (ENRICH `balance` / `distractors`). Không ghi `--ids` / `--pack` → câu AI / tài liệu
+  `active` tạo từ `quality.exam_spec_since`, chưa dò ở phiên bản hiện tại, không niêm phong (mới nhất trước, tối đa 60 câu/lượt).
+  Dòng 🎯 ghi vào `verify.md` với `"probe":"choices-only"` trong phần dữ liệu và **không bao giờ** được tính là kết quả giải mù: không
+  vào số câu đã giải, hàng chờ duyệt, tự chuyển draft / tự dùng lại, điều kiện đề niêm phong hay mức sẵn sàng.
 - **Tự chuyển draft** (`coach.verify.auto_draft`): câu `mismatch`/`ambiguous` do AI viết (`origin: ai | doc`) hoặc vừa bị lượt AI sửa →
   `status: draft` qua một patch item (`coach/patches/<run_id>-verify.yaml`) + dòng quyết định `drafted`. Câu **imported** (đề gốc) không
   bao giờ bị tự chuyển draft — chỉ vào hàng chờ duyệt.
@@ -379,11 +519,18 @@ forms:
 
 - **Do app quản lý — đừng sửa tay** (và đừng đọc danh sách id nếu muốn điểm trung thực). Nội dung lúc tạo **tất định** (không có
   thời điểm, thứ tự theo hash): hai máy tạo độc lập từ cùng ngân hàng + lịch sử ra cùng một file, đồng bộ không xung đột.
-- Cách chọn: câu `active`, trong phạm vi đề thi, **không có câu anh em** ([v5] theo nhóm `cluster` ở §3 — áp dụng cho đề tạo từ nay;
-  file đề cũ không bị chọn lại), không có issue mở / 👎 nhiều / lỗi lint
+- Cách chọn: câu `active`, trong phạm vi đề thi ([v6] không `out` / `legacy`), **không có câu anh em** ([v5] theo nhóm `cluster` ở §3 —
+  áp dụng cho đề tạo từ nay; file đề cũ không bị chọn lại), không có issue mở / 👎 nhiều / lỗi lint
   nặng, chưa từng thuộc đề trước; chia theo trọng số domain 30/26/24/20 (50 câu → 15/13/12/10) và xoay vòng các task 1.1–4.4;
-  ưu tiên câu **chưa gặp**, rồi đề dài hơn; số câu nhiều đáp án chia đều giữa các đề.
+  ưu tiên câu **chưa gặp**, rồi [v6] câu tầng A, câu giống đề thật khác, rồi đề dài hơn; số câu nhiều đáp án chia đều giữa các đề.
+- [v6] **Thêm một đề khi các đề khác còn niêm phong** — `npm run seal -- --add [--tier A] [--size 50] [--allow-short]`: tạo **một** đề
+  mới (đánh số tiếp, vd S3; tối đa 5 đề niêm phong cùng lúc) chỉ từ câu đủ điều kiện như trên **và chưa từng gặp khi luyện** (câu AI
+  phải được giải mù khớp đáp án ở phiên bản hiện tại); `--tier A` = chỉ câu tầng A (§6b); `--size` = số câu tính điểm (mặc định
+  `exam.sealed_size`), vẫn chia theo trọng số domain. Domain thiếu câu → từ chối và báo mỗi domain thiếu bao nhiêu câu; `--allow-short`
+  → đề lớn nhất (nhỏ hơn `--size`, ≥ 10 câu) mà mọi domain lấp đủ. Câu tầng A mới nên qua đủ các cổng (lint, giải mù, phép thử phương án,
+  `/trainer-review`) **trước** khi niêm phong — sau đó chúng bị ẩn cho tới khi làm đề.
 - AI (COACH, ENRICH) **không bao giờ** dùng câu niêm phong làm câu gốc cho biến thể / câu dài, không đưa vào kế hoạch.
 - Lệnh: `npm run seal` (trạng thái, không in id) · `-- --forms 2 --size 50` (tạo khi không còn đề nào đang niêm phong) ·
+  [v6] `-- --add --tier A [--size 50]` (thêm một đề tầng A, kể cả khi còn đề đang niêm phong) ·
   `-- --release S1` (mở sớm) · `-- --reset [--forms N --size M]` (bỏ mọi đề rồi tạo lại; `--forms 0` = chỉ bỏ). Đề mới đánh số
   tiếp (S3, S4…) để không trùng `sealed_form` của bài làm cũ.

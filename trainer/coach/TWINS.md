@@ -25,7 +25,16 @@ người học có làm đúng ngay lần đầu không (chỉ số chuyển gia
   một chi tiết cụ thể; giải thích theo SCHEMA §3 (vì sao đúng + từng distractor theo **nội dung**, không chữ cái + dòng `> 🇻🇳 …`);
   `hint` 1 dòng tiếng Việt không lộ đáp án; `task` cùng domain; `skills` như câu gốc nếu đúng; độ dài đề tương tự câu gốc (câu dài
   → câu dài).
-- Kiến thức hiện hành (`taxonomy.yaml → currency:`); không đưa con số không chắc chắn. Không dùng dịch vụ ngoài phạm vi đề thi.
+- Kiến thức hiện hành (`taxonomy.yaml → currency:`); không đưa con số không chắc chắn. Không dùng dịch vụ ngoài phạm vi đề thi
+  (`scope: out` / `legacy`). Đáp án đúng của câu mới không bao giờ là service đã đóng với khách hàng mới: câu gốc còn dựa trên kiến thức
+  cũ (dòng ⏳ trong file lô) → câu song sinh dùng giải pháp hiện hành cho cùng điểm quyết định và nêu câu gốc trong `summary`.
+- **[v6] Chuẩn tầng A (SCHEMA §6b) theo câu gốc** — câu song sinh **giữ dáng** câu gốc:
+  - câu gốc **giống đề thật** (đề ≥ 55 từ, phương án trung bình ≥ 8 từ) → câu song sinh phải đạt **tầng A** đầy đủ: đề 55–130 từ có
+    tiêu chí quyết định, phương án 8–35 từ song song, giải thích 50–120 từ với nhãn lý do sai cho **mọi** phương án nhiễu
+    (`(<nhãn> "<cụm trong đề>")`) + ≥ 1 URL tài liệu AWS;
+  - câu gốc **ngắn** (tầng B/C) → câu song sinh ngắn tương tự — **không** kéo dài đề hay độn phương án để qua lint. Lint chuẩn đề
+    (`stem-short`, `options-bare`…) có thể cảnh báo các câu này: chấp nhận được, đừng sửa bằng cách thêm chữ.
+  Nhãn lý do sai vẫn nên có ở mọi câu song sinh (giúp người học thấy chính xác vì sao phương án nhiễu thua).
 - Mỗi câu mới được **model thứ hai giải mù**; câu lệch / mơ hồ chuyển `draft` chờ duyệt — đề phải đủ dữ kiện cho một đáp án.
 
 ## Chế độ app (JSON)
@@ -43,7 +52,8 @@ Prompt ghi “CHẾ ĐỘ APP (JSON)”: chỉ đọc (Read / Grep / Glob), khô
 2. Viết pack mới đúng đường dẫn (thay `<slug>`): front matter `pack`, `title: "AI · Câu song sinh · <chủ đề>"`, `exam: SAA-C03`,
    `origin: ai`, `created`, `generated_by: <run_id>`, `source: <file lô>`; block `## Q <id>` (SCHEMA §3) với `- variant_of: <id gốc>`,
    bỏ trống `time`.
-3. `node trainer/scripts/validate.ts packs/ai/<tên-file> --fill-time --lint` — sửa mọi ❌ và lỗi lint mức cao.
+3. `node trainer/scripts/validate.ts packs/ai/<tên-file> --fill-time --lint` — sửa mọi ❌ và lỗi lint mức cao, cùng lint chuẩn đề ở câu
+   song sinh của câu giống đề thật. Cảnh báo cấp pack về tỉ lệ câu nhiều đáp án không áp dụng (câu song sinh giữ số đáp án của câu gốc).
 
 ## Trả lời cuối
 

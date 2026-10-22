@@ -9,8 +9,11 @@
 // Selection (createForms): active questions that are in the exam scope, have no sibling ([v5] clusters.ts: variant_of either
 // way, lexical / semantic duplicates, a similar stem with the same topic or key), no open issue, no low
 // rating, no high-severity lint flaw and were never in an earlier form. Stratified by exam domain weight and round-robin
-// over the tasks of each domain; never-seen questions first (a second pass may take seen ones), longer stems first, a
-// seeded hash for ties. The picks of each task are dealt to the forms in snake order, so the forms are equivalent.
+// over the tasks of each domain; never-seen questions first (a second pass may take seen ones), [v6] tier A then the
+// other exam-like questions (shared/tier.ts), longer stems first, a seeded hash for ties. The picks of each task are
+// dealt to the forms in snake order, so the forms are equivalent.
+// [v6] addForm (`npm run seal -- --add`): one more form while others are still sealed — never-seen questions only,
+// optionally one tier, refused (or smaller with allowShort) when a domain lacks eligible questions.
 //
 // A sealed exam (mode 'sealed', [α]) uses one form as its scored items; after submit results.ts calls markFormUsed()
 // and the questions return to practice. "Mở sớm" = releaseForm(). Must not import results.ts.
@@ -28,7 +31,8 @@ import { aggregateRatings, loadRatings, lowRatedIds } from './ratings.ts';
 import { CLUSTER_RULES, buildClusters, clusterIndex, clusteredIds } from './clusters.ts';
 import { localIso } from './time.ts';
 import { latestVerdicts } from './verify.ts'; // used at call time only (verify.ts imports this module too)
-import type { Attempt, Question, SealedForm, SealedFormSummary, SealedState, SealedStatus, Taxonomy, VerifyVerdict } from '../../shared/types.ts';
+import { examRank, tierOf } from '../../shared/tier.ts';
+import type { Attempt, Question, SealedForm, SealedFormSummary, SealedState, SealedStatus, Taxonomy, Tier, VerifyVerdict } from '../../shared/types.ts';
 
 export const SEALED_FILE = path.join(RESULTS_DIR, 'sealed.md');
 export const MIN_FORM_SIZE = 10;
@@ -390,14 +394,18 @@ export function domainQuotas(size: number, tax: Taxonomy): Map<string, number> {
 interface Candidate {
   q: Question;
   seen: boolean;
-  rank: [number, number, string]; // never-seen first · longer stems first (10-word bands) · seeded hash
+  rank: [number, number, number, string]; // never-seen first · [v6] tier A, other exam-like, rest · longer stems first (10-word bands) · seeded hash
 }
 
 /** `nForms` forms of up to `size` questions from `pool` (best candidates first, see the header). */
 export function pickForms(pool: Question[], nForms: number, size: number, tax: Taxonomy, seen: Set<string>): Question[][] {
   const ranked: Candidate[] = pool
-    .map((q) => ({ q, seen: seen.has(q.id), rank: [seen.has(q.id) ? 1 : 0, -Math.min(12, Math.floor((q.words ?? 0) / 10)), hashOf(`${SEED}|${q.id}`)] as [number, number, string] }))
-    .sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || (a.rank[2] < b.rank[2] ? -1 : a.rank[2] > b.rank[2] ? 1 : 0));
+    .map((q) => ({
+      q,
+      seen: seen.has(q.id),
+      rank: [seen.has(q.id) ? 1 : 0, examRank(q, tax), -Math.min(12, Math.floor((q.words ?? 0) / 10)), hashOf(`${SEED}|${q.id}`)] as Candidate['rank'],
+    }))
+    .sort((a, b) => a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.rank[2] - b.rank[2] || (a.rank[3] < b.rank[3] ? -1 : a.rank[3] > b.rank[3] ? 1 : 0));
   const forms: Question[][] = Array.from({ length: nForms }, () => []);
   const taken = new Set<string>();
   const quota = domainQuotas(size, tax);
@@ -495,6 +503,70 @@ export function createForms(bank: BankState, attempts: Attempt[], cfg: AppConfig
   });
   saveSealed({ forms: [...cur.state.forms, ...forms], size, file: rel(SEALED_FILE) });
   return { state: loadSealed(), created: ids, notes, excluded, pool: pool.length };
+}
+
+export interface AddResult extends CreateResult {
+  excluded: Eligibility['excluded'] & { seen: number; tier: number }; // + seen in practice · of another tier than `tier`
+  size: number; // questions in the new form
+}
+
+/**
+ * [v6] `npm run seal -- --add`: ONE more form, also while other forms are still sealed (numbering continues; at most
+ * MAX_FORMS sealed at once). Eligible: eligibleForSealing (active, in scope — not out / legacy —, no sibling, quality ok,
+ * an AI-written key verified for its current version, never in a form), never seen (seenIds — no second pass with seen
+ * questions: an added form measures questions the learner has not met) and, with `tier`, of that tier only.
+ * Domain-weighted like createForms (pickForms). A domain short of eligible questions → 422 saying how many are missing
+ * per domain; `allowShort` → the largest form (≥ MIN_FORM_SIZE) whose domain quotas the eligible questions fill, so the
+ * smaller form keeps the exam weights.
+ */
+export function addForm(bank: BankState, attempts: Attempt[], cfg: AppConfig, opts: { size?: number; tier?: Tier; allowShort?: boolean } = {}): AddResult {
+  const cur = current();
+  assertWritable(cur);
+  const open = cur.state.forms.filter((f) => f.status === 'sealed');
+  if (open.length >= MAX_FORMS) {
+    throw new SealedError(409, `Đang có ${open.length} đề niêm phong chưa làm (${open.map((f) => f.id).join(', ')}) — tối đa ${MAX_FORMS} đề cùng lúc: làm hoặc mở sớm bớt một đề trước khi thêm.`);
+  }
+  const size = clampInt(opts.size ?? cfg.exam?.sealed_size, MIN_FORM_SIZE, MAX_FORM_SIZE, 50);
+  const tax = bank.taxonomy;
+  const elig = eligibleForSealing(bank, cfg, new Set(cur.state.forms.flatMap((f) => f.ids)));
+  const seen = seenIds(attempts);
+  const excluded = { ...elig.excluded, seen: 0, tier: 0 };
+  const pool: Question[] = [];
+  for (const q of elig.pool) {
+    if (seen.has(q.id)) excluded.seen++;
+    else if (opts.tier && tierOf(q, tax) !== opts.tier) excluded.tier++;
+    else pool.push(q);
+  }
+  const have = new Map<string, number>();
+  for (const q of pool) have.set(q.domain, (have.get(q.domain) ?? 0) + 1);
+  const code = (d: string) => tax.domains.find((x) => x.id === d)?.code ?? d;
+  /** Domains whose quota for an `n`-question form the eligible questions cannot fill ('' = none). */
+  const missing = (n: number) =>
+    [...domainQuotas(n, tax)]
+      .filter(([d, want]) => (have.get(d) ?? 0) < want)
+      .map(([d, want]) => `${code(d)} thiếu ${want - (have.get(d) ?? 0)} câu (có ${have.get(d) ?? 0}/${want})`)
+      .join(', ');
+  const which = opts.tier ? ` (chỉ câu tầng ${opts.tier})` : '';
+  let n = size;
+  const short = missing(size);
+  if (short) {
+    if (!opts.allowShort) {
+      throw new SealedError(
+        422,
+        `Không đủ câu đủ điều kiện để thêm một đề ${size} câu${which}: ${short}. Viết thêm câu cho các domain đó, giảm --size, hoặc thêm --allow-short để tạo đề nhỏ hơn vẫn giữ trọng số domain.`,
+      );
+    }
+    // largest remainder quotas are not monotone in the size: walk down to the largest size every domain can fill
+    while (n > MIN_FORM_SIZE && missing(n)) n--;
+    if (missing(n)) throw new SealedError(422, `Không đủ câu đủ điều kiện cho cả một đề ${MIN_FORM_SIZE} câu${which}: ${missing(n)}.`);
+  }
+  const [qs] = pickForms(pool, 1, n, tax, seen);
+  const [id] = nextFormIds(cur.state.forms, attempts, 1);
+  const notes = n < size ? [`Đề ${id} có ${qs.length}/${size} câu${which}: ${short} — đề nhỏ hơn vẫn giữ trọng số domain.`] : [];
+  const order = qs.map((q) => q.id).sort((a, b) => (hashOf(`order|${SEED}|${a}`) < hashOf(`order|${SEED}|${b}`) ? -1 : 1));
+  // the file's `size` (questions per form, shown by --status) stays that of the forms already there
+  saveSealed({ forms: [...cur.state.forms, { id, status: 'sealed', ids: order }], size: cur.state.forms.length ? cur.state.size : size, file: rel(SEALED_FILE) });
+  return { state: loadSealed(), created: [id], notes, excluded, pool: pool.length, size: qs.length };
 }
 
 /**

@@ -8,6 +8,8 @@ import { MODE_INFO, FEEDBACK_INFO, REQUIREMENTS, REQUIREMENT_INFO } from '../../
 import { EXAM_PACE_PRESETS, TIMING_PRESETS, computeTimeLimit, defaultTimingPreset } from '../../shared/timing.ts';
 import { applyFilters, modePool, newOrder, practicePool, taskQuotas } from '../../shared/filters.ts';
 import { REALISM_LOW_HINT, REFERENCE_WORDS_PER_QUESTION, isExamLike, questionWords, realismLow, realismText, realismTitle, testRealism } from '../../shared/realism.ts';
+import { tierOf } from '../../shared/tier.ts';
+import { TIERS, TIER_INFO, isTier } from '../components/TierBadge.tsx';
 import type {
   BuildTestRequest,
   ConfusableGroup,
@@ -19,6 +21,7 @@ import type {
   SelectionFilters,
   TestMode,
   TestRealism,
+  Tier,
   TodayPreview,
 } from '../../shared/types.ts';
 
@@ -56,7 +59,7 @@ interface Init {
 
 /**
  * `#/new` query: mode, count, topics, domains, packs, services, tags, tasks, requirements, form, pearson=1, recall=1, feedback;
- * [v5] contrast=a,b (discriminate), minutes=N (today).
+ * [v5] contrast=a,b (discriminate), minutes=N (today); [v6] tiers=A,B (custom mode) — mode=exam&tiers=A = "Chỉ dùng câu tầng A".
  */
 function parseQuery(q: URLSearchParams): Init {
   const list = (k: string) => {
@@ -71,6 +74,9 @@ function parseQuery(q: URLSearchParams): Init {
   const count = Number(q.get('count'));
   const minutes = Number(q.get('minutes'));
   const fb = q.get('feedback');
+  const tiers = list('tiers')
+    ?.map((t) => t.toUpperCase())
+    .filter(isTier);
   return {
     mode: mode && MODES.includes(mode) ? mode : undefined,
     count: Number.isFinite(count) && count > 0 ? Math.round(count) : undefined,
@@ -82,6 +88,7 @@ function parseQuery(q: URLSearchParams): Init {
       tags: list('tags'),
       tasks: list('tasks'),
       requirements: list('requirements'),
+      tiers: tiers?.length ? [...new Set(tiers)] : undefined,
     },
     pearson: flag('pearson'),
     recall: flag('recall'),
@@ -93,6 +100,8 @@ function parseQuery(q: URLSearchParams): Init {
 }
 
 const shortTask = (label: string) => label.split(' (')[0];
+/** [v6] `mode=exam&tiers=A`: the mock draws tier-A questions only. */
+const tierAOnly = (init: Init) => init.mode === 'exam' && init.filters.tiers?.length === 1 && init.filters.tiers[0] === 'A';
 
 /** Expected realism of `n` questions drawn at random from `pool` (the badge before a random selection exists). */
 function expectedRealism(pool: Parameters<typeof testRealism>[0], n: number, tax: Parameters<typeof testRealism>[1]): TestRealism {
@@ -130,6 +139,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
   const [form, setForm] = useState<string | undefined>(init.form);
   const [shuffleOptions, setShuffleOptions] = useState<boolean>(() => meta?.practice?.shuffle_options ?? true);
   const [pearson, setPearson] = useState<boolean>(init.pearson ?? true);
+  const [examTierA, setExamTierA] = useState<boolean>(() => tierAOnly(init)); // [v6] 🎯 Thi thử: "Chỉ dùng câu tầng A"
   const [recallFirst, setRecallFirst] = useState<boolean>(init.recall ?? false);
   const [busy, setBusy] = useState(false);
   const [serviceQuery, setServiceQuery] = useState('');
@@ -151,6 +161,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
     setFilters(init.filters);
     if (init.count) (init.mode === 'diagnostic' ? setDiagCount : setCount)(init.count);
     if (init.pearson !== undefined) setPearson(init.pearson);
+    if (init.mode === 'exam') setExamTierA(tierAOnly(init));
     if (init.recall !== undefined) setRecallFirst(init.recall);
     if (init.feedback) setFeedback(init.feedback);
     if (init.form) setForm(init.form);
@@ -223,15 +234,46 @@ export function NewTest({ query }: { query: URLSearchParams }) {
   const active = useMemo(() => (bank?.questions ?? []).filter((q) => q.status === 'active'), [bank]);
   const withOos = useMemo(() => practicePool(active, { sealed: sealedIds }), [active, sealedIds]);
   const practice = useMemo(() => (excludeOos ? withOos.filter((q) => !q.outOfScope) : withOos), [withOos, excludeOos]);
+  // [v6] mocks never serve an out-of-scope / legacy answer, whatever practice.exclude_out_of_scope says (server mockScope)
+  const mocks = useMemo(() => (excludeOos ? practice : withOos.filter((q) => !q.outOfScope)), [excludeOos, practice, withOos]);
+  // [v6] tiers (Question.tier, else shared/tier.ts): 🛠️ Tùy chỉnh chip counts (practice pool) and the mock's tier-A option
+  const tierStats = useMemo(() => {
+    const n: Record<Tier, number> = { A: 0, B: 0, C: 0 };
+    for (const q of practice) n[tierOf(q, meta)]++;
+    const clustersA = new Set<string>(); // a mock never takes two questions of one sibling cluster
+    let mockA = 0;
+    for (const q of mocks) {
+      if (tierOf(q, meta) !== 'A') continue;
+      mockA++;
+      clustersA.add(q.cluster ?? q.id);
+    }
+    return { n, mockA, eligibleA: clustersA.size };
+  }, [practice, mocks, meta]);
+  const tierAReady = tierStats.eligibleA >= (meta?.exam.questions ?? 65);
+  const tierAOn = mode === 'exam' && examTierA && tierAReady;
   const states = state?.states ?? {};
   const counts = state?.counts;
   const srsLimit = counts?.srsRemaining; // today's review allowance after srs.daily_limit
   const backlog = counts?.backlog ?? 0;
   const filterable = !FIXED.includes(mode) && mode !== 'pack';
-  const effectiveFilters: SelectionFilters = mode === 'pack' ? { packs: filters.packs?.slice(0, 1) } : FIXED.includes(mode) ? {} : filters;
+  // [v6] tiers reach the server from the 🛠️ Tùy chỉnh chips and the mock's "Chỉ dùng câu tầng A" only (the modes that apply them)
+  const effectiveFilters: SelectionFilters =
+    mode === 'pack'
+      ? { packs: filters.packs?.slice(0, 1) }
+      : tierAOn
+        ? { tiers: ['A'] }
+        : FIXED.includes(mode)
+          ? {}
+          : mode === 'custom'
+            ? filters
+            : { ...filters, tiers: undefined };
   const filterKey = JSON.stringify(effectiveFilters);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const pool = useMemo(() => applyFilters(mode === 'pack' ? withOos : practice, effectiveFilters), [mode, withOos, practice, filterKey]);
+  const pool = useMemo(() => {
+    const base = applyFilters(mode === 'pack' ? withOos : mode === 'exam' ? mocks : practice, { ...effectiveFilters, tiers: undefined });
+    const tiers = effectiveFilters.tiers;
+    return tiers?.length ? base.filter((q) => tiers.includes(tierOf(q, meta))) : base;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, withOos, mocks, practice, filterKey, meta]);
   const mPool = useMemo(() => modePool(mode, pool, states, { srsLimit }), [mode, pool, states, srsLimit]);
   const countsByMode = useMemo(
     () => Object.fromEntries(MODES.map((m) => [m, modePool(m, m === 'pack' ? withOos : practice, states, { srsLimit }).length])),
@@ -297,7 +339,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
   const pearsonLike = pearsonOn || mode === 'sealed';
 
   // what will be served: size, Σ estimates and realism (server previews for the full mock and the sealed forms)
-  const examPreview = mode === 'exam' ? preview(counts, 'exam') : undefined;
+  const examPreview = mode === 'exam' && !tierAOn ? preview(counts, 'exam') : undefined; // the server previews the unfiltered mock
   const sealedPreview = mode === 'sealed' && formId ? preview(counts, `sealed.${formId}`) : undefined;
   const sealedMeta = sealedForms.find((f) => f.id === formId);
   const n =
@@ -422,6 +464,25 @@ export function NewTest({ query }: { query: URLSearchParams }) {
                   <span className="small dim">
                     {meta.exam.questions} câu = {Math.max(0, meta.exam.questions - PILOT)} tính điểm + {PILOT} câu thử nghiệm <b>không tính điểm và không báo trước</b> (như đề thật) ·
                     đồng hồ không tạm dừng · cảnh báo khi còn 15′ và 5′ · cuối bài có <b>màn hình xem lại</b> (lọc câu cắm cờ / chưa trả lời) trước khi “Kết thúc bài thi”.
+                  </span>
+                </span>
+              </label>
+              <label className={`toggle-card ${tierAOn ? 'on' : ''}`} style={tierAReady ? undefined : { opacity: 0.6, cursor: 'default' }}>
+                <input type="checkbox" checked={tierAOn} disabled={!tierAReady} onChange={(e) => setExamTierA(e.target.checked)} />
+                <span className="stack sm">
+                  <b>🏷️ Chỉ dùng câu tầng A</b>
+                  <span className="small dim">
+                    {tierAReady ? (
+                      <>
+                        Chỉ lấy câu <b>giống đề thật</b> (tình huống dài, phương án là câu đầy đủ, có tiêu chí như MOST cost-effective) — ngân hàng có {tierStats.mockA} câu tầng A
+                        dùng được. Vẫn chia theo trọng số domain: domain nào thiếu câu tầng A thì được bù bằng câu tầng khác, app báo khi tạo bài.
+                      </>
+                    ) : (
+                      <>
+                        Cần ít nhất {meta.exam.questions} câu tầng A khác nhau (không tính câu anh em) — ngân hàng mới có {tierStats.eligibleA}. Xem số câu theo domain ở Ngân hàng
+                        → 📐 Chất lượng → 🏷️ Tầng câu hỏi.
+                      </>
+                    )}
                   </span>
                 </span>
               </label>
@@ -795,6 +856,28 @@ export function NewTest({ query }: { query: URLSearchParams }) {
           )}
 
           {showAdvanced && (
+            <div className="stack sm">
+              <div className="row between">
+                <b className="small">
+                  Tầng câu hỏi {filters.tiers?.length ? <span className="badge accent">{filters.tiers.length}</span> : null}
+                </b>
+                {filters.tiers?.length ? (
+                  <button className="btn ghost sm" onClick={() => set({ tiers: [] })}>
+                    Bỏ chọn
+                  </button>
+                ) : null}
+              </div>
+              <div className="row" style={{ gap: 6 }}>
+                {TIERS.map((t) => (
+                  <Chip key={t} on={filters.tiers?.includes(t)} onClick={() => set({ tiers: toggle(filters.tiers, t) })} count={tierStats.n[t]} title={TIER_INFO[t].title}>
+                    {TIER_INFO[t].label} · {TIER_INFO[t].short}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showAdvanced && (
             <>
               <div className="stack sm">
                 <b className="small">Nguồn câu hỏi</b>
@@ -839,6 +922,7 @@ export function NewTest({ query }: { query: URLSearchParams }) {
               {mode === 'sealed' && formId ? ` ${formId}` : ''}
             </div>
             {pearsonLike && <div className="small nt-accent">🏛 Mô phỏng Pearson VUE</div>}
+            {tierAOn && <div className="small nt-accent">🏷️ Chỉ câu tầng A (giống đề thật)</div>}
           </div>
 
           {mode !== 'pack' && !pearsonLike && mode !== 'diagnostic' && mode !== 'today' && (

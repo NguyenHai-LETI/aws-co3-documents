@@ -1,3 +1,4 @@
+import { tierOf } from './tier.ts';
 import type { AnswerRecord, DomainId, Question, QuestionState, SelectionFilters } from './types.ts';
 
 export function applyFilters(qs: Question[], f: SelectionFilters = {}): Question[] {
@@ -13,6 +14,7 @@ export function applyFilters(qs: Question[], f: SelectionFilters = {}): Question
     if (has(f.tags) && !q.tags.some((t) => f.tags!.includes(t))) return false;
     if (has(f.tasks) && !(q.task && f.tasks!.includes(q.task))) return false;
     if (has(f.requirements) && !(q.requirements ?? []).some((r) => f.requirements!.includes(r))) return false;
+    if (has(f.tiers) && !f.tiers!.includes(tierOf(q))) return false; // [v6]
     if (search) {
       const hay = `${q.id} ${q.stem} ${q.options.map((o) => o.text).join(' ')} ${q.services.join(' ')} ${q.tags.join(' ')} ${q.concept ?? ''}`.toLowerCase();
       if (!hay.includes(search)) return false;
@@ -84,7 +86,7 @@ export function retestIds(answers: readonly Pick<AnswerRecord, 'q' | 'ok' | 'pic
   return tiers.flat();
 }
 
-/** Any content filter set (packs, topics, domains, …, requirements, search)? Empty = the whole pool. */
+/** Any content filter set (packs, topics, domains, …, requirements, [v6] tiers, search)? Empty = the whole pool. */
 export function hasFilters(f: SelectionFilters | undefined): boolean {
   if (!f) return false;
   return Object.entries(f).some(([k, v]) => (k === 'search' ? typeof v === 'string' && v.trim() !== '' : Array.isArray(v) && v.length > 0));

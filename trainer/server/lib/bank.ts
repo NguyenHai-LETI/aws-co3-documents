@@ -6,9 +6,10 @@ import { loadTaxonomy, outOfScopeIn } from './taxonomy.ts';
 import { parsePack, type ParsedPack } from './pack-format.ts';
 import { clusterIndex } from './clusters.ts';
 import { assignSkills, guideSig } from './exam-guide.ts';
+import { questionTier } from '../../shared/tier.ts';
 import type { BankProblem, Pack, Question, Taxonomy } from '../../shared/types.ts';
 
-// ── computed fields: requirement categories (B4) and exam scope (B5) ────────────────────────────────────────
+// ── computed fields: requirement categories (B4), exam scope (B5) and [v6] tier (shared/tier.ts) ─────────────
 
 /** Requirement category of a negative question (NOT / EXCEPT / LEAST likely…) — not a taxonomy.keywords group. */
 export const NEGATIVE_REQUIREMENT = 'negative';
@@ -109,7 +110,7 @@ export function stemRequirements(stem: string, tax: Taxonomy): string[] {
   return out;
 }
 
-/** Out-of-scope services (taxonomy `scope: out`) named by the correct option(s) of a question. */
+/** Out-of-scope services (taxonomy `scope: out`, [v6] or `scope: legacy`) named by the correct option(s) of a question. */
 export function correctOutOfScope(q: Pick<Question, 'options' | 'answer'>, tax: Taxonomy): string[] {
   const text = q.options.filter((o) => q.answer.includes(o.key)).map((o) => o.text).join('\n');
   return outOfScopeIn(text, tax);
@@ -118,6 +119,7 @@ export function correctOutOfScope(q: Pick<Question, 'options' | 'answer'>, tax: 
 /** Fills the computed fields that depend on the taxonomy (once per parse: the taxonomy is part of the file signature). */
 function annotate(q: Question, tax: Taxonomy): void {
   q.requirements = stemRequirements(q.stem, tax);
+  q.tier = questionTier(q, tax); // [v6] after requirements: a qualifier group is a decision criterion
   if (correctOutOfScope(q, tax).length) q.outOfScope = true;
   else delete q.outOfScope;
 }

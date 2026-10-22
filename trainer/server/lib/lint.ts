@@ -9,22 +9,35 @@
 //            unemphasized NOT, a/an cue, overlapping options) → warning;
 //   low    = maintenance work for ENRICH (short explanation, a distractor naming an out-of-scope service) → warning.
 // Codes are stable: they are stored nowhere, but patch reports, the UI and `validate --lint` refer to them.
-// Taxonomy-aware rules (oos-answer, oos-distractor: services marked `scope: out`; [v5] stale-fact: taxonomy `currency:`)
-// run only when `tax` is passed. [v5] family-options needs the other members of the question's family (`ctx.family`, see
-// lintContext()): lintBank, validate and the drawer route pass them; a lone question is never flagged.
+// Taxonomy-aware rules (oos-answer, oos-distractor: services marked `scope: out` — [v6] or `scope: legacy`; [v5] stale-fact:
+// taxonomy `currency:`) run only when `tax` is passed. [v5] family-options needs the other members of the question's
+// family (`ctx.family`, see lintContext()): lintBank, validate and the drawer route pass them; a lone question is never flagged.
+// [v6] Exam-spec rules (stem-short, options-bare, no-criterion, explanation-coverage, doc-url-missing, options-nonparallel;
+// SCHEMA §6b) hold new AI / document questions to the exam-grade bar: they run only on "exam-spec" questions — origin
+// ai | doc, difficulty medium | hard, `created` on or after `ctx.examSpecSince` (default config quality.exam_spec_since;
+// '' = off). Older and hand-written questions are never flagged by them; none of them is high (they never reject an edit).
+import { CONFIG_FILE, loadConfig } from '../config.ts';
+import { stemRequirements, type BankState } from './bank.ts'; // used at call time only (bank.ts reaches this module through sealed.ts)
+import { detectServices } from './classify.ts';
+import { fileSig } from './index-db.ts';
 import { LETTER_REF_RE } from './pack-format.ts';
-import { outOfScopeIn } from './taxonomy.ts';
+import { legacySet, outOfScopeIn } from './taxonomy.ts';
+import { EXAM_LIKE_OPTION_WORDS, EXAM_LIKE_STEM_WORDS } from '../../shared/realism.ts';
+import { hasCriterion } from '../../shared/tier.ts';
 import { countWords } from '../../shared/timing.ts';
-import type { BankState } from './bank.ts';
 import type { LintFlaw, LintSeverity, LintSummary, Question, Taxonomy } from '../../shared/types.ts';
 
-export type LintInput = Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'explanation'>;
+/** What the rules read. [v6] origin / difficulty / created (exam-spec scope), refs, words and requirements are optional:
+ *  the full Question carries them; without them the exam-spec rules do not run. */
+export type LintInput = Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'explanation'> &
+  Partial<Pick<Question, 'origin' | 'difficulty' | 'created' | 'refs' | 'words' | 'requirements'>>;
 
 export interface LintRule {
   code: string;
   severity: LintSeverity;
   label: string; // Vietnamese, short (rule list, summary)
   fix: string; // Vietnamese, how to fix (UI, validate --lint)
+  examSpec?: boolean; // [v6] runs only on exam-spec questions (AI / document, medium / hard, created ≥ quality.exam_spec_since)
 }
 
 export const LINT_RULES: readonly LintRule[] = [
@@ -42,7 +55,7 @@ export const LINT_RULES: readonly LintRule[] = [
     code: 'oos-answer',
     severity: 'medium',
     label: 'Đáp án là dịch vụ ngoài phạm vi đề',
-    fix: 'Đề thật không hỏi dịch vụ ngoài phạm vi (danh sách chính thức SAA-C03): retire câu (status: retired) hoặc viết lại để đáp án là dịch vụ trong phạm vi.',
+    fix: 'Đề thật không hỏi dịch vụ ngoài phạm vi (danh sách chính thức SAA-C03) hay đã bị gỡ khỏi danh sách in-scope: retire câu (status: retired) hoặc viết lại để đáp án là dịch vụ trong phạm vi.',
   },
   {
     code: 'family-options',
@@ -56,12 +69,55 @@ export const LINT_RULES: readonly LintRule[] = [
     label: 'Kiến thức có thể đã lỗi thời',
     fix: 'Đối chiếu tài liệu AWS (URL trong thông báo): sửa theo tên / giới hạn hiện hành, viết “tên mới (tên cũ)” — hoặc chạy kiểm chứng bằng tài liệu AWS (🧪 Giải mù).',
   },
+  // [v6] exam-spec rules: only AI / document questions, medium / hard, created on or after quality.exam_spec_since
+  {
+    code: 'stem-short',
+    severity: 'medium',
+    examSpec: true,
+    label: 'Đề ngắn hơn đề thật',
+    fix: 'Viết đề thành tình huống ≥ 55 từ như đề thật: bối cảnh công ty → hiện trạng → ràng buộc cứng → câu hỏi đóng có tiêu chí.',
+  },
+  {
+    code: 'options-bare',
+    severity: 'medium',
+    examSpec: true,
+    label: 'Phương án quá ngắn',
+    fix: 'Mỗi phương án là một giải pháp hoàn chỉnh 1–2 câu (dịch vụ + cấu hình), trung bình ≥ 8 từ — không để tên dịch vụ trần.',
+  },
+  {
+    code: 'no-criterion',
+    severity: 'medium',
+    examSpec: true,
+    label: 'Đề không nêu tiêu chí chọn',
+    fix: 'Kết thúc đề bằng câu hỏi có tiêu chí: qualifier (MOST cost-effective, LEAST operational overhead, MOST secure…) hoặc “Which solution will meet these requirements?” sau các ràng buộc.',
+  },
+  {
+    code: 'explanation-coverage',
+    severity: 'medium',
+    examSpec: true,
+    label: 'Giải thích bỏ sót phương án nhiễu',
+    fix: 'Mỗi phương án nhiễu một dòng riêng “- <nội dung phương án>: vì sao sai” (gọi bằng nội dung, không bằng chữ cái).',
+  },
   { code: 'short-explanation', severity: 'low', label: 'Giải thích quá ngắn', fix: 'ENRICH “explain”: vì sao đúng + từng phương án nhiễu + tóm tắt 🇻🇳.' },
   {
     code: 'oos-distractor',
     severity: 'low',
     label: 'Phương án nhiễu là dịch vụ ngoài phạm vi',
-    fix: 'ENRICH “distractors”: thay bằng dịch vụ trong phạm vi hay bị nhầm với đáp án đúng — dịch vụ ngoài phạm vi bị loại ngay.',
+    fix: 'ENRICH “distractors”: thay bằng dịch vụ trong phạm vi hay bị nhầm với đáp án đúng — dịch vụ ngoài phạm vi (hay đã bị gỡ khỏi danh sách in-scope) bị loại ngay.',
+  },
+  {
+    code: 'doc-url-missing',
+    severity: 'low',
+    examSpec: true,
+    label: 'Thiếu link tài liệu AWS',
+    fix: 'Thêm URL tài liệu chính thức (https://docs.aws.amazon.com/… hoặc https://aws.amazon.com/…) vào refs hoặc cuối giải thích để kiểm chứng được đáp án.',
+  },
+  {
+    code: 'options-nonparallel',
+    severity: 'low',
+    examSpec: true,
+    label: 'Phương án không cùng dạng',
+    fix: 'Viết mọi phương án cùng một dạng: cùng mở đầu bằng động từ hành động (“Use…”, “Configure…”) hoặc cùng là cụm danh từ.',
   },
 ];
 
@@ -328,7 +384,10 @@ const CHOOSE_TAIL = '(?:\\s+(?:answers?|options?|choices?|responses?))?\\s*\\.?'
 const CHOOSE_PAREN_RE = new RegExp(`\\(\\s*(?:choose|select|pick)\\s+${COUNT}${CHOOSE_TAIL}\\s*\\)`, 'i');
 const CHOOSE_END_RE = new RegExp(`(?:^|[.?!:]\\s+)(?:choose|select|pick)\\s+${COUNT}${CHOOSE_TAIL}\\s*$`, 'i');
 
-/** The "(Choose N)" instruction of a stem: the count asked for and the text shown, or undefined. */
+/**
+ * The "(Choose N)" instruction of a stem: the count asked for and the text shown, or undefined. [v6] The real exam writes
+ * "(Select TWO.)", the bank "(Choose TWO)" (what the app writes): both, any case, with or without the period.
+ */
 export function chooseInstruction(stem: string): { count: number; text: string } | undefined {
   const plainStem = stem.replace(/[*_`]/g, '').trim();
   const m = plainStem.match(CHOOSE_PAREN_RE) ?? plainStem.match(CHOOSE_END_RE);
@@ -360,9 +419,18 @@ function shortExplanation(q: LintInput): LintFlaw[] {
   return [flaw('short-explanation', n ? `Giải thích chỉ ${n} từ (< ${SHORT_EXPLANATION_WORDS}) — chưa nói vì sao các phương án nhiễu sai` : 'Chưa có giải thích')];
 }
 
+/** [v6] "ngoài phạm vi đề thi (X)" for `scope: out` services, "đã bị gỡ khỏi danh sách in-scope của đề (Y)" for `scope: legacy`. */
+function scopeText(services: string[], tax: Taxonomy, outText: string): string {
+  const legacy = legacySet(tax);
+  const out = services.filter((s) => !legacy.has(s));
+  const gone = services.filter((s) => legacy.has(s));
+  return [out.length ? `${outText} (${out.join(', ')})` : '', gone.length ? `đã bị gỡ khỏi danh sách in-scope của đề (${gone.join(', ')})` : ''].filter(Boolean).join('; ');
+}
+
 /**
- * Exam scope (taxonomy `scope: out` = the official out-of-scope list): a correct option naming such a service makes the
- * whole question off-exam (oos-answer); otherwise each distractor naming one is an easy give-away (oos-distractor).
+ * Exam scope (taxonomy `scope: out` = the official out-of-scope list; [v6] `scope: legacy` = dropped from the official
+ * in-scope list or retired, treated the same): a correct option naming such a service makes the whole question off-exam
+ * (oos-answer); otherwise each distractor naming one is an easy give-away (oos-distractor).
  */
 function scopeFlaws(q: LintInput, tax?: Taxonomy): LintFlaw[] {
   if (!tax) return [];
@@ -371,9 +439,9 @@ function scopeFlaws(q: LintInput, tax?: Taxonomy): LintFlaw[] {
   const right = named.filter((x) => keys.has(x.o.key));
   if (right.length) {
     const services = [...new Set(right.flatMap((x) => x.services))];
-    return [flaw('oos-answer', `Đáp án đúng nêu dịch vụ ngoài phạm vi đề thi (${services.join(', ')}) — đề thật SAA-C03 không hỏi dịch vụ này`, right[0].o.key)];
+    return [flaw('oos-answer', `Đáp án đúng nêu dịch vụ ${scopeText(services, tax, 'ngoài phạm vi đề thi')} — đề thật SAA-C03 không hỏi dịch vụ này`, right[0].o.key)];
   }
-  return named.map((x) => flaw('oos-distractor', `Phương án nhiễu ${x.o.key} nêu dịch vụ ngoài phạm vi (${x.services.join(', ')}) — loại được ngay vì đề thật không dùng`, x.o.key));
+  return named.map((x) => flaw('oos-distractor', `Phương án nhiễu ${x.o.key} nêu dịch vụ ${scopeText(x.services, tax, 'ngoài phạm vi')} — loại được ngay vì đề thật không dùng`, x.o.key));
 }
 
 // ── [v5] qualifier families and stale facts ─────────────────────────────────
@@ -381,6 +449,7 @@ function scopeFlaws(q: LintInput, tax?: Taxonomy): LintFlaw[] {
 /** Bank context of a lint run: the members of the question's qualifier family (bank order, the question included). */
 export interface LintContext {
   family?: Pick<Question, 'id' | 'stem' | 'options' | 'answer'>[];
+  examSpecSince?: string; // [v6] YYYY-MM-DD from which AI / document questions are exam-spec ('' = off); default config quality.exam_spec_since
 }
 
 /** The family members of `q` (non-retired, bank order) — the context lintQuestion needs for `family-options`. */
@@ -446,6 +515,160 @@ function staleFacts(q: LintInput, tax?: Taxonomy): LintFlaw[] {
     .map(({ fact }) => flaw('stale-fact', `Có thể đã lỗi thời (${fact.id}): ${fact.fact} — từ ${fact.since}, nguồn ${fact.url}`));
 }
 
+// ── [v6] exam-spec rules (SCHEMA §6b) ───────────────────────────────────────
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
+let specMemo: { sig: string; since: string } | undefined;
+
+/** config quality.exam_spec_since as YYYY-MM-DD ('' = off, also for a malformed value); config.yaml re-read only when it changes. */
+export function examSpecSince(): string {
+  const sig = fileSig(CONFIG_FILE);
+  if (specMemo?.sig !== sig) {
+    const v: unknown = loadConfig().quality?.exam_spec_since;
+    const s = v instanceof Date ? v.toISOString() : String(v ?? '').trim();
+    specMemo = { sig, since: DATE_RE.test(s) ? s.slice(0, 10) : '' };
+  }
+  return specMemo.since;
+}
+
+const specCandidate = (q: Partial<Pick<Question, 'origin' | 'difficulty' | 'created'>>) =>
+  (q.origin === 'ai' || q.origin === 'doc') && (q.difficulty === 'medium' || q.difficulty === 'hard') && !!q.created && DATE_RE.test(q.created);
+
+/**
+ * Exam-spec question: written by the AI or from documents (origin ai | doc), medium / hard, created on or after `since`
+ * (default config quality.exam_spec_since; '' = no question is exam-spec).
+ */
+export function isExamSpec(q: Partial<Pick<Question, 'origin' | 'difficulty' | 'created'>>, since: string = examSpecSince()): boolean {
+  return !!since && specCandidate(q) && q.created!.slice(0, 10) >= since;
+}
+
+function stemShort(q: LintInput, tax?: Taxonomy): LintFlaw[] {
+  const min = tax?.timing?.long_form_min_words ?? EXAM_LIKE_STEM_WORDS;
+  const n = typeof q.words === 'number' && q.words >= 0 ? q.words : countWords(q.stem);
+  if (n >= min) return [];
+  return [flaw('stem-short', `Đề chỉ ${n} từ (< ${min}) — câu chuẩn đề thi là một tình huống đầy đủ: bối cảnh, hiện trạng, ràng buộc rồi câu hỏi`)];
+}
+
+function optionsBare(q: LintInput): LintFlaw[] {
+  if (!q.options.length) return [];
+  const avg = q.options.reduce((s, o) => s + countWords(o.text), 0) / q.options.length;
+  if (avg >= EXAM_LIKE_OPTION_WORDS) return [];
+  return [flaw('options-bare', `Phương án dài trung bình ${avg.toFixed(1).replace('.', ',')} từ (< ${EXAM_LIKE_OPTION_WORDS}) — đề thật dùng câu hành động hoàn chỉnh (dịch vụ + cấu hình), không phải tên dịch vụ trần`)];
+}
+
+function noCriterion(q: LintInput, tax?: Taxonomy): LintFlaw[] {
+  // re-parsed questions (AI drafts, patched blocks) carry no computed `requirements`: same rule as bank.ts annotate()
+  const requirements = q.requirements ?? (tax ? stemRequirements(q.stem, tax) : undefined);
+  if (hasCriterion({ stem: q.stem, options: q.options, requirements })) return [];
+  return [flaw('no-criterion', 'Đề không nêu tiêu chí chọn (qualifier như MOST cost-effective / LEAST operational overhead, hay “…meet these requirements?”) — nhiều phương án cùng chạy được thì không biết chọn theo tiêu chí nào')];
+}
+
+/** A bullet line naming one option by its content: "- Read replicas: …", "* **SSE-C** — …", "1. Snapshots : …" (not "https:"). */
+const isOptionLine = (line: string) => /^\s*(?:[-*+•]|\d+[.)])\s+\S[^\n]*?(?::(?:\s|$)|\s[—–]\s)/.test(line);
+
+function explanationCoverage(q: LintInput): LintFlaw[] {
+  const keys = correctKeys(q);
+  const distractors = q.options.filter((o) => !keys.has(o.key)).length;
+  if (!distractors) return [];
+  const lines = q.explanation.split('\n').filter(isOptionLine).length;
+  if (lines >= distractors) return [];
+  return [flaw('explanation-coverage', `Giải thích có ${lines} dòng “- …:” cho ${distractors} phương án nhiễu — mỗi phương án nhiễu cần một dòng riêng nói vì sao sai`)];
+}
+
+const AWS_DOC_URL = /https:\/\/(?:docs\.)?aws\.amazon\.com(?![\w.-])/i;
+
+function docUrlMissing(q: LintInput): LintFlaw[] {
+  if (AWS_DOC_URL.test(q.explanation) || (q.refs ?? []).some((r) => AWS_DOC_URL.test(r))) return [];
+  return [flaw('doc-url-missing', 'Giải thích và refs chưa có URL tài liệu AWS (https://docs.aws.amazon.com/… hoặc https://aws.amazon.com/…) — không kiểm chứng được đáp án')];
+}
+
+// Imperative verbs that open an action option ("Use …", "Set up …", "Turn on …"). Left out on purpose: words that also
+// open AWS noun phrases — "Read replicas", "Route 53", "Spread / Partition placement group", "Block Public Access",
+// "Mount targets", "Transfer Acceleration", "Tag / Filter policies", "Patch Manager", "Snapshot", "Load balancer"…
+const ACTION_VERBS = new Set(
+  (
+    'use configure create deploy enable set migrate store launch add move replace implement attach turn run schedule ' +
+    'allocate allow apply assign associate assume automate back build buy call capture centralize change choose collect ' +
+    'compress connect consolidate containerize convert copy decrease define delete deliver deny designate detach disable ' +
+    'distribute divide do download encrypt enforce establish export expose extend generate give grant import increase ' +
+    'ingest insert install integrate invoke isolate keep leverage limit lower make merge modify monitor offload ' +
+    'orchestrate pick place point poll prefetch promote protect provide provision publish purchase put query raise ' +
+    'rearchitect rebuild reboot redeploy redirect reduce refactor register rehost remove rename replatform replicate ' +
+    'request require reserve resize restore restrict retain rewrite rotate save scale select send shift ship specify ' +
+    'split start stop stream submit subscribe suspend switch sync synchronize take terminate toggle track transform ' +
+    'trigger tune update upgrade upload validate verify write'
+  ).split(' '),
+);
+// noun phrases that open with one of those verbs (AWS feature names)
+const VERB_LED_NAMES = /^(?:run\s+command|launch\s+(?:templates?|configurations?|wizard)|change\s+(?:sets?|manager|calendar)|schedule\s+expressions?)\b/i;
+
+/**
+ * Shape of an option's opening: 'verb' (an action: "Use…", "Configure…") or 'noun' (clearly a noun phrase: an article,
+ * Amazon / AWS, a product name or acronym such as "S3", "DynamoDB", "gp3", "Route 53", a taxonomy service such as
+ * "Aurora"). Anything else is undecided — a capitalised common word ("Dedicated Hosts", "Local disk", "Peer the VPCs")
+ * can be either, so it never counts (no false alarm on noun-phrase sets).
+ */
+function optionShape(text: string, tax?: Taxonomy): 'verb' | 'noun' | undefined {
+  const t = text.replace(/[*_`]/g, '').replace(/^[^\p{L}\p{N}]+/u, '');
+  const first = t.match(/^[\p{L}\p{N}][\p{L}\p{N}'’/-]*/u)?.[0];
+  if (!first) return undefined;
+  if (VERB_LED_NAMES.test(t) || /^route\s+53\b/i.test(t)) return 'noun';
+  if (ACTION_VERBS.has(first.toLowerCase())) return 'verb';
+  if (/^(?:a|an|the|amazon|aws)$/i.test(first)) return 'noun';
+  if (/^(?:SSH|RDP)$/.test(first)) return undefined; // used as verbs ("SSH into the instance")
+  if (/\d/.test(first) || (first.match(/\p{Lu}/gu)?.length ?? 0) >= 2) return 'noun';
+  return tax && detectServices(first, tax).length ? 'noun' : undefined;
+}
+
+function optionsNonparallel(q: LintInput, tax?: Taxonomy): LintFlaw[] {
+  const keys = correctKeys(q);
+  const right = q.options.filter((o) => keys.has(o.key));
+  const wrong = q.options.filter((o) => !keys.has(o.key));
+  if (!right.length || wrong.length < 2) return [];
+  const shape = optionShape(right[0].text, tax);
+  if (!shape || right.some((o) => optionShape(o.text, tax) !== shape)) return [];
+  const odd = wrong.filter((o) => optionShape(o.text, tax) === (shape === 'verb' ? 'noun' : 'verb'));
+  if (odd.length < 2) return [];
+  const opening = quote(`${right[0].text.trim().split(/\s+/).slice(0, 2).join(' ')} …`);
+  const others = `${odd.length} phương án nhiễu (${odd.map((o) => o.key).join(', ')})`;
+  const what = shape === 'verb' ? `Đáp án đúng mở đầu bằng động từ ${opening} còn ${others} là cụm danh từ` : `Đáp án đúng là cụm danh từ ${opening} còn ${others} mở đầu bằng động từ`;
+  return [flaw('options-nonparallel', `${what} — phương án khác dạng nhau làm lộ đáp án`, right[0].key)];
+}
+
+const EXAM_SPEC_CHECKS: ((q: LintInput, tax?: Taxonomy) => LintFlaw[])[] = [stemShort, optionsBare, noCriterion, explanationCoverage, docUrlMissing, optionsNonparallel];
+
+/** Pack-level exam-spec checks (validate): only packs with at least this many exam-spec questions… */
+export const PACK_SPEC_MIN_QUESTIONS = 8;
+/** …want ≥ 20 % multiple-response questions (the real exam: ~20–30 % "(Select TWO.)")… */
+export const PACK_SPEC_MIN_MULTI = 0.2;
+/** …and the key strictly the longest option in ≤ 25 % of them (chance with 4 options; AWS samples: 1 key in 13). */
+export const PACK_SPEC_MAX_LONGEST_KEY = 0.25;
+
+/** The (a) correct option is strictly longer than every distractor (characters). */
+const keyIsLongest = (q: Pick<Question, 'options' | 'answer'>) => {
+  const len = (right: boolean) => Math.max(0, ...q.options.filter((o) => q.answer.includes(o.key) === right).map((o) => o.text.trim().length));
+  const other = len(false);
+  return other > 0 && len(true) > other;
+};
+
+const pctOf = (n: number, total: number) => Math.round((100 * n) / total);
+
+/** [v6] Warnings for one pack's exam-spec questions (Vietnamese, one line each); [] below PACK_SPEC_MIN_QUESTIONS. */
+export function packSpecWarnings(qs: readonly Pick<Question, 'options' | 'answer'>[]): string[] {
+  const n = qs.length;
+  if (n < PACK_SPEC_MIN_QUESTIONS) return [];
+  const out: string[] = [];
+  const multi = qs.filter((q) => q.answer.length > 1).length;
+  if (multi / n < PACK_SPEC_MIN_MULTI) {
+    out.push(`${multi}/${n} câu chuẩn đề là câu nhiều đáp án (${pctOf(multi, n)} % < ${pctOf(PACK_SPEC_MIN_MULTI, 1)} %) — đề thật có khoảng 20–30 % câu “(Select TWO.)”: viết thêm câu chọn 2–3 đáp án`);
+  }
+  const longest = qs.filter(keyIsLongest).length;
+  if (longest / n > PACK_SPEC_MAX_LONGEST_KEY) {
+    out.push(`Đáp án đúng là phương án dài nhất ở ${longest}/${n} câu chuẩn đề (${pctOf(longest, n)} % > ${pctOf(PACK_SPEC_MAX_LONGEST_KEY, 1)} %) — người học đoán được nhờ độ dài: cân lại độ dài các phương án (ENRICH “balance”)`);
+  }
+  return out;
+}
+
 function flaw(code: string, message: string, option?: string): LintFlaw {
   const f: LintFlaw = { code, severity: RULE.get(code)!.severity, message };
   if (option) f.option = option;
@@ -471,11 +694,19 @@ const CHECKS: ((q: LintInput, tax?: Taxonomy) => LintFlaw[])[] = [
 const byRank = (a: LintFlaw, b: LintFlaw) =>
   SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || (CODE_RANK.get(a.code) ?? 99) - (CODE_RANK.get(b.code) ?? 99) || (a.option ?? '').localeCompare(b.option ?? '');
 
-/** Flaws of one question, most severe first. Pure function: no I/O. With `tax`, also the exam-scope rules (oos-*). */
-export function lintQuestion(q: Pick<Question, 'id' | 'stem' | 'options' | 'answer' | 'explanation'>, tax?: Taxonomy, ctx?: LintContext): LintFlaw[] {
+/**
+ * Flaws of one question, most severe first. Pure function: no I/O — except [v6] reading quality.exam_spec_since from
+ * config.yaml (memoized) for an AI / document medium-hard question when `ctx.examSpecSince` is not given. With `tax`,
+ * also the exam-scope rules (oos-*); [v6] exam-spec questions (isExamSpec) also get the exam-spec rules.
+ */
+export function lintQuestion(q: LintInput, tax?: Taxonomy, ctx?: LintContext): LintFlaw[] {
   const input: LintInput = { id: q.id, stem: q.stem ?? '', options: q.options ?? [], answer: q.answer ?? [], explanation: q.explanation ?? '' };
   const flaws = CHECKS.flatMap((check) => check(input, tax));
   if (ctx?.family?.length) flaws.push(...familyFlaws(input, ctx.family));
+  if (specCandidate(q) && isExamSpec(q, ctx?.examSpecSince ?? examSpecSince())) {
+    const spec: LintInput = { ...input, refs: q.refs ?? [], words: q.words, requirements: q.requirements };
+    flaws.push(...EXAM_SPEC_CHECKS.flatMap((check) => check(spec, tax)));
+  }
   return flaws.sort(byRank);
 }
 
@@ -500,12 +731,14 @@ let cache: { version: string; value: LintSummary } | undefined;
 const excludeKey = (exclude?: ReadonlySet<string>) => (exclude?.size ? [...exclude].sort().join(',') : '');
 
 /**
- * Lint every active question: per-rule counts, flagged ids per rule and the worst questions. Cached by bank version.
+ * Lint every active question: per-rule counts, flagged ids per rule and the worst questions. Cached by bank version
+ * ([v6] and the exam-spec date: config quality.exam_spec_since unless `opts.examSpecSince`).
  * `exclude` (sealed questions) are left out of every number and list.
  */
-export function lintBank(bank: BankState, opts: { cache?: boolean; exclude?: ReadonlySet<string> } = {}): LintSummary {
+export function lintBank(bank: BankState, opts: { cache?: boolean; exclude?: ReadonlySet<string>; examSpecSince?: string } = {}): LintSummary {
+  const since = opts.examSpecSince ?? examSpecSince();
   const useCache = opts.cache !== false && !!bank.version;
-  const key = `${bank.version}|${excludeKey(opts.exclude)}`;
+  const key = `${bank.version}|${excludeKey(opts.exclude)}|${since}`;
   if (useCache && cache?.version === key) return cache.value;
   const active = bank.questions.filter((q) => q.status === 'active' && !opts.exclude?.has(q.id));
   const byCode: LintSummary['byCode'] = {};
@@ -514,7 +747,7 @@ export function lintBank(bank: BankState, opts: { cache?: boolean; exclude?: Rea
   const bySeverity: Record<LintSeverity, number> = { high: 0, medium: 0, low: 0 };
   const flagged: { id: string; flaws: LintFlaw[]; rank: number[] }[] = [];
   for (const q of active) {
-    const flaws = lintQuestion(q, bank.taxonomy, lintContext(bank, q));
+    const flaws = lintQuestion(q, bank.taxonomy, { ...lintContext(bank, q), examSpecSince: since });
     if (!flaws.length) continue;
     for (const code of new Set(flaws.map((f) => f.code))) {
       const rule = RULE.get(code)!;
@@ -539,11 +772,12 @@ export function lintBank(bank: BankState, opts: { cache?: boolean; exclude?: Rea
 
 /** Every flagged active question for one rule (or all rules), worst first — the drill-down behind the summary cap. */
 export function lintQuestionsFor(bank: BankState, code?: string, exclude?: ReadonlySet<string>): { id: string; flaws: LintFlaw[] }[] {
-  const summary = lintBank(bank, { exclude });
+  const since = examSpecSince();
+  const summary = lintBank(bank, { exclude, examSpecSince: since });
   const wanted = code ? new Set(summary.ids?.[code] ?? []) : undefined;
   return bank.questions
     .filter((q) => q.status === 'active' && !exclude?.has(q.id) && (!wanted || wanted.has(q.id)))
-    .map((q) => ({ id: q.id, flaws: lintQuestion(q, bank.taxonomy, lintContext(bank, q)) }))
+    .map((q) => ({ id: q.id, flaws: lintQuestion(q, bank.taxonomy, { ...lintContext(bank, q), examSpecSince: since }) }))
     .filter((x) => x.flaws.length)
     .sort((a, b) => {
       const [x, y] = [badness(a.flaws), badness(b.flaws)];

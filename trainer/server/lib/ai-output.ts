@@ -10,6 +10,9 @@
 // (qualifier families: one scenario + one shared option set, 2–4 final questions with different requirements and keys,
 // `family: <id>`) are packs too; generate / longform may target exam-guide bullets (`skills`). Questions a pack adds are
 // recorded for "↩️ Hoàn tác" (undo.ts) before the pack is written.
+// [v6] New medium / hard questions are exam-spec (lint.ts isExamSpec): the exam-spec lint rules come back from checkDraft
+// as warnings (never a rejection — only high-severity flaws reject); a rejected question carries its medium ones into
+// the repair round (ItemFailure.warnings, examSpecWarnings) so the model fixes them along the way.
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
@@ -17,7 +20,7 @@ import { PACKS_DIR, REPO_DIR, rel } from '../config.ts';
 import { stemRequirements, type BankState } from './bank.ts';
 import { stringifyFrontMatter } from './frontmatter.ts';
 import { correctIsLongest, hintReveals, lintDelta, type LintFn } from './patch.ts';
-import { familyFlaws } from './lint.ts';
+import { LINT_RULES, familyFlaws } from './lint.ts';
 import { CHOOSE_RE, ID_RE, LETTER_REF_RE, SKILL_ID_RE, parsePack, serializePack, type QuestionDraft } from './pack-format.ts';
 import { normalizeDomain } from './taxonomy.ts';
 import { recordCreated } from './undo.ts';
@@ -241,6 +244,15 @@ export interface ItemFailure {
   id: string;
   errors: string[];
   label?: string; // what the id refers to (new questions: start of the stem)
+  warnings?: string[]; // [v6] non-blocking flaws to fix along the way (examSpecWarnings of the rejected question)
+}
+
+/** [v6] Medium exam-spec lint rules (stem-short, options-bare, no-criterion, explanation-coverage). */
+const SPEC_REPAIR_CODES = new Set(LINT_RULES.filter((r) => r.examSpec && r.severity === 'medium').map((r) => r.code));
+
+/** [v6] The medium exam-spec flaws among checkDraft warnings ("lint: … [stem-short]") — what ItemFailure.warnings carries. */
+export function examSpecWarnings(warnings: readonly string[]): string[] {
+  return warnings.filter((w) => SPEC_REPAIR_CODES.has(/^lint: [\s\S]*\[([a-z]+(?:-[a-z]+)*)(?: · [A-H])?\]$/.exec(w)?.[1] ?? ''));
 }
 
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
@@ -777,7 +789,7 @@ export function repairPrompt(task: StructuredTask, runId: string, failures: Item
         ? 'Mỗi họ sửa lại phải đủ các trường như lần đầu (scenario, options dùng chung, 2–4 members) và có `id` = id họ ở đầu dòng; `pack` giữ như cũ.'
         : 'Mỗi câu sửa lại phải đủ các trường như lần đầu và có `id` = id ở đầu dòng; `pack` giữ như cũ.',
     '',
-    ...failures.map((f) => `- \`${f.id}\`${f.label ? ` (${f.label})` : ''}: ${f.errors.join(' | ')}`),
+    ...failures.map((f) => `- \`${f.id}\`${f.label ? ` (${f.label})` : ''}: ${f.errors.join(' | ')}${f.warnings?.length ? ` — nên sửa luôn (không chặn): ${f.warnings.join(' | ')}` : ''}`),
     '',
     'Nhắc lại: gọi lựa chọn bằng NỘI DUNG (không "option B", "(C)", "= D", dòng bắt đầu "A:"/"A."), task cùng domain, hint không lộ đáp án,',
     'đáp án đúng không dài hơn hẳn các distractor, câu nhiều đáp án ghi "(Choose TWO)".',

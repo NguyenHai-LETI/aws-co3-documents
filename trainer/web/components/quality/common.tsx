@@ -59,14 +59,17 @@ export async function startEnrich(ids: string[], tasks: string, note?: string): 
   }
 }
 
-/** Blind-solve by a second model: explicit ids, a pack, or a scope ('unverified-ai' | 'changed' | 'new'). */
-export async function startVerify(params: { ids?: string[]; pack?: string; scope?: string }, label: string): Promise<boolean> {
+/**
+ * Blind-solve by a second model: explicit ids, a pack, or a scope ('unverified-ai' | 'changed' | 'new' | …); `what` names
+ * the kind of run in the toast ([v6] scope 'cues' = "dò" — the choices-only cue probe).
+ */
+export async function startVerify(params: { ids?: string[]; pack?: string; scope?: string }, label: string, what = 'giải mù'): Promise<boolean> {
   try {
     await api.post<{ run: CoachRunInfo }>('/api/verify/run', params);
-    toast(`🔎 Đã bắt đầu giải mù ${label} — xem log ở AI Coach.`);
+    toast(`🔎 Đã bắt đầu ${what} ${label} — xem log ở AI Coach.`);
     return true;
   } catch (e) {
-    toast(errorText(e, 'giải mù'));
+    toast(errorText(e, what));
     return false;
   }
 }
