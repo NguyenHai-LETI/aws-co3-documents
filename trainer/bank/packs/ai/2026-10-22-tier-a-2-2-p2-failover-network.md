@@ -123,6 +123,7 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover-pri
 - services: Route 53, ALB
 - tags: route53-routing, route53-health-checks, multi-region
 - difficulty: easy
+- time: 100
 - skills: 2.2.k1, 2.2.k6
 - concept: Latency alias records with Evaluate Target Health route each user to the fastest healthy Region
 - refs: 04-networking-services.md
@@ -130,21 +131,20 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover-pri
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 100
 
 A photo-sharing startup runs identical application stacks behind Application Load Balancers in us-east-1 and ap-southeast-1. Users are spread across the Americas and Asia. The startup wants each user's requests to go to the Region that responds fastest for that user, and if one Region becomes unhealthy, its users must be served automatically by the other Region. The operations team is small. Which Route 53 configuration meets these requirements?
 
 - A. Create geolocation records that map the Americas to us-east-1 and every other location to ap-southeast-1, with health checks on both load balancers
 - B. Create failover alias records with us-east-1 as the primary Region and ap-southeast-1 as the secondary Region, with Evaluate Target Health turned on
 - C. Create latency alias records for both load balancers with Evaluate Target Health turned on so that unhealthy Regions are skipped
-- D. Create weighted alias records with equal weights for both load balancers and attach health checks so that unhealthy Regions are skipped
+- D. Create geoproximity alias records for both load balancers with a bias of zero and Evaluate Target Health turned on so that unhealthy Regions are skipped
 
 **Answer:** C
 
 **Explanation:** Latency alias records send each user to the Region with the lowest measured latency, and with Evaluate Target Health on, Route 53 drops an unhealthy Region's record and answers with the healthy one, with no scripts to maintain.
 - Geolocation records: route by the user's location, not by measured latency (dùng sai tính năng).
 - Failover records: keep every user on us-east-1 until it fails, so Asian users see higher latency (vi phạm ràng buộc).
-- Equal-weight records: split traffic evenly wherever the user is (giải bài toán khác).
+- Geoproximity records: route by geographic distance to each Region, not by measured latency (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-latency.html
 > 🇻🇳 Mỗi user vào Region nhanh nhất + tự loại Region lỗi → latency routing + Evaluate Target Health.
 
@@ -157,6 +157,7 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-l
 - services: CloudFront, S3, Route 53
 - tags: s3-replication, s3-versioning, multi-region, high-availability
 - difficulty: medium
+- time: 120
 - skills: 2.2.k6, 2.2.k11
 - concept: A CloudFront origin group with a replicated second bucket fails over per request with unchanged URLs and no DNS logic
 - refs: 02-storage-services.md, 04-networking-services.md
@@ -164,20 +165,19 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy-l
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 An e-learning company serves course videos and PDFs from an Amazon S3 bucket in eu-west-1 through Amazon CloudFront. After a Regional S3 disruption, learners saw errors for hours. The company wants downloads to keep working automatically if the bucket in eu-west-1 is unavailable, without changing the URLs that learners use or adding DNS failover logic. Objects are written only by a publishing pipeline in eu-west-1. Which solution will meet these requirements with the LEAST operational overhead?
 
-- A. Increase the CloudFront default TTL to seven days so that cached objects remain available during a bucket outage
-- B. Enable S3 Versioning and Transfer Acceleration on the bucket so that requests are served through edge locations when its Region fails
+- A. Turn on CloudFront Origin Shield in eu-west-1 and raise the default TTL so that cached objects are served during a bucket outage
+- B. Enable S3 Versioning and Cross-Region Replication to a second bucket in eu-central-1 so that a copy of every object is available elsewhere
 - C. Replicate the bucket to a second bucket in eu-central-1 and create a Route 53 failover record that points the course domain name at the second bucket's website endpoint
 - D. Replicate the bucket to a second bucket in eu-central-1 with Cross-Region Replication and add both buckets to an origin group on the CloudFront distribution
 
 **Answer:** D
 
 **Explanation:** A CloudFront origin group switches per request to the secondary bucket when the primary returns an error, and Cross-Region Replication keeps the second bucket current, so learners keep the same URLs with no DNS changes.
-- Longer CloudFront TTL: helps only objects already cached; everything else still fails (giải bài toán khác).
-- Versioning with Transfer Acceleration: Transfer Acceleration speeds transfers and provides neither a second copy nor failover (dùng sai tính năng).
+- Origin Shield with a longer TTL: protects the origin and extends caching, but uncached objects still fail (giải bài toán khác).
+- Replication alone: a second copy exists, but CloudFront keeps requesting the failed bucket (vi phạm ràng buộc).
 - Route 53 failover to the second bucket: adds the DNS failover logic the company wants to avoid (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/high_availability_origin_failover.html
 > 🇻🇳 S3 một Region + CloudFront: bucket thứ hai + CRR + origin group → failover theo từng request, URL không đổi.
@@ -188,9 +188,10 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/high_av
 - domain: resilient
 - task: 2.2
 - topic: compute
-- services: EC2 Auto Scaling, ALB, CloudWatch
+- services: EC2 Auto Scaling, ALB, CloudWatch, Systems Manager
 - tags: elb-features, scaling-policies, high-availability
 - difficulty: medium
+- time: 120
 - skills: 2.2.k8, 2.2.s1
 - concept: An Auto Scaling group ignores load balancer health by default; turning on ELB health checks lets it replace instances the ALB reports unhealthy
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
@@ -198,20 +199,19 @@ Docs: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/high_av
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 An online retailer runs a web application on an Auto Scaling group of EC2 instances behind an Application Load Balancer. Last week an application process hung on several instances and returned HTTP 500 errors for every request. The ALB stopped sending traffic to those instances, but they stayed in service and capacity dropped until the team replaced them manually. The EC2 status checks for the instances were passing. The company wants unhealthy instances replaced automatically without code changes. What should a solutions architect do?
 
-- A. Create a target tracking scaling policy for the Auto Scaling group based on the request count per target of the group
-- B. Increase the interval and the unhealthy threshold of the load balancer health checks for the target group
+- A. Create a CloudWatch alarm on the Elastic Load Balancing UnHealthyHostCount metric of the target group with an Auto Scaling action that adds instances to the group
+- B. Monitor the application process with the CloudWatch agent and run a Systems Manager Automation runbook that restarts the process when its checks fail
 - C. Turn on Elastic Load Balancing health checks for the Auto Scaling group and set a grace period that covers instance startup
 - D. Create a CloudWatch alarm on the instance status check metric with an action that reboots the affected instances automatically
 
 **Answer:** C
 
 **Explanation:** By default an Auto Scaling group replaces an instance only when EC2 status checks fail, so instances the load balancer marks unhealthy stay in service; ELB health checks let the group replace them, and the grace period protects new ones.
-- Target tracking on request count: adds capacity but never replaces the hung instances (giải bài toán khác).
-- Longer interval and threshold: changes when the ALB stops routing, which already happens, not group replacement (dùng sai tính năng).
+- Scaling on UnHealthyHostCount: adds capacity but leaves the hung instances in service (giải bài toán khác).
+- Restarting the process with Automation: repairs the instance in place, but the company wants unhealthy instances replaced (vi phạm ràng buộc).
 - Reboot alarm on the status check: the checks pass, so the alarm never fires (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overview.html
 > 🇻🇳 ASG mặc định chỉ xét EC2 status check → bật ELB health check để thay instance mà ALB báo unhealthy.
@@ -222,9 +222,10 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overvi
 - domain: resilient
 - task: 2.2
 - topic: networking
-- services: ALB, EC2 Auto Scaling, Route 53
+- services: ALB, EC2 Auto Scaling
 - tags: elb-features, subnets, high-availability
 - difficulty: medium
+- time: 120
 - skills: 2.2.k8, 2.2.s2
 - concept: A load balancer routes only to targets in Availability Zones that are enabled for it, so a new zone needs a subnet added to the ALB
 - refs: 04-networking-services.md, C-kien-truc-web-app.md
@@ -232,21 +233,20 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overvi
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A company runs a web application on an Auto Scaling group that spans subnets in us-east-1a, us-east-1b, and us-east-1c and registers instances with an Application Load Balancer target group. To improve availability, the company recently added the us-east-1c subnet to the group. The new instances in us-east-1c show as unused in the target group and receive no traffic, while the instances in the other two zones run at high CPU. The load balancer was created with subnets in only us-east-1a and us-east-1b. What should a solutions architect do to use the new capacity?
 
-- A. Create a second Application Load Balancer with a subnet in us-east-1c and use Route 53 weighted records to split traffic between the two load balancers
+- A. Create a second target group for the us-east-1c instances and add it to the listener's forward action with an equal weight
 - B. Enable cross-zone load balancing on the load balancer so that traffic is distributed to every registered instance in each Availability Zone
-- C. Increase the health check grace period of the Auto Scaling group so that the new instances are marked healthy
+- C. Turn on Elastic Load Balancing health checks for the Auto Scaling group so that the unused instances in the us-east-1c subnet are replaced
 - D. Add a subnet in us-east-1c to the load balancer so that the Availability Zone is enabled for it
 
 **Answer:** D
 
 **Explanation:** A load balancer sends traffic only to targets in Availability Zones that are enabled for it, which requires a subnet in that zone; instances registered from other zones show as unused until then.
-- Second ALB with weighted records: adds cost and DNS management for a one-setting problem (tốn vận hành hơn).
+- Second weighted target group: its targets are still in a zone that the load balancer does not serve (dùng sai tính năng).
 - Cross-zone load balancing: already on for an ALB and it does not enable a zone (dùng sai tính năng).
-- Longer grace period: concerns when Auto Scaling starts health checks, not where the load balancer routes (giải bài toán khác).
+- ELB health checks for the group: the replacements land in the same unused zone (giải bài toán khác).
 Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html
 > 🇻🇳 ALB chỉ gửi traffic tới AZ đã được bật (có subnet) → thêm subnet của AZ mới vào ALB.
 
@@ -256,7 +256,7 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elas
 - domain: resilient
 - task: 2.2
 - topic: networking
-- services: NAT Gateway, VPC, Internet Gateway
+- services: NAT Gateway, VPC, Internet Gateway, PrivateLink
 - tags: subnets, high-availability, egress-only-igw
 - difficulty: medium
 - time: 135
@@ -270,18 +270,18 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elas
 
 A company runs application servers in private subnets in three Availability Zones. All three private subnets share one route table whose default route points to a single NAT gateway in a public subnet in us-east-1a. The servers call external payment APIs. During an outage of us-east-1a, servers in all three zones lost outbound internet access. The company wants to remove this single point of failure while avoiding cross-zone dependencies. Which combination of steps will meet these requirements? (Choose TWO)
 
-- A. Add a second NAT gateway to the public subnet in the same Availability Zone and configure equal-cost multipath routing in the route table between the two gateways
+- A. Create a second NAT gateway in us-east-1b and add it to the shared route table as a backup default route with a lower priority
 - B. Create a NAT gateway in a public subnet in each Availability Zone that contains private subnets
-- C. Replace the NAT gateway with a NAT instance in an Auto Scaling group of size one in us-east-1a
+- C. Create interface VPC endpoints in each Availability Zone for the public APIs that the servers call so that outbound traffic no longer depends on the NAT gateway
 - D. Create a route table for each private subnet that sends 0.0.0.0/0 to the NAT gateway in the same Availability Zone
-- E. Create an egress-only internet gateway and route 0.0.0.0/0 from the private subnets to it
+- E. Assign IPv6 addresses to the private subnets and send outbound traffic through an egress-only internet gateway, which is not tied to one zone
 
 **Answer:** B, D
 
 **Explanation:** A zonal NAT gateway is redundant only within its own Availability Zone, so each zone needs its own gateway, and each private subnet's route table must send the default route to the same-zone gateway. (A regional NAT gateway, available since November 2025, spans zones automatically, but it is not offered here.)
-- Second gateway in one zone with multipath routing: a route has a single target and both gateways fail with that zone (cấu hình không tồn tại).
-- NAT instance in a one-instance group in us-east-1a: still one zone, plus patching work (tốn vận hành hơn).
-- Egress-only internet gateway: outbound access for IPv6 only, not IPv4 NAT (dùng sai tính năng).
+- Backup default route with a priority: a route table cannot hold two routes for the same destination (cấu hình không tồn tại).
+- Interface endpoints: reach AWS and PrivateLink services, not the payment providers' public APIs (giải bài toán khác).
+- Egress-only internet gateway: outbound access for IPv6 only, not the IPv4 NAT the servers use (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-scenarios.html
 > 🇻🇳 NAT gateway kiểu zonal chỉ chịu lỗi trong 1 AZ → mỗi AZ một NAT gateway + route table từng AZ trỏ về NAT cùng AZ (NAT gateway kiểu regional từ 11/2025 tự trải nhiều AZ).
 
@@ -294,6 +294,7 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-scenarios.htm
 - services: EC2, EC2 Auto Scaling, CloudWatch
 - tags: capacity-reservation, reserved-instances, dr-warm-standby, multi-region
 - difficulty: hard
+- time: 160
 - skills: 2.2.k10, 2.2.s6
 - concept: A standby Region needs raised Regional service quotas and On-Demand Capacity Reservations before a disaster, not just a larger Auto Scaling maximum
 - refs: 01-compute-services.md, A-nen-tang-kien-truc.md
@@ -301,22 +302,21 @@ Docs: https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-scenarios.htm
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 155
 
 A company keeps a warm standby in us-west-2 for its production workload in us-east-1. The standby runs two m6i.large instances, while production runs 120 instances of that type. During a DR test, the Auto Scaling group in us-west-2, whose maximum size is already 150, tried to scale out and many launches failed: some with VcpuLimitExceeded errors and others with InsufficientInstanceCapacity errors. The company wants the next failover to reach full production capacity without launch failures. Which combination of actions will meet these requirements? (Choose TWO)
 
 - A. Purchase Regional Reserved Instances in us-west-2 for the production fleet size to secure the capacity
-- B. Increase the maximum size of the Auto Scaling group in us-west-2 to 200 instances
+- B. Request an increase of the On-Demand vCPU service quota in us-east-1 so that the account can run the production fleet at peak size
 - C. Request an increase of the On-Demand vCPU service quota in us-west-2 that covers the production fleet at peak size
-- D. Create a CloudWatch alarm on the vCPU quota utilization in us-west-2 that notifies the operations team at a high threshold
+- D. Turn on capacity rebalancing for the Auto Scaling group in us-west-2 so that failed launches are retried in other Availability Zones
 - E. Create On-Demand Capacity Reservations in us-west-2 for the instances and Availability Zones that a disaster recovery will need
 
 **Answer:** C, E
 
 **Explanation:** VcpuLimitExceeded means the DR Region's On-Demand quota is too low (quotas apply per Region), and InsufficientInstanceCapacity means capacity was not available, which On-Demand Capacity Reservations secure in advance, so both fixes are needed before a disaster.
 - Regional Reserved Instances: give a billing discount but reserve no capacity (dùng sai tính năng).
-- Higher Auto Scaling maximum: the group's maximum was already above the fleet size, so it was not the limit (giải bài toán khác).
-- Quota utilization alarm: a useful alert, but it neither raises the quota nor reserves capacity (đúng một phần).
+- Quota increase in us-east-1: quotas apply per Region, and the failures happened in us-west-2 (đặt sai chỗ).
+- Capacity rebalancing: replaces Spot Instances at elevated risk of interruption, not failed On-Demand launches (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-reservations.html
 > 🇻🇳 Region DR cần tăng quota (theo Region) VÀ đặt Capacity Reservation trước khi thảm hoạ xảy ra.
 

@@ -18,6 +18,7 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.2: S
 - services: Secrets Manager, Systems Manager, Aurora, ECS, Fargate
 - tags: key-rotation, multi-region
 - difficulty: medium
+- time: 125
 - skills: 1.2.k1, 1.2.s3
 - concept: Secrets Manager rotates credentials automatically and replicates the rotated value to replica Regions; Parameter Store has no native rotation or multi-Region replication
 - refs: 05-security-services.md
@@ -25,23 +26,22 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 1.2: S
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
 A fintech company runs an order service on Amazon ECS with AWS Fargate in two Regions in front of an Amazon Aurora global database. The packaged application supports only user name and password authentication to the database. Policy requires the database password to be rotated on a 30-day schedule, and the application in the secondary Region must read the same credentials from a local source even when the primary Region is unavailable. The team wants the LEAST operational overhead. Which solution will meet these requirements?
 
-- A. Store the credentials as SecureString parameters in Parameter Store in each Region and schedule a Lambda function in each Region on a 30-day cycle to change the password and update the parameter
+- A. Store the credentials as separate AWS Secrets Manager secrets in each Region and turn on managed rotation on a 30-day schedule for each secret independently
 - B. Store the credentials in AWS Secrets Manager, configure rotation on a 30-day schedule for the secret, and replicate the secret to the secondary Region
-- C. Turn on IAM database authentication for the Aurora cluster so that the tasks request short-lived authentication tokens instead of using a stored password
-- D. Store the credentials as a SecureString parameter in the primary Region and let the tasks in the secondary Region read the parameter across Regions
+- C. Turn on IAM database authentication for the Aurora global database so that the tasks in both Regions request short-lived tokens through their task roles
+- D. Store the credentials in AWS Secrets Manager with 30-day rotation in the primary Region and have the tasks in the secondary Region read that secret across Regions
 
 **Answer:** B
 
-**Explanation:** Secrets Manager rotates the password on a schedule and propagates the rotated value to replica secrets, so the secondary Region reads a local copy without custom code.
-- Parameter Store with scheduled Lambda functions: has no native rotation, so the team builds and runs the logic in each Region (tốn vận hành hơn)
+**Explanation:** Secrets Manager rotates the password on schedule and propagates each rotated value to the replica secret, so the secondary Region reads the same credentials locally.
+- Separate rotating secrets per Region: each rotation sets its own password for the shared database user, so the copies diverge (vi phạm ràng buộc)
 - IAM database authentication: the application supports passwords only (vi phạm ràng buộc)
-- Cross-Region parameter reads: no rotation, and the secondary Region depends on the primary Region (vi phạm ràng buộc)
+- Cross-Region reads of the primary secret: the secondary Region depends on the primary Region (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/replicate-secrets.html
-> 🇻🇳 Xoay mật khẩu tự động + bản sao đa Region → Secrets Manager; Parameter Store không có rotation hay replication.
+> 🇻🇳 Xoay mật khẩu tự động + bản sao đọc tại chỗ ở Region phụ → một secret Secrets Manager có rotation + replica.
 
 ---
 
@@ -52,6 +52,7 @@ Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/replicate-secr
 - services: Secrets Manager, KMS, Lambda, IAM
 - tags: cross-account-access, iam-policies
 - difficulty: hard
+- time: 130
 - skills: 1.2.k1, 1.2.s3
 - concept: Cross-account access to a secret needs a resource policy, an identity policy, and a customer managed KMS key because the aws/secretsmanager key policy cannot be changed
 - refs: 05-security-services.md
@@ -59,23 +60,22 @@ Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/replicate-secr
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A central security account stores a database secret in AWS Secrets Manager. The secret is encrypted with the default AWS managed key aws/secretsmanager. An AWS Lambda function in a separate application account must retrieve the secret at runtime. The security team wants to grant this access without copying the secret and without sharing IAM user credentials between accounts. Which solution will meet these requirements?
 
-- A. Add the application account to the key policy of the aws/secretsmanager key and attach a resource policy that allows the Lambda execution role to the secret
-- B. Create an IAM user in the security account and store its access keys in environment variables of the Lambda function in the application account
-- C. Re-encrypt the secret with a customer managed KMS key, attach a resource policy for the Lambda role to the secret, and let the role call kms:Decrypt on that key
-- D. Use Secrets Manager replication to copy the secret into the application account and let the Lambda function read the replica from there
+- A. Keep the aws/secretsmanager key, attach a resource policy that allows the Lambda execution role to read the secret, and grant the role GetSecretValue
+- B. Re-encrypt the secret with a customer managed KMS key and attach a resource policy that allows the Lambda execution role to read the secret
+- C. Re-encrypt the secret with a customer managed KMS key, attach a resource policy for the Lambda role to the secret, and allow that role kms:Decrypt in the key policy
+- D. Replicate the secret into the application account with Secrets Manager replication and let the Lambda function read the replica locally
 
 **Answer:** C
 
-**Explanation:** Cross-account access needs the secret's resource policy, an identity policy for the role, and permission on the KMS key. The AWS managed key cannot be shared, so a customer managed key with a key policy is required.
-- Editing the aws/secretsmanager key policy: AWS managed key policies cannot be changed (cấu hình không tồn tại)
-- IAM user access keys: shares long-term credentials across accounts (vi phạm ràng buộc)
-- Replication to the application account: replication copies secrets to other Regions, not accounts (dùng sai tính năng)
+**Explanation:** Cross-account access to a secret needs the secret's resource policy, the role's identity policy, and permission on the KMS key. The AWS managed key cannot be shared, so the secret moves to a customer managed key whose key policy admits the role.
+- aws/secretsmanager with a resource policy: the AWS managed key cannot be used from another account (dùng sai tính năng)
+- Customer managed key without a key policy grant: the role can request the secret but cannot decrypt it (giải bài toán khác)
+- Replication: copies the secret, which the team forbids, and targets other Regions rather than accounts (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_examples_cross.html
-> 🇻🇳 Chia sẻ secret giữa tài khoản: resource policy + identity policy + khoá KMS tự quản (không dùng aws/secretsmanager).
+> 🇻🇳 Chia sẻ secret giữa tài khoản: resource policy + identity policy + khoá KMS tự quản có key policy cho role.
 
 ---
 
@@ -98,17 +98,17 @@ Docs: https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-acces
 A fitness startup is building a mobile app. Users sign up with an email address and password. The app must upload each user's workout videos directly to an Amazon S3 bucket, and each user must be able to reach objects under only their own prefix. The team does not want to run authentication servers or ship long-term AWS credentials inside the app. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Create an Amazon Cognito user pool for sign-up and sign-in, and exchange its tokens for temporary AWS credentials by using a Cognito identity pool
-- B. Create an IAM user for each app user and ship the long-term credentials as access keys in the secure storage of the mobile device on each phone
+- B. Attach an IAM role to the identity pool that allows object actions on the whole bucket and record each user's identity ID as an object tag
 - C. Attach an IAM role to the identity pool that allows object actions under a prefix built with the cognito-identity.amazonaws.com:sub variable
-- D. Attach the S3 permissions policy directly to the Cognito user pool so that signed-in users inherit access to their own prefix in the bucket and its objects
-- E. Configure a bucket policy that allows uploads from any principal and require the app to use random object names for the videos that it stores
+- D. Create user pool groups that map to IAM roles in the identity pool, with one role and one bucket prefix for each group of users
+- E. Turn on unauthenticated guest access in the identity pool and give the guest role temporary credentials to upload under a prefix for each device
 
 **Answer:** A, C
 
 **Explanation:** The user pool handles sign-up and sign-in, the identity pool trades the token for temporary credentials, and a role policy with the identity ID variable limits each user to a personal prefix.
-- IAM user per app user: long-term keys on devices, and this does not scale (vi phạm ràng buộc)
-- Policy attached to the user pool: user pools cannot hold IAM permissions (cấu hình không tồn tại)
-- Open bucket policy with random names: obscurity is not access control (vi phạm ràng buộc)
+- Role on the whole bucket with tags: any user could read or overwrite other users' objects (vi phạm ràng buộc)
+- Group roles with a prefix per group: users in one group share a prefix (vi phạm ràng buộc)
+- Guest access per device: credentials are not tied to the signed-in user, so per-user isolation is lost (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/cognito/latest/developerguide/iam-roles.html
 > 🇻🇳 User pool = đăng nhập; identity pool = cấp credential tạm; biến ${cognito-identity.amazonaws.com:sub} giới hạn prefix từng user.
 
@@ -121,6 +121,7 @@ Docs: https://docs.aws.amazon.com/cognito/latest/developerguide/iam-roles.html
 - services: GuardDuty, Macie, Inspector, Security Hub, S3
 - tags: threat-detection, compliance
 - difficulty: medium
+- time: 130
 - skills: 1.2.k5
 - concept: GuardDuty Malware Protection for S3 scans new uploads for malware; Macie discovers PII in S3 objects; Inspector and Security Hub do neither
 - refs: 05-security-services.md
@@ -128,22 +129,21 @@ Docs: https://docs.aws.amazon.com/cognito/latest/developerguide/iam-roles.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 An insurance company lets customers upload claim documents, such as PDF files and images, to an Amazon S3 bucket. Security must detect uploaded files that contain malware before downstream workflows use them, and must discover which objects contain personally identifiable information such as national ID numbers. The team wants managed services and no custom scanning code. Which combination of actions will meet these requirements? (Choose TWO)
 
-- A. Enable Amazon Inspector so that it scans the objects in the bucket for malware and for personally identifiable information
+- A. Create an Amazon Macie sensitive data discovery job with custom data identifiers that match known malware signatures in the uploaded S3 objects
 - B. Enable GuardDuty Malware Protection for S3 on the bucket so that newly uploaded objects are scanned automatically
-- C. Enable AWS Security Hub so that it runs sensitive data discovery and malware checks on the content of the uploaded objects
-- D. Enable GuardDuty S3 Protection so that it identifies the objects that contain national ID numbers in their content
+- C. Enable GuardDuty Malware Protection for EC2 on the instances that process the documents so that their volumes are scanned for malware
+- D. Enable AWS Security Hub with the Foundational Security Best Practices standard so that it flags the buckets that contain national ID numbers
 - E. Create an Amazon Macie sensitive data discovery job for the bucket to find objects that contain national ID numbers
 
 **Answer:** B, E
 
-**Explanation:** Malware Protection for S3 scans each new object and publishes the result, while Macie uses managed data identifiers to find PII such as national ID numbers.
-- Inspector: scans EC2 instances, container images, and Lambda functions, not S3 objects (dùng sai tính năng)
-- Security Hub: aggregates findings and does not inspect object content (giải bài toán khác)
-- GuardDuty S3 Protection: detects suspicious access patterns, not the content of objects (dùng sai tính năng)
+**Explanation:** Malware Protection for S3 scans each new object as it arrives and tags the result, while Macie uses managed data identifiers to find PII such as national ID numbers.
+- Macie custom identifiers for malware: pattern matching on text is not malware detection (dùng sai tính năng)
+- Malware Protection for EC2: scans instance volumes after a GuardDuty finding, so files can reach the workflow first (vi phạm ràng buộc)
+- Security Hub best-practice standard: checks bucket configuration, not object content (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.html
 > 🇻🇳 Mã độc trong file upload → GuardDuty Malware Protection for S3; tìm PII trong S3 → Macie.
 
@@ -156,6 +156,7 @@ Docs: https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.
 - services: Inspector, EC2, ECR, Lambda, Organizations
 - tags: threat-detection, compliance
 - difficulty: easy
+- time: 100
 - skills: 1.2.k5
 - concept: Amazon Inspector continuously scans EC2, ECR images, and Lambda functions for software vulnerabilities and can be activated organization-wide
 - refs: 05-security-services.md
@@ -163,21 +164,20 @@ Docs: https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 100
 
 A SaaS company runs several hundred Amazon EC2 instances, container images in Amazon ECR, and AWS Lambda functions across ten AWS accounts in an AWS Organizations organization. After a critical software vulnerability was published last week, the security team spent two days checking by hand which workloads were affected. The company wants continuous, automated detection of newly published software vulnerabilities for all three workload types, with findings reviewed in one place. Which solution will meet these requirements with the LEAST operational overhead?
 
 - A. Activate Amazon Inspector for the organization by using a delegated administrator account and review the findings centrally
-- B. Enable Amazon GuardDuty for the organization by using a delegated administrator account and review its findings for software vulnerabilities
-- C. Run AWS Systems Manager Patch Manager scans on a schedule in each account and review the compliance reports centrally
-- D. Create an AWS Config conformance pack that evaluates the installed software versions and aggregate the results in one account
+- B. Activate Amazon Inspector separately in each of the ten accounts and review the findings in the console of each account
+- C. Use Systems Manager Patch Manager patch policies from Quick Setup for the organization and review patch compliance centrally
+- D. Turn on Amazon ECR enhanced scanning for the registries in each account and review the image findings centrally
 
 **Answer:** A
 
-**Explanation:** Inspector discovers EC2 instances, ECR images, and Lambda functions automatically, rescans when a new CVE is published, and a delegated administrator gives one place to review findings.
-- GuardDuty: detects threats such as unusual activity, not software vulnerabilities (giải bài toán khác)
-- Patch Manager scans: cover missing patches on managed instances on a schedule, not images or functions (giải bài toán khác)
-- Config conformance pack: evaluates resource configuration and does not match packages to CVEs (dùng sai tính năng)
+**Explanation:** Inspector discovers EC2 instances, ECR images, and Lambda functions automatically, rescans them when new CVEs are published, and a delegated administrator gives one place to review findings for the organization.
+- Inspector per account: same scanning, but findings stay in ten separate consoles (vi phạm ràng buộc)
+- Patch Manager patch policies: report missing OS patches on managed instances, not images or functions (giải bài toán khác)
+- ECR enhanced scanning: covers container images only (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html
 > 🇻🇳 Quét lỗ hổng CVE liên tục cho EC2 + ECR + Lambda, quản lý tập trung qua Organizations → Amazon Inspector.
 
@@ -190,6 +190,7 @@ Docs: https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html
 - services: Security Hub, GuardDuty, Inspector, Macie, Organizations
 - tags: threat-detection, centralized-logging
 - difficulty: medium
+- time: 105
 - skills: 1.2.k5
 - concept: Security Hub aggregates findings from GuardDuty, Inspector, and Macie across accounts with a delegated administrator and across Regions with an aggregation Region
 - refs: 05-security-services.md
@@ -197,20 +198,19 @@ Docs: https://docs.aws.amazon.com/inspector/latest/user/what-is-inspector.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A retail company uses AWS Organizations with 60 member accounts in three AWS Regions. GuardDuty, Inspector, and Macie are enabled in every account. Security analysts must review the findings of these services from a single console, in a normalized format, with findings from the member accounts and from all three Regions visible in one Region. Which solution will meet these requirements with the LEAST operational overhead?
 
-- A. Export the findings of each service in each account to an S3 bucket in a central security account and query the findings with Amazon Athena
-- B. Enable Amazon Detective in the AWS Organizations management account and add the member accounts to its behavior graph in each Region
-- C. Create an AWS Config aggregator in the management account and review the aggregated compliance results of the member accounts
+- A. Designate a Security Hub delegated administrator in Organizations and enable Security Hub in the Region where the security analysts work
+- B. Designate a GuardDuty delegated administrator in Organizations and enable GuardDuty in each Region with findings exported to one Region
+- C. Create an AWS Config aggregator in a delegated administrator account that collects data from every member account and Region
 - D. Designate a Security Hub delegated administrator in Organizations, enable Security Hub in each Region, and choose an aggregation Region
 
 **Answer:** D
 
 **Explanation:** Security Hub receives findings from GuardDuty, Inspector, and Macie in a standard format, a delegated administrator covers the member accounts, and an aggregation Region brings findings from the other Regions into one place.
-- S3 export with Athena: custom pipeline to build and maintain, with no normalization (tốn vận hành hơn)
-- Detective: investigates the root cause of findings and does not aggregate them (giải bài toán khác)
+- Security Hub in the analysts' Region alone: findings from the other two Regions are not collected (vi phạm ràng buộc)
+- GuardDuty delegated administrator: centralizes GuardDuty findings only, not Inspector or Macie (giải bài toán khác)
 - Config aggregator: collects configuration and compliance data, not security findings (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html
 > 🇻🇳 Gom finding GuardDuty/Inspector/Macie nhiều tài khoản + Region vào một chỗ → Security Hub (delegated admin + aggregation Region).
@@ -224,6 +224,7 @@ Docs: https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityh
 - services: WAF, API Gateway, Shield
 - tags: web-attacks, ddos-protection
 - difficulty: medium
+- time: 110
 - skills: 1.2.k6, 1.2.s3
 - concept: AWS WAF web ACLs attach to API Gateway REST API stages; managed SQL rule groups and rate-based rules block injection and abusive IPs
 - refs: 05-security-services.md
@@ -231,21 +232,20 @@ Docs: https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityh
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 An online retailer exposes a REST API through a Regional Amazon API Gateway endpoint. Attackers send SQL injection payloads in the request bodies, and a few IP addresses call the checkout resource thousands of times per minute. The company must block both kinds of traffic without changing the API code and with the LEAST operational overhead. Which solution will meet these requirements?
 
-- A. Configure usage plans with API keys and per-key throttling limits on the API stage and require every client to send a key
-- B. Add network ACL deny entries for the offending IP addresses and for known SQL injection patterns to the subnets of the API clients
+- A. Associate an AWS WAF web ACL with the API stage that uses the AWS managed SQL database rule group and an IP set of the offending addresses
+- B. Configure usage plans with API keys and per-key throttling limits on the API stage, and require every client to send its key
 - C. Associate an AWS WAF web ACL with the API stage that uses the AWS managed SQL database rule group and a rate-based rule
-- D. Enable AWS Shield Advanced on the API stage and rely on its automatic mitigation to block the injection attempts and the IP addresses
+- D. Put an Amazon CloudFront distribution in front of the API, subscribe to AWS Shield Advanced, and add the distribution as a protected resource
 
 **Answer:** C
 
-**Explanation:** A web ACL attached to the API stage inspects request content with the managed SQL database rule group and blocks IP addresses that exceed a request rate, with no code change.
-- Usage plans with API keys: throttle per key, do not inspect payloads or block IP addresses (dùng sai tính năng)
-- Network ACL entries: API Gateway endpoints are outside the client subnets and ACLs cannot read request bodies (đặt sai chỗ)
-- Shield Advanced on the API stage: protects other resource types and targets DDoS events, not injection (giải bài toán khác)
+**Explanation:** A web ACL on the API stage inspects request bodies with the managed SQL database rule group, and a rate-based rule blocks whichever IP addresses exceed the rate, with no code change and no list to maintain.
+- Web ACL with an IP set of offenders: blocks today's addresses only, so the list needs constant updates (tốn vận hành hơn)
+- Usage plans with API keys: throttle per key and do not inspect payloads (giải bài toán khác)
+- CloudFront with Shield Advanced: targets DDoS events, not SQL injection payloads (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-use-case.html
 > 🇻🇳 SQL injection + giới hạn tốc độ theo IP trên API Gateway → AWS WAF (managed SQLi rule group + rate-based rule).
 
@@ -269,17 +269,17 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-gro
 
 A gaming company serves players through Amazon Route 53, an Amazon CloudFront distribution, and an internet-facing Application Load Balancer. A large HTTP flood recently made the game unavailable and caused a large scaling bill. The company has an AWS Enterprise Support plan. It wants 24/7 access to AWS DDoS experts during attacks, credits for attack-related scaling costs, and automatic mitigation of layer 7 floods without writing rules during an incident. Which solution will meet these requirements?
 
-- A. Subscribe to AWS Shield Advanced, add the CloudFront distribution and the load balancer as protected resources, and add the AWS WAF Anti-DDoS managed rule group to their web ACLs
-- B. Rely on AWS Shield Standard for DDoS protection and create AWS WAF rate-based rules on the CloudFront distribution that block IP addresses above a request threshold
-- C. Deploy AWS Network Firewall in the VPC with automatic layer 4 rules that drop traffic from known attacker IP address ranges as DDoS mitigation at the subnet edge
-- D. Use AWS Firewall Manager to create security group policies that restrict the load balancer to the CloudFront IP address ranges
+- A. Subscribe to AWS Shield Advanced, protect the CloudFront distribution and the load balancer, and add the AWS WAF Anti-DDoS managed rule group to their web ACLs
+- B. Add the AWS WAF Anti-DDoS managed rule group and a rate-based rule to the web ACLs of the CloudFront distribution and the load balancer
+- C. Subscribe to AWS Shield Advanced, protect the CloudFront distribution and the load balancer, and have the team add rate-based rules to their web ACLs when an attack starts
+- D. Use AWS Firewall Manager to deploy rate-based rules and the AWS managed IP reputation rule group to the distribution and the load balancer
 
 **Answer:** A
 
-**Explanation:** Shield Advanced provides access to the Shield Response Team (with Business or Enterprise Support) and cost protection through service credits for attack-related scaling. The AWS WAF Anti-DDoS managed rule group detects HTTP floods against the traffic baseline and challenges or blocks attack requests automatically; since March 2026 it replaces Shield Advanced's legacy automatic layer 7 mitigation.
-- Shield Standard with rate-based rules: no expert team, no cost protection, and rules are written by hand (vi phạm ràng buộc)
-- Network Firewall in the VPC: not an edge DDoS service and offers neither experts nor credits (dùng sai tính năng)
-- Firewall Manager security group policies: restrict the origin but do not mitigate floods (giải bài toán khác)
+**Explanation:** Shield Advanced gives access to the Shield Response Team (with Business or Enterprise Support) and cost protection credits, and the AWS WAF Anti-DDoS managed rule group mitigates HTTP floods automatically against the traffic baseline.
+- Anti-DDoS rule group without Shield Advanced: mitigates floods but gives no response team or cost credits (vi phạm ràng buộc)
+- Shield Advanced with rate-based rules added during attacks: rules are written by hand during the incident (vi phạm ràng buộc)
+- Firewall Manager with rate-based and IP reputation rules: no response team or cost credits (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response.html
 > 🇻🇳 DDoS: chuyên gia SRT 24/7 + hoàn chi phí → Shield Advanced (cần Business/Enterprise Support); tự giảm thiểu L7 → WAF Anti-DDoS managed rule group.
 
@@ -303,19 +303,19 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-l
 
 A company has 90 accounts in AWS Organizations. Security requires a baseline AWS WAF web ACL and AWS Shield Advanced protection on every Application Load Balancer and CloudFront distribution, including resources that teams create later and accounts that join the organization later. Non-compliant resources must be remediated automatically with the LEAST operational overhead. Which combination of steps will meet these requirements? (Choose THREE)
 
-- A. Deploy a CloudFormation StackSet in AWS Organizations that creates a web ACL in each member account and associates it with the load balancers that exist today
+- A. Deploy a CloudFormation StackSet with automatic deployment to the organization that creates the baseline AWS WAF web ACL in each new member account
 - B. Designate a delegated Firewall Manager administrator account for the policies of the organization
-- C. Create a service control policy that denies creation of load balancers and distributions that lack an associated web ACL, with automatic remediation of older ones
+- C. Subscribe each account to AWS Shield Advanced and add the existing load balancers and distributions as protected resources in each account
 - D. Enable AWS Config in each member account and Region that is in scope for the Firewall Manager policies
-- E. Enable AWS Security Hub in the management account so that it applies the WAF web ACL and Shield Advanced protection to each new resource
+- E. Enable AWS Security Hub with the Foundational Security Best Practices standard so that resources without a web ACL appear as findings for remediation
 - F. Create Firewall Manager AWS WAF and Shield Advanced policies scoped to the organization with automatic remediation turned on
 
 **Answer:** B, D, F
 
-**Explanation:** Firewall Manager needs an administrator account and AWS Config, and its policies keep protecting new resources and new accounts, remediating non-compliant ones automatically.
-- StackSet of web ACLs: covers today's load balancers but not resources created later (vi phạm ràng buộc)
-- Service control policy: cannot evaluate whether a web ACL is associated (dùng sai tính năng)
-- Security Hub in the management account: reports findings and does not apply protections (giải bài toán khác)
+**Explanation:** Firewall Manager needs an administrator account and AWS Config, and its organization-wide WAF and Shield Advanced policies protect new resources and accounts and remediate non-compliant ones automatically.
+- StackSet that creates a web ACL: the web ACL is not associated with resources created later (vi phạm ràng buộc)
+- Shield Advanced protections added per account: covers today's resources and needs manual work for each new one (vi phạm ràng buộc)
+- Security Hub best-practice standard: reports missing web ACLs but does not remediate (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/waf/latest/developerguide/fms-chapter.html
 > 🇻🇳 Bảo vệ tự động toàn tổ chức → Firewall Manager (admin + AWS Config + policy WAF/Shield có auto-remediation).
 
@@ -328,6 +328,7 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/fms-chapter.html
 - services: Client VPN, Site-to-Site VPN, IAM Identity Center
 - tags: federation, mfa
 - difficulty: hard
+- time: 135
 - skills: 1.2.s4, 1.2.s3
 - concept: Client VPN with SAML federation, group-based authorization rules per subnet, and connection logging fits remote workforce access
 - refs: 04-networking-services.md
@@ -335,20 +336,19 @@ Docs: https://docs.aws.amazon.com/waf/latest/developerguide/fms-chapter.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A consulting firm's 400 employees work remotely and must reach internal web applications on EC2 instances in several private subnets of a VPC. Employees authenticate through the company's SAML 2.0 identity provider, which enforces multi-factor authentication. Members of the finance group must reach only the finance subnet, and engineers must reach only the engineering subnet. Auditors need connection logs, and the company does not want VPN servers to patch. Which solution will meet these requirements?
 
-- A. Create a Site-to-Site VPN connection from each employee laptop to a virtual private gateway and restrict each group with security group rules
-- B. Create a Client VPN endpoint with SAML federated authentication, add an authorization rule per group for each subnet CIDR, and log connections to CloudWatch Logs
-- C. Deploy OpenVPN servers on EC2 instances in public subnets, connect them to the SAML identity provider, and collect the connection logs on the servers
-- D. Create a Client VPN endpoint with mutual certificate authentication, issue one shared client certificate to the employees, and add one authorization rule for the VPC CIDR
+- A. Create a Client VPN endpoint with SAML federated authentication, add a single authorization rule for the whole VPC CIDR, and send connection logs to CloudWatch Logs
+- B. Create a Client VPN endpoint with SAML federated authentication, add a group-based authorization rule for each subnet CIDR, and log connections to CloudWatch Logs
+- C. Create a Client VPN endpoint with mutual certificate authentication, issue a certificate to each employee, add an authorization rule per subnet, and log connections
+- D. Deploy OpenVPN Access Server from AWS Marketplace on EC2 instances with SAML sign-in, group-based routing, and connection logs sent to CloudWatch
 
 **Answer:** B
 
-**Explanation:** Client VPN is a managed service for remote users. SAML federation keeps IdP controls such as MFA, group-based authorization rules limit each group to its subnet, and connection logs go to CloudWatch Logs.
-- Site-to-Site VPN per laptop: built to connect networks, not individual users (dùng sai tính năng)
-- OpenVPN on EC2: servers to patch and scale, which the company wants to avoid (tốn vận hành hơn)
-- Shared certificate with one rule: no per-user identity, MFA, or group separation (vi phạm ràng buộc)
+**Explanation:** Client VPN is a managed service: SAML federation keeps the identity provider's MFA, group-based authorization rules limit each group to its subnet, and connection logs go to CloudWatch Logs.
+- One authorization rule for the VPC CIDR: every employee reaches every subnet (vi phạm ràng buộc)
+- Mutual certificate authentication: bypasses the SAML provider and its MFA, with no group identity (vi phạm ràng buộc)
+- OpenVPN on EC2: VPN servers to patch and scale (tốn vận hành hơn)
 Docs: https://docs.aws.amazon.com/vpn/latest/clientvpn-admin/cvpn-working-rules.html
 > 🇻🇳 Truy cập từ xa + SAML/MFA + phân quyền theo nhóm/subnet + log → Client VPN (authorization rules + connection logging).

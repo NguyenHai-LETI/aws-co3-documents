@@ -15,30 +15,30 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.1"
 - domain: resilient
 - task: 2.1
 - topic: api
-- services: API Gateway, Lambda, WAF, ALB, DynamoDB
+- services: API Gateway, Lambda, WAF
 - tags: web-attacks
 - difficulty: medium
+- time: 125
 - skills: 2.1.k1, 2.1.s7
-- concept: Only API Gateway REST APIs offer API keys and usage plans for per-customer throttling and monthly quotas; HTTP APIs, WAF rate rules, and custom counters do not
+- concept: Only API Gateway REST API usage plans with API keys give per-customer throttling and monthly quotas; stage throttling, WAF rate rules, and HTTP API route throttling do not
 - refs: 11-api-integration.md
 - hint: Mỗi gói bán có tốc độ và hạn mức tháng riêng, phải nhận diện từng khách — loại API nào có API key và usage plan?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A weather-data provider exposes a REST API backed by AWS Lambda to paying customers. The company sells three plans, each with a different request rate and monthly request quota, and must identify and throttle each customer individually. Customers sign in with an OAuth provider that is already connected through a Lambda authorizer. The company wants the LEAST operational overhead and does not want to write metering code. Which solution will meet these requirements?
 
-- A. Expose the Lambda function through a function URL and count the requests of each customer in an Amazon DynamoDB table from inside the function, rejecting calls over the plan quota.
-- B. Place an Application Load Balancer in front of the function and attach an AWS WAF rate-based rule for each plan to limit the request rate of each customer.
+- A. Create an Amazon API Gateway REST API and set stage-level and method-level throttling limits that match the request rates and quota limits of the three plans.
+- B. Associate an AWS WAF web ACL with the REST API stage and add one rate-based rule for each plan that aggregates the requests by a customer ID header.
 - C. Create an Amazon API Gateway HTTP API in place of the REST API, with a JWT authorizer and route-level throttling limits that match each of the three plans.
-- D. Create an Amazon API Gateway REST API, define a usage plan with throttling and quota limits for each plan, and give each customer an API key that is associated with its plan.
+- D. Create an Amazon API Gateway REST API, define a usage plan with throttling and quota limits for each plan, and give each customer a plan-linked API key.
 
 **Answer:** D
 
 **Explanation:** REST APIs support API keys and usage plans, which apply per-client throttling and quotas without custom code.
-- Function URL with custom counting: metering code to write and operate (tốn vận hành hơn)
-- WAF rate-based rules on an ALB: limit request rates, not monthly quotas per plan (dùng sai tính năng)
+- Stage and method throttling: limits all customers together, with no per-customer identity or monthly quota (dùng sai tính năng)
+- WAF rate-based rules per customer header: limit request rates but cannot enforce monthly quotas (dùng sai tính năng)
 - HTTP API with route throttling: HTTP APIs have no API keys, usage plans, or per-client throttling (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html
 > 🇻🇳 Mỗi khách một API key, giới hạn tốc độ + hạn mức tháng theo gói → API Gateway REST API với usage plan (HTTP API không có API key/usage plan).
@@ -49,9 +49,10 @@ Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-r
 - domain: resilient
 - task: 2.1
 - topic: api
-- services: API Gateway, SQS, Lambda, RDS
+- services: API Gateway, SQS, SNS, Lambda, RDS, RDS Proxy
 - tags: decoupling, lambda-concurrency
 - difficulty: hard
+- time: 150
 - skills: 2.1.k1, 2.1.k11, 2.1.s3
 - concept: An API Gateway AWS service integration can write requests straight to SQS, so a burst is buffered without compute and the database is fed at a controlled rate
 - refs: 11-api-integration.md, 07-application-integration.md
@@ -59,21 +60,20 @@ Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-r
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 150
 
 A ticketing company receives bursts of order submissions from a mobile app through an Amazon API Gateway REST API. The API invokes an AWS Lambda function that writes each order to an Amazon RDS database. During on-sale events the database becomes overloaded and the API returns 5xx errors, so orders are lost. The company wants the API to acknowledge orders reliably during bursts while the database is written at a steady pace, with the LEAST operational overhead and without adding compute to the receive path. Which solution will meet these requirements?
 
 - A. Add an AWS service integration to the API method that sends each order to an Amazon SQS queue, and process the queue with a Lambda function of limited concurrency.
-- B. Enable API caching on the POST method of the stage so that repeated order submissions are absorbed before they reach the Lambda function and the database.
-- C. Increase the reserved concurrency of the Lambda function and move the RDS instance to a larger instance class so that the database can absorb the full burst of orders.
-- D. Replace the REST API with an Application Load Balancer that forwards orders to EC2 instances in an Auto Scaling group, which keep the orders in memory until the database has caught up with the burst.
+- B. Place Amazon RDS Proxy between the Lambda function and the database so that the burst of order connections is pooled before it reaches the database.
+- C. Add an AWS service integration to the API method that publishes each order to an Amazon SNS topic, and subscribe the Lambda function that writes each order to the database.
+- D. Set stage throttling on the API to the rate that the database can sustain so that excess submissions are rejected and retried later by the mobile app.
 
 **Answer:** A
 
 **Explanation:** An API Gateway AWS service integration writes straight to SQS, so the API acknowledges orders without compute while consumers drain the queue into the database at a controlled rate.
-- API caching: unique POST submissions cannot be served from a cache (dùng sai tính năng)
-- More concurrency and a larger instance: pushes more load at the database and costs more (tốn chi phí hơn)
-- ALB with in-memory buffering: adds compute, and orders are lost if an instance terminates (vi phạm ràng buộc)
+- RDS Proxy: pools connections, but every order is still written at the burst rate (giải bài toán khác)
+- SNS topic with the function subscribed: SNS pushes each order at once, so the database is not written at a steady pace (vi phạm ràng buộc)
+- Stage throttling: rejects orders during bursts instead of acknowledging them (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-integration-types.html
 > 🇻🇳 Tải đột biến, cần đệm bền và nhẹ vận hành → API Gateway tích hợp thẳng SQS (AWS service integration), consumer xả vào DB với tốc độ kiểm soát.
 
@@ -83,33 +83,33 @@ Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-a
 - domain: resilient
 - task: 2.1
 - topic: database
-- services: ElastiCache, Aurora
+- services: ElastiCache, Aurora, Lambda
 - tags: caching-strategies, ttl
 - difficulty: medium
+- time: 125
 - skills: 2.1.k3, 2.1.s6
-- concept: Write-through updates the cache on every database write so cached values are never stale, while a TTL still bounds cache size; shrinking the TTL or dropping the cache hurts the hit rate
+- concept: Write-through updates the cache on every database write so cached values are never stale, while a TTL still bounds cache size; shorter TTLs, audit streams, or a bigger cache do not remove staleness
 - refs: E-kien-truc-database.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Giá đổi hiếm nhưng khách vẫn thấy giá cũ tới hết TTL — chiến lược nào cập nhật cache cùng lúc với lần ghi vào CSDL?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
 An e-commerce company caches product prices in Amazon ElastiCache to reduce read load on its Amazon Aurora database. The application uses lazy loading with a 15-minute TTL. When merchants change a price, shoppers keep seeing the old price for up to 15 minutes, which violates a pricing-accuracy policy. Price changes are infrequent and reads are heavy, and the team wants to keep the cache hit rate high without increasing read traffic on the database. Which change will meet these requirements?
 
-- A. Reduce the TTL on every cached price to one second so that the cache is refreshed from the database on almost every read of a price.
-- B. Stop caching prices and read them from an Aurora Replica through the reader endpoint so that shoppers see the current price straight from the database.
+- A. Reduce the TTL on every cached price to 30 seconds so that shoppers see a changed price within half a minute while most reads still hit the cache.
+- B. Capture price changes with Aurora Database Activity Streams and have a Lambda function update the cached price for each change that the stream reports.
 - C. Update the application so that each price write to Aurora also writes the new price to the cache (write-through), and keep the TTL as a safety net.
-- D. Add a second ElastiCache cluster in another Availability Zone and read prices from whichever cluster answers first to reduce the chance of stale data.
+- D. Migrate the cache to Amazon ElastiCache Serverless so that it scales automatically with the read load and keeps serving prices from memory.
 
 **Answer:** C
 
 **Explanation:** Write-through updates the cache whenever the database is written, so prices are not stale, and the TTL keeps rarely read entries from piling up.
-- One-second TTL: the hit rate collapses and database reads soar (vi phạm ràng buộc)
-- Aurora Replica without a cache: removes the cache and raises database read traffic (vi phạm ràng buộc)
-- Second cache cluster: adds availability, but both clusters still hold stale prices after a change (giải bài toán khác)
+- 30-second TTL: shoppers still see old prices for up to half a minute, which the policy forbids (vi phạm ràng buộc)
+- Database Activity Streams: an encrypted audit feed for monitoring database activity, not a change feed for updating a cache (dùng sai tính năng)
+- ElastiCache Serverless: scales capacity, but lazily loaded entries stay stale until their TTL ends (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html
-> 🇻🇳 Cache-aside (lazy loading) gây dữ liệu cũ tới hết TTL → thêm write-through (ghi DB thì ghi cache) + giữ TTL; TTL 1 giây hay bỏ cache làm tăng tải DB.
+> 🇻🇳 Cache-aside (lazy loading) gây dữ liệu cũ tới hết TTL → thêm write-through (ghi DB thì ghi cache) + giữ TTL; TTL ngắn vẫn còn giá cũ, Database Activity Streams là luồng audit.
 
 ---
 
@@ -189,6 +189,7 @@ Docs: https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-comp
 - services: S3, EFS, EBS, EC2
 - tags: ebs-multi-attach, instance-store, ebs-volume-types
 - difficulty: hard
+- time: 180
 - skills: 2.1.k13, 2.1.s6
 - concept: Match storage types to workloads: object storage (S3) for HTTP-served images, a shared multi-AZ file system (EFS) for a common POSIX directory, block storage (EBS) for database data files
 - refs: D-kien-truc-luu-tru.md, 02-storage-services.md
@@ -196,23 +197,22 @@ Docs: https://docs.aws.amazon.com/global-accelerator/latest/dg/introduction-comp
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 180
 
 A media company is moving three workloads to AWS. First, a photo-sharing site stores tens of millions of user-uploaded images that web and mobile clients download over HTTP. Second, a content-management system runs on a fleet of Linux web servers in an Auto Scaling group across three Availability Zones, and all servers must read and write the same shared directory of themes and plugins. Third, a single self-managed PostgreSQL server on Amazon EC2 needs low-latency block storage with consistent IOPS for its data files. Which combination of storage choices will meet these requirements? (Choose THREE)
 
 - A. Store the images on an Amazon EBS volume with Multi-Attach enabled and mount it on the back-end instances that serve the web and mobile clients.
 - B. Store the images as objects in Amazon S3 and serve them to web and mobile clients over HTTPS.
-- C. Place the shared theme and plugin directory on the instance store volumes of each web server and keep the copies in sync with a scheduled job.
+- C. Mount an Amazon S3 bucket on every web server with Mountpoint for Amazon S3 for the shared theme and plugin directory.
 - D. Mount a regional Amazon EFS file share on every web server for the shared theme and plugin directory.
-- E. Mount an Amazon S3 bucket on the PostgreSQL instance with Mountpoint for Amazon S3 and place the database data files there to get consistent IOPS.
+- E. Place the PostgreSQL data files on an Amazon EFS file system with provisioned throughput for consistent IOPS, mounted on the database instance.
 - F. Attach a Provisioned IOPS or General Purpose SSD Amazon EBS volume to the PostgreSQL instance for its data files.
 
 **Answer:** B, D, F
 
 **Explanation:** Images are objects for S3, a shared multi-AZ POSIX directory is a file system for EFS, and database data files need block storage from EBS.
 - EBS Multi-Attach for images: it works only within one Availability Zone and is not an HTTP object store (dùng sai tính năng)
-- Instance store with a sync job: ephemeral, not shared, and fragile to operate (đặt sai chỗ)
-- Mountpoint for S3: it cannot modify existing files (https://docs.aws.amazon.com/AmazonS3/latest/userguide/mountpoint.html), so database files cannot live there (dùng sai tính năng)
+- Mountpoint for the shared directory: it cannot modify existing files (https://docs.aws.amazon.com/AmazonS3/latest/userguide/mountpoint.html), so servers cannot update themes and plugins in place (vi phạm ràng buộc)
+- EFS for the database files: a network file system, not the low-latency block storage the database needs (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
 > 🇻🇳 Object → S3 (ảnh qua HTTP); file dùng chung nhiều AZ → EFS; block cho dữ liệu CSDL → EBS. Multi-Attach chỉ trong một AZ, S3 không phải block storage.
 
@@ -222,9 +222,10 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
 - domain: resilient
 - task: 2.1
 - topic: database
-- services: RDS
+- services: RDS, EventBridge
 - tags: read-replicas, multi-az, multi-region
 - difficulty: medium
+- time: 145
 - skills: 2.1.k15, 2.1.s6
 - concept: Read replicas serve stale-tolerant reads for reporting and for users in another Region; a Multi-AZ standby cannot serve reads and Multi-AZ never spans Regions
 - refs: E-kien-truc-database.md, 03-database-services.md
@@ -232,22 +233,21 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/whatisefs.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A SaaS provider runs its multi-tenant application on Amazon RDS for PostgreSQL in a Multi-AZ DB instance deployment in us-east-1. Heavy analytical reports that run on the primary during business hours slow down transactions, and the reports tolerate data that is a few seconds old. Customers in Singapore also see slow dashboards because every read crosses the Pacific Ocean, and these dashboards tolerate slightly stale data too. Writes are modest and do not need to scale. Which combination of actions will resolve both problems? (Choose TWO)
 
 - A. Create a read replica in us-east-1 and point the reporting tools at the endpoint of the replica.
-- B. Modify the DB instance to use a larger instance class with more memory and vCPUs so that the primary can run the reports and the transactions together without slowdowns.
+- B. Move the analytical reports to a nightly schedule with Amazon EventBridge Scheduler so that they no longer compete with business-hour transactions.
 - C. Create a cross-Region read replica in Asia Pacific (Singapore) and point the Singapore dashboards at the endpoint of that replica.
 - D. Connect the reporting tools to the standby instance in us-east-1 of the Multi-AZ DB instance deployment to offload the reports from the primary instance.
-- E. Use Multi-AZ failover to move the primary instance to Singapore so that users across the Pacific read from the new primary and the dashboards stay fast.
+- E. Add a standby instance in Asia Pacific (Singapore) to the Multi-AZ deployment and point the Singapore dashboards at that standby instance for read traffic.
 
 **Answer:** A, C
 
 **Explanation:** Read replicas copy data asynchronously and serve read-only queries, so a replica in the Region isolates the reports and a cross-Region replica puts reads near Singapore users.
-- Larger instance class: does not isolate the reports or shorten the distance to Singapore (giải bài toán khác)
+- Nightly reports: stop competing with transactions, but report data becomes up to a day old instead of a few seconds (vi phạm ràng buộc)
 - Standby of a Multi-AZ instance deployment: it cannot serve read traffic (cấu hình không tồn tại)
-- Multi-AZ failover to Singapore: Multi-AZ stays within one Region (cấu hình không tồn tại)
+- Standby in Singapore: a Multi-AZ standby stays in the primary's Region and serves no reads (cấu hình không tồn tại)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html
 > 🇻🇳 Đọc nặng/báo cáo hoặc đọc gần người dùng ở Region khác → read replica (bất đồng bộ, có thể cross-Region); standby Multi-AZ không đọc được và không vượt Region.
 
@@ -294,6 +294,7 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand
 - services: Neptune, Aurora, DynamoDB, Redshift
 - tags: decoupling
 - difficulty: medium
+- time: 110
 - skills: 2.1.s7, 2.1.s6
 - concept: Highly connected, multi-hop relationship queries belong in a purpose-built graph database (Neptune), not in recursive SQL joins, key-value traversals, or a data warehouse
 - refs: E-kien-truc-database.md
@@ -301,23 +302,22 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A professional-networking company recommends people that a user might know. The recommendation query traverses connections up to four levels deep across 800 million relationships stored in an Amazon Aurora PostgreSQL database. Recursive SQL joins take minutes and slow the whole cluster, but the query must return in milliseconds. The team is willing to move the relationship data to a different database service. Which solution will meet these requirements?
 
 - A. Move the relationship data to Amazon Neptune and run the traversals with the Gremlin or openCypher query language.
-- B. Add several Aurora Replicas and route the recommendation queries to the reader endpoint of the cluster.
-- C. Store the connections of each user as a list attribute in Amazon DynamoDB and traverse the lists with repeated GetItem calls from the application.
-- D. Export the relationship data every night to Amazon Redshift and run each recommendation query there.
+- B. Keep the data in Aurora PostgreSQL, add an Aurora Replica with a larger instance class, and run the recursive queries on the reader endpoint.
+- C. Store each user's connections in Amazon DynamoDB with an adjacency-list design and traverse the levels with BatchGetItem calls from the application.
+- D. Load the relationship data into Amazon Redshift Serverless and run each traversal as a SQL query on capacity that the warehouse scales automatically.
 
 **Answer:** A
 
 **Explanation:** Neptune is a purpose-built graph database that stores relationships natively and traverses billions of them in milliseconds with Gremlin or openCypher.
-- Aurora Replicas: add query concurrency, not a cheaper way to run multi-level joins (giải bài toán khác)
-- DynamoDB lists with GetItem: each hop is a separate round trip made by the application (tốn vận hành hơn)
-- Nightly Redshift export: a warehouse for analytics, with stale data and no millisecond lookups (dùng sai tính năng)
+- Larger Aurora Replica: offloads the primary, but the recursive joins still take minutes (giải bài toán khác)
+- DynamoDB adjacency lists: four levels of fan-out need many sequential round trips from the application, far from milliseconds (vi phạm ràng buộc)
+- Redshift Serverless: a warehouse for analytics scans, not millisecond multi-hop traversals (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html
-> 🇻🇳 Quan hệ nhiều bước, dữ liệu kết nối dày, cần mili giây → Amazon Neptune (graph DB); join SQL đệ quy, replica hay Redshift không giải đúng bài toán.
+> 🇻🇳 Quan hệ nhiều bước, dữ liệu kết nối dày, cần mili giây → Amazon Neptune (graph DB); join SQL đệ quy, adjacency list trên DynamoDB hay Redshift không đạt mili giây.
 
 ---
 
@@ -325,9 +325,10 @@ Docs: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html
 - domain: resilient
 - task: 2.1
 - topic: migration
-- services: Transfer Family, S3, EC2, DataSync, EFS
+- services: Transfer Family, S3, EC2, EFS
 - tags: decoupling
 - difficulty: easy
+- time: 115
 - skills: 2.1.k2, 2.1.s7
 - concept: AWS Transfer Family is the managed SFTP endpoint that keeps partners' existing clients and hostname and lands files in S3, replacing self-managed SFTP servers
 - refs: 10-migration-transfer.md
@@ -335,20 +336,19 @@ Docs: https://docs.aws.amazon.com/neptune/latest/userguide/intro.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A healthcare billing company receives claim files from about 300 external clinics. The clinics upload files by using their own SFTP client software, against a hostname and credentials that the company issued years ago. The company runs the SFTP servers on two Amazon EC2 instances with local disks and spends considerable time on patching and capacity. It wants to stop managing servers, keep every clinic's client configuration unchanged, and land the files in Amazon S3 for downstream processing. Which solution will meet these requirements?
 
-- A. Create an Amazon S3 bucket and give each clinic an IAM user with access key credentials so that the clinics upload their files with the AWS CLI from their own networks.
-- B. Deploy an AWS DataSync agent at each clinic to copy the claim files to Amazon S3 on a nightly schedule through the network of the clinic.
+- A. Create an AWS Transfer Family server that uses the FTPS protocol, stores files in Amazon S3, and accepts the clinics' credentials at the existing hostname.
+- B. Create an AWS Transfer Family SFTP server that stores files in Amazon S3, and give each clinic the server's endpoint name and a new SSH key pair.
 - C. Create an AWS Transfer Family SFTP server that stores files in Amazon S3, point the existing hostname at it, and import the clinics' credentials.
 - D. Replace the two EC2 instances with an Auto Scaling group of SFTP servers behind a Network Load Balancer that uses the existing hostname, mount Amazon EFS, and sync its files to Amazon S3.
 
 **Answer:** C
 
 **Explanation:** Transfer Family provides a fully managed SFTP endpoint backed by S3, so clinics keep their clients, hostname, and credentials, and the company runs no servers.
-- IAM users with the AWS CLI: every clinic would have to change its tooling (vi phạm ràng buộc)
-- DataSync agent at each clinic: also changes every clinic's setup and is not an SFTP endpoint (vi phạm ràng buộc)
+- FTPS server: a different protocol, so the clinics' SFTP clients would need reconfiguration (vi phạm ràng buộc)
+- New endpoint name and new keys: every clinic would have to change its client configuration (vi phạm ràng buộc)
 - Auto Scaling group of SFTP servers: still servers to patch and operate (tốn vận hành hơn)
 Docs: https://docs.aws.amazon.com/transfer/latest/userguide/what-is-aws-transfer-family.html
 > 🇻🇳 Giữ nguyên SFTP client của đối tác, bỏ quản trị máy chủ, ghi vào S3 → AWS Transfer Family (SFTP được quản lý).
@@ -359,30 +359,30 @@ Docs: https://docs.aws.amazon.com/transfer/latest/userguide/what-is-aws-transfer
 - domain: resilient
 - task: 2.1
 - topic: database
-- services: Aurora, RDS
+- services: Aurora, RDS, DynamoDB, EventBridge
 - tags: aurora-serverless, read-replicas, multi-az
 - difficulty: medium
+- time: 115
 - skills: 2.1.k6, 2.1.s6
-- concept: Aurora Serverless v2 scales database capacity in place within an ACU range, so a spiky relational workload needs no manual resizing or outage; read replicas, Multi-AZ standbys, and scheduled class changes do not
+- concept: Aurora Serverless v2 scales relational capacity in place within an ACU range with no outage; replicas add only reads, DynamoDB leaves PostgreSQL, and class changes cause outages
 - refs: E-kien-truc-database.md, 03-database-services.md
 - hint: Tải đỉnh lương gồm cả ghi, đổi instance class thì có gián đoạn — kiểu CSDL quan hệ nào tự co giãn dung lượng tại chỗ?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A startup runs a multi-tenant HR application on an Amazon RDS for PostgreSQL instance sized for its monthly payroll peak. For most of the month the database is mostly idle, and during the three days around payroll its CPU saturates within minutes. Resizing the instance class causes a short outage, so the team keeps over-provisioning. The workload is relational and must stay on PostgreSQL. The company wants the database to follow demand automatically, with no outage and no manual resizing. Which solution will meet these requirements?
 
-- A. Add read replicas to the RDS for PostgreSQL instance and use the reader endpoint to spread the payroll load across the replicas.
+- A. Migrate to Amazon Aurora PostgreSQL with provisioned instances and add Aurora Replicas with an Auto Scaling policy on their CPU utilization.
 - B. Migrate to Amazon Aurora PostgreSQL with Aurora Serverless v2 and set a minimum and maximum capacity range in ACUs.
-- C. Convert the PostgreSQL DB instance to a Multi-AZ DB instance deployment so that a standby of the same size absorbs the payroll peak.
-- D. Use scheduled actions to change the class of the PostgreSQL DB instance up before the payroll days and down again afterward.
+- C. Migrate the data to Amazon DynamoDB with on-demand capacity so that throughput follows the payroll peak without any capacity planning.
+- D. Use Amazon EventBridge Scheduler to modify the DB instance class up before the payroll days and down afterward, applying each change immediately.
 
 **Answer:** B
 
 **Explanation:** Aurora Serverless v2 scales capacity in place within a configured ACU range as demand changes, with no outage and no manual resizing, and it stays PostgreSQL-compatible.
-- Read replicas: add read capacity, but the payroll peak includes writes (giải bài toán khác)
-- Multi-AZ standby: a standby does not serve traffic (dùng sai tính năng)
-- Scheduled instance class changes: modifying the class causes an outage and needs manual timing (vi phạm ràng buộc)
+- Aurora Replicas with auto scaling: add read capacity, but the payroll peak includes writes (giải bài toán khác)
+- DynamoDB on-demand: scales automatically, but the workload must stay relational on PostgreSQL (vi phạm ràng buộc)
+- Scheduled class changes: each modification causes a short outage (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.how-it-works.html
-> 🇻🇳 CSDL quan hệ tải đỉnh ngắn, không muốn gián đoạn hay resize tay → Aurora Serverless v2 (tự co giãn ACU tại chỗ); read replica/Multi-AZ không giải quyết.
+> 🇻🇳 CSDL quan hệ tải đỉnh ngắn, không muốn gián đoạn hay resize tay → Aurora Serverless v2 (tự co giãn ACU tại chỗ); replica chỉ tăng đọc, DynamoDB không còn là PostgreSQL.

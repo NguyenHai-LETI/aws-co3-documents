@@ -15,9 +15,10 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.1"
 - domain: resilient
 - task: 2.1
 - topic: integration
-- services: SQS, SNS
+- services: SQS, Kinesis Data Streams
 - tags: sqs-fifo, decoupling
 - difficulty: medium
+- time: 135
 - skills: 2.1.k11, 2.1.s3
 - concept: SQS FIFO with a message group ID per entity keeps order inside each group, drops duplicate sends, and still lets many consumers work on different groups in parallel
 - refs: 07-application-integration.md
@@ -25,21 +26,20 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.1"
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A payments company ingests transaction events from its mobile app and processes them with a fleet of worker instances. Events for the same customer account must be processed in the exact order they were sent, but events for different accounts can be processed in parallel. The app sometimes retries a send after a network timeout, and a retried event must not be processed twice. The company expects steady growth and wants to add workers without code changes. Which solution will meet these requirements?
 
 - A. Send events to an Amazon SQS FIFO queue, use the account ID as the message group ID, enable content-based deduplication, and run multiple consumers on the queue.
-- B. Send events to an Amazon SQS standard queue, add a sequence number to each message body, and have every worker sort messages by that number and discard duplicates before processing them.
-- C. Send events to an Amazon SQS FIFO queue that uses one fixed message group ID for every event, and run multiple consumers on the queue to scale processing.
-- D. Publish events to an Amazon SNS standard topic and subscribe one Amazon SQS standard queue for each worker so that every worker receives every event.
+- B. Send events to an Amazon SQS FIFO queue, use a random UUID as the message group ID of each event, enable content-based deduplication, and run multiple consumers on the queue.
+- C. Send events to an Amazon Kinesis data stream with the account ID as the partition key, and run one consumer for each shard so that the shards are processed in parallel.
+- D. Send events to an Amazon SQS FIFO queue, use the account ID as the message group ID, set a new random deduplication ID on every send attempt, and run multiple consumers.
 
 **Answer:** A
 
 **Explanation:** FIFO keeps order within a message group and drops duplicate sends, and the account ID as group ID still allows parallel processing across accounts.
-- Standard queue with sequence numbers: at-least-once delivery and best-effort order, so workers need shared state to reorder and deduplicate (tốn vận hành hơn)
-- One fixed group ID: a single group serializes all processing (vi phạm ràng buộc)
-- SNS topic with a queue per worker: each worker gets every event, with no ordering (giải bài toán khác)
+- Random group ID for each event: maximizes parallelism but loses the per-account order (vi phạm ràng buộc)
+- Kinesis stream keyed by account ID: keeps per-account order, but a retried put is stored as a second record and processed twice (vi phạm ràng buộc)
+- New random deduplication ID per attempt: every retry looks like a new message, so a retried event is processed twice (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-fifo-queues.html
 > 🇻🇳 Cần thứ tự theo từng tài khoản + chống gửi trùng + song song giữa các tài khoản → SQS FIFO với MessageGroupId = account ID.
 
@@ -52,6 +52,7 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - services: SQS, EC2
 - tags: sqs-visibility-timeout, sqs-long-polling
 - difficulty: hard
+- time: 145
 - skills: 2.1.k11, 2.1.k2
 - concept: For mixed short and very long jobs, keep the SQS visibility timeout short and extend it per message with ChangeMessageVisibility while a job still runs
 - refs: 07-application-integration.md
@@ -59,21 +60,20 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 An engineering firm renders CAD files with worker instances that poll an Amazon SQS standard queue. Most render jobs finish within a minute, but a few large jobs run for up to 40 minutes. With the default visibility timeout, a large job's message becomes visible again and a second worker renders the same file. The firm raised the visibility timeout to the 12-hour maximum, but now messages from crashed workers stay hidden for hours, and customers wait too long for their renders. Which solution will fix both problems?
 
-- A. Convert the queue to an SQS FIFO queue with content-based deduplication and keep the default visibility timeout so that two workers do not receive the same message.
-- B. Enable long polling with the maximum wait time and leave the visibility timeout unchanged so that a given message is received by one worker a single time.
+- A. Set the queue's visibility timeout to 45 minutes, just above the longest render job, so that no message becomes visible again while a worker still renders it.
+- B. Convert the queue to an SQS FIFO queue and use each file name as the message group ID so that one worker at a time renders a given file.
 - C. Set a short visibility timeout on the queue and have each worker call ChangeMessageVisibility periodically while a render job is still running.
-- D. Set the queue's DelaySeconds to the length of the longest job and keep the default visibility timeout so that messages stay hidden until the largest render has finished.
+- D. Keep the default visibility timeout and have each worker call ChangeMessageVisibility with a value of zero whenever a render job fails, so the job is retried quickly.
 
 **Answer:** C
 
 **Explanation:** A short timeout lets messages from crashed workers reappear quickly, and a worker still rendering extends the timeout of its own message, so only long jobs stay hidden.
-- FIFO with deduplication: deduplication covers producer sends, and FIFO messages also reappear when the timeout expires (dùng sai tính năng)
-- Long polling: reduces empty receives and does not change how long a received message stays hidden (dùng sai tính năng)
-- DelaySeconds: postpones the first delivery of new messages, not messages already being processed (giải bài toán khác)
+- 45-minute visibility timeout: stops duplicate renders, but a crashed worker's message still stays hidden for up to 45 minutes (vi phạm ràng buộc)
+- FIFO queue with a group per file: an in-flight message still becomes visible again when the timeout expires, so a long job is received twice (dùng sai tính năng)
+- Zero timeout on failure: speeds up retries of failed jobs but does nothing for long jobs that outlast the default timeout (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html
 > 🇻🇳 Job dài ngắn lẫn lộn → visibility timeout ngắn + "heartbeat" ChangeMessageVisibility; timeout 12 giờ làm tin của worker hỏng ẩn quá lâu.
 
@@ -86,6 +86,7 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - services: SQS
 - tags: sqs-dlq, decoupling
 - difficulty: medium
+- time: 150
 - skills: 2.1.k11, 2.1.k2
 - concept: A redrive policy with a maximum receive count sends poison messages to a same-type DLQ, whose retention must exceed the source queue's because the original enqueue time is kept
 - refs: 07-application-integration.md
@@ -93,22 +94,21 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 150
 
 A streaming-video company processes upload notifications from an Amazon SQS standard queue by using a fleet of consumers. Some messages are malformed and fail on every attempt, so consumers keep retrying them and waste capacity. The operations team wants messages that fail repeatedly to be set aside automatically and wants a full week to inspect each one afterward, even though the source queue keeps messages for only four days. Which combination of actions will meet these requirements? (Choose TWO)
 
-- A. Create the dead-letter queue as an Amazon SQS FIFO queue so that failed messages keep their original order while the support team reviews them.
+- A. Set the message retention period of the source queue to 14 days so that messages that keep failing remain available for a full week of inspection.
 - B. Create a standard SQS queue as the dead-letter queue and add a redrive policy with a maximum receive count to the source queue.
-- C. Set the visibility timeout of the standard source queue to zero so that failed messages return immediately and can be inspected by the team.
+- C. Enable a redrive allow policy on the dead-letter queue and start a dead-letter queue redrive that moves failed messages back to the source SQS queue.
 - D. Set the message retention period of the dead-letter queue to a value that is longer than the retention period of the source queue.
-- E. Enable long polling on the standard source queue so that consumers stop receiving the malformed messages again and again after a failure.
+- E. Create the standard dead-letter queue in a second AWS Region so that the failed messages are isolated from the production queue and its consumers.
 
 **Answer:** B, D
 
 **Explanation:** A redrive policy moves a message to a dead-letter queue after repeated failed receives, and because the message keeps its original enqueue time, the dead-letter queue needs longer retention than the source queue.
-- FIFO dead-letter queue: it must match the source queue type (cấu hình không tồn tại)
-- Visibility timeout of zero: makes a message visible again at once, which speeds up retries (dùng sai tính năng)
-- Long polling: reduces empty receives and does not stop re-receiving a failing message (dùng sai tính năng)
+- Longer source retention: failing messages stay in the source queue and keep being retried, so nothing sets them aside (giải bài toán khác)
+- Redrive back to the source queue: returns messages for reprocessing, the opposite of setting them aside (giải bài toán khác)
+- Dead-letter queue in another Region: a dead-letter queue must be in the same account and Region as its source queue (cấu hình không tồn tại)
 Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html
 > 🇻🇳 Cô lập tin lỗi → DLQ cùng loại + redrive policy (maxReceiveCount); retention của DLQ phải dài hơn queue gốc vì tính từ lúc tin vào queue gốc.
 
@@ -118,9 +118,10 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - domain: resilient
 - task: 2.1
 - topic: integration
-- services: SNS, SQS
+- services: SNS, SQS, Lambda
 - tags: fan-out, sns-filtering, decoupling
 - difficulty: medium
+- time: 150
 - skills: 2.1.k11, 2.1.s3
 - concept: SNS-to-SQS fan-out with one queue per subscriber buffers events while a consumer is offline, and subscription filter policies deliver only the needed event types
 - refs: 07-application-integration.md
@@ -128,22 +129,21 @@ Docs: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 155
 
 An online marketplace publishes an event whenever an order changes state: PLACED, PAID, SHIPPED, or CANCELED. The order service already publishes every event to a single Amazon SNS topic. The billing service needs only PAID and CANCELED events, the warehouse service needs only PAID and SHIPPED events, and the analytics service needs every event. Each service must still receive events that arrive while it is offline for maintenance, and the order service must not be changed when new subscribers are added later. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Create one Amazon SQS queue for each service and subscribe each queue to the SNS topic.
-- B. Subscribe the HTTPS endpoints of the billing, warehouse, and analytics services directly to the topic and have each service discard events for the wrong order state in its own code.
+- B. Subscribe the HTTPS endpoints of the three services to the topic, with filter policies on the order state for the billing and warehouse subscriptions.
 - C. Add a subscription filter policy on the order state to the billing and warehouse subscriptions.
-- D. Change the order service to publish each event to a different SNS topic for the billing, warehouse, and analytics services.
-- E. Create one shared SQS queue, subscribe it to the topic, and have the billing, warehouse, and analytics services poll it and ignore the messages they do not need.
+- D. Create one Amazon SQS FIFO queue for each service and subscribe each FIFO queue to the existing SNS standard topic.
+- E. Subscribe one shared SQS queue to the topic and add a Lambda function that forwards each event to the services that need it.
 
 **Answer:** A, C
 
 **Explanation:** A queue per service holds events while that service is offline, and filter policies deliver only the order states each service needs, so subscribers can be added without touching the publisher.
-- HTTPS endpoints without queues: nothing holds events during maintenance, so deliveries can be dropped once retries end (vi phạm ràng buộc)
-- Separate topic per service: the order service must change for each new subscriber (vi phạm ràng buộc)
-- One shared queue: each message goes to one consumer, so two services miss events (dùng sai tính năng)
+- HTTPS subscriptions with filter policies: events are filtered, but nothing holds them while a service is offline, so they are dropped once retries end (vi phạm ràng buộc)
+- FIFO queues on a standard topic: only an SNS FIFO topic can deliver to SQS FIFO queues (cấu hình không tồn tại)
+- Shared queue with a forwarding function: the function pushes events to the services, so a service in maintenance misses them (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
 > 🇻🇳 Fan-out chuẩn: SNS topic → mỗi dịch vụ một hàng đợi SQS (đệm khi offline) + filter policy; thêm subscriber không sửa nguồn phát.
 
@@ -156,30 +156,30 @@ Docs: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
 - services: EventBridge, Lambda, Step Functions, DynamoDB
 - tags: event-driven, serverless-cost
 - difficulty: hard
+- time: 140
 - skills: 2.1.k5, 2.1.s1
-- concept: EventBridge Scheduler offers one-time schedules in any time zone at very large scale, unlike scheduled rules (UTC, legacy), DynamoDB TTL (days of delay), or Step Functions Wait (one-year limit)
+- concept: EventBridge Scheduler one-time schedules in a chosen time zone scale to millions with no polling code, unlike scheduled rules (UTC, legacy, limited per bus), a Step Functions Wait state (one-year limit), or a table polled every minute
 - refs: 07-application-integration.md
 - hint: Nhắc hẹn một lần, giờ địa phương, đặt trước nhiều năm, hàng triệu lịch, sai số khoảng một phút — công cụ lên lịch nào đáp ứng cả bốn?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A car-leasing company sends each customer a renewal reminder by SMS at 09:00 local time, 30 days before the lease ends. Leases run for as long as five years, so reminders are scheduled up to five years ahead for customers in many time zones, and millions of reminders can be pending at once. Each reminder must be delivered within about a minute of its target time. The company wants a serverless solution with the LEAST operational overhead. Which solution will meet these requirements?
 
 - A. Create a one-time schedule in Amazon EventBridge Scheduler for each reminder, set to the customer's time zone, with a Lambda function as the target.
-- B. Start an AWS Step Functions Standard workflow execution for each lease that waits in a Wait state until the target time and then invokes the function that sends the SMS.
-- C. Write each reminder to an Amazon DynamoDB table with a TTL attribute set to the target time and send the SMS from a function that processes the table's TTL deletions.
-- D. Create an Amazon EventBridge scheduled rule with a cron expression for each reminder that invokes a Lambda function at the target time of the reminder.
+- B. Start an AWS Step Functions Standard workflow for each lease with a Wait state that reads the reminder timestamp, followed by a task that invokes the SMS function.
+- C. Store each reminder in a DynamoDB table and run a Lambda function every minute from a recurring EventBridge Scheduler schedule that queries and sends due reminders.
+- D. Create an Amazon EventBridge scheduled rule for each reminder with a cron expression converted from the customer's local time to UTC and a Lambda function target.
 
 **Answer:** A
 
 **Explanation:** EventBridge Scheduler supports one-time schedules in a time zone you choose, scales to millions of schedules, and invokes targets with about one-minute precision, with no servers to run.
-- Step Functions Standard Wait state: an execution runs for at most one year (https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html), so it cannot wait years (vi phạm ràng buộc)
-- DynamoDB TTL: expired items are deleted within a few days, not a minute (vi phạm ràng buộc)
-- Scheduled rules: a legacy feature that evaluates cron in UTC and is not built for millions of one-time schedules (dùng sai tính năng)
+- Step Functions Wait state: a Standard execution runs for at most one year (https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html), so it cannot wait five years (vi phạm ràng buộc)
+- Table polled every minute: works, but adds a table, an index, and query code to build and operate (tốn vận hành hơn)
+- Scheduled rule per reminder: rules per event bus are limited and scheduled rules are a legacy feature, so millions of one-time reminders do not fit (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html
-> 🇻🇳 Nhắc hẹn một lần, đúng giờ địa phương, hàng triệu lịch → EventBridge Scheduler (one-time + time zone); TTL và Wait state không phù hợp.
+> 🇻🇳 Nhắc hẹn một lần, đúng giờ địa phương, hàng triệu lịch → EventBridge Scheduler (one-time + time zone); Wait state tối đa 1 năm, bảng quét mỗi phút tốn vận hành hơn.
 
 ---
 
@@ -190,6 +190,7 @@ Docs: https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html
 - services: EventBridge, DynamoDB, API Gateway, SQS, Lambda
 - tags: event-driven, dynamodb-streams, decoupling
 - difficulty: medium
+- time: 150
 - skills: 2.1.k5, 2.1.s1
 - concept: EventBridge Pipes connects a polled source such as a DynamoDB stream to a target with filtering and enrichment and no glue code; event bus rules cannot read streams
 - refs: 07-application-integration.md
@@ -197,13 +198,12 @@ Docs: https://docs.aws.amazon.com/scheduler/latest/UserGuide/schedule-types.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 150
 
 A fitness-app company records workout sessions in an Amazon DynamoDB table. When a new session item is inserted with a status of COMPLETED, the company must look up the user's coaching plan by calling its Amazon API Gateway REST API and then send the combined data to an Amazon SQS queue for a recommendation engine. Today a Lambda function that polls the table's stream does the filtering, the API call, and the queue write. The team wants to remove this custom glue code while keeping the events for each item in order. Which solution will meet these requirements with the LEAST operational overhead?
 
 - A. Keep a Lambda function on the table's stream, add an event source mapping filter for INSERT events with COMPLETED status, and let the function call the API and send the message to the queue.
 - B. Create an Amazon EventBridge rule on the default event bus that uses the table's DynamoDB stream as its source for INSERT events with COMPLETED status and the SQS queue as its target.
-- C. Enable the table's Amazon Kinesis Data Streams destination and run an Amazon Managed Service for Apache Flink application that filters INSERT events with COMPLETED status, calls the API, and writes to the queue.
+- C. Create an Amazon EventBridge pipe with the table's stream as the source and a Step Functions Express workflow as the target that filters the events, calls the API, and writes to the queue.
 - D. Create an Amazon EventBridge pipe with the table's stream as the source, a filter for INSERT events with COMPLETED status, the API as an enrichment step, and the queue as the target.
 
 **Answer:** D
@@ -211,7 +211,7 @@ A fitness-app company records workout sessions in an Amazon DynamoDB table. When
 **Explanation:** EventBridge Pipes reads the DynamoDB stream in order, filters the records, enriches each one through API Gateway, and delivers it to SQS, so the glue function disappears.
 - Lambda with an event filter: the function still holds the API call and the queue write (tốn vận hành hơn)
 - EventBridge rule on the bus: a rule matches events sent to a bus and cannot read a DynamoDB stream, the polled source that pipes are built for (cấu hình không tồn tại)
-- Kinesis destination with Flink: adds a stream and an application to build and operate (tốn vận hành hơn)
+- Pipe with a Step Functions target: also removes the function, but adds a workflow to build and run for filtering and enrichment that a pipe performs natively (tốn vận hành hơn)
 Docs: https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes.html
 > 🇻🇳 Nguồn stream/queue + lọc + làm giàu + đích, không muốn code keo → EventBridge Pipes (rule trên bus không đọc được DynamoDB stream).
 
@@ -258,6 +258,7 @@ Docs: https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-typ
 - services: Lambda, Kinesis Data Streams, SQS
 - tags: event-driven, lambda-concurrency
 - difficulty: hard
+- time: 180
 - skills: 2.1.k12, 2.1.k5
 - concept: A poison record blocks a Kinesis shard for a Lambda event source mapping until bisect-on-error, retry and age limits, and an on-failure destination are set; a function DLQ covers only asynchronous invocations
 - refs: 01-compute-services.md, 07-application-integration.md
@@ -265,23 +266,22 @@ Docs: https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-typ
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 180
 
 A ride-hailing company processes GPS pings with an AWS Lambda function that reads from an Amazon Kinesis data stream through an event source mapping. Occasionally a malformed record makes the function throw an error. Lambda keeps retrying the same batch, the affected shard stops advancing, and the pings behind the bad record are delayed for hours. The company wants healthy records to keep flowing, wants to limit both the number of retries and the age of records that Lambda still processes, and wants details about discarded records saved for later analysis. Which combination of changes will meet these requirements? (Choose THREE)
 
-- A. Increase the number of shards in the stream so that the batch with the malformed record is spread across more shards and stops blocking processing.
+- A. Enable enhanced fan-out for the event source mapping so that the function reads each shard through a dedicated connection with a lower iterator age.
 - B. Enable the bisect batch on function error setting so that Lambda splits a failing batch to isolate the malformed record.
 - C. Set a maximum number of retry attempts and a maximum record age on the event source mapping so that Lambda gives up on old records.
-- D. Configure a dead-letter queue on the Lambda function of the event source mapping to capture the failed batches, whatever their age, from the stream.
+- D. Configure an Amazon SQS dead-letter queue in the function's asynchronous invocation settings to capture the batches that Lambda discards from the stream.
 - E. Configure an on-failure destination, such as an Amazon SQS queue, on the event source mapping to keep metadata of the records that Lambda skips.
-- F. Increase the function's memory and timeout so that the function can finish processing the batch with the malformed record without raising an error.
+- F. Increase the batch size and the batching window of the event source mapping so that Lambda reads a larger number of records per invocation and gets past the malformed record faster after an error.
 
 **Answer:** B, C, E
 
 **Explanation:** Bisecting isolates the bad record, a retry limit and maximum record age end the endless retries, and an on-failure destination keeps details of what was discarded.
-- Function-level dead-letter queue: it applies to asynchronous invocations, not to a stream event source mapping (dùng sai tính năng)
-- More shards: the shard holding the bad record stays blocked and resharding does not remove it (giải bài toán khác)
-- More memory and timeout: the error comes from malformed data, not from missing resources (giải bài toán khác)
+- Enhanced fan-out: lowers read latency, but the failing batch still blocks the shard (giải bài toán khác)
+- Dead-letter queue for asynchronous invocations: it applies to asynchronous invocations, not to a stream event source mapping (dùng sai tính năng)
+- Larger batch size and window: more records per call, but the batch with the bad record keeps failing (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-parameters.html
 > 🇻🇳 Bản ghi lỗi chặn shard → bisect batch + giới hạn retry/tuổi bản ghi + on-failure destination; DLQ của function chỉ cho gọi bất đồng bộ.
 
@@ -294,6 +294,7 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-parameters.h
 - services: Lambda, SQS
 - tags: lambda-concurrency, sqs-dlq, decoupling
 - difficulty: hard
+- time: 140
 - skills: 2.1.k12, 2.1.s3
 - concept: To cap how fast Lambda drains an SQS queue, set maximum concurrency on the event source mapping; reserved concurrency throttles invocations and can push messages to the DLQ
 - refs: 01-compute-services.md, 07-application-integration.md
@@ -301,21 +302,20 @@ Docs: https://docs.aws.amazon.com/lambda/latest/dg/services-kinesis-parameters.h
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A tax-preparation company processes submitted returns with an AWS Lambda function that is triggered by an Amazon SQS standard queue. During filing season the queue holds millions of messages, and Lambda scales out until the partner e-filing API that the function calls starts rejecting requests because it allows only a limited number of parallel calls. The backlog can take longer to drain, but no message may be lost, and messages must not be moved to the dead-letter queue merely because the function was throttled. Which solution will meet these requirements?
 
 - A. Set the reserved concurrency of the function that processes the SQS messages to the number of parallel calls that the partner API can handle.
-- B. Reduce the batch size of the SQS event source mapping to one message so that each invocation makes a single call to the partner API.
+- B. Set a maximum batching window of five minutes on the SQS event source mapping so that the function is invoked with fewer, larger batches.
 - C. Set the maximum concurrency of the SQS event source mapping to the number of parallel calls that the partner API can handle.
-- D. Increase the visibility timeout of the SQS queue so that Lambda polls the queue less often and sends fewer calls to the partner API.
+- D. Set the provisioned concurrency of the function that processes the SQS messages to the number of parallel calls that the partner API can handle.
 
 **Answer:** C
 
 **Explanation:** Maximum concurrency on the SQS event source mapping caps how many function instances that queue can invoke, so Lambda reads fewer messages and the backlog waits safely in the queue.
 - Reserved concurrency: throttled invocations send messages back to the queue, and repeated failed receives can move them to the dead-letter queue (vi phạm ràng buộc)
-- Batch size of one: creates more invocations and does not cap parallelism (giải bài toán khác)
-- Longer visibility timeout: changes when messages reappear, not how many invocations run (dùng sai tính năng)
+- Batching window: fewer invocations, but Lambda can still scale out and call the partner in parallel (giải bài toán khác)
+- Provisioned concurrency: keeps execution environments initialized but does not cap how far the function scales (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/lambda/latest/dg/services-sqs-scaling.html
 > 🇻🇳 Giới hạn song song khi Lambda đọc SQS → đặt maximum concurrency ở event source mapping; reserved concurrency gây throttle và tin có thể rơi vào DLQ.
 
@@ -360,12 +360,12 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html
 - domain: resilient
 - task: 2.1
 - topic: integration
-- services: Amazon MQ, SQS, MSK, EC2
+- services: Amazon MQ, MSK, EC2
 - tags: decoupling
 - difficulty: easy
 - time: 100
 - skills: 2.1.k2, 2.1.s7
-- concept: Amazon MQ for RabbitMQ keeps AMQP clients unchanged and removes broker administration; only a cluster deployment (three nodes across Availability Zones) survives an AZ failure, and MSK speaks Kafka, not AMQP
+- concept: Amazon MQ for RabbitMQ keeps AMQP 0-9-1 clients unchanged; only its cluster deployment survives an AZ failure, while ActiveMQ (AMQP 1.0, OpenWire) and MSK (Kafka) would need client changes
 - refs: 07-application-integration.md
 - hint: Giữ nguyên giao thức AMQP và mã nguồn, bỏ việc vá broker, chịu lỗi một AZ — dịch vụ managed nào nói giao thức này, và kiểu triển khai nào trải qua nhiều AZ?
 - status: draft
@@ -374,7 +374,7 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventBridge.html
 
 A logistics company runs an order-routing application on premises. Its services exchange messages through a RabbitMQ broker by using AMQP 0-9-1 client libraries. The company is moving the application to Amazon EC2 and wants to stop patching and operating broker servers while keeping the application code and messaging protocol unchanged. The broker must stay available if an Availability Zone fails. Which solution will meet these requirements?
 
-- A. Replace the broker with Amazon SQS standard queues and rewrite the messaging code of the application to use the AWS SDK for queue operations.
+- A. Create an Amazon MQ for ActiveMQ broker with an active/standby deployment across two Availability Zones and point the application at its endpoint.
 - B. Create an Amazon MQ for RabbitMQ broker with a cluster deployment across three Availability Zones and point the application at its endpoint.
 - C. Create an Amazon MQ for RabbitMQ single-instance broker, enable automatic minor version upgrades, and point the application at its endpoint.
 - D. Replace the broker with an Amazon MSK cluster that has brokers in three Availability Zones and point the application's clients at the bootstrap brokers.
@@ -382,7 +382,7 @@ A logistics company runs an order-routing application on premises. Its services 
 **Answer:** B
 
 **Explanation:** Amazon MQ for RabbitMQ runs a managed RabbitMQ broker that existing AMQP 0-9-1 clients use without code changes, and a cluster deployment places three broker nodes in different Availability Zones behind one endpoint, while AWS handles patching.
-- SQS with an SDK rewrite: requires application code changes (vi phạm ràng buộc)
+- Amazon MQ for ActiveMQ: highly available and managed, but ActiveMQ supports AMQP 1.0, not the AMQP 0-9-1 protocol of the RabbitMQ clients (vi phạm ràng buộc)
 - Single-instance RabbitMQ broker: one node in one Availability Zone, so a zone failure stops messaging (vi phạm ràng buộc)
 - Amazon MSK: speaks the Apache Kafka protocol, so the AMQP clients would have to be rewritten (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-broker-architecture.html

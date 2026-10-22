@@ -52,6 +52,7 @@ Docs: https://docs.aws.amazon.com/documentdb/latest/developerguide/docdb-using-e
 - services: Keyspaces, DynamoDB, Timestream, EC2
 - tags: purpose-built, serverless-database
 - difficulty: medium
+- time: 110
 - skills: 3.3.k8, 3.3.s4
 - concept: Amazon Keyspaces runs existing Cassandra workloads serverlessly with CQL and Cassandra drivers, billed by reads and writes in on-demand mode
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -59,21 +60,20 @@ Docs: https://docs.aws.amazon.com/documentdb/latest/developerguide/docdb-using-e
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A logistics company runs a 12-node Apache Cassandra cluster on Amazon EC2 to store package-tracking events. The team spends significant time replacing nodes, running repairs, and changing capacity, and traffic varies widely between weekdays and holidays. The application code uses CQL and Cassandra drivers. The company wants to eliminate node management and pay mainly for the reads and writes it performs, with minimal application changes. Which solution will meet these requirements?
 
 - A. Migrate the tables to Amazon Keyspaces in on-demand capacity mode and point the existing Cassandra drivers at the Keyspaces endpoint.
-- B. Migrate the data to Amazon DynamoDB tables in on-demand capacity mode and replace the CQL queries in the application with DynamoDB API calls.
-- C. Migrate the data to Amazon Timestream for InfluxDB and rewrite the tracking-event queries in the InfluxQL query language.
-- D. Replace the EC2 nodes with an Auto Scaling group of larger Cassandra nodes, keep the same drivers, and automate the repairs with AWS Systems Manager.
+- B. Migrate the tables to Amazon Keyspaces in provisioned capacity mode with auto scaling and point the existing drivers at its endpoint.
+- C. Migrate the data to Amazon DynamoDB in on-demand mode and run the existing CQL statements through the DynamoDB PartiQL interface.
+- D. Run the Cassandra cluster on Amazon EKS with a Kubernetes operator that automates node replacement, repairs, and scaling.
 
 **Answer:** A
 
 **Explanation:** Amazon Keyspaces is a serverless, Cassandra-compatible service: the same CQL and drivers keep working, there are no nodes to patch, repair, or resize, and on-demand mode bills for the reads and writes performed.
-- DynamoDB: scales and bills by request, but every CQL query must be rewritten (vi phạm ràng buộc)
-- Timestream for InfluxDB: a time-series engine with a different data model and query language (dùng sai tính năng)
-- Larger self-managed nodes with automated repairs: the team still operates Cassandra nodes (tốn vận hành hơn)
+- Keyspaces provisioned with auto scaling: bills for provisioned capacity rather than for the reads and writes performed (vi phạm ràng buộc)
+- DynamoDB through PartiQL: PartiQL is not CQL, so the Cassandra queries and drivers must change (cấu hình không tồn tại)
+- Cassandra on EKS with an operator: automates some tasks, but the team still runs Cassandra nodes (tốn vận hành hơn)
 Docs: https://docs.aws.amazon.com/keyspaces/latest/devguide/what-is-keyspaces.html
 > 🇻🇳 Giữ CQL + driver Cassandra, bỏ quản lý node, trả theo request → Amazon Keyspaces (on-demand).
 
@@ -86,6 +86,7 @@ Docs: https://docs.aws.amazon.com/keyspaces/latest/devguide/what-is-keyspaces.ht
 - services: Timestream, Aurora, DynamoDB, Keyspaces
 - tags: purpose-built, time-series, multi-az
 - difficulty: medium
+- time: 115
 - skills: 3.3.k8, 3.3.s4
 - concept: Amazon Timestream for InfluxDB is the managed option for existing InfluxDB workloads, with single-digit-millisecond queries and Multi-AZ failover
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -93,21 +94,20 @@ Docs: https://docs.aws.amazon.com/keyspaces/latest/devguide/what-is-keyspaces.ht
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A manufacturer collects readings from thousands of production-line sensors every second and keeps them in a self-managed InfluxDB 2.x server on Amazon EC2. The operations team spends time patching the server and building failover, and dashboards that query recent data need single-digit millisecond responses. The Telegraf agents and queries already use InfluxDB's line protocol and query languages. The company wants a managed service that keeps the existing agents and queries working, with Multi-AZ availability and minimal changes. Which solution will meet these requirements?
 
-- A. Migrate the InfluxDB readings to Amazon Aurora PostgreSQL in a Multi-AZ deployment and rewrite the dashboard queries as SQL against partitioned tables.
-- B. Migrate the readings to Amazon DynamoDB with the sensor ID as the partition key and the timestamp as the sort key.
-- C. Migrate the readings to Amazon Keyspaces with one table for each sensor type and rewrite the queries in CQL.
+- A. Migrate the readings to Amazon Timestream for InfluxDB in a Single-AZ deployment and restore from snapshots after a failure.
+- B. Run the InfluxDB container on Amazon ECS with AWS Fargate and keep its data on an Amazon EFS file system that spans zones.
+- C. Migrate the readings to Amazon Aurora PostgreSQL in a Multi-AZ deployment and rewrite the dashboard queries as SQL statements.
 - D. Migrate the readings to Amazon Timestream for InfluxDB and run the database instance in a Multi-AZ deployment.
 
 **Answer:** D
 
 **Explanation:** Timestream for InfluxDB is a managed InfluxDB 2.x engine, so Telegraf agents and queries keep working, with single-digit-millisecond query responses, a Multi-AZ standby for failover, and patching handled by AWS.
-- Aurora PostgreSQL: relational engine that needs the dashboard queries rewritten as SQL (vi phạm ràng buộc)
-- DynamoDB: key-value store with no time-series query language, so queries and agents change (vi phạm ràng buộc)
-- Keyspaces: wide-column Cassandra model that needs new schemas and CQL queries (vi phạm ràng buộc)
+- Single-AZ Timestream for InfluxDB: keeps the agents and queries, but lacks the required Multi-AZ availability (vi phạm ràng buộc)
+- InfluxDB on Fargate with EFS: the team still maintains the database image, upgrades, and failover design (tốn vận hành hơn)
+- Aurora PostgreSQL: a relational engine that needs the dashboard queries rewritten as SQL (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/timestream/latest/developerguide/timestream-for-influxdb.html
 > 🇻🇳 Chuỗi thời gian đang dùng InfluxDB/Telegraf, cần Multi-AZ ít sửa đổi → Amazon Timestream for InfluxDB.
 
@@ -120,6 +120,7 @@ Docs: https://docs.aws.amazon.com/timestream/latest/developerguide/timestream-fo
 - services: OpenSearch, RDS, DynamoDB, Redshift
 - tags: purpose-built, full-text-search
 - difficulty: easy
+- time: 105
 - skills: 3.3.k8, 3.3.s4
 - concept: Full-text search with relevance ranking and typo tolerance, plus interactive log analytics, is the use case of Amazon OpenSearch Service rather than relational LIKE queries
 - refs: 03-database-services.md, 09-analytics-bigdata.md
@@ -127,21 +128,20 @@ Docs: https://docs.aws.amazon.com/timestream/latest/developerguide/timestream-fo
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 An online marketplace stores product listings in Amazon RDS for MySQL and offers search with LIKE queries across the title and description columns. As the catalog passes tens of millions of listings, searches take seconds, and shoppers expect relevance ranking and tolerance for typing mistakes. The same platform must also let engineers analyze application logs interactively. The company wants a managed service for both full-text search and log analytics with the LEAST operational overhead. Which solution will meet these requirements?
 
-- A. Add Aurora Replicas and create FULLTEXT indexes on the title and description columns so that the LIKE queries use the indexes.
+- A. Index the listings into an Amazon OpenSearch Service domain for search and analyze the application logs with Amazon CloudWatch Logs Insights.
 - B. Index the listings and the logs into an Amazon OpenSearch Service domain and send the application's search requests to it.
-- C. Move the listings to Amazon DynamoDB and query the title attribute through a global secondary index with begins_with conditions.
-- D. Load the listings into Amazon Redshift and run the searches as SQL pattern-matching queries, keeping the logs in the same large cluster.
+- C. Run a self-managed OpenSearch cluster on Amazon EC2 instances and index both the listings and the logs into that cluster.
+- D. Migrate to Aurora MySQL, create FULLTEXT indexes on the title and description columns, and load the logs into the same cluster.
 
 **Answer:** B
 
 **Explanation:** Amazon OpenSearch Service is a managed search and analytics engine that provides full-text search with relevance scoring and fuzzy matching, and it also supports interactive log analytics and dashboards on the same platform.
-- Aurora replicas with FULLTEXT indexes: no typo tolerance and no log analytics (giải bài toán khác)
-- DynamoDB with begins_with: prefix matching only, with no relevance ranking (dùng sai tính năng)
-- Redshift pattern matching: an analytic warehouse, too slow for interactive search requests (dùng sai tính năng)
+- OpenSearch plus CloudWatch Logs Insights: works, but uses two services instead of one managed service for both (vi phạm ràng buộc)
+- Self-managed OpenSearch on EC2: the same engine, with nodes to patch and scale (tốn vận hành hơn)
+- Aurora FULLTEXT indexes: no typo tolerance for shoppers (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-is.html
 > 🇻🇳 Tìm kiếm full-text có xếp hạng, chịu lỗi gõ + phân tích log → Amazon OpenSearch Service, không phải LIKE trên RDS.
 
@@ -154,6 +154,7 @@ Docs: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-
 - services: RDS, Aurora, DMS, SCT
 - tags: homogeneous-migration, read-replicas
 - difficulty: medium
+- time: 145
 - skills: 3.3.k6, 3.3.s3
 - concept: A homogeneous RDS for MySQL to Aurora MySQL move uses an Aurora read replica that is promoted once writes stop and lag is zero; SCT and DMS are for different engines and a dump-and-import needs long downtime
 - refs: 03-database-services.md, 10-migration-transfer.md
@@ -161,21 +162,20 @@ Docs: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/what-
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A company runs a 3 TiB Amazon RDS for MySQL database and wants to move it to Amazon Aurora MySQL for better read scaling and storage. The application can be offline for no more than a few minutes during the cutover, the copy can run in the background for hours, and the team does not want to convert schemas or rewrite queries. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Create an Aurora MySQL read replica of the RDS for MySQL instance and let it replicate the changes while the application keeps running.
-- B. Run AWS Schema Conversion Tool against the RDS for MySQL schema and use AWS DMS to copy the data into a new Aurora MySQL cluster.
+- B. Restore the latest snapshot of the RDS for MySQL instance into a new Aurora MySQL cluster with a read endpoint and move the application to it right away.
 - C. Stop the application's writes, wait until the replica lag reaches zero, promote the Aurora replica, and point the application at its endpoint.
-- D. Export the RDS for MySQL database with mysqldump to Amazon S3 and read the dump into Aurora MySQL while the application is stopped.
+- D. Create an RDS Blue/Green Deployment whose green environment is an Aurora MySQL cluster, and switch over once it is in sync.
 - E. Promote the Aurora replica immediately while the application keeps writing to the source instance, and then switch the application to the new cluster.
 
 **Answer:** A, C
 
 **Explanation:** An Aurora read replica of an RDS for MySQL instance copies data in the background and keeps replicating; once writes stop and lag reaches zero, promotion makes it a standalone cluster, so downtime is brief with no schema conversion.
-- SCT plus DMS: built for different engines, which this same-engine move does not need (tốn vận hành hơn)
-- mysqldump export and import: the application stays offline throughout (vi phạm ràng buộc)
+- Snapshot restore with an immediate switch: writes made after the snapshot are lost, or the application stays offline for hours (vi phạm ràng buộc)
+- Blue/Green Deployment to Aurora: the green environment uses the same engine and cannot be an Aurora cluster (cấu hình không tồn tại)
 - Immediate promotion: later writes to the source never reach the new cluster (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Migrating.RDSMySQL.Replica.html
 > 🇻🇳 RDS MySQL → Aurora MySQL (cùng engine): tạo Aurora read replica, dừng ghi, chờ lag = 0 rồi promote; SCT/DMS dành cho khác engine.
@@ -189,6 +189,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.M
 - services: Aurora, ElastiCache, DynamoDB, RDS
 - tags: aurora-global-database, write-forwarding, multi-region
 - difficulty: hard
+- time: 160
 - skills: 3.3.k1, 3.3.k7
 - concept: An Aurora global database with a secondary cluster gives local low-latency reads in another Region, and write forwarding lets that Region keep one local endpoint for writes too
 - refs: 03-database-services.md, E-kien-truc-database.md
@@ -196,22 +197,21 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.M
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 155
 
 A travel-booking company runs an Amazon Aurora MySQL cluster in us-east-1. Users in Europe see slow page loads because every read crosses the Atlantic, and the European application must also make occasional profile updates without keeping a separate connection to the US Region. The company wants low-latency local reads in eu-west-1 with replication lag that is typically sub-second, and the European application should use one local endpoint for both reads and writes. Which combination of steps will meet these requirements? (Choose TWO)
 
-- A. Create a cross-Region read replica cluster by using MySQL binary log replication and promote it whenever the European application needs to write.
+- A. Create a cross-Region read replica cluster by using binary log replication and point the European reads and writes at it.
 - B. Create an Aurora global database by adding a secondary cluster in eu-west-1 to the existing cluster.
-- C. Create an ElastiCache Global Datastore in eu-west-1 and cache the profile reads and writes there.
+- C. Turn on local write forwarding for the primary cluster in us-east-1 so that its reader instances also accept write statements.
 - D. Turn on write forwarding for the secondary cluster so that write statements sent to it are forwarded to the primary cluster.
-- E. Create DynamoDB global tables in both Regions and copy the profile data from Aurora into them with AWS DMS.
+- E. Deploy an Amazon RDS Proxy in eu-west-1 that forwards the European reads and writes to the Aurora cluster in us-east-1.
 
 **Answer:** B, D
 
 **Explanation:** An Aurora global database replicates storage to a secondary cluster in another Region with typical lag under a second, serving local reads, and write forwarding sends write statements from that cluster to the primary, so one local endpoint serves reads and writes.
-- Binlog replica promoted for writes: promotion splits the data into a separate writable cluster (giải bài toán khác)
-- ElastiCache Global Datastore: caches data but is not the system of record for profile updates (dùng sai tính năng)
-- DynamoDB global tables fed by DMS: changes the database type and adds a pipeline (vi phạm ràng buộc)
+- Binlog replica used for writes: a cross-Region read replica is read-only, so the writes fail (dùng sai tính năng)
+- Local write forwarding in us-east-1: forwards writes inside the primary Region and does nothing for European reads (đặt sai chỗ)
+- RDS Proxy in eu-west-1: a proxy does not replicate data, so every read still crosses the Atlantic (đặt sai chỗ)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-write-forwarding.html
 > 🇻🇳 Đọc cục bộ ở Region khác + ghi qua endpoint cục bộ → Aurora global database (cluster phụ) + write forwarding.
 
@@ -224,6 +224,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - services: ElastiCache, Aurora, DAX, Lambda
 - tags: elasticache-serverless, capacity-planning
 - difficulty: medium
+- time: 120
 - skills: 3.3.k4, 3.3.k2
 - concept: ElastiCache Serverless scales memory, compute, and network automatically with no capacity planning, whereas replicas copy the whole dataset, scheduled resizing still forecasts, and DAX only fronts DynamoDB
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -231,20 +232,19 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A retail company caches product-detail data in an Amazon ElastiCache for Valkey cluster with one shard, while the products themselves live in Amazon Aurora. Before each seasonal campaign, engineers estimate the data set size and resize the node type by hand because evictions rise when memory fills and the node's network saturates. Between campaigns the cache is mostly idle. The company wants the cache to adapt its memory, compute, and network capacity to demand automatically, with no capacity forecasting and the LEAST operational overhead. Which solution will meet these requirements?
 
 - A. Create an ElastiCache Serverless cache for Valkey and point the application at its endpoint instead of the cluster endpoint.
-- B. Add more read replicas to the existing ElastiCache for Valkey shard so that each replica holds a share of the data set and the evictions stop.
-- C. Schedule an AWS Lambda function that raises the node type before each campaign and lowers it again after the campaign ends.
-- D. Replace the cluster with Amazon DynamoDB Accelerator (DAX) so that the cache capacity grows together with the database.
+- B. Turn on cluster mode and ElastiCache Auto Scaling for shards with a target on memory usage, and keep the current node type.
+- C. Move the cache to data tiering node types so that less frequently used items move from memory to local SSD storage.
+- D. Add more read replicas to the existing ElastiCache for Valkey shard so that each replica holds a share of the product data set.
 
 **Answer:** A
 
 **Explanation:** ElastiCache Serverless monitors the memory, compute, and network that the application uses and scales to meet demand, so nobody plans or resizes capacity, and the application sees a single endpoint.
-- Extra read replicas: each replica holds a full copy of the shard's data, so memory pressure and write load do not shrink (dùng sai tính năng)
-- Scheduled resizing: still depends on a forecast and adds scripts to maintain (tốn vận hành hơn)
-- DAX: accelerates DynamoDB only, and these products are stored in Aurora (dùng sai tính năng)
+- Shard auto scaling in cluster mode: adapts the shard count, but the node type, limits, and policies are still planned and tuned (tốn vận hành hơn)
+- Data tiering nodes: extend memory with SSD, but compute and network stay fixed and the node type is still sized by hand (giải bài toán khác)
+- More read replicas: each replica holds a full copy of the data, so memory pressure does not shrink (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html
 > 🇻🇳 Cache phải tự co giãn bộ nhớ/compute/mạng theo nhu cầu, không dự báo → ElastiCache Serverless; replica nhân bản toàn bộ dữ liệu, DAX chỉ cho DynamoDB.

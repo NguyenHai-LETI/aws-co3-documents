@@ -18,6 +18,7 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.3"
 - services: RDS, Aurora
 - tags: read-replicas, aurora-endpoints
 - difficulty: medium
+- time: 120
 - skills: 3.3.s1, 3.3.k7
 - concept: RDS cannot autoscale read replicas, while Aurora Auto Scaling adds and removes Aurora Replicas behind the reader endpoint
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -25,21 +26,20 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 3.3"
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 An online retailer runs its catalog on Amazon RDS for MySQL with a Multi-AZ instance deployment. Reporting dashboards and a public search page generate heavy read traffic that rises unpredictably during campaigns and slows the primary. The team has added two read replicas, but each campaign still requires an engineer to create more replicas by hand and delete them afterward. The company wants read capacity to be added and removed automatically, with no application changes beyond using a read endpoint. Which solution will meet these requirements?
 
-- A. Add an Auto Scaling policy to the RDS for MySQL instance so that RDS creates and removes read replicas based on CPU utilization during each campaign.
-- B. Convert the Multi-AZ deployment to a Multi-AZ DB cluster so that its two readable standby instances absorb the reporting and search reads.
+- A. Keep RDS for MySQL and use an EventBridge schedule with a Lambda function to add read replicas before each campaign and remove them afterward.
+- B. Convert the Multi-AZ deployment to a Multi-AZ DB cluster and send the reporting and search reads to its reader endpoint.
 - C. Migrate to Amazon Aurora MySQL and apply Aurora Auto Scaling to the Aurora Replicas, with reads sent to the reader endpoint.
-- D. Create a larger number of RDS read replicas before each campaign and keep them running year-round behind a weighted Route 53 read endpoint.
+- D. Migrate to Amazon Aurora MySQL with a fixed set of Aurora Replicas sized for the campaign peak, with reads sent to the reader endpoint.
 
 **Answer:** C
 
 **Explanation:** Amazon RDS does not autoscale read replicas, but Aurora Auto Scaling adds and removes Aurora Replicas with a target tracking policy on reader metrics, and the reader endpoint balances connections across them, so the application only needs the reader endpoint.
-- RDS auto scaling policy for replicas: RDS has no such setting (cấu hình không tồn tại)
+- Scheduled Lambda that adds RDS replicas: campaign traffic rises unpredictably, so a schedule cannot follow it (vi phạm ràng buộc)
 - Multi-AZ DB cluster: its two readable standbys are a fixed number, not elastic (giải bài toán khác)
-- Replicas kept running all year: pays for peak read capacity continuously and is still manual (tốn chi phí hơn)
+- Aurora with replicas sized for the peak: one read endpoint, but capacity is not added and removed automatically (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Integrating.AutoScaling.html
 > 🇻🇳 RDS không tự scale read replica; Aurora có Aurora Auto Scaling cho replica (theo CPU/số kết nối) + reader endpoint.
 
@@ -52,6 +52,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Integr
 - services: Aurora
 - tags: aurora-endpoints, read-replicas
 - difficulty: medium
+- time: 145
 - skills: 3.3.s1, 3.3.k7, 3.3.k3
 - concept: Aurora custom endpoints group chosen replicas so that application reads and heavy BI queries use different replicas; the reader endpoint balances across all replicas and promotion tiers do not steer reads
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -59,22 +60,21 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Integr
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A SaaS company runs an Amazon Aurora PostgreSQL cluster with one writer and four Aurora Replicas: two small replicas that serve the user-facing application and two large replicas intended for heavy business-intelligence queries. Analysts' long queries are slowing application reads because the application connects to the reader endpoint, which spreads connections across all four replicas. The company wants the application and the analytics tools each to use only their own replicas, with connection strings that do not depend on individual instance names. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Create a custom endpoint that contains the two large replicas and point the analytics tools at it.
-- B. Point the application at the instance endpoint of each small replica and rotate the list in the application configuration.
-- C. Create a second Aurora cluster by cloning the cluster and refresh the clone every night for the analytics tools.
+- B. Create an RDS Proxy with a read-only endpoint for the cluster and point the application at that proxy endpoint.
+- C. Create a clone of the cluster each night and point the analytics tools at the cluster endpoint of the clone.
 - D. Create a custom endpoint that contains the two small replicas and point the application at it.
-- E. Set the promotion tier of the two large replicas to the lowest priority so that the reader endpoint stops sending application connections to them.
+- E. Set the promotion tier of the two large replicas to the lowest priority so that the reader endpoint favors the small replicas.
 
 **Answer:** A, D
 
 **Explanation:** A custom endpoint load-balances connections across a chosen subset of replicas, so one endpoint for the small replicas and one for the large replicas isolate the two workloads without naming any instance.
-- Instance endpoints: tie the application to specific instances, which contradicts the connection-string requirement (vi phạm ràng buộc)
-- Nightly clone: adds a second cluster to pay for and serves stale data (tốn chi phí hơn)
-- Promotion tier: decides which replica is promoted on failover, not where reader connections go (dùng sai tính năng)
+- RDS Proxy read-only endpoint: spreads connections across all readers, so the large replicas still serve the application (dùng sai tính năng)
+- Nightly clone: a second cluster to pay for that serves stale data (tốn chi phí hơn)
+- Promotion tier: sets the failover order, not where reader connections go (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overview.Endpoints.html
 > 🇻🇳 Tách tải bằng custom endpoint: một cho replica nhỏ (app), một cho replica lớn (BI); instance endpoint hay promotion tier không làm việc này.
 
@@ -87,6 +87,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overvi
 - services: Aurora
 - tags: aurora-serverless, read-replicas, capacity-planning
 - difficulty: hard
+- time: 140
 - skills: 3.3.k8, 3.3.k4, 3.3.s1
 - concept: A cluster can mix provisioned and Serverless v2 instances; Serverless v2 readers in promotion tier 2 or higher scale in place, independently of the writer, which makes only the spiky reader capacity elastic
 - refs: 03-database-services.md, R-performance-benchmarks.md
@@ -94,21 +95,20 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overvi
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A media company runs an Amazon Aurora MySQL cluster with a provisioned writer that carries a steady transactional load and is covered by Reserved Instances. Two provisioned readers sized for peak serve analytics queries that spike for a few minutes at unpredictable times and otherwise sit nearly idle, and adding Aurora Replicas during a spike takes too long to help. The company wants reader capacity to follow the spikes inside the cluster, without changing the writer or the application, and with the LEAST operational effort. Which solution will meet these requirements?
 
 - A. Apply Aurora Auto Scaling to the cluster with a target on reader CPU utilization so that more provisioned replicas are added during each spike.
-- B. Convert the writer and the readers to Aurora Serverless v2 and give up the Reserved Instance commitment that covers the writer.
-- C. Add more provisioned readers sized for peak load and create a custom endpoint that sends the analytics queries to them.
+- B. Replace the provisioned readers with Aurora Serverless v2 readers in the same cluster and keep their promotion tier at 0 or 1.
+- C. Convert the writer and the readers to Aurora Serverless v2 so that every instance in the cluster scales with the analytics spikes.
 - D. Replace the provisioned readers with Aurora Serverless v2 readers in the same cluster and set their promotion tier to 2 or higher.
 
 **Answer:** D
 
 **Explanation:** A cluster can mix provisioned and Serverless v2 instances; Serverless v2 readers scale in place in fine-grained steps, and readers in promotion tier 2 or higher scale independently of the writer, so only the readers become elastic.
 - Aurora Auto Scaling: adds fixed-size provisioned replicas, which launch too slowly for short spikes (giải bài toán khác)
-- Converting the writer too: changes the steady writer and wastes its reservation (vi phạm ràng buộc)
-- More provisioned readers: pays for peak capacity all the time (tốn chi phí hơn)
+- Serverless v2 readers in tier 0 or 1: their capacity is tied to the writer, so they do not scale with the analytics spikes (dùng sai tính năng)
+- Converting the writer too: changes the steady writer that must stay as it is and wastes its reservation (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.setting-capacity.html
 > 🇻🇳 Writer ổn định + reader đột biến ngắn → reader Aurora Serverless v2 (promotion tier ≥ 2) co giãn độc lập writer; Auto Scaling replica quá chậm.
 
@@ -121,6 +121,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-server
 - services: RDS Proxy, Lambda, RDS, Secrets Manager
 - tags: connection-pooling, rds-proxy
 - difficulty: medium
+- time: 120
 - skills: 3.3.k5
 - concept: RDS Proxy pools and reuses connections for bursts of short-lived Lambda functions and keeps client connections during failover while using Secrets Manager credentials
 - refs: 03-database-services.md, 01-compute-services.md
@@ -128,21 +129,20 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-server
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A ticketing company runs a serverless backend on AWS Lambda that connects to an Amazon RDS for PostgreSQL Multi-AZ database. When a popular event goes on sale, thousands of function instances open new database connections at once, the database runs out of connections, and failovers during maintenance leave functions hanging while DNS updates. Database credentials must stay in AWS Secrets Manager. The company wants to protect the database from connection storms and shorten application recovery after a failover, with minimal code changes. Which solution will meet these requirements?
 
-- A. Increase the max_connections value in the DB parameter group, move the database to a larger instance class, and keep the credentials in Secrets Manager.
+- A. Run PgBouncer on an Auto Scaling group of Amazon EC2 instances and have the Lambda functions connect through a Network Load Balancer.
 - B. Create an RDS Proxy that uses the credentials in Secrets Manager, and have the Lambda functions connect to the proxy endpoint.
-- C. Set the Lambda functions' reserved concurrency to a low value so that fewer functions connect to the database at the same time.
-- D. Create an RDS read replica and have the Lambda functions send their connections to the replica's endpoint.
+- C. Create an RDS Proxy for the database and copy the credentials from Secrets Manager into encrypted Lambda environment variables.
+- D. Convert the database to a Multi-AZ DB cluster deployment so that failovers complete faster, and keep the existing connection code.
 
 **Answer:** B
 
 **Explanation:** RDS Proxy pools and reuses connections, so thousands of short-lived function instances share a small number of database connections, and it connects to the standby during a failover while preserving application connections, with Secrets Manager credentials and few code changes.
-- Higher max_connections and a bigger instance: more memory per connection, but the storm and the failover delay remain (dùng sai tính năng)
-- Low reserved concurrency: throttles customers during the sale (vi phạm ràng buộc)
-- Read replica: read-only, and it fixes neither writes nor failover (dùng sai tính năng)
+- Self-managed PgBouncer on EC2: pools connections, but adds servers to run and does not follow RDS failovers itself (tốn vận hành hơn)
+- Password in environment variables: the credentials must stay in Secrets Manager (vi phạm ràng buộc)
+- Multi-AZ DB cluster: shortens failover but does nothing about the connection storms (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 > 🇻🇳 Lambda mở ồ ạt kết nối + failover chậm → RDS Proxy (pool kết nối, giữ kết nối khi failover, dùng Secrets Manager).
 
@@ -190,6 +190,7 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Replication.html
 - services: DynamoDB
 - tags: sharding, hot-partition, dynamodb-capacity
 - difficulty: hard
+- time: 135
 - skills: 3.3.k3, 3.3.s4
 - concept: A partition key that is the current date funnels all writes into one partition; write sharding with a suffix spreads them, whereas more capacity, on-demand mode or a GSI do not lift the per-partition limit
 - refs: 03-database-services.md, E-kien-truc-database.md
@@ -197,21 +198,20 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Replication.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 135
 
 A fleet-tracking company stores vehicle telemetry in an Amazon DynamoDB table whose partition key is the current date, such as 2026-10-22, and whose sort key is a timestamp. The table is provisioned with 10,000 write capacity units, yet during peak hours writes are throttled although consumed capacity stays well below the provisioned amount. Reads always target one calendar day at a time. The company wants the table to sustain peak write rates without moving to a different database. Which solution will meet these requirements?
 
 - A. Add a random suffix to the date in the partition key on writes, and query each suffix for the requested date and merge the results.
-- B. Increase the provisioned write capacity to 40,000 units so that every partition of the table receives a larger share of the capacity.
+- B. Change the partition key to the vehicle ID and keep the timestamp as the sort key so that the writes spread evenly across many partitions.
 - C. Switch the table to on-demand capacity mode so that DynamoDB adds partitions for the date key as the load grows.
-- D. Create a global secondary index on the timestamp attribute and direct the writes to the index instead of to the table itself.
+- D. Place a DynamoDB Accelerator (DAX) cluster in front of the table so that the telemetry writes are absorbed during peak hours.
 
 **Answer:** A
 
 **Explanation:** All writes for one date hit one partition key value with a fixed maximum write rate, so throttling occurs despite unused capacity; a random suffix spreads writes across partitions, and reads query each suffix and merge.
-- More provisioned capacity: the per-partition limit stays, so the hot key still throttles (giải bài toán khác)
-- On-demand mode: has the same per-partition limits, so one hot key still throttles (giải bài toán khác)
-- Global secondary index: updated from table writes and cannot be written to directly (cấu hình không tồn tại)
+- Vehicle ID as partition key: spreads writes, but a one-day read would then need a scan or an index keyed on the hot date (vi phạm ràng buộc)
+- On-demand mode: keeps the same per-partition limit, so the hot date key still throttles (giải bài toán khác)
+- DAX: a write-through cache that passes every write to the table, so the hot key still throttles (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-sharding.html
 > 🇻🇳 Khoá phân vùng là ngày hiện tại → mọi ghi dồn vào một partition; thêm hậu tố ngẫu nhiên (write sharding), tăng WCU hay on-demand không gỡ giới hạn.
 
@@ -294,6 +294,7 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html
 - services: Aurora, DynamoDB, DocumentDB, Keyspaces
 - tags: relational-vs-nonrelational, purpose-built
 - difficulty: easy
+- time: 90
 - skills: 3.3.s4, 3.3.k8
 - concept: Complex joins, multi-table ACID transactions and ad hoc SQL reporting call for a relational engine such as Aurora, not a key-value, document or wide-column store
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -301,21 +302,20 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 90
 
 A wholesale distributor is replacing its legacy order-management system. The application runs complex multi-table joins for invoicing, requires ACID transactions across orders, line items, and inventory, and lets analysts run ad hoc SQL reports. Order volume is growing quickly, and the company wants a managed database with automatic failover, read scaling, and storage that grows without manual provisioning. Which database should a solutions architect choose?
 
-- A. Use Amazon DynamoDB with one table for each entity and join the entities in application code.
-- B. Use Amazon DocumentDB and store each order as a document that embeds its line items and inventory counts.
-- C. Use Amazon Keyspaces and model orders and line items as wide-column tables that are queried with CQL.
+- A. Use Amazon RDS for PostgreSQL in a Single-AZ deployment with read replicas and storage autoscaling turned on.
+- B. Use Amazon Redshift Serverless for the order data so that analysts run ad hoc SQL reports on the same database.
+- C. Use Amazon DynamoDB transactions with TransactWriteItems across the order, line item, and inventory tables.
 - D. Use Amazon Aurora with a MySQL-compatible or PostgreSQL-compatible cluster and add Aurora Replicas for reads.
 
 **Answer:** D
 
 **Explanation:** Aurora is a managed relational engine with SQL joins and ACID transactions across tables, automatic failover, up to 15 low-lag Aurora Replicas for read scaling, and storage that grows automatically.
-- DynamoDB: no joins or ad hoc SQL, so the joins would move into application code (dùng sai tính năng)
-- DocumentDB: document model that does not provide relational joins or SQL reporting (dùng sai tính năng)
-- Keyspaces: wide-column store queried by key with CQL, not for joins or ad hoc SQL (dùng sai tính năng)
+- RDS Single-AZ with replicas: relational with read scaling, but no automatic failover (vi phạm ràng buộc)
+- Redshift Serverless: an analytics warehouse, not an OLTP store for high-rate transactional orders (dùng sai tính năng)
+- DynamoDB transactions: ACID writes, but no joins or ad hoc SQL reports (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_AuroraOverview.html
 > 🇻🇳 Join phức tạp + giao dịch ACID + báo cáo SQL → cơ sở dữ liệu quan hệ (Amazon Aurora), không phải DynamoDB/DocumentDB/Keyspaces.
 
@@ -328,6 +328,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_AuroraOv
 - services: DynamoDB, ElastiCache, Aurora, Neptune, RDS
 - tags: purpose-built, database-design
 - difficulty: hard
+- time: 175
 - skills: 3.3.s2, 3.3.k8, 3.3.s4
 - concept: Design the data layer from purpose-built engines: DynamoDB for key-value player data at scale, ElastiCache sorted sets for the leaderboard, and Aurora for ACID purchase transactions
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md, E-kien-truc-database.md
@@ -335,22 +336,21 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_AuroraOv
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 175
 
 A game studio is designing the data layer for a global online game that expects millions of concurrent players. Player profiles and inventories are read and written by player ID at very high request rates and must scale horizontally with single-digit millisecond latency. A live leaderboard must rank millions of players and refresh in under a millisecond. Purchase transactions require ACID guarantees across multiple related tables. The team wants to use purpose-built managed databases. Which combination of designs will meet these requirements? (Choose THREE)
 
-- A. Store the player profiles and inventories on a single Amazon RDS for MySQL instance that is sized for the peak load.
+- A. Store the player profiles and inventories in a single Amazon Aurora Serverless v2 cluster so that capacity follows demand.
 - B. Store the player profiles and inventories in Amazon DynamoDB with on-demand capacity so that throughput follows demand.
-- C. Compute the leaderboard by scanning the DynamoDB profile table and sorting the scores in the application on every request.
+- C. Compute the leaderboard by querying a DynamoDB global secondary index whose sort key is the player's score after each match.
 - D. Compute the leaderboard with sorted sets in Amazon ElastiCache for Valkey and update the scores after each match result.
-- E. Store the purchase transactions in Amazon Neptune as graph edges that connect each player to the items that the player bought.
+- E. Store the purchase transactions in Amazon Keyspaces and use lightweight transactions to protect each purchase.
 - F. Store the purchase transactions in Amazon Aurora so that every purchase commits or rolls back as a single unit.
 
 **Answer:** B, D, F
 
 **Explanation:** Match each need to a purpose-built engine: DynamoDB scales key-value access by player ID, ElastiCache sorted sets rank players in memory, and Aurora provides ACID transactions across related tables.
-- Single RDS instance for profiles: cannot scale horizontally for peak key-value traffic (vi phạm ràng buộc)
-- Scanning DynamoDB to rank: reads the whole table on each request, too slow and costly (dùng sai tính năng)
-- Neptune for purchases: a graph engine, not a transactional relational store (dùng sai tính năng)
+- Aurora Serverless v2 for profiles: scales capacity, but every write still goes to one writer instead of scaling horizontally (vi phạm ràng buộc)
+- GSI sorted by score: returns ranked items in milliseconds, not the sub-millisecond refresh of an in-memory sorted set (vi phạm ràng buộc)
+- Keyspaces lightweight transactions: conditional writes within one partition, not ACID transactions across related tables (dùng sai tính năng)
 Docs: https://aws.amazon.com/products/databases/
 > 🇻🇳 Chọn DB theo kiểu truy cập: DynamoDB cho key–value quy mô lớn, ElastiCache (sorted set) cho leaderboard, Aurora cho giao dịch ACID.

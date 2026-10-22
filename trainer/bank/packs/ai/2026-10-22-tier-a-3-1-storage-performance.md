@@ -52,6 +52,7 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html
 - services: EC2
 - tags: instance-store, scratch-storage
 - difficulty: easy
+- time: 110
 - skills: 3.1.s1, 3.1.k3
 - concept: Local NVMe instance store gives the lowest latency and highest IOPS for scratch data that need not survive a stop or termination, at no extra storage cost
 - refs: 02-storage-services.md, 01-compute-services.md
@@ -59,21 +60,20 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/general-purpose.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A genomics company runs analysis jobs on a fleet of Amazon EC2 instances. Each job writes several hundred gigabytes of intermediate files, reads them back in a random pattern, and deletes them when the job ends; final results are written to Amazon S3. The intermediate files do not need to survive a stop or termination of the instance. The jobs are limited by storage latency and IOPS, and the company does not want to pay for storage on top of the instance price. Which configuration will provide the HIGHEST performance for the intermediate files?
 
-- A. Attach a Provisioned IOPS io2 Block Express volume to each instance and configure the volume to be deleted on instance termination.
+- A. Attach a Provisioned IOPS io2 Block Express volume to each instance and configure the volume to be deleted when the instance terminates.
 - B. Choose instance types that include local NVMe instance store volumes and write the intermediate files to those volumes.
-- C. Mount an Amazon EFS file system that uses Elastic throughput on every instance and write the intermediate files to the shared file system.
-- D. Write each intermediate file to an Amazon S3 bucket and read the data back later with ranged GET requests from the instances.
+- C. Mount an Amazon FSx for Lustre scratch file system on every instance and write the intermediate files to it for sub-millisecond latency.
+- D. Write the intermediate files to an S3 Express One Zone directory bucket in the same Availability Zone as the instances.
 
 **Answer:** B
 
 **Explanation:** Instance store volumes sit on the host, so they give the lowest latency and highest IOPS, they are included in the instance price, and losing them on stop or termination is acceptable for scratch data.
-- io2 Block Express: network-attached storage billed separately for capacity and provisioned IOPS (vi phạm ràng buộc)
-- Amazon EFS: a shared network file system with higher per-operation latency, and sharing is not needed (dùng sai tính năng)
-- Amazon S3: object requests with far higher latency than block storage (dùng sai tính năng)
+- io2 Block Express volume: network-attached storage billed for capacity and IOPS on top of the instance price (vi phạm ràng buộc)
+- FSx for Lustre scratch file system: fast shared storage, but billed separately and reached over the network (vi phạm ràng buộc)
+- S3 Express One Zone: low-latency object storage, but billed per GB and request and slower than local NVMe (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html
 > 🇻🇳 Dữ liệu tạm cần IOPS và độ trễ tốt nhất, không cần bền → instance store (NVMe gắn trực tiếp host), đã nằm trong giá instance.
 
@@ -121,6 +121,7 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/performance.html
 - services: FSx, DataSync
 - tags: fsx-ontap, hybrid-storage, multi-protocol
 - difficulty: medium
+- time: 110
 - skills: 3.1.k1, 3.1.k2
 - concept: Only FSx for NetApp ONTAP serves the same data over NFS and SMB and keeps NetApp replication working; Lustre is Linux-only, OpenZFS is NFS-only, Windows File Server is SMB-only
 - refs: 02-storage-services.md, 10-migration-transfer.md
@@ -128,21 +129,20 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/performance.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 An engineering company stores simulation data on on-premises NetApp file servers. Linux compute nodes read the data over NFS, and engineers on Windows workstations open the same files over SMB. The company will burst simulation jobs into AWS during peak weeks and wants to keep replicating volumes with the NetApp tooling it already uses, without changing how any client mounts the data. Which AWS storage solution will meet these requirements with the LEAST operational overhead?
 
-- A. Create an Amazon FSx for Lustre file system and replicate the on-premises NetApp volumes into it by using AWS DataSync tasks.
-- B. Create an Amazon FSx for OpenZFS file system, replicate the on-premises NetApp volumes into it by using AWS DataSync tasks, and mount it over NFS.
-- C. Create an Amazon FSx for Windows File Server file system, replicate the on-premises NetApp volumes into it by using AWS DataSync tasks, and share it over SMB.
+- A. Create an Amazon FSx for NetApp ONTAP file system and copy the on-premises volumes into it with scheduled AWS DataSync tasks.
+- B. Create an Amazon FSx for OpenZFS file system and replicate the on-premises NetApp volumes into it by using NetApp SnapMirror.
+- C. Run a self-managed NetApp ONTAP virtual appliance on Amazon EC2 and replicate the on-premises volumes to it with NetApp SnapMirror.
 - D. Create an Amazon FSx for NetApp ONTAP file system and replicate the on-premises volumes to it by using NetApp SnapMirror.
 
 **Answer:** D
 
 **Explanation:** FSx for NetApp ONTAP serves the same data over NFS and SMB and supports SnapMirror replication, so existing clients and tooling keep working without changes or servers to manage.
-- FSx for Lustre: Linux clients only, through the Lustre client, so SMB users are not served (vi phạm ràng buộc)
-- FSx for OpenZFS: NFS only, so the Windows workstations lose SMB access (vi phạm ràng buộc)
-- FSx for Windows File Server: SMB only, so the NFS compute nodes cannot mount it (vi phạm ràng buộc)
+- FSx for ONTAP fed by DataSync: right file system, but the company must keep replicating with its NetApp tooling (vi phạm ràng buộc)
+- FSx for OpenZFS with SnapMirror: SnapMirror replicates only between ONTAP systems (cấu hình không tồn tại)
+- Self-managed ONTAP on EC2: keeps SnapMirror, but the team patches and operates the appliance (tốn vận hành hơn)
 Docs: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html
 > 🇻🇳 Cùng dữ liệu cho NFS lẫn SMB + SnapMirror của NetApp → FSx for NetApp ONTAP; Lustre, OpenZFS, Windows chỉ một giao thức.
 
@@ -155,6 +155,7 @@ Docs: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html
 - services: S3
 - tags: s3-transfer-acceleration, s3-multipart-upload
 - difficulty: medium
+- time: 145
 - skills: 3.1.s1, 3.1.k2
 - concept: Long-distance uploads of very large objects: Transfer Acceleration for distance plus multipart upload for parallelism and partial retries
 - refs: 02-storage-services.md, R-performance-benchmarks.md
@@ -162,22 +163,21 @@ Docs: https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/what-is-fsx-ontap.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A film-production company's field crews around the world upload raw footage files of 30–60 GB each to a single Amazon S3 bucket in us-east-1 over the public internet. Uploads from Asia and Australia are slow, and a dropped connection near the end of an upload forces the crew to restart the whole file. The company wants faster and more reliable uploads without changing the bucket or the Region where the data is stored. Which combination of actions will meet these requirements? (Choose TWO)
 
 - A. Enable S3 Transfer Acceleration on the bucket and upload through the bucket's accelerate endpoint.
-- B. Add S3 replication rules and have each crew upload to a new bucket in the AWS Region closest to that crew.
+- B. Create an S3 Multi-Region Access Point and have each crew upload through it so that requests travel over the AWS global network.
 - C. Upload each file with the S3 multipart upload API, sending the parts in parallel and retrying only the parts that fail.
-- D. Configure the upload tool to use S3 byte-range fetches so that each file moves to the bucket in smaller ranges.
-- E. Generate S3 presigned PUT URLs so that every crew member can upload each file in a single request.
+- D. Connect each crew site with AWS Site-to-Site VPN to a VPC and upload to the bucket through an S3 gateway endpoint in that VPC.
+- E. Upload each file in a single PUT request that includes a Content-MD5 checksum so that S3 rejects any corrupted upload.
 
 **Answer:** A, C
 
 **Explanation:** Transfer Acceleration sends each upload to the nearest CloudFront edge location and then over an optimized AWS network path, which helps distant crews, and multipart upload sends parts in parallel and retries only a failed part.
-- Replication to a bucket in each Region: changes where the data is stored, which the company ruled out (vi phạm ràng buộc)
-- Byte-range fetches: speed up downloads made with GET requests, not uploads (giải bài toán khác)
-- Presigned PUT URLs: change only how requests are authorized, and one PUT request cannot carry objects this large (dùng sai tính năng)
+- Multi-Region Access Point: accelerates over the AWS network but needs buckets in several Regions, which changes where data is stored (vi phạm ràng buộc)
+- Site-to-Site VPN to a gateway endpoint: gateway endpoints cannot be used from on-premises networks over VPN (cấu hình không tồn tại)
+- Single PUT with Content-MD5: checks integrity, but one PUT cannot carry objects larger than 5 GB (cấu hình không tồn tại)
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html
 > 🇻🇳 Upload xa, file lớn, hay rớt → Transfer Acceleration + multipart upload (song song, chỉ gửi lại phần lỗi).
 
@@ -202,16 +202,16 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleratio
 An IoT analytics company ingests sensor files into one Amazon S3 bucket. Thousands of devices upload small objects, and every object key begins with the same date segment, such as 2026-10-22/device-id/file. At peak, the ingestion service sends about 12,000 PUT requests per second to keys that begin with the same date and receives HTTP 503 Slow Down responses. The data must stay in one bucket in the S3 Standard storage class for later queries. The company needs a higher sustained write rate. Which solution will meet these requirements?
 
 - A. Add a short hash to the beginning of each object name so that requests spread across many prefixes, and send the uploads in parallel.
-- B. Enable S3 Transfer Acceleration on the bucket and have the ingestion service send every upload through the bucket's accelerate endpoint.
-- C. Switch the ingestion service to multipart upload for every object so that each small file is sent to the bucket in several parts.
-- D. Request a service quota increase for the number of PUT requests per second that the bucket is allowed to receive.
+- B. Add exponential backoff with jitter to the ingestion service so that it retries the object uploads that receive a 503 Slow Down response.
+- C. Write the sensor files to an S3 Express One Zone directory bucket, which supports far higher request rates than general purpose buckets.
+- D. Open an AWS Support case to raise the per-prefix PUT request rate quota of the bucket above its current limit.
 
 **Answer:** A
 
 **Explanation:** S3 scales request rates per key prefix and allows unlimited prefixes, so spreading objects across many prefixes and sending requests in parallel raises the sustained PUT rate.
-- Transfer Acceleration: speeds up long-distance transfers, not the request rate against one prefix (giải bài toán khác)
-- Multipart upload: meant for large objects and only adds requests for small files (dùng sai tính năng)
-- Quota increase: request rates scale per prefix, not through a quota that support can raise (cấu hình không tồn tại)
+- Exponential backoff: smooths retries, but the hot prefix keeps the same request-rate ceiling (giải bài toán khác)
+- S3 Express One Zone: high request rates, but the data must stay in S3 Standard in the existing bucket (vi phạm ràng buộc)
+- Support case for a higher per-prefix rate: request rates scale with prefixes, not through a quota (cấu hình không tồn tại)
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performance.html
 > 🇻🇳 503 Slow Down trên một prefix → rải object ra nhiều prefix và gửi song song; không có quota để nâng tốc độ request.
 
@@ -224,6 +224,7 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performan
 - services: S3, EC2
 - tags: s3-express-one-zone, low-latency
 - difficulty: hard
+- time: 140
 - skills: 3.1.s1, 3.1.k2
 - concept: S3 Express One Zone directory buckets in the compute's Availability Zone give single-digit-millisecond request latency for small-object ML workloads when single-AZ storage is acceptable
 - refs: 02-storage-services.md, R-performance-benchmarks.md
@@ -231,20 +232,19 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performan
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A machine-learning team trains models on a fleet of GPU instances that all run in one Availability Zone. Each training epoch reads tens of millions of small image files from an Amazon S3 Standard bucket, and the GPUs sit idle waiting on the first-byte latency of those requests. The training data is copied from a durable source bucket before every run and can be recreated at any time. The team must keep using the Amazon S3 API and wants the lowest possible request latency. Which solution will meet these requirements?
 
-- A. Enable S3 Transfer Acceleration on the Standard bucket and have the training code read the files through the accelerate endpoint.
+- A. Mount the Standard bucket on the instances with Mountpoint for Amazon S3 and turn on its local cache for the training data.
 - B. Spread the image files across many key prefixes in the Standard bucket and add more reader threads to the training code.
 - C. Copy the data set into an S3 Express One Zone directory bucket in the same Availability Zone as the instances and read from it.
-- D. Create an Amazon EFS file system, copy the data set into it, and mount it from the instances through a mount target in their Availability Zone.
+- D. Copy the data set into an S3 One Zone-IA bucket in the same Availability Zone as the GPU instances and read the training files from it.
 
 **Answer:** C
 
 **Explanation:** S3 Express One Zone directory buckets give consistent single-digit-millisecond access for many small objects, fastest when placed in the compute's Availability Zone; single-zone storage is acceptable because the data can be recreated.
-- Transfer Acceleration: speeds up long-distance transfers over edge locations, not requests from compute in the same zone (dùng sai tính năng)
+- Mountpoint for Amazon S3 with caching: presents a file interface, so the code would stop using the S3 API (vi phạm ràng buộc)
 - More prefixes and reader threads: raise the request rate, but every request keeps Standard-class latency (giải bài toán khác)
-- Amazon EFS: is not the S3 API, so the training code would have to change (vi phạm ràng buộc)
+- S3 One Zone-IA: stores data in one zone but has Standard-class first-byte latency plus retrieval fees (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/directory-bucket-high-performance.html
 > 🇻🇳 Cần độ trễ S3 thấp nhất, dữ liệu tái tạo được → S3 Express One Zone (directory bucket) cùng AZ với compute.

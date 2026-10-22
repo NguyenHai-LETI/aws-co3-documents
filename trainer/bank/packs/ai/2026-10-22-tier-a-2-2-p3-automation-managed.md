@@ -15,9 +15,10 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.2 �
 - domain: resilient
 - task: 2.2
 - topic: compute
-- services: EC2, CloudWatch, EC2 Auto Scaling, AWS Backup
+- services: EC2, CloudWatch, EC2 Auto Scaling, Elastic Disaster Recovery
 - tags: high-availability, snapshots
 - difficulty: medium
+- time: 110
 - skills: 2.2.s4, 2.2.s7
 - concept: EC2 automatic recovery restores a single legacy instance on new hardware in the same zone with the same ID, IPs, and volumes
 - refs: 01-compute-services.md
@@ -25,21 +26,20 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 2.2 �
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A company runs a legacy license-server application on a single Amazon EC2 instance that has an Elastic IP address and attached EBS volumes. The software can run on only one instance at a time and cannot be clustered. The company wants the instance to recover automatically if the underlying host hardware fails, keeping the same instance ID, IP addresses, and data, with the LEAST operational effort and cost. Which solution meets these requirements?
 
 - A. Create a CloudWatch alarm on the StatusCheckFailed_System metric of the instance with the EC2 recover action
-- B. Place the instance in an Auto Scaling group with a minimum and maximum size of one and attach the Elastic IP address through user data
-- C. Launch a second identical instance in another Availability Zone behind a Network Load Balancer and run the license software on both instances
-- D. Take hourly EBS snapshots with AWS Backup and restore them to a new EC2 instance to recover after a failure
+- B. Place the instance in an Auto Scaling group of one with a lifecycle hook that reattaches the Elastic IP address and the data volume
+- C. Create a CloudWatch alarm on the StatusCheckFailed_Instance metric of the instance with the EC2 reboot action
+- D. Replicate the instance to another Availability Zone with AWS Elastic Disaster Recovery and launch a recovery instance after a failure
 
 **Answer:** A
 
 **Explanation:** EC2 recovers an impaired instance on new hardware in the same zone, keeping its instance ID, IP addresses, and EBS volumes; a CloudWatch alarm on the system status check with the recover action sets it up at no extra cost.
-- Auto Scaling group of one: launches a replacement with a new instance ID and without the old volumes (vi phạm ràng buộc).
-- Second instance behind a load balancer: the software cannot run on two instances at once (vi phạm ràng buộc).
-- Hourly snapshots restored by hand: manual, a new instance ID, and data up to an hour old (tốn vận hành hơn).
+- Auto Scaling group of one with a lifecycle hook: the replacement gets a new instance ID (vi phạm ràng buộc).
+- Reboot alarm on the instance status check: a reboot stays on the failed host, and that check covers the guest OS, not host hardware (dùng sai tính năng).
+- Elastic Disaster Recovery: launches a new instance with a new ID and adds replication cost (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html
 > 🇻🇳 Hỏng phần cứng host của 1 instance (giữ ID/IP/EBS) → EC2 auto recovery (alarm StatusCheckFailed_System).
 
@@ -52,6 +52,7 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.h
 - services: EC2 Auto Scaling, ALB, EC2, Systems Manager
 - tags: deployment-strategies, ami, launch-template, infrastructure-as-code
 - difficulty: hard
+- time: 175
 - skills: 2.2.k7, 2.2.s1, 2.2.k8
 - concept: Immutable infrastructure bakes a new AMI per release and shifts ALB target group weights between old and new groups for instant rollback
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
@@ -59,21 +60,20 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.h
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 170
 
 A company runs a web application on EC2 instances in an Auto Scaling group behind an Application Load Balancer. Operators patch the instances in place with SSH and Systems Manager Run Command. After months the instances have drifted, with different library versions, and a faulty patch took hours to undo. The company wants every change deployed as a new, tested image to consistent instances, wants to switch back to the previous version immediately without launching or replacing instances again, and wants no one to log in to production instances. Which combination of steps will meet these requirements? (Choose TWO)
 
-- A. Run Systems Manager Patch Manager in a monthly maintenance window to patch the running instances in place
+- A. Patch the running instances with Systems Manager Patch Manager in a maintenance window and remove SSH access so that no one logs in to them
 - B. Bake each release into a new AMI and reference it from a new launch template version used by a new Auto Scaling group
-- C. Add a user data script that installs the latest application version from a package repository whenever an instance launches
+- C. Bake each release into a new AMI and set it as the default launch template version of the existing group so that scale-out launches use it
 - D. Start an Auto Scaling instance refresh on the existing group behind the load balancer for each release and roll back by starting another refresh
 - E. Shift traffic to the new group by changing target group weights on the load balancer listener, and keep the old group running for rollback
 
 **Answer:** B, E
 
 **Explanation:** Immutable infrastructure never changes running servers: each release is a new AMI launched by a new Auto Scaling group, and weighted target groups shift traffic while the old group stays untouched, so rollback means moving weights back.
-- Patch Manager on running instances: in-place changes, the cause of the drift (vi phạm ràng buộc).
-- User data installing the latest version at launch: instances differ by launch time and no tested image exists (dùng sai tính năng).
+- Patch Manager without SSH: still changes running servers in place, the cause of the drift (vi phạm ràng buộc).
+- New AMI in the existing group's template: old and new versions run side by side, and rollback needs instance replacements (vi phạm ràng buộc).
 - Instance refresh: replaces instances again to roll back, so rollback is not immediate (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_tracking_change_management_immutable_infrastructure.html
 > 🇻🇳 Immutable: AMI mới mỗi bản phát hành + chuyển trọng số target group → rollback tức thì, không vá tại chỗ.
@@ -84,9 +84,10 @@ Docs: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_
 - domain: resilient
 - task: 2.2
 - topic: devtools
-- services: X-Ray, API Gateway, Lambda, CloudTrail, VPC Flow Logs, CloudWatch
+- services: X-Ray, API Gateway, Lambda, CloudWatch
 - tags: observability
 - difficulty: medium
+- time: 120
 - skills: 2.2.k12
 - concept: AWS X-Ray traces individual requests across services and shows a service map with latency and error rates
 - refs: Q-service-comparisons.md, 06-management-governance.md
@@ -94,21 +95,20 @@ Docs: https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A food-delivery company runs its order workflow as Amazon API Gateway REST APIs that invoke AWS Lambda functions, which call Amazon DynamoDB and other AWS services. Customers report intermittent slow checkouts, yet CloudWatch shows normal average duration for every function. Engineers cannot tell which downstream call adds latency or fails. The company needs end-to-end visibility into individual requests across the services, including a map of dependencies and error rates, with as little change to the application as possible. What should a solutions architect do?
 
-- A. Enable AWS CloudTrail data events for the API Gateway API and the Lambda functions and query the log files with Amazon Athena
-- B. Enable AWS X-Ray active tracing on the API Gateway stage and the Lambda functions, then use the service graph and traces to find the failing call
-- C. Publish custom CloudWatch metrics for the duration of each call from every Lambda function behind the API Gateway API and build a dashboard of the averages
-- D. Turn on VPC Flow Logs for the subnets that the Lambda functions use and analyze the flow records for the API Gateway traffic with CloudWatch Logs Insights
+- A. Enable CloudWatch Lambda Insights on every function and compare the duration, memory, and cold start metrics of the functions on its dashboards
+- B. Enable AWS X-Ray active tracing on the API Gateway stage and the Lambda functions, and use the service graph to find the slow call
+- C. Turn on API Gateway access logging with the integration latency field and query the logs of slow checkout requests with CloudWatch Logs Insights
+- D. Create CloudWatch Synthetics canaries that call the checkout API every minute from several Regions and raise alarms when response times increase
 
 **Answer:** B
 
 **Explanation:** AWS X-Ray collects traces across API Gateway, Lambda, and downstream calls, builds a service map with latency and error rates for each node, and active tracing is mostly a configuration change.
-- CloudTrail data events: record who called which API, not latency or the path of a request (dùng sai tính năng).
-- Custom CloudWatch metrics: need code changes and show averages per function, not individual requests across services (tốn vận hành hơn).
-- VPC Flow Logs: show network flows only, with no request-level view of API calls (giải bài toán khác).
+- Lambda Insights: per-function resource metrics, not the path of individual requests across services (giải bài toán khác).
+- Access logs with integration latency: show the time spent behind the API, not which downstream call is slow (giải bài toán khác).
+- Synthetics canaries: measure synthetic requests end to end, not where real requests slow down (giải bài toán khác).
 Docs: https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html
 > 🇻🇳 Cần truy vết từng request xuyên nhiều dịch vụ + service map → AWS X-Ray (active tracing).
 
@@ -118,9 +118,10 @@ Docs: https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html
 - domain: resilient
 - task: 2.2
 - topic: ml
-- services: Comprehend, SageMaker, Rekognition, Lex, EC2
+- services: Comprehend, SageMaker, Transcribe, Macie, EC2
 - tags: managed-service, high-availability
 - difficulty: medium
+- time: 115
 - skills: 2.2.k2, 2.2.s8
 - concept: Amazon Comprehend is a managed NLP service that replaces a self-managed model fleet for sentiment, key phrases, and PII detection
 - refs: 12-ml-ai.md
@@ -128,21 +129,20 @@ Docs: https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A telecom company runs a self-managed sentiment-analysis pipeline for customer chat transcripts. Two GPU-based Amazon EC2 instances host an open-source NLP model, and the small data science team must patch the servers, retrain the model, and add capacity during campaign peaks. A recent instance failure delayed analysis for a day. The company wants sentiment, key phrases, and detection of personally identifiable information (PII) in English text without managing servers or training models, with the LEAST operational overhead. Which solution meets these requirements?
 
 - A. Move the model to an Amazon SageMaker AI real-time endpoint with auto scaling and keep retraining it on the team's schedule to detect key phrases
-- B. Replace the pipeline with Amazon Rekognition and send the transcripts to its text analysis APIs to detect sentiment, key phrases, and PII
+- B. Send the transcripts to Amazon Transcribe Call Analytics jobs to detect sentiment and key phrases and to redact PII from each conversation
 - C. Call Amazon Comprehend to detect sentiment, key phrases, and PII, using batch jobs for stored transcripts and real-time APIs for live chats
-- D. Use Amazon Lex to analyze the transcripts and detect the sentiment and the PII found in each customer message, and store the key phrases for later reporting
+- D. Store the transcripts in Amazon S3 and run Amazon Macie discovery jobs that detect the PII and classify the sentiment and key phrases of each file
 
 **Answer:** C
 
 **Explanation:** Amazon Comprehend is a managed NLP service with pre-trained models for sentiment, key phrases, and PII detection, available through real-time APIs and asynchronous jobs, so there are no servers, patches, GPUs, or models to maintain.
 - SageMaker AI endpoint: still a custom model to train, deploy, scale, and monitor (tốn vận hành hơn).
-- Amazon Rekognition: analyzes images and video, not text sentiment (dùng sai tính năng).
-- Amazon Lex: builds conversational bots, not text analytics (giải bài toán khác).
+- Transcribe Call Analytics: analyzes call audio, not existing text transcripts (dùng sai tính năng).
+- Amazon Macie: discovers sensitive data in S3 but does not analyze sentiment or key phrases (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/comprehend/latest/dg/what-is.html
 > 🇻🇳 Phân tích cảm xúc/cụm từ khoá/PII trên văn bản, không tự quản server hay train model → Amazon Comprehend.
 
@@ -152,9 +152,10 @@ Docs: https://docs.aws.amazon.com/comprehend/latest/dg/what-is.html
 - domain: resilient
 - task: 2.2
 - topic: ml
-- services: Polly, Transcribe, Translate, EC2 Auto Scaling, S3
+- services: Polly, Transcribe, Lex, EC2 Auto Scaling, S3
 - tags: managed-service, serverless-cost
 - difficulty: easy
+- time: 100
 - skills: 2.2.k2, 2.2.s8
 - concept: Amazon Polly is a managed text-to-speech service that removes the self-managed engine fleet and its capacity planning
 - refs: 12-ml-ai.md
@@ -162,13 +163,12 @@ Docs: https://docs.aws.amazon.com/comprehend/latest/dg/what-is.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 95
 
 An e-learning company converts lesson text into audio narration with a text-to-speech engine running on a fixed fleet of Amazon EC2 instances. Demand spikes before exam season, and an instance failure last year left lessons without audio for hours. The company wants natural-sounding voices in several languages for its mobile app and wants to eliminate server and capacity management, paying only for the text it converts. Which solution will meet these requirements?
 
 - A. Move the engine to an Auto Scaling group across two Availability Zones behind an Application Load Balancer
 - B. Use Amazon Transcribe to convert the lesson text into audio files and store them in Amazon S3
-- C. Use Amazon Translate to generate spoken audio in each language from the lesson text
+- C. Build an Amazon Lex bot that reads each lesson text aloud and save the spoken responses of the bot as audio files in Amazon S3
 - D. Call Amazon Polly to synthesize speech from the lesson text and cache the generated audio in Amazon S3
 
 **Answer:** D
@@ -176,7 +176,7 @@ An e-learning company converts lesson text into audio narration with a text-to-s
 **Explanation:** Amazon Polly is a managed text-to-speech service with lifelike voices in many languages; there are no servers or capacity to manage, you pay only for the text you synthesize, and generated audio can be cached and replayed at no extra cost.
 - Auto Scaling engine on EC2: more resilient, but the company still runs and patches the fleet (tốn vận hành hơn).
 - Amazon Transcribe: converts speech to text, the opposite direction (dùng sai tính năng).
-- Amazon Translate: translates text into other languages and produces no audio (giải bài toán khác).
+- Amazon Lex: builds conversational bots, not a narration service for lesson text (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/polly/latest/dg/what-is.html
 > 🇻🇳 Chuyển văn bản thành giọng nói, không quản server, trả tiền theo ký tự → Amazon Polly.
 
@@ -221,9 +221,10 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - domain: resilient
 - task: 2.2
 - topic: database
-- services: RDS Proxy, RDS, EC2, Route 53
+- services: RDS Proxy, RDS, EC2
 - tags: connection-pooling, multi-az, read-replicas
 - difficulty: medium
+- time: 110
 - skills: 2.2.k9, 2.2.s7
 - concept: RDS Proxy pools connections and bypasses DNS caches during failover, so an unmodifiable legacy app needs only a new endpoint
 - refs: 03-database-services.md, E-kien-truc-database.md
@@ -231,21 +232,20 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A company runs a legacy Java application on Amazon EC2 that cannot be modified. It connects to an Amazon RDS for MySQL Multi-AZ DB instance deployment. After a database failover, the application takes minutes to reconnect because the JVM caches the old DNS entry, and thousands of short-lived connections exhaust database memory at peak hours. The team can change only the application's connection string. Which solution will reduce the failover impact and the connection overhead?
 
 - A. Create an RDS Proxy for the database and change the application's connection string to the proxy endpoint
-- B. Add a read replica of the RDS database and change the connection string to a Route 53 weighted record that lists the primary and the replica
+- B. Set the JVM's networkaddress.cache.ttl security property to a few seconds so that the application resolves the new primary quickly after a failover
 - C. Convert the RDS DB instance to a Multi-AZ DB cluster so that the reader endpoint absorbs the database connections
-- D. Increase the DB instance class of the RDS database and raise the max_connections parameter so that more connections fit in memory
+- D. Add a client-side connection pool library to the application, keep its connection string, and configure it to validate connections and reconnect quickly after a failover
 
 **Answer:** A
 
 **Explanation:** RDS Proxy pools and multiplexes connections, so thousands of short-lived client connections share a few database connections, and during failover it connects to the new primary and preserves client connections without waiting for DNS caches.
-- Read replica behind a weighted record: replicas are read-only and do not take over writes (dùng sai tính năng).
+- Shorter JVM DNS cache: a JVM setting change, while only the connection string may change (vi phạm ràng buộc).
 - Multi-AZ DB cluster: faster failover, but clients still resolve DNS and open the same number of connections (giải bài toán khác).
-- Larger instance and higher max_connections: costs more and leaves the reconnect delay (tốn chi phí hơn).
+- Client-side connection pool: a change to the application, which cannot be modified (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-planning.html
 > 🇻🇳 App cũ không sửa được, cache DNS + quá nhiều kết nối → RDS Proxy (gộp kết nối, bỏ qua DNS cache khi failover).
 
@@ -255,9 +255,10 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-planning.
 - domain: resilient
 - task: 2.2
 - topic: integration
-- services: Amazon MQ, SQS, SNS, EC2
+- services: Amazon MQ, EC2
 - tags: high-availability, decoupling
 - difficulty: medium
+- time: 110
 - skills: 2.2.s7, 2.2.s8, 2.2.s4
 - concept: Amazon MQ active/standby brokers across two zones give a managed, JMS-compatible broker that removes the single point of failure without code changes
 - refs: 07-application-integration.md
@@ -265,23 +266,22 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-planning.
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A logistics company runs an Apache ActiveMQ broker on a single Amazon EC2 instance. Dozens of legacy Java services exchange order messages with it through JMS, and the code cannot be rewritten. An instance failure last quarter stopped order processing for 90 minutes. The company wants to remove this single point of failure and the broker maintenance work, and to keep the JMS clients unchanged apart from their connection URL. Which solution will meet these requirements?
 
-- A. Migrate the queues to Amazon SQS standard queues and rewrite the services to use the AWS SDK
+- A. Create an Amazon MQ for RabbitMQ broker with a cluster deployment across three Availability Zones and point the clients to its endpoint
 - B. Create an Amazon MQ for ActiveMQ broker with an active/standby deployment across two Availability Zones and point the clients to its failover endpoints
 - C. Run a second ActiveMQ broker on another EC2 instance in a different Availability Zone and configure a network of brokers manually, then point the clients at both brokers
-- D. Publish the messages to an Amazon SNS topic and have each service subscribe through its own Amazon SQS queue so that the clients read from the queues
+- D. Create an Amazon MQ for ActiveMQ single-instance broker with automatic minor version upgrades and point the clients to its endpoint
 
 **Answer:** B
 
 **Explanation:** Amazon MQ for ActiveMQ is a managed broker that speaks the same wire-level protocols as the existing JMS clients; an active/standby deployment places two brokers in different Availability Zones with shared storage, fails over automatically, and removes patching, so only the connection URL changes.
-- SQS queues with an SDK rewrite: needs the code changes that are ruled out (vi phạm ràng buộc).
+- RabbitMQ cluster deployment: highly available, but RabbitMQ does not speak the OpenWire protocol of the existing JMS clients (vi phạm ràng buộc).
 - A second self-managed broker: removes the single point of failure but keeps the maintenance burden (tốn vận hành hơn).
-- SNS to SQS fan-out: a different messaging model that JMS clients cannot use unchanged (giải bài toán khác).
+- Single-instance ActiveMQ broker: managed, but one broker in one zone remains a single point of failure (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/amazon-mq-broker-architecture.html
-> 🇻🇳 Broker ActiveMQ/JMS legacy, không sửa code, loại SPOF → Amazon MQ active/standby 2 AZ.
+> 🇻🇳 Broker ActiveMQ/JMS legacy, không sửa code, loại SPOF → Amazon MQ for ActiveMQ active/standby 2 AZ (RabbitMQ không nói OpenWire, single-instance vẫn là SPOF).
 
 ---
 
@@ -289,9 +289,10 @@ Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/amazon-mq-bro
 - domain: resilient
 - task: 2.2
 - topic: storage
-- services: FSx, EFS, EC2, Directory Service
+- services: FSx, Storage Gateway, S3, EC2, Directory Service
 - tags: multi-az, fsx-windows, high-availability
 - difficulty: medium
+- time: 115
 - skills: 2.2.k11, 2.2.s7, 2.2.s8
 - concept: FSx for Windows File Server Multi-AZ gives SMB shares with synchronous replication and automatic failover for legacy Windows workloads
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
@@ -299,11 +300,10 @@ Docs: https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/amazon-mq-bro
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A company runs a Windows file server on a single EC2 instance in one Availability Zone, with an EBS volume that serves SMB shares to 300 users and applications joined to Active Directory. An Availability Zone outage made the shares unavailable for hours. The company wants a managed solution that keeps the shares available through an Availability Zone failure with automatic failover, preserves NTFS permissions and Active Directory integration, and needs no client changes, with the LEAST operational overhead. Which solution meets these requirements?
 
-- A. Migrate the data to an Amazon EFS Regional file system and mount it on the Windows clients that stay joined to Active Directory
+- A. Move the data to Amazon S3 and serve it through an Amazon S3 File Gateway SMB file share that is joined to Active Directory
 - B. Create a second Windows file server instance joined to Active Directory in another Availability Zone and replicate the shares with DFS Replication, using scripts to manage failover
 - C. Migrate the data to an Amazon FSx for Windows File Server Multi-AZ file system joined to Active Directory
 - D. Migrate the data to an Amazon FSx for Windows File Server Single-AZ file system joined to Active Directory and enable daily backups
@@ -311,11 +311,11 @@ A company runs a Windows file server on a single EC2 instance in one Availabilit
 **Answer:** C
 
 **Explanation:** FSx for Windows File Server Multi-AZ runs an active and a standby file server in two Availability Zones with synchronous replication and automatic failover, keeping the same DNS name, NTFS permissions, and Active Directory integration for clients.
-- EFS: uses NFS and is not supported on Windows clients (dùng sai tính năng).
+- S3 File Gateway: the gateway appliance runs on a single VM or instance, so an Availability Zone failure still takes the shares offline (vi phạm ràng buộc).
 - A second self-managed server with DFS Replication: adds patching and failover scripting (tốn vận hành hơn).
 - FSx Single-AZ with daily backups: an Availability Zone outage still takes the shares offline until a restore (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/fsx/latest/WindowsGuide/high-availability-multiAZ.html
-> 🇻🇳 SMB + AD + chịu lỗi AZ + ít vận hành → FSx for Windows File Server Multi-AZ (EFS không dùng cho Windows).
+> 🇻🇳 SMB + AD + chịu lỗi AZ + ít vận hành → FSx for Windows File Server Multi-AZ (S3 File Gateway chạy trên một máy, không chịu lỗi AZ).
 
 ---
 
@@ -328,7 +328,7 @@ Docs: https://docs.aws.amazon.com/fsx/latest/WindowsGuide/high-availability-mult
 - difficulty: medium
 - time: 110
 - skills: 2.2.k5, 2.2.s4
-- concept: An ElastiCache (Redis OSS) replication group with replicas in other Availability Zones and Multi-AZ automatic failover keeps session data through a node or AZ failure; Memcached does not replicate, backups need a manual restore, and a bigger node is still one node
+- concept: An ElastiCache (Redis OSS) replication group with replicas in other Availability Zones and Multi-AZ automatic failover keeps session data through a node or AZ failure; Memcached and replica-less shards do not replicate, and backups need a manual restore
 - refs: 03-database-services.md, C-kien-truc-web-app.md
 - hint: Kho phiên chỉ có một node ở một AZ — engine và cấu hình nào vừa giữ bản sao dữ liệu ở AZ khác vừa tự chuyển khi node chính hỏng?
 - status: draft
@@ -339,7 +339,7 @@ An online ticketing site runs a PHP application on Amazon EC2 instances in an Au
 
 - A. Replace the cluster with an ElastiCache (Memcached) cluster that has three nodes in different Availability Zones and spread the session keys across the nodes
 - B. Enable daily automatic backups on the existing single-node cluster and restore the newest backup to a new node whenever the current node fails
-- C. Move the cluster to a larger node type with more memory and network capacity so that the single node is less likely to fail during peak hours
+- C. Turn on cluster mode and split the session keys across three shards without replicas so that a node failure affects a single shard
 - D. Add read replicas in two other Availability Zones, enable Multi-AZ with automatic failover, and point the session handler at the primary endpoint
 
 **Answer:** D
@@ -347,7 +347,7 @@ An online ticketing site runs a PHP application on Amazon EC2 instances in an Au
 **Explanation:** A Redis OSS replication group with replicas in other Availability Zones and Multi-AZ enabled promotes a replica automatically when the primary node or its zone fails, and the primary endpoint keeps its DNS name, so only the session handler's configuration changes.
 - Memcached across three zones: nodes do not replicate, so a failed node takes its share of the sessions with it (dùng sai tính năng).
 - Daily backups with a manual restore: loses up to a day of sessions and needs work during each failure (vi phạm ràng buộc).
-- Larger node type: still one node in one zone, so a node or zone failure still signs everyone out (giải bài toán khác).
+- Three shards without replicas: a failed node still loses its share of the sessions, and nothing fails over (vi phạm ràng buộc).
 Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html
 > 🇻🇳 Kho session phải chịu lỗi node/AZ → ElastiCache (Redis OSS/Valkey) replication group có replica ở AZ khác + Multi-AZ auto failover; Memcached không sao chép dữ liệu.
 
@@ -357,9 +357,10 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html
 - domain: resilient
 - task: 2.2
 - topic: resilience
-- services: SQS, DynamoDB, EC2, Lambda
+- services: SQS, DynamoDB, DAX, API Gateway, EC2
 - tags: decoupling, dynamodb-capacity, sqs-dlq
 - difficulty: hard
+- time: 170
 - skills: 2.2.k5, 2.2.k10
 - concept: Handle throttling with exponential backoff and jitter, buffer bursts in a queue, and let DynamoDB on-demand capacity follow traffic
 - refs: 07-application-integration.md, 03-database-services.md
@@ -367,22 +368,21 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 165
 
 A company's image-processing service receives bursts of requests from a mobile app. The service calls an Amazon DynamoDB table and a rate-limited partner API. During bursts it receives ProvisionedThroughputExceededException from DynamoDB and HTTP 429 from the partner, retries immediately in a tight loop, then crashes, and requests are lost. The company wants the service to degrade gracefully and recover without losing requests. Which combination of steps will meet these requirements? (Choose THREE)
 
-- A. Disable the partner API calls during bursts and return an error to the app so that the app retries later
+- A. Place DynamoDB Accelerator (DAX) in front of the table so that the throttled writes are absorbed by the in-memory cache
 - B. Retry throttled calls with exponential backoff and jitter instead of retrying immediately
-- C. Move the service to a larger EC2 instance type with more CPU so that it retries faster against the DynamoDB table
+- C. Throttle the mobile app's calls with an API Gateway usage plan so that bursts above the steady rate are rejected immediately with HTTP 429
 - D. Place the requests in an Amazon SQS queue and process them with consumers that scale with the queue depth
-- E. Raise the retry count of the client so that every request is retried immediately until the DynamoDB table accepts it
+- E. Add a replica in a second Region to make the table a global table so that the write load is spread across two Regions
 - F. Switch the DynamoDB table to on-demand capacity mode so that throughput follows the traffic
 
 **Answer:** B, D, F
 
 **Explanation:** Exponential backoff with jitter spreads retries so throttled calls recover, an SQS queue absorbs bursts and lets consumers call the partner at its allowed rate, and on-demand capacity lets table throughput follow the bursts.
-- Skipping the partner call and returning errors: loses the requests the company wants to keep (vi phạm ràng buộc).
-- Larger instance type: only retries sooner and raises no quota (giải bài toán khác).
-- Higher retry count without backoff: amplifies the retry storm and the throttling (vi phạm ràng buộc).
+- DAX: a read-through and write-through cache; writes still go to the table and are throttled (dùng sai tính năng).
+- API Gateway throttling: rejects bursts, losing the requests the company wants to keep (vi phạm ràng buộc).
+- Global table replica: every replica receives every write, so the load is not spread (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/sdkref/latest/guide/feature-retry-behavior.html
 > 🇻🇳 Bị throttle: retry có exponential backoff + jitter, đệm bằng SQS, và để DynamoDB on-demand co giãn theo tải.

@@ -86,6 +86,7 @@ Docs: https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.htm
 - services: ALB, NLB, GWLB, ECS, ACM
 - tags: elb-features, tls-termination
 - difficulty: easy
+- time: 100
 - skills: 4.2.s1
 - concept: One ALB with host-based listener rules replaces many per-service ALBs; NLB cannot route by hostname and GWLB is for appliances
 - refs: 04-networking-services.md, C-kien-truc-web-app.md
@@ -93,21 +94,20 @@ Docs: https://docs.aws.amazon.com/outposts/latest/userguide/what-is-outposts.htm
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 100
 
 A software company hosts 14 containerized microservices on Amazon ECS. Each service is exposed to customers over HTTPS on its own hostname, for example billing.example.com, and each currently has a dedicated internet-facing load balancer that is lightly used. The company wants to cut load balancing cost without changing the hostnames, adding servers, or modifying service code, and must keep TLS termination with certificates from AWS Certificate Manager (ACM). Which solution will meet these requirements MOST cost-effectively?
 
-- A. Replace the load balancers with a Network Load Balancer that has a separate TCP listener port for each service and each hostname
-- B. Replace the load balancers with a Gateway Load Balancer and route each hostname through Gateway Load Balancer endpoints
-- C. Keep the existing load balancers and place an Amazon CloudFront distribution in front of each one of them
-- D. Replace the load balancers with one Application Load Balancer that uses host-based rules to route each hostname to its own target group
+- A. Replace the load balancers with one Network Load Balancer whose TLS listener holds an ACM certificate for each hostname
+- B. Replace the load balancers with Amazon ECS Service Connect and publish each service on its own hostname through it
+- C. Keep the existing load balancers and put one Amazon CloudFront distribution with alternate domain names in front of them
+- D. Consolidate the services behind one Application Load Balancer with host-based listener rules and a target group for each
 
 **Answer:** D
 
 **Explanation:** An Application Load Balancer routes by host header to separate target groups and terminates HTTPS with ACM certificates, so one load balancer replaces fourteen.
-- Network Load Balancer with ports: cannot route by hostname, so the hostnames would change (vi phạm ràng buộc).
-- Gateway Load Balancer: inserts network appliances and does not route HTTP by host (dùng sai tính năng).
-- CloudFront in front of each balancer: keeps all fourteen balancers and adds a bill (tốn chi phí hơn).
+- One NLB with a TLS listener: can present several certificates, but a listener forwards to one target group and cannot route by hostname (dùng sai tính năng).
+- ECS Service Connect: service-to-service traffic inside a namespace, not internet-facing HTTPS endpoints (dùng sai tính năng).
+- CloudFront in front of the balancers: keeps all fourteen balancers and adds a bill (tốn chi phí hơn).
 Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html
 > 🇻🇳 Nhiều dịch vụ HTTP(S) theo hostname → gom về một ALB với host-based rule, tiết kiệm phí load balancer.
 
@@ -120,6 +120,7 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introd
 - services: ALB, NLB, GWLB
 - tags: elb-features
 - difficulty: medium
+- time: 165
 - skills: 4.2.s1
 - concept: Choose each load balancer by protocol layer: ALB for HTTP routing, NLB for UDP and static IPs, GWLB for transparent appliances
 - refs: 04-networking-services.md, Q-service-comparisons.md
@@ -127,22 +128,21 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introd
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 165
 
 A gaming company is moving a multiplayer platform to AWS. The platform has three tiers in one VPC. The first is a set of HTTPS REST services that must be routed by URL path to different Amazon ECS services. The second is a fleet of UDP game-session servers that clients reach through IP addresses allow-listed on partner firewalls. The third is a fleet of third-party intrusion-prevention appliances that must inspect inbound traffic transparently before it reaches the other tiers. Each tier should use the load balancer built for its protocol so that the company does not pay for unnecessary components. Which combination of choices will meet these requirements? (Choose THREE)
 
-- A. Use a Network Load Balancer with TLS listeners for the REST services
+- A. Use an Application Load Balancer with host-based listener rules for the REST services
 - B. Use an Application Load Balancer with path-based listener rules for the REST services
-- C. Use a Network Load Balancer with an Elastic IP address in each Availability Zone for the UDP game-session servers
-- D. Use an Application Load Balancer with sticky sessions for the UDP game-session servers
-- E. Use a Network Load Balancer in front of the intrusion-prevention appliances and point the route tables at its IP addresses
+- C. Use a Network Load Balancer with one Elastic IP per Availability Zone for the UDP game-session servers
+- D. Use a Network Load Balancer with UDP listeners behind AWS Global Accelerator for the game-session servers
+- E. Use a Network Load Balancer with cross-zone load balancing turned on in front of the intrusion-prevention appliance fleet
 - F. Use a Gateway Load Balancer with Gateway Load Balancer endpoints in front of the intrusion-prevention appliances
 
 **Answer:** B, C, F
 
 **Explanation:** ALB is the Layer 7 balancer with path rules, NLB handles UDP and supports a static Elastic IP per Availability Zone, and GWLB inserts and scales transparent appliances.
-- NLB for the REST services: cannot route by URL path (dùng sai tính năng).
-- ALB for the UDP servers: supports HTTP and HTTPS only, not UDP (dùng sai tính năng).
+- ALB with host-based rules: routes by hostname, but the services must be routed by URL path (dùng sai tính năng).
+- NLB behind Global Accelerator: works, but pays for an accelerator that the static Elastic IPs make unnecessary (tốn chi phí hơn).
 - NLB in front of the appliances: it is not a transparent next hop for route tables (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/introduction.html
 > 🇻🇳 ALB = HTTP theo path; NLB = UDP/TCP + Elastic IP cố định; GWLB = thiết bị kiểm tra trong suốt (GENEVE).
@@ -167,17 +167,17 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/gateway/introducti
 
 An e-commerce company runs a stateless web tier on an Amazon EC2 Auto Scaling group behind an Application Load Balancer. All instances are On-Demand instances of a single type across three Availability Zones, and traffic peaks sharply during campaigns. The company wants to reduce compute cost, but a minimum amount of capacity must always run on instances that Amazon EC2 cannot reclaim, and the site must stay available if Spot capacity in one capacity pool disappears. Which Auto Scaling configuration will meet these requirements MOST cost-effectively?
 
-- A. Use a mixed instances policy that runs the entire group on Spot Instances across several instance types and three Availability Zones, with no On-Demand base capacity
-- B. Keep On-Demand Instances for the whole group and buy Standard Reserved Instances sized for the campaign peak capacity in each Availability Zone
+- A. Use a mixed instances policy with no On-Demand base and Spot across several instance types in three zones, with price-capacity-optimized allocation and Capacity Rebalancing turned on
+- B. Use a mixed instances policy with an On-Demand base sized for the campaign peak, Spot above it, several instance types, and price-capacity-optimized allocation
 - C. Use a mixed instances policy with a small On-Demand base, Spot above it, several instance types across three zones, price-capacity-optimized allocation and Capacity Rebalancing
-- D. Use a mixed instances policy with a small On-Demand base and Spot above it, but keep the current instance type and choose the lowest-price strategy for Spot capacity
+- D. Use a mixed instances policy with a small On-Demand base, Spot above it, the current single instance type, lowest-price allocation and Capacity Rebalancing
 
 **Answer:** C
 
 **Explanation:** The On-Demand base keeps a floor of capacity that EC2 cannot reclaim, diversification spreads Spot across many pools, price-capacity-optimized picks pools that are cheap and unlikely to be interrupted, and Capacity Rebalancing replaces at-risk instances early.
-- Spot only with no base: every instance can be reclaimed, so there is no guaranteed floor (vi phạm ràng buộc "capacity that Amazon EC2 cannot reclaim")
-- Reserved Instances for the peak: paying for peak capacity all year (tốn chi phí hơn)
-- One instance type with lowest-price: concentrates Spot capacity in the cheapest pools, raising interruption risk (vi phạm ràng buộc)
+- No On-Demand base: every instance can be reclaimed, so there is no guaranteed floor (vi phạm ràng buộc "capacity that Amazon EC2 cannot reclaim")
+- On-Demand base sized for the campaign peak: keeps the floor, but pays On-Demand prices for peak capacity (tốn chi phí hơn)
+- One instance type with lowest-price: concentrates Spot capacity in the cheapest pools, so losing one pool removes much of it at once (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.html
 > 🇻🇳 Spot an toàn: nền On-Demand nhỏ + Spot đa dạng instance/AZ + price-capacity-optimized + Capacity Rebalancing.
 
@@ -190,6 +190,7 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.ht
 - services: ECS, Fargate, SQS
 - tags: spot-instances, serverless-cost, sqs-visibility-timeout
 - difficulty: hard
+- time: 165
 - skills: 4.2.k4, 4.2.k8
 - concept: ECS capacity provider strategy with a Fargate base and Fargate Spot weight, plus SIGTERM handling for the two-minute Spot warning
 - refs: 01-compute-services.md, 07-application-integration.md
@@ -197,22 +198,21 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-best-practices.ht
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 165
 
 A retailer runs a stateless order-export worker as an Amazon ECS service on AWS Fargate that polls an Amazon SQS queue. Six tasks must always run to keep the queue drained, and the service scales out to about sixty tasks during daily sales. Work is idempotent. The company wants to cut Fargate cost, but the six baseline tasks must never be interrupted, and an order held by a task that is interrupted must be retried within seconds rather than after the queue's visibility timeout expires. Which TWO actions will meet these requirements? (Choose TWO)
 
 - A. Handle SIGTERM in the worker by returning its in-flight message to the queue immediately and finishing before the stop timeout
-- B. Place every worker task on Fargate Spot with no base so that the cost is as low as possible
-- C. Buy a Compute Savings Plan sized to the sixty-task peak and lengthen the queue visibility timeout to cover interruptions
-- D. Combine a Fargate capacity provider for the six baseline worker tasks with an Auto Scaling group Spot capacity provider in one strategy
+- B. Configure a capacity provider strategy with a base of six tasks on Fargate Spot and weight the additional tasks onto Fargate
+- C. Lengthen the queue's visibility timeout to cover a Fargate Spot interruption so that the held order reappears after the task stops
+- D. Handle SIGTERM in the worker by deleting its in-flight message from the queue and exiting before the stop timeout
 - E. Configure a capacity provider strategy with a base of six tasks on Fargate and weight the additional tasks onto Fargate Spot
 
 **Answer:** A, E
 
 **Explanation:** A base of six on Fargate keeps the baseline on regular capacity while the burst runs on cheaper Fargate Spot. Fargate Spot sends a two-minute warning as SIGTERM, which lets the worker release its message immediately.
-- All tasks on Spot: the baseline could be interrupted (vi phạm ràng buộc).
-- Savings Plan for the peak: pays for peak capacity that is idle most of the day (tốn chi phí hơn).
-- Fargate plus Auto Scaling group providers in one strategy: a strategy cannot mix them (cấu hình không tồn tại).
+- Base of six on Fargate Spot: the baseline tasks could be interrupted (vi phạm ràng buộc).
+- Longer visibility timeout: the order is retried only after the timeout expires, not within seconds (vi phạm ràng buộc).
+- Deleting the message on SIGTERM: the unfinished order is lost instead of retried (dùng sai tính năng).
 Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-capacity-providers.html
 > 🇻🇳 Base trên Fargate + phần burst trên Fargate Spot; xử lý SIGTERM trong 2 phút cảnh báo để trả message về queue ngay.
 
@@ -259,6 +259,7 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-reservati
 - services: EC2, Cost Explorer, Organizations
 - tags: savings-plans, spot-instances, reserved-instances
 - difficulty: hard
+- time: 145
 - skills: 4.2.k4, 4.2.k2
 - concept: Commit Savings Plans to the steady baseline and run fault-tolerant peaks on Spot; committing to peaks wastes the unused hours
 - refs: 01-compute-services.md, A-nen-tang-kien-truc.md, L-quyet-dinh-nhanh.md
@@ -266,22 +267,21 @@ Docs: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-capacity-reservati
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 An analytics company's 25 AWS accounts, all in one AWS Organization, run a data-processing platform on Amazon EC2. Hourly compute spend never falls below about $50 but a nightly batch lifts it to about $150 for four hours. Engineers regularly change instance families and sometimes shift workloads between us-east-1 and eu-west-1. The batch jobs are fault tolerant. Which TWO actions will reduce compute cost the MOST while minimizing paid-for but unused commitment? (Choose TWO)
 
-- A. Buy a Compute Savings Plan with an hourly commitment that matches the nightly peak spend of the batch
+- A. In the management account, buy a Compute Savings Plan whose hourly commitment equals the nightly peak spend
 - B. In the management account, buy a Compute Savings Plan whose hourly commitment equals the steady baseline spend
-- C. Buy EC2 Instance Savings Plans for the current instance families in us-east-1 that run the batch and the baseline
-- D. Buy Standard Reserved Instances for the nightly batch peak capacity
+- C. In the management account, buy an EC2 Instance Savings Plan whose hourly commitment equals the steady baseline spend
+- D. Run the nightly batch capacity on On-Demand Instances that are covered by On-Demand Capacity Reservations
 - E. Run the nightly batch capacity on Spot Instances across several instance types
 
 **Answer:** B, E
 
 **Explanation:** A Compute Savings Plan on the steady baseline is fully used every hour and follows instance family and Region changes; the four-hour fault-tolerant peak is cheapest on diversified Spot.
-- Commitment at peak spend: unused commitment is lost in each of the other hours (tốn chi phí hơn).
-- EC2 Instance Savings Plans: tied to a family and Region, which engineers keep changing (vi phạm ràng buộc).
-- Standard RIs for the peak: capacity paid for around the clock but used four hours a day (tốn chi phí hơn).
+- Commitment at peak spend: unused commitment is paid in each of the other 20 hours (tốn chi phí hơn).
+- EC2 Instance Savings Plan: tied to one family in one Region, which engineers keep changing (vi phạm ràng buộc).
+- On-Demand batch with Capacity Reservations: pays full On-Demand rates for fault-tolerant work (tốn chi phí hơn).
 Docs: https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-applying.html
 > 🇻🇳 Cam kết Savings Plan ở mức nền ổn định (Compute SP, linh hoạt họ/Region); đỉnh chịu lỗi được thì chạy Spot.
 
@@ -294,6 +294,7 @@ Docs: https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-applying.html
 - services: Compute Optimizer, CloudWatch, Systems Manager, EC2
 - tags: right-sizing
 - difficulty: medium
+- time: 105
 - skills: 4.2.s6, 4.2.s5
 - concept: Compute Optimizer analyzes memory only when the CloudWatch agent publishes it; detailed monitoring does not add memory metrics
 - refs: 06-management-governance.md
@@ -301,21 +302,20 @@ Docs: https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-applying.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A company runs about 300 Amazon EC2 instances for internal applications. CPU utilization is below 10 percent on most of them, and management wants to cut cost by right-sizing without causing out-of-memory failures. AWS Compute Optimizer is enabled, but its recommendations ignore memory because the instances publish only the default EC2 metrics. What should a solutions architect do to get memory-aware right-sizing recommendations with the LEAST operational effort?
 
 - A. Enable detailed monitoring on the instances so that Compute Optimizer recommendations include memory utilization at one-minute granularity
-- B. Replace the instances with burstable T3 instances in unlimited mode because the CPU use that is published is low on most of them
-- C. Create CloudWatch alarms on CPUUtilization and have each application manager manually downsize any instance that stays below a threshold
+- B. Activate the Compute Optimizer enhanced infrastructure metrics feature so that the recommendations take memory into account
+- C. Sign in to each instance with Session Manager, install the CloudWatch agent by hand so memory utilization is published, then review the recommendations
 - D. Use Systems Manager to install the CloudWatch agent so memory utilization is published, then review the recommendations
 
 **Answer:** D
 
 **Explanation:** Compute Optimizer analyzes memory utilization only for instances that publish it through the CloudWatch agent, and Systems Manager can install and configure the agent at scale.
 - Detailed monitoring: adds one-minute granularity for existing metrics, not memory (cấu hình không tồn tại).
-- Burstable T3 instances: changes the platform without data on memory, risking failures (giải bài toán khác).
-- CPU alarms and manual downsizing: ignores memory and is manual work (tốn vận hành hơn).
+- Enhanced infrastructure metrics: extends the look-back period, but still has no memory data (dùng sai tính năng).
+- Manual agent installation on 300 instances: publishes memory, but with far more effort (tốn vận hành hơn).
 Docs: https://docs.aws.amazon.com/compute-optimizer/latest/ug/ec2-metrics-analyzed.html
 > 🇻🇳 Right-sizing có tính bộ nhớ cần CloudWatch agent gửi memory metric (cài bằng Systems Manager); detailed monitoring không có memory.
 
@@ -328,6 +328,7 @@ Docs: https://docs.aws.amazon.com/compute-optimizer/latest/ug/ec2-metrics-analyz
 - services: EC2, EC2 Auto Scaling
 - tags: right-sizing
 - difficulty: easy
+- time: 95
 - skills: 4.2.k7, 4.2.s5
 - concept: Graviton-based instances offer lower cost for portable workloads such as Java after arm64 validation
 - refs: A-nen-tang-kien-truc.md
@@ -335,21 +336,20 @@ Docs: https://docs.aws.amazon.com/compute-optimizer/latest/ug/ec2-metrics-analyz
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 95
 
 A company runs a Java 17 Spring Boot API on a fleet of x86 c5.2xlarge instances in an Auto Scaling group behind an Application Load Balancer. The workload is CPU-bound and runs around the clock. The team wants to reduce EC2 cost with minimal changes: no rewrite and no new platform to learn. Which solution will meet these requirements MOST cost-effectively?
 
-- A. Move the group to larger x86 instances of the same family and halve the instance count to reduce the number of instances
-- B. Replace the instances with burstable T3 instances in unlimited mode to cut the hourly price for the same CPU-bound work
+- A. Update the launch template to the newer Intel-based c7i instances and keep the current x86 image after performance testing
+- B. Update the launch template to AMD-based c6a instances, which cost less per hour than the Intel-based c5 instances
 - C. Update the launch template to Graviton-based instances and rebuild the image for arm64 after performance testing
-- D. Rewrite the API as AWS Lambda functions behind Amazon API Gateway and retire the Auto Scaling group and load balancer
+- D. Package the API as a container image and run it on AWS Fargate behind the load balancer instead of the Auto Scaling group
 
 **Answer:** C
 
 **Explanation:** Graviton-based instances cost up to 20 percent less than comparable x86 instances, and a JVM application needs only an arm64 image or AMI and testing, with no code rewrite.
-- Larger x86 instances: the same price per unit of compute, so no meaningful saving (giải bài toán khác).
-- T3 in unlimited mode: sustained CPU use exhausts credits and adds surplus charges (tốn chi phí hơn).
-- Rewrite to Lambda: contradicts the no-rewrite requirement (vi phạm ràng buộc).
+- Newer Intel instances: better performance, but a smaller saving than Graviton for the same work (tốn chi phí hơn).
+- AMD-based instances: cheaper than Intel, but still behind Graviton price performance (tốn chi phí hơn).
+- AWS Fargate: a new platform for the team to learn, which the company ruled out (vi phạm ràng buộc).
 Docs: https://aws.amazon.com/ec2/graviton/
 > 🇻🇳 Java chạy liên tục, không muốn viết lại → chuyển sang instance Graviton (arm64) sau khi test; rẻ hơn x86 tương đương.
 

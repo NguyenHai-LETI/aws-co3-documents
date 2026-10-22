@@ -18,6 +18,7 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.1"
 - services: S3
 - tags: requester-pays, data-transfer-cost
 - difficulty: medium
+- time: 110
 - skills: 4.1.k1
 - concept: S3 Requester Pays shifts request and data transfer charges to authenticated requesters while the owner pays only for storage
 - refs: 02-storage-services.md
@@ -25,21 +26,20 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.1"
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 120
 
 A genomics research institute publishes a 300 TB reference dataset in an Amazon S3 bucket. About 40 partner universities, each with its own AWS account, download parts of the dataset every month, and the institute's data transfer and request charges now exceed its research budget. The institute wants to stop paying for the partners' downloads while keeping the data readable only by the partner accounts. Which solution will meet these requirements MOST cost-effectively?
 
-- A. Enable S3 Transfer Acceleration on the bucket and ask the partners to download through the accelerated endpoint so that transfers finish sooner and cost less.
-- B. Configure replication from the bucket to a destination bucket in every partner account so that each university reads its own local copy of the dataset.
-- C. Enable Requester Pays on the bucket and grant the partner accounts read access with a bucket policy, so that partners include the request-payer parameter in requests.
-- D. Make the bucket public, enable Requester Pays, and publish the object URLs so that the partners can download the dataset without presenting any credentials or signing their requests.
+- A. Create an S3 access point for each partner account with a policy that allows reads, and give each partner its access point alias.
+- B. Serve the dataset through an Amazon CloudFront distribution and give each partner signed URLs that are created for its account.
+- C. Enable Requester Pays on the bucket and grant the partner accounts read access to the dataset through a bucket policy.
+- D. Enable Requester Pays on the bucket and give the partners presigned URLs that the institute generates for each object they request.
 
 **Answer:** C
 
 **Explanation:** Requester Pays makes each authenticated requester pay for its own requests and data transfer, while the institute pays only for storage; the bucket policy limits reads to the partner accounts.
-- Transfer Acceleration: speeds up transfers and adds a fee, but the bucket owner still pays (giải bài toán khác)
-- Replication to every partner account: the institute pays transfer, requests and storage for each copy (tốn chi phí hơn)
-- Public bucket with Requester Pays: anonymous requests are rejected, and public access breaks the access limit (vi phạm ràng buộc)
+- Access point per partner: controls access, but the institute still pays for the requests and data transfer (vi phạm ràng buộc)
+- CloudFront with signed URLs: a lower rate, but the institute still pays for data transfer out (vi phạm ràng buộc)
+- Presigned URLs created by the institute: the requests are signed with the owner's credentials, so the owner is still charged (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets.html
 > 🇻🇳 Muốn đối tác tự trả phí request và tải dữ liệu → bật Requester Pays; bắt buộc có xác thực, không cho truy cập ẩn danh.
 
@@ -64,16 +64,16 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/RequesterPaysBuckets
 A logistics company's tracking service writes each GPS event, about 2 KB of JSON, to Amazon S3 as its own object. The service produces roughly 150 million events per day, and S3 request charges are now the largest part of the storage bill. Analysts query the data once a day with Amazon Athena, and a delay of a few minutes before events become queryable is acceptable. Which change will meet these requirements and reduce the S3 cost the MOST?
 
 - A. Send the events to Amazon Data Firehose, which buffers them and delivers larger compressed objects to the bucket.
-- B. Compress the events with gzip before uploading them, and keep writing one object per event to the bucket.
-- C. Upload each event with the S3 multipart upload API so that the request is committed as several smaller parts in parallel.
-- D. Enable S3 Transfer Acceleration on the bucket so that each small upload reaches S3 over the AWS edge network.
+- B. Write each event to an S3 Express One Zone directory bucket, which charges lower request prices than S3 Standard.
+- C. Store the events in S3 Intelligent-Tiering so that objects that analysts rarely read move to cheaper access tiers.
+- D. Send the events to an Amazon SQS queue and have a Lambda function write each message to the bucket as an object.
 
 **Answer:** A
 
 **Explanation:** Firehose concatenates many records into one S3 object per buffering interval, so the number of PUT requests drops by orders of magnitude; larger objects are also cheaper to scan with Athena.
-- Per-event gzip: shrinks bytes but not the request count (giải bài toán khác)
-- Multipart upload per event: adds extra requests for tiny objects (dùng sai tính năng)
-- Transfer Acceleration: adds a per-GB fee and does not reduce requests (giải bài toán khác)
+- S3 Express One Zone: a lower per-request price, but still one write per event (tốn chi phí hơn)
+- Intelligent-Tiering: changes storage pricing, not the number of PUT requests (giải bài toán khác)
+- SQS with a Lambda writer per message: buffers events but still writes one object per event (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/firehose/latest/dev/basic-deliver.html
 > 🇻🇳 Phí request S3 lớn vì ghi từng object nhỏ → gom (batch) bằng Firehose thành object lớn hơn.
 
@@ -86,6 +86,7 @@ Docs: https://docs.aws.amazon.com/firehose/latest/dev/basic-deliver.html
 - services: S3
 - tags: s3-storage-classes, s3-intelligent-tiering, small-objects
 - difficulty: hard
+- time: 120
 - skills: 4.1.k10, 4.1.s8
 - concept: Objects under 128 KB are not tiered by Intelligent-Tiering and are billed at a 128 KB minimum in IA and Glacier Instant Retrieval, so Standard is cheapest
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
@@ -93,21 +94,20 @@ Docs: https://docs.aws.amazon.com/firehose/latest/dev/basic-deliver.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
 A photo-sharing company stores about 600 million profile thumbnails in Amazon S3 Standard. Each thumbnail is about 10 KB. Most thumbnails have not been requested for over a year, but users open old profiles at unpredictable times and the application needs millisecond access. A colleague suggests moving the bucket to a cheaper storage class to save money. The company wants the MOST cost-effective storage approach for this data. What should a solutions architect recommend?
 
-- A. Transition the thumbnails to S3 Standard-IA after 30 days because they are rarely read after the first month.
-- B. Transition the thumbnails to S3 Glacier Instant Retrieval after 90 days because they need millisecond access but are rarely read.
-- C. Store the thumbnails in S3 Intelligent-Tiering so that unrequested thumbnails move to cheaper access tiers automatically.
-- D. Keep the thumbnails in S3 Standard and add no transition rules, because objects this small gain nothing from the cheaper classes.
+- A. Add a lifecycle rule that transitions the thumbnails to S3 Standard-IA 30 days after they are created.
+- B. Add a lifecycle rule that transitions the thumbnails to S3 Glacier Instant Retrieval 90 days after they are created.
+- C. Copy the thumbnails into the S3 Intelligent-Tiering storage class so that rarely requested objects move to cheaper access tiers.
+- D. Keep the thumbnails in S3 Standard and do not add lifecycle transitions to other storage classes.
 
 **Answer:** D
 
 **Explanation:** Standard-IA and Glacier Instant Retrieval bill at least 128 KB per object, and every transition is a per-object request, so for 10 KB objects the savings disappear; Intelligent-Tiering does not monitor or tier objects under 128 KB.
 - Standard-IA: the 128 KB minimum billable size and retrieval fees raise the cost (tốn chi phí hơn)
 - Glacier Instant Retrieval: the same minimum size, plus transition requests for 600 million objects (tốn chi phí hơn)
-- Intelligent-Tiering: small objects stay in the Frequent Access tier at full price (dùng sai tính năng)
+- Intelligent-Tiering: objects under 128 KB stay in the Frequent Access tier at full price, after a paid copy (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
 > 🇻🇳 Object nhỏ hơn 128 KB: IA/Glacier IR tính tối thiểu 128 KB và Intelligent-Tiering không chuyển tầng → giữ S3 Standard.
 
@@ -120,7 +120,7 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.
 - services: S3
 - tags: s3-lifecycle, s3-versioning, s3-multipart-upload
 - difficulty: medium
-- time: 125
+- time: 130
 - skills: 4.1.s5, 4.1.s9, 4.1.k7
 - concept: Lifecycle rules should expire noncurrent versions after the undo window and abort incomplete multipart uploads
 - refs: 02-storage-services.md
@@ -131,18 +131,18 @@ Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.
 
 A document-management company stores customer files in an Amazon S3 bucket that has versioning enabled. The application overwrites files often, so older versions pile up and storage costs keep rising. Staff open current files throughout the day, and users upload large videos with multipart uploads that are frequently abandoned halfway. The company needs only the previous 30 days of versions for undo and wants to cut storage cost without changing the application. Which TWO S3 Lifecycle actions will meet these requirements? (Choose TWO)
 
-- A. Transition current object versions to S3 Glacier Deep Archive a few days after they are created.
+- A. Expire noncurrent object versions 1 day after they become noncurrent.
 - B. Expire noncurrent object versions 30 days after they become noncurrent.
-- C. Disable versioning on the bucket so that overwrites stop creating new versions.
-- D. Abort incomplete uploads that remain unfinished beyond a set number of days.
-- E. Transition every object version to S3 One Zone-IA immediately after upload.
+- C. Transition noncurrent object versions to S3 Glacier Flexible Retrieval 30 days after they become noncurrent.
+- D. Abort incomplete multipart transfers after a set number of days so that their stored parts are deleted.
+- E. Expire current object versions 30 days after they are created, including objects that arrived through multipart uploads.
 
 **Answer:** B, D
 
 **Explanation:** Expiring noncurrent versions after the undo window removes storage nobody needs, and the abort-incomplete-multipart-upload action deletes orphaned parts that normal expiration rules do not remove.
-- Deep Archive for current versions: staff open them daily and restores take hours (vi phạm ràng buộc)
-- Disabling versioning: it can only be suspended, and the 30-day undo is required (vi phạm ràng buộc)
-- One Zone-IA for everything: frequent reads add retrieval fees and minimum storage charges (tốn chi phí hơn)
+- Expiring noncurrent versions after 1 day: removes versions inside the 30-day undo window (vi phạm ràng buộc)
+- Moving noncurrent versions to Glacier Flexible Retrieval: keeps paying for versions nobody needs (tốn chi phí hơn)
+- Expiring current versions: adds delete markers to files that staff still open every day (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html
 > 🇻🇳 Bucket bật versioning: hết hạn noncurrent version + abort multipart upload dở dang để giảm chi phí.
 
@@ -259,6 +259,7 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/hdd-vols.html
 - services: EBS, CloudWatch
 - tags: ebs-volume-types, right-sizing, elastic-volumes
 - difficulty: medium
+- time: 145
 - skills: 4.1.s2, 4.1.s4, 4.1.k6
 - concept: EBS volumes cannot be shrunk and have no native auto scaling, so right-size by migrating to a smaller volume and automate growth with Elastic Volumes
 - refs: 02-storage-services.md
@@ -266,22 +267,21 @@ Docs: https://docs.aws.amazon.com/ebs/latest/userguide/hdd-vols.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 145
 
 A SaaS company runs a PostgreSQL database on Amazon EC2 with a 6 TiB gp3 data volume. Monitoring shows about 900 GiB in use, growing roughly 40 GiB per month, so the company pays for far more capacity than it needs. The database needs consistent low-latency random I/O, and a short maintenance window is acceptable. The team wants to pay only for the capacity it needs and avoid out-of-space outages. Which TWO actions should a solutions architect take? (Choose TWO)
 
 - A. Create a smaller gp3 volume sized for current data plus growth and copy the database files to it during the maintenance window.
 - B. Use the modify-volume operation during the maintenance window to reduce the existing gp3 database volume to a smaller size without detaching it.
 - C. Create a CloudWatch alarm on disk usage that triggers automation to increase the volume size with Elastic Volumes and extend the file system.
-- D. Enable the EBS automatic scaling setting on the gp3 volume so that the database volume grows by itself when free space is low.
-- E. Change the volume type to Throughput Optimized HDD (st1) to lower the price per GiB of the storage that the database uses.
+- D. Take an EBS snapshot during the maintenance window and restore it to a new, smaller gp3 volume for the database files.
+- E. Move the database files to an Amazon EFS file system with Elastic throughput so that capacity grows and shrinks with the data.
 
 **Answer:** A, C
 
 **Explanation:** EBS cannot decrease a volume, so the team creates a smaller volume and migrates the data; growth is then handled by an alarm-driven increase with Elastic Volumes, which needs no downtime.
-- Reducing the volume with modify-volume: size can only increase (cấu hình không tồn tại)
-- EBS automatic scaling setting: EBS has no native auto scaling (cấu hình không tồn tại)
-- st1 volume: HDD is built for sequential throughput, not random database I/O (dùng sai tính năng)
+- Shrinking with modify-volume: EBS volume sizes can only increase (cấu hình không tồn tại)
+- Restoring a snapshot to a smaller volume: a volume created from a snapshot cannot be smaller than the source volume (cấu hình không tồn tại)
+- Amazon EFS for the data files: elastic capacity, but network file latency does not give consistent low-latency database I/O (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modify-volume.html
 > 🇻🇳 EBS không giảm được dung lượng và không tự scale → tạo volume nhỏ hơn rồi tự động hoá tăng dung lượng bằng alarm + Elastic Volumes.
 
@@ -328,6 +328,7 @@ Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/plan-options-and-co
 - services: EFS
 - tags: efs-lifecycle, storage-tiering
 - difficulty: hard
+- time: 140
 - skills: 4.1.k4, 4.1.k10, 4.1.s9
 - concept: EFS lifecycle policies move cold files to IA and Archive, and Transition into Standard on first access returns reopened files to Standard
 - refs: 02-storage-services.md, D-kien-truc-luu-tru.md
@@ -335,20 +336,19 @@ Docs: https://docs.aws.amazon.com/aws-backup/latest/devguide/plan-options-and-co
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 140
 
 A media company stores 120 TB of project files on an Amazon EFS file system that uses the Standard storage class and Elastic throughput. After a project ends, its files are rarely opened. Occasionally an artist reopens an old project and works with it intensively for several weeks, and its files must then open with Standard-class performance. The file system must stay available if an Availability Zone fails, and the company wants to reduce storage cost without manual data movement. Which solution will meet these requirements MOST cost-effectively?
 
 - A. Enable lifecycle transitions to Infrequent Access after 30 days and to Archive after 90 days, and leave the Transition into Standard policy at its default.
 - B. Enable lifecycle transitions to Infrequent Access after 30 days and to Archive after 90 days, and set Transition into Standard to On first access.
-- C. Use AWS DataSync to copy project folders older than 90 days to an S3 bucket and delete them from EFS, then copy them back when a project reopens.
-- D. Migrate the data to an EFS One Zone file system, which has lower per-GB prices than the Regional storage classes.
+- C. Enable a lifecycle transition to Infrequent Access after 30 days with no Archive transition, and set Transition into Standard to On first access.
+- D. Migrate the data to an EFS One Zone file system and enable lifecycle transitions to its lower-cost Infrequent Access class.
 
 **Answer:** B
 
 **Explanation:** Lifecycle policies move untouched files to IA and Archive automatically, and Transition into Standard on first access moves a reopened project back to Standard, so intensive work is neither slow nor billed for repeated access in a cold class.
 - Default Transition into Standard: reopened files stay in IA or Archive with slower access and per-GB access charges (vi phạm ràng buộc)
-- DataSync to S3 and back: manual data movement for every project (tốn vận hành hơn)
+- IA only, without Archive: works, but leaves long-idle files in a pricier class than Archive (tốn chi phí hơn)
 - One Zone file system: data is not protected from an Availability Zone failure (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/efs/latest/ug/lifecycle-management-efs.html
 > 🇻🇳 EFS: IA sau 30 ngày, Archive sau 90 ngày và "Transition into Standard: On first access" cho dự án mở lại.
@@ -374,7 +374,7 @@ Docs: https://docs.aws.amazon.com/efs/latest/ug/lifecycle-management-efs.html
 A company has 85 AWS accounts in AWS Organizations and thousands of Amazon S3 buckets. The finance team wants one view across all accounts that shows buckets without rules to expire incomplete multipart uploads and shows which prefixes are rarely requested, so that the team can add lifecycle transitions. The solution must not require custom code or per-bucket configuration. Which TWO actions will meet these requirements? (Choose TWO)
 
 - A. Create an organization-level S3 Storage Lens dashboard on the free metrics tier and review its summary and recommendations each week.
-- B. Turn on S3 Storage Class Analysis in the buckets of every account and export the reports to a central bucket.
+- B. From the management account, enable trusted access for AWS Config and deploy an organization conformance pack that checks S3 lifecycle rules.
 - C. From the management account, enable trusted access for S3 Storage Lens in AWS Organizations.
 - D. Run S3 Inventory on every bucket and write Athena queries that find large and unused prefixes across the accounts.
 - E. Create an organization-level S3 Storage Lens dashboard on the advanced tier with activity metrics and prefix aggregation enabled.
@@ -383,7 +383,7 @@ A company has 85 AWS accounts in AWS Organizations and thousands of Amazon S3 bu
 
 **Explanation:** Organization-level Storage Lens needs trusted access enabled from the management account; the advanced tier adds prefix-level activity metrics and recommendations for finding rarely requested prefixes.
 - Free-tier dashboard: lacks prefix aggregation and activity metrics (đúng một phần)
-- Storage Class Analysis per bucket: configured bucket by bucket, with no organization-wide view (tốn vận hành hơn)
+- Config conformance pack: can flag missing lifecycle rules, but shows nothing about how often prefixes are requested (đúng một phần)
 - S3 Inventory with Athena: custom queries to build and maintain (tốn vận hành hơn)
 Docs: https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens_basics_metrics_recommendations.html
 > 🇻🇳 Toàn tổ chức: bật trusted access cho Storage Lens + dashboard bậc advanced (activity metrics, prefix aggregation).

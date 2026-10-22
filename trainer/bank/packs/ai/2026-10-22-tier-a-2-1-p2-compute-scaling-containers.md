@@ -50,31 +50,31 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-auto-s
 - domain: resilient
 - task: 2.1
 - topic: compute
-- services: EC2 Auto Scaling, ALB, ElastiCache
+- services: EC2 Auto Scaling, ALB, ElastiCache, EFS
 - tags: elb-features, redis-vs-memcached, ttl
 - difficulty: medium
+- time: 120
 - skills: 2.1.k4, 2.1.k6
-- concept: Externalizing session state to a shared in-memory store makes web instances stateless and replaceable; sticky sessions and bigger instances do not survive termination
+- concept: Externalizing session state to a shared in-memory store makes web instances stateless and replaceable; stickiness, protected instances, and file-based session stores fail termination or latency needs
 - refs: C-kien-truc-web-app.md, E-kien-truc-database.md
 - hint: Giỏ hàng mất khi instance bị thay — dữ liệu phiên phải nằm ở đâu để mọi instance đều đọc được và instance dùng xong bỏ được?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A ticket-resale website runs a Java web application on EC2 instances in an Auto Scaling group behind an Application Load Balancer. User sessions live in each instance's memory, and the load balancer uses sticky sessions. During scale-in events and deployments, customers lose their shopping carts, and traffic spreads unevenly across instances. The company wants instances to be replaceable at any time, with sessions that survive instance termination and low-latency access to session data, while keeping code changes small. Which solution will meet these requirements?
 
-- A. Increase the stickiness duration on the target group to its maximum so that each customer stays on the same instance for the whole shopping session, even during deployments.
-- B. Write session data to a local Amazon EBS volume on each instance and take frequent snapshots so that a replacement instance can restore the carts of the instance that it replaces.
+- A. Switch the target group to application-based cookie stickiness that lasts for the whole shopping session and raise the deregistration delay for deployments.
+- B. Store session data on an Amazon EFS file system mounted on every instance and delete expired session files with a scheduled cleanup job.
 - C. Store session data in an Amazon ElastiCache replication group with Multi-AZ enabled and a TTL on each session key, shared by every instance.
-- D. Replace the instances with a larger instance type that has more memory so that fewer instances are needed and scale-in events and deployments become rare.
+- D. Move to a memory-optimized instance type and enable scale-in protection on the instances that hold active shopping sessions during busy hours.
 
 **Answer:** C
 
 **Explanation:** A shared in-memory session store takes state off the instances, so any instance can serve any request, instances can be terminated freely, and load spreads evenly without stickiness.
-- Longer stickiness: affinity does not survive the termination of the instance (dùng sai tính năng)
-- Local EBS volume with snapshots: volumes belong to one instance, and restoring snapshots is slow and manual (tốn vận hành hơn)
-- Larger instances: sessions stay in instance memory and scale-in still happens (giải bài toán khác)
+- Application cookie stickiness with a longer deregistration delay: affinity and draining do not keep sessions when an instance is terminated (dùng sai tính năng)
+- EFS session files: shared and durable, but file reads are slower than the in-memory access the company wants (vi phạm ràng buộc)
+- Memory-optimized instances with scale-in protection: sessions stay on instances, which can then no longer be replaced at any time (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/elasticache-use-cases.html
 > 🇻🇳 Muốn instance thay thế được và phiên không mất → đưa session ra kho dùng chung (ElastiCache + TTL); sticky session không sống sót khi instance bị huỷ.
 
@@ -87,6 +87,7 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/elasticache-use-ca
 - services: EC2 Auto Scaling, SQS, Aurora
 - tags: scaling-policies, aurora-serverless, read-replicas
 - difficulty: hard
+- time: 180
 - skills: 2.1.k6, 2.1.s2
 - concept: Match each tier to its scaling strategy: stateless web scales out on load per target, queue workers scale out on backlog per instance, and a single relational writer scales up (or uses Aurora Serverless v2)
 - refs: A-nen-tang-kien-truc.md, C-kien-truc-web-app.md, E-kien-truc-database.md
@@ -94,23 +95,22 @@ Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/elasticache-use-ca
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 180
 
 A travel-booking company runs a three-tier application. The stateless web tier on EC2 receives unpredictable traffic spikes. The order-processing tier consists of EC2 workers that pull booking jobs from an Amazon SQS queue whose backlog varies widely. The data tier is a single-writer Amazon Aurora database with a steady write load that occasionally needs more CPU and memory on the writer. Which combination of scaling strategies will meet these requirements? (Choose THREE)
 
-- A. Scale the web tier vertically by replacing its instances with a larger instance type before each expected traffic spike, using a new AMI for the larger size.
+- A. Scale the web tier with a predictive scaling policy that forecasts capacity from the request count of the previous two weeks.
 - B. Scale the web tier horizontally with an Auto Scaling group and a target tracking policy on the request count per target.
-- C. Scale the worker tier with scheduled scaling actions that are based on the average backlog of the queue during the previous month.
+- C. Scale the worker tier horizontally with an Auto Scaling group and a target tracking policy on the total backlog of visible messages in the queue.
 - D. Scale the worker tier horizontally with an Auto Scaling group and a target tracking policy on the backlog per instance of the queue.
 - E. Scale the database writer vertically with a larger DB instance class, or use Aurora Serverless v2 capacity so that it scales in place.
-- F. Scale the database horizontally by adding Aurora Replicas to the cluster so that the capacity of the writer is multiplied across the replicas.
+- F. Scale the database tier by adding Aurora Replicas with an Aurora Auto Scaling policy on replica CPU utilization to take load off the writer.
 
 **Answer:** B, D, E
 
 **Explanation:** Stateless web instances scale out on load per target, queue workers scale out on backlog per instance, and a single writer scales up (or uses Aurora Serverless v2) because write capacity cannot be spread over replicas.
-- Larger web instances before spikes: vertical, slow, and the spikes are unpredictable (dùng sai tính năng)
-- Scheduled scaling from last month's queue length: the backlog varies widely, so a schedule cannot track it (dùng sai tính năng)
-- Aurora Replicas: they add read capacity, not write capacity (dùng sai tính năng)
+- Predictive scaling from past weeks: forecasts recurring patterns, but the spikes are unpredictable (vi phạm ràng buộc)
+- Target tracking on visible messages: queue length alone ignores how many instances share it, so the group scales out of proportion (dùng sai tính năng)
+- Aurora Replicas with auto scaling: add read capacity, while the extra load is on the writer (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.html
 > 🇻🇳 Web stateless → scale ngang theo request/target; worker → scale ngang theo backlog/instance; writer đơn → scale dọc (hoặc Aurora Serverless v2); replica chỉ tăng đọc.
 
@@ -123,9 +123,9 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - services: EC2 Auto Scaling, EBS, ALB
 - tags: asg-warm-pool, scaling-policies, launch-template
 - difficulty: hard
-- time: 145
+- time: 140
 - skills: 2.1.k6, 2.1.s2
-- concept: A warm pool of stopped, pre-initialized instances cuts scale-out latency for slow-booting instances at a cost of EBS only, unlike scheduled scaling, timer tweaks, or a peak-sized minimum
+- concept: A warm pool of Stopped, pre-initialized instances cuts scale-out latency for slow-booting instances at the cost of EBS only, unlike a Running warm pool, predictive scaling for unpredictable spikes, or larger instances
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
 - hint: Boot mất chừng mười phút, tải tăng bất ngờ nên không đặt lịch được và không muốn chạy sẵn cả ngày — làm sao có sẵn máy đã khởi tạo mà rẻ?
 - status: draft
@@ -134,17 +134,17 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 
 A genomics SaaS company runs a web application on EC2 instances in an Auto Scaling group. Each new instance downloads a large reference dataset to its EBS root volume and builds index files on that volume during boot, which takes about ten minutes before the instance passes load balancer health checks. Request volume rises sharply and unpredictably several times a day, and users see timeouts while new instances are still starting. Keeping the group scaled for the peak all day would be too expensive. Which solution will reduce the scale-out delay MOST cost-effectively?
 
-- A. Reduce the health check grace period and the scaling cooldown of the Auto Scaling group so that new instances are launched and registered with the load balancer sooner.
+- A. Move the group to a larger instance type with more network and EBS throughput so that the dataset download and indexing finish sooner at boot.
 - B. Add a warm pool of pre-initialized instances in the Stopped state and use a lifecycle hook to finish initialization before the instances stop.
-- C. Configure scheduled scaling actions that add capacity at the times of day when the traffic spikes usually occur, based on the graphs of last week.
-- D. Raise the minimum capacity of the group to the number of instances that the peak needs so that enough instances are running through the whole day.
+- C. Add a predictive scaling policy with a ten-minute pre-launch buffer so that instances are launched before the forecast increases in load.
+- D. Add a warm pool of pre-initialized instances in the Running state and use a lifecycle hook to finish initialization before they join the pool.
 
 **Answer:** B
 
 **Explanation:** A warm pool keeps initialized instances stopped, so scale-out starts from a prepared instance instead of a ten-minute boot, and stopped instances cost only for their EBS volumes.
-- Shorter grace period and cooldown: they do not shorten the boot time of an instance (dùng sai tính năng)
-- Scheduled scaling: the spikes are unpredictable, so no schedule matches them (vi phạm ràng buộc)
-- Minimum capacity at peak: keeps peak capacity running all day (tốn chi phí hơn)
+- Larger instance type: shortens boot somewhat, but every instance costs more all day and still needs minutes to start (tốn chi phí hơn)
+- Predictive scaling: launches ahead of forecast patterns, but the spikes are unpredictable (vi phạm ràng buộc)
+- Warm pool in the Running state: serves quickly but pays for running instances around the clock (tốn chi phí hơn)
 Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-warm-pools.html
 > 🇻🇳 Instance khởi động lâu + tải bất ngờ + tiết kiệm → warm pool (instance đã khởi tạo ở trạng thái Stopped, chỉ trả phí EBS).
 
@@ -192,28 +192,28 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/asg-capacity-p
 - services: ALB, EC2 Auto Scaling
 - tags: elb-features, scaling-policies
 - difficulty: hard
+- time: 125
 - skills: 2.1.k9, 2.1.s2
-- concept: ALB slow start mode ramps a new target's share of requests gradually, unlike deregistration delay, ASG health check grace period, or predictive scaling
+- concept: ALB slow start mode ramps a new target's share of requests gradually, unlike a launch lifecycle hook (full share after the wait), least outstanding requests routing, or default instance warmup
 - refs: C-kien-truc-web-app.md
 - hint: Instance mới nhận đủ phần tải ngay khi đăng ký và trả lỗi trong lúc khởi động — tham số nào của target group làm tải tăng dần?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 An online retailer runs a Java application on EC2 instances behind an Application Load Balancer. When the Auto Scaling group adds instances during a sale, each new instance immediately receives its full share of requests and returns errors for about two minutes while its JIT compiler and caches warm up. Existing instances are healthy and lightly loaded. The company wants new instances to receive traffic gradually, without keeping extra instances running. Which change will meet these requirements?
 
 - A. Enable slow start mode on the target group with a duration that matches the warm-up period of the instances.
-- B. Increase the deregistration delay on the target group so that new instances have time to warm up before they receive requests.
-- C. Increase the health check grace period of the Auto Scaling group so that the load balancer waits before it sends requests to new instances.
-- D. Configure predictive scaling so that instances are launched before the sale begins and have time to warm up.
+- B. Switch the target group to the least outstanding requests routing algorithm so that busy new instances receive fewer requests.
+- C. Add a launch lifecycle hook that keeps new instances in a wait state until a warm-up script has exercised the application.
+- D. Set the default instance warmup of the Auto Scaling group to the two-minute warm-up period of the new instances.
 
 **Answer:** A
 
 **Explanation:** Slow start mode makes the load balancer increase a new target's share of requests linearly over the configured duration, so a warming instance never takes a full share at once.
-- Deregistration delay: applies to targets being removed, not to new ones (dùng sai tính năng)
-- Health check grace period: delays the group's own health checks, not how the load balancer routes requests (dùng sai tính năng)
-- Predictive scaling: launches capacity earlier, but each instance still takes a full share when it registers (giải bài toán khác)
+- Least outstanding requests: favors targets with few in-flight requests, which includes brand-new instances (dùng sai tính năng)
+- Lifecycle hook with a warm-up script: delays registration, but each instance then takes its full share at once instead of gradually (vi phạm ràng buộc)
+- Default instance warmup: keeps new instances out of the scaling metrics, not out of load balancer routing (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-target-group-attributes.html
 > 🇻🇳 Instance mới cần được tăng tải dần trong lúc khởi động → slow start mode trên target group; deregistration delay chỉ áp dụng khi gỡ target.
 
@@ -223,9 +223,10 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-t
 - domain: resilient
 - task: 2.1
 - topic: integration
-- services: SNS, SQS, ALB
+- services: SNS, SQS, ALB, Step Functions
 - tags: decoupling, fan-out, high-availability
 - difficulty: medium
+- time: 150
 - skills: 2.1.k4, 2.1.s1
 - concept: In microservices, keep a call synchronous when the caller needs the result now, and decouple the rest with SNS and per-service SQS queues so a slow dependency cannot fail the request
 - refs: A-nen-tang-kien-truc.md, 07-application-integration.md
@@ -233,22 +234,21 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-t
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 150
 
 An e-commerce platform is built from microservices. When a customer places an order, the order service calls the payment, inventory, and shipping services one after another over HTTP. When the shipping service slows down, order requests time out and customers see errors even though payment succeeded. The customer must still see the payment result immediately, but inventory reservation and shipping can complete a few seconds later. Teams must be able to deploy their services independently. Which combination of changes will improve resilience? (Choose TWO)
 
-- A. Convert the payment call to an asynchronous SQS message as well, and show customers a confirmation page that does not include the payment result.
+- A. Send the payment request to an Amazon SQS queue as well and email the customer the payment result a few seconds after the order is placed.
 - B. Keep the payment call synchronous through an internal load balancer and add client-side timeouts and retries with exponential backoff.
-- C. Merge the inventory and shipping logic into the order service so that fewer network calls are needed between the services.
+- C. Orchestrate the payment, inventory, and shipping calls in an AWS Step Functions Express workflow that the order service invokes synchronously for each order.
 - D. Publish an OrderPlaced event to an Amazon SNS topic and have the inventory and shipping services consume it through their own Amazon SQS queues.
-- E. Increase the timeouts on each service call so that slow dependencies have more time to respond before the call fails.
+- E. Raise the client timeouts and the retry counts on every service call so that slow dependencies get more time and more attempts to respond.
 
 **Answer:** B, D
 
 **Explanation:** The payment result is needed immediately, so that call stays synchronous with timeouts and backoff; inventory and shipping can finish later, so an SNS topic with a queue per service decouples them and a slow shipping service no longer fails orders.
-- Asynchronous payment: the customer must see the payment result immediately (vi phạm ràng buộc)
-- Merging services: removes independent deployment (vi phạm ràng buộc)
-- Longer timeouts everywhere: callers wait longer and slow dependencies cascade (dùng sai tính năng)
+- Asynchronous payment with an email: the customer must see the payment result immediately (vi phạm ràng buộc)
+- Synchronous Express workflow: the order still waits for shipping, so a slow shipping service still fails the request (vi phạm ràng buộc)
+- Longer timeouts and more retries: callers wait longer and the slowdown cascades (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
 > 🇻🇳 Bước cần kết quả ngay giữ đồng bộ (timeout + retry backoff); bước làm sau được thì tách bằng SNS → SQS; gộp dịch vụ hay tăng timeout đều sai hướng.
 
@@ -261,31 +261,31 @@ Docs: https://docs.aws.amazon.com/sns/latest/dg/sns-sqs-as-subscriber.html
 - services: ECS, Fargate, ECR, EFS, ALB, S3, EBS
 - tags: ecr-containers, efs-throughput-modes
 - difficulty: hard
+- time: 180
 - skills: 2.1.k8, 2.1.s4, 2.1.k13
-- concept: Moving a legacy app into containers without code changes: build an image on ECS with Fargate, and mount EFS so every task shares the same POSIX directory (EBS is per task, S3 needs code changes)
+- concept: Moving a legacy app into containers without code changes: run the image on ECS with Fargate and mount EFS so every task shares a full POSIX directory (EBS is per task, Mountpoint for S3 cannot modify files, ECS on EC2 needs servers)
 - refs: 01-compute-services.md, D-kien-truc-luu-tru.md
 - hint: Không được sửa mã nguồn và vẫn cần thư mục ghi chung kiểu POSIX cho nhiều bản sao — loại lưu trữ nào gắn vào task được dùng chung?
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 180
 
 A company runs a monolithic Java web application on a single large EC2 instance. The application writes uploaded documents to a local directory and reads them back on later requests, and it relies on POSIX file semantics. User sessions are already stored in a shared database. The company wants to move the application into containers so that several copies can run behind a load balancer and scale on demand, without servers to manage and without changing the application code. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Build a container image, push it to Amazon ECR, and run it as an Amazon ECS service on AWS Fargate behind an Application Load Balancer.
-- B. Modify the application to upload documents to an Amazon S3 bucket by using the AWS SDK and serve them to users through presigned URLs behind the load balancer.
+- B. Mount an Amazon S3 bucket as a file system at the uploads directory path in each task by using Mountpoint for Amazon S3 so that every task shares the same files.
 - C. Mount an Amazon EFS file system in the ECS task definition at the uploads directory path so that every task behind the load balancer shares the same files.
-- D. Attach a separate Amazon EBS volume to each Fargate task behind the load balancer and mount it at the uploads directory path for the document files.
-- E. Install Kubernetes on EC2 instances that the team manages and deploy the container behind a load balancer with hostPath volumes on the local file system of each node for the uploads directory.
+- D. Attach an Amazon EBS volume to each Fargate task in the ECS task definition and mount it at the uploads directory path for the documents.
+- E. Run the image as an Amazon ECS service on an Auto Scaling group of EC2 container instances through a capacity provider behind an Application Load Balancer.
 
 **Answer:** A, C
 
 **Explanation:** An image on ECS with Fargate removes servers, and an EFS volume gives all tasks the same POSIX directory with no code change.
-- S3 with the SDK: requires application code changes (vi phạm ràng buộc)
+- Mountpoint for Amazon S3: does not provide full POSIX semantics, for example it cannot modify existing files (vi phạm ràng buộc)
 - EBS volume per task: each task gets its own volume, so copies cannot share documents (dùng sai tính năng)
-- Self-managed Kubernetes with hostPath: servers to manage, and files stay on one host (vi phạm ràng buộc)
+- ECS on EC2 container instances: works with EFS, but the company would manage the instances (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/efs-volumes.html
-> 🇻🇳 Đưa app cũ vào container không sửa code → image trên ECS Fargate + mount EFS làm thư mục POSIX dùng chung; EBS gắn riêng từng task, S3 phải sửa code.
+> 🇻🇳 Đưa app cũ vào container không sửa code → image trên ECS Fargate + mount EFS làm thư mục POSIX dùng chung; EBS gắn riêng từng task, Mountpoint for S3 không sửa được file có sẵn, ECS trên EC2 phải quản lý máy chủ.
 
 ---
 
@@ -293,10 +293,10 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/efs-volumes.ht
 - domain: resilient
 - task: 2.1
 - topic: compute
-- services: Lambda, API Gateway, DynamoDB, SES, EC2, Fargate
+- services: Lambda, API Gateway, DynamoDB, SES, ALB, Fargate
 - tags: serverless-cost
 - difficulty: easy
-- time: 120
+- time: 115
 - skills: 2.1.k12, 2.1.s5
 - concept: Bursty, rare, short work with no operations staff fits Lambda with API Gateway because it bills only while requests run and needs no capacity planning
 - refs: 01-compute-services.md, C-kien-truc-web-app.md
@@ -307,17 +307,17 @@ Docs: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/efs-volumes.ht
 
 A small online-learning company creates a student profile and sends a welcome email each time a student registers through a web form. Registrations arrive in short bursts after marketing campaigns and are rare otherwise, and each registration needs about two seconds of processing. The company has no operations staff and wants to pay only while registrations are processed, with no servers to manage and no capacity to plan. Which solution will meet these requirements MOST cost-effectively?
 
-- A. Run the code that creates the profile and sends the welcome email on two Amazon EC2 instances in an Auto Scaling group behind an Application Load Balancer.
+- A. Expose an Amazon API Gateway HTTP API that invokes an AWS Lambda function with provisioned concurrency sized for the largest registration burst.
 - B. Run the code that creates the profile and sends the welcome email as an Amazon ECS service on AWS Fargate with a minimum of one task behind an Application Load Balancer.
 - C. Expose an Amazon API Gateway HTTP API that invokes an AWS Lambda function, which writes the profile to DynamoDB and sends the email by using SES.
-- D. Run the code that creates the profile and sends the welcome email on one Amazon EC2 instance that is covered by a one-year Savings Plan to lower its hourly price.
+- D. Expose an Application Load Balancer with an AWS Lambda function as its target, which writes the profile to DynamoDB and sends the email by using SES.
 
 **Answer:** C
 
 **Explanation:** Lambda behind API Gateway bills for requests and run time, scales through bursts, and needs no servers, so idle periods cost almost nothing.
-- EC2 Auto Scaling group with ALB: instances and a load balancer bill around the clock (tốn chi phí hơn)
+- Provisioned concurrency: keeps execution environments initialized and billed even when no one registers (tốn chi phí hơn)
 - Fargate with one minimum task: a task and a load balancer run even when idle (tốn chi phí hơn)
-- One instance with a Savings Plan: still a server to manage, and the commitment pays for idle hours (vi phạm ràng buộc)
+- ALB with a Lambda target: no servers, but the load balancer bills every hour, while an HTTP API bills per request (tốn chi phí hơn)
 Docs: https://docs.aws.amazon.com/lambda/latest/dg/welcome.html
 > 🇻🇳 Tải rải rác, ngắn, không có đội vận hành, chỉ muốn trả khi có xử lý → Lambda + API Gateway; EC2/Fargate tối thiểu vẫn tính tiền khi rảnh.
 
@@ -362,9 +362,10 @@ Docs: https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html
 - domain: resilient
 - task: 2.1
 - topic: networking
-- services: ALB, EC2 Auto Scaling, NAT Gateway, VPC
+- services: ALB, EC2 Auto Scaling, Lambda, VPC
 - tags: subnets, security-groups, elb-features
 - difficulty: easy
+- time: 115
 - skills: 2.1.k10, 2.1.s1
 - concept: In a multi-tier design, give each tier its own Auto Scaling group and put an internal load balancer in private subnets between the web tier and the logic tier
 - refs: C-kien-truc-web-app.md, A-nen-tang-kien-truc.md
@@ -372,21 +373,20 @@ Docs: https://docs.aws.amazon.com/eks/latest/userguide/what-is-eks.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A university runs a three-tier application. The web servers and the business-logic servers run together on the same EC2 instances in public subnets behind one internet-facing Application Load Balancer. Releases are slow because the layers must be deployed and scaled together, and auditors want the business-logic layer to be unreachable from the internet. Which architecture will let each tier scale independently while keeping the logic tier private?
 
-- A. Keep both layers on the same instances, move them to private subnets, and place a NAT gateway in front of them to receive client requests.
-- B. Run both layers in one larger Auto Scaling group behind the internet-facing load balancer with a step scaling policy and restrict the logic layer with security group rules.
-- C. Run the logic tier on instances in public subnets with Elastic IP addresses and have the internet-facing web tier call those addresses, restricting access with network ACLs.
+- A. Put the web tier and the logic tier in separate Auto Scaling groups, with the logic tier behind a second internet-facing ALB that allows traffic from the web tier's security group.
+- B. Keep both layers on the same instances, move them to private subnets behind the internet-facing ALB, and deploy each layer with its own launch template version.
+- C. Move the logic tier to an AWS Lambda function with a public function URL that the web tier calls, and keep the web tier in its Auto Scaling group.
 - D. Put the web tier in an Auto Scaling group and the logic tier in its own private-subnet group behind an internal ALB that is called by the web tier.
 
 **Answer:** D
 
 **Explanation:** Separate Auto Scaling groups let each tier scale on its own, and an internal load balancer in private subnets lets the web tier call the logic tier without exposing it to the internet.
-- NAT gateway in front: NAT handles outbound connections and cannot receive client requests (đặt sai chỗ)
-- One larger group: the layers still deploy and scale together (vi phạm ràng buộc)
-- Public subnets with Elastic IP addresses: the logic tier stays reachable from the internet (vi phạm ràng buộc)
+- Second internet-facing ALB: the logic tier keeps an internet-facing endpoint, which the auditors reject (vi phạm ràng buộc)
+- Same instances with separate template versions: the layers still run, deploy, and scale together (vi phạm ràng buộc)
+- Lambda with a public function URL: the logic tier gets a public endpoint (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html
 > 🇻🇳 Đa tầng, mỗi tầng scale riêng, tầng logic private → ASG riêng cho từng tầng + ALB nội bộ (internal) trong private subnet giữa web và logic.
 
@@ -412,14 +412,14 @@ A photo-printing company runs worker instances in an Auto Scaling group that pul
 
 - A. Use a target tracking policy on the ApproximateNumberOfMessagesVisible metric of the queue with a backlog target of 20 messages, the number of jobs one instance can process in 2 minutes.
 - B. Use a target tracking policy on a backlog-per-instance metric, calculated as queue length divided by in-service instances, with a target based on acceptable latency and job processing time.
-- C. Use a scheduled scaling action that doubles the desired capacity of the group every morning and halves it every evening to follow the average daily pattern of jobs.
+- C. Add a predictive scaling policy that forecasts the number of workers from the job arrivals of the previous two weeks and launches the workers before the forecast load arrives.
 - D. Lower the CPU target value of the existing target tracking policy so that the group scales out at a lower average CPU utilization of the instances that process a job.
 
 **Answer:** B
 
 **Explanation:** Backlog per instance scales the fleet with the waiting work, using a target of acceptable latency divided by processing time (here 120 s ÷ 6 s = 20 messages per instance), independent of CPU.
 - Raw queue length with a fixed target: the metric ignores how many instances share the backlog, so a per-instance figure applied to the whole queue makes the group scale out of proportion (dùng sai tính năng)
-- Scheduled scaling: arrival rates are unpredictable, so a schedule cannot track them (vi phạm ràng buộc)
+- Predictive scaling: forecasts recurring patterns, but job arrivals change unpredictably (vi phạm ràng buộc)
 - Lower CPU target: CPU stays low while workers wait on the API, so it is the wrong signal (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.html
 > 🇻🇳 Worker đọc SQS, CPU thấp giả → target tracking theo "backlog per instance" (độ dài hàng đợi ÷ số instance), đích = độ trễ chấp nhận ÷ thời gian xử lý.
@@ -433,6 +433,7 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - services: EC2 Auto Scaling, SQS
 - tags: scaling-policies, asg-lifecycle-hooks
 - difficulty: hard
+- time: 145
 - skills: 2.1.s2, 2.1.k6
 - concept: Workers on long, non-resumable jobs call SetInstanceProtection to keep Auto Scaling from terminating them mid-job while dynamic scaling stays in place
 - refs: C-kien-truc-web-app.md
@@ -440,21 +441,20 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-using-sqs-queue.h
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 150
 
 A video-editing SaaS company runs export workers on EC2 instances in an Auto Scaling group that pulls export jobs from an Amazon SQS queue. Each export is not idempotent, takes up to 45 minutes, and cannot be resumed. A target tracking policy on the queue backlog scales the group in when the backlog shrinks, and the group terminates instances that are in the middle of an export, which corrupts customers' output files. The company wants to keep the dynamic scaling policy and stop in-progress exports from being terminated by scale-in events, with minimal changes. Which solution will meet these requirements?
 
-- A. Increase the visibility timeout of the queue to more than the longest export so that a worker whose export was cut off by a scale-in termination does not start it again.
-- B. Replace the target tracking policy with a scheduled scaling action that reduces capacity after business hours, when no worker is expected to run an export.
+- A. Turn on the disable scale-in setting of the target tracking policy so that the group scales out on backlog and an operator removes idle instances.
+- B. Set an instance maintenance policy that launches a replacement before it terminates an instance, so that capacity is in place before any instance stops.
 - C. Have each worker enable scale-in protection on its own instance during an export and disable it afterwards, by calling the SetInstanceProtection API.
-- D. Increase the cooldown period of the scaling policy to more than the longest export so that the group cannot scale in while a worker runs an export.
+- D. Change the termination policy of the group to OldestInstance so that instances whose workers have finished their exports are terminated first.
 
 **Answer:** C
 
 **Explanation:** Scale-in protection stops Auto Scaling from choosing a protected instance during scale-in, so each worker protects itself only while it runs an export and the dynamic policy stays in place.
-- Longer visibility timeout: it does not stop a termination, and a non-idempotent export would be corrupted anyway (dùng sai tính năng)
-- Scheduled scaling instead of target tracking: gives up the dynamic scaling policy the company wants to keep (vi phạm ràng buộc)
-- Longer cooldown: delays every scaling action rather than protecting specific instances (dùng sai tính năng)
+- Disabled scale-in on the policy: the group no longer scales in by itself, giving up part of the dynamic scaling the company wants to keep (vi phạm ràng buộc)
+- Instance maintenance policy: governs health replacements and instance refreshes, not which instance a scale-in removes (dùng sai tính năng)
+- OldestInstance termination policy: chooses by age, not by whether an export is running (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-instance-protection.html
 > 🇻🇳 Worker xử lý job dài không chạy lại được → worker tự bật scale-in protection (SetInstanceProtection) khi bắt đầu job, tắt khi xong; vẫn giữ dynamic scaling.
 
@@ -467,6 +467,7 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-ins
 - services: ALB, NLB, GWLB, Lambda
 - tags: elb-features, tls-termination
 - difficulty: medium
+- time: 150
 - skills: 2.1.k9, 2.1.s6
 - concept: ALB routes HTTP by path to containers and Lambda targets; NLB serves TCP at layer 4 with a static Elastic IP per Availability Zone for partner allow-lists
 - refs: C-kien-truc-web-app.md, 04-networking-services.md
@@ -474,21 +475,20 @@ Docs: https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-ins
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 150
 
 A financial-data company is migrating two workloads to AWS. The first is a set of HTTP microservices that must be reachable through different URL paths on one domain name and are served by containers and an AWS Lambda function. The second is a proprietary TCP feed that trading partners reach through a fixed set of IP addresses that the partners have allow-listed in their firewalls, with very high connection rates and low latency. Which combination of load balancers will meet these requirements? (Choose TWO)
 
-- A. Use an Application Load Balancer with a TCP listener for the proprietary feed and share its DNS name with the trading partners instead of fixed IP addresses.
+- A. Use a Network Load Balancer with Elastic IP addresses and a TCP listener that forwards to an Application Load Balancer in front of the feed servers.
 - B. Use an Application Load Balancer with path-based listener rules that forward to target groups for the containers and the Lambda function.
-- C. Use a Gateway Load Balancer in front of the microservices and containers to route requests by URL path to the right target group.
+- C. Use an Application Load Balancer with host-based listener rules that give each container service and the Lambda function its own subdomain.
 - D. Use a Network Load Balancer with TLS listener rules that route HTTP requests to the containers and Lambda functions by URL path.
 - E. Use a Network Load Balancer with an Elastic IP address in each Availability Zone and forward its TCP listener to the feed servers.
 
 **Answer:** B, E
 
 **Explanation:** An ALB routes HTTP by URL path to container and Lambda targets, while an NLB works at layer 4 for TCP at high rates and can use an Elastic IP per Availability Zone for allow-lists.
-- ALB with a TCP listener: an ALB handles HTTP and HTTPS and offers no static IPs for allow-lists (dùng sai tính năng)
-- Gateway Load Balancer for path routing: it fronts virtual appliances, not microservices (dùng sai tính năng)
+- NLB forwarding to an ALB for the feed: an ALB accepts only HTTP and HTTPS, so the proprietary TCP protocol cannot pass through it (dùng sai tính năng)
+- Host-based rules with a subdomain per service: the services must share one domain name and differ by path (vi phạm ràng buộc)
 - NLB path rules to Lambda: an NLB works at layer 4 and has no URL path routing (cấu hình không tồn tại)
 Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html
 > 🇻🇳 HTTP theo path tới container/Lambda → ALB; TCP tốc độ cao + IP cố định cho đối tác → NLB với Elastic IP mỗi AZ.

@@ -31,16 +31,16 @@ A software company runs Amazon Aurora and Amazon DynamoDB databases for 30 appli
 
 - A. Activate the application tag separately in the billing console of each of the 14 member accounts.
 - B. Activate the application tag as a user-defined cost allocation tag from the management account.
-- C. Create a CloudWatch billing alarm on estimated charges in each member account and filter the alarm on the application tag to see forecasted spend.
+- C. Create an AWS Budgets cost budget for each application, filtered on the tag, with an alert when actual spend, not forecasted spend, reaches 100 percent.
 - D. Create an AWS Budgets cost budget for each application, filtered on the tag, with an alert on forecasted spend.
-- E. Deliver an AWS Cost and Usage Report from every member account to its own bucket and email a monthly summary to finance.
+- E. Create an AWS Cost Anomaly Detection monitor for each application tag and email finance when unusual spend appears.
 
 **Answer:** B, D
 
 **Explanation:** Only the management account can activate cost allocation tags, after which Cost Explorer and Budgets can group and filter by them; a tag-filtered budget can alert on forecasted spend.
 - Activation in each member account: member accounts cannot manage cost allocation tags (đặt sai chỗ)
-- CloudWatch billing alarm filtered by tag: billing alarms cannot filter on tags (cấu hình không tồn tại)
-- Cost and Usage Report per account with a monthly email: manual work and no forecast alert (tốn vận hành hơn)
+- Budget alert on actual spend: fires after the limit is reached, not when the forecast approaches it (vi phạm ràng buộc)
+- Cost Anomaly Detection: flags unusual spending patterns, not a forecast against a monthly limit (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html
 > 🇻🇳 Kích hoạt cost allocation tag ở management account, rồi dùng AWS Budgets lọc theo tag với cảnh báo dự báo.
 
@@ -53,6 +53,7 @@ Docs: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-ta
 - services: ElastiCache, RDS
 - tags: caching-strategies, lazy-loading
 - difficulty: easy
+- time: 110
 - skills: 4.3.k3
 - concept: Lazy loading with a TTL caches only requested data, while write-through fills the cache with data that may never be read
 - refs: 03-database-services.md, E-kien-truc-database.md
@@ -60,20 +61,19 @@ Docs: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-ta
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 An online retailer's product-catalog service reads from Amazon RDS for PostgreSQL. A small share of the catalog items accounts for most reads, but the catalog has millions of items and updates arrive throughout the day. The team will put an Amazon ElastiCache cache in front of the database to reduce database load. Memory cost matters: the cache should not hold items that nobody reads, and the application can tolerate data that is a few minutes old. Which caching strategy will meet these requirements MOST cost-effectively?
 
-- A. Use write-through caching so that every catalog update is written to the cache and to the database at the same time.
+- A. Use lazy loading that fills the cache on a read miss, and keep each cached item with no expiration time.
 - B. Use lazy loading that fills the cache on a read miss, and give every cached item a time to live of a few minutes.
-- C. Preload the entire catalog into the cache every night with a scheduled job and keep the items until the next load.
+- C. Use write-through caching for every catalog update, and give every cached item a time to live of a few minutes.
 - D. Use write-behind caching so that updates go to the cache first and are flushed to the database asynchronously a few minutes later.
 
 **Answer:** B
 
 **Explanation:** Lazy loading caches only items that are actually requested, and a short TTL keeps data from becoming too stale, so the cache stays small and inexpensive.
-- Write-through: every update is cached even if nobody reads it, which wastes memory (tốn chi phí hơn)
-- Nightly full preload: needs memory for the whole catalog (tốn chi phí hơn)
+- Lazy loading without expiration: items stay stale after updates for as long as they are cached (vi phạm ràng buộc)
+- Write-through with a TTL: every updated item is cached even if nobody reads it, which wastes memory (tốn chi phí hơn)
 - Write-behind: speeds writes and risks data loss, and does not reduce database reads (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Strategies.html
 > 🇻🇳 Chỉ cache mục được đọc, chấp nhận dữ liệu cũ vài phút → lazy loading + TTL; write-through lãng phí bộ nhớ.
@@ -121,6 +121,7 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/provision
 - services: RDS Proxy, RDS, Lambda
 - tags: connection-pooling, rds-proxy
 - difficulty: medium
+- time: 110
 - skills: 4.3.k6
 - concept: RDS Proxy pools connections so a small instance can serve many Lambda connections instead of scaling the instance up
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -128,21 +129,20 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/provision
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A company runs a serverless order-processing API on AWS Lambda that writes to an Amazon RDS for PostgreSQL db.r6g.4xlarge instance. During flash sales, thousands of concurrent Lambda executions open connections, and the database reaches its connection limit while CPU stays below 20%. The team plans to double the instance size to raise the connection limit, which would double the instance cost. The application code cannot be rewritten. Which solution will stop the connection errors MOST cost-effectively?
 
 - A. Double the size of the RDS DB instance so that its connection limit rises with the larger memory that it gets.
-- B. Create an RDS read replica and send every Lambda connection to the replica endpoint instead of the primary instance.
+- B. Set reserved concurrency on the Lambda function so that concurrent executions stay below the database connection limit.
 - C. Create an Amazon RDS Proxy for the database and point the Lambda functions to the proxy endpoint, keeping the current instance size.
-- D. Place an Amazon ElastiCache cluster in front of the database to absorb the connection requests that the Lambda functions open during flash sales.
+- D. Migrate the database to Amazon Aurora PostgreSQL Serverless v2 so that capacity and the connection limit scale automatically with each flash sale.
 
 **Answer:** C
 
 **Explanation:** RDS Proxy pools and shares database connections, so thousands of short-lived Lambda connections map to a few database connections, and most applications need only an endpoint change; the existing instance size is enough.
 - Doubling the instance: pays for compute that is idle at 20% CPU (tốn chi phí hơn)
-- Read replica: it is read-only, so it cannot accept the writes (dùng sai tính năng)
-- ElastiCache: caches reads and needs code changes, and it does not pool write connections (vi phạm ràng buộc)
+- Low reserved concurrency: turns connection errors into throttled invocations during the sale (giải bài toán khác)
+- Aurora Serverless v2: a migration that pays for more capacity to get more connections (tốn chi phí hơn)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 > 🇻🇳 Lambda mở quá nhiều kết nối, CPU thấp → RDS Proxy (connection pooling) thay vì nâng cấp instance.
 
@@ -155,6 +155,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 - services: DMS, Aurora
 - tags: heterogeneous-migration, cdc-replication, schema-conversion
 - difficulty: hard
+- time: 130
 - skills: 4.3.k7, 4.3.s5
 - concept: A heterogeneous migration needs schema and code conversion (DMS Schema Conversion) plus DMS full load and CDC for the data
 - refs: 03-database-services.md, 10-migration-transfer.md
@@ -162,21 +163,20 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 130
 
 A logistics company runs a 4 TB Oracle database on premises, and the licensing costs more than the rest of the application. The company wants to move to a managed open-source-compatible engine on AWS to eliminate license fees. The schema has many PL/SQL stored procedures and packages. Downtime must be limited to a short cutover window, and the team wants to use managed AWS tooling. Which solution will meet these requirements?
 
-- A. Run an AWS DMS task with full load and change data capture to Amazon Aurora PostgreSQL, and rely on DMS to convert the schema and the stored procedures automatically.
-- B. Export the database with Oracle Data Pump and import the dump files into Amazon Aurora PostgreSQL with the native PostgreSQL import tools during a weekend cutover.
-- C. Use homogeneous data migrations in AWS DMS to move the database to Amazon RDS for Oracle with the license included in the instance price.
+- A. Use AWS DMS Schema Conversion to convert the schema and code to Amazon Aurora PostgreSQL, then copy the data with one full-load task at cutover.
+- B. Use homogeneous data migrations in AWS DMS to move the database to Amazon RDS for Oracle under the Bring Your Own License model.
+- C. Run an AWS DMS task with full load and change data capture to Amazon Aurora PostgreSQL and let the task create the tables, packages, and stored procedures.
 - D. Use AWS DMS Schema Conversion to convert the schema and code to Amazon Aurora PostgreSQL, then run an AWS DMS task with full load and change data capture.
 
 **Answer:** D
 
 **Explanation:** Moving to a different engine needs schema and code conversion, which DMS Schema Conversion automates and reports on, and a DMS task with full load plus CDC copies the data with a short cutover.
-- DMS task alone: it migrates data and does not convert stored procedures (dùng sai tính năng)
-- Data Pump dump files: an Oracle-specific format that PostgreSQL tools cannot import (cấu hình không tồn tại)
-- Homogeneous migration to RDS for Oracle: keeps paying the license fees (vi phạm ràng buộc)
+- Full load only at cutover: copying 4 TB inside the cutover window means long downtime (vi phạm ràng buộc)
+- RDS for Oracle with BYOL: keeps paying Oracle license fees (vi phạm ràng buộc)
+- DMS task creating the objects: DMS creates basic tables only and does not convert stored procedures (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html
 > 🇻🇳 Oracle → engine mã nguồn mở: DMS Schema Conversion (schema + code) rồi DMS full load + CDC để cutover ngắn.
 
@@ -189,6 +189,7 @@ Docs: https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html
 - services: RDS
 - tags: read-replicas, multi-az
 - difficulty: medium
+- time: 110
 - skills: 4.3.k8
 - concept: A read replica isolates reporting at low cost; replicas cannot be stopped and a Multi-AZ instance standby is not readable
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -196,21 +197,20 @@ Docs: https://docs.aws.amazon.com/dms/latest/userguide/Welcome.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A media-streaming company runs its subscriber database on Amazon RDS for MySQL with a Multi-AZ instance deployment. Analysts run heavy reporting queries on weekdays from 8 AM to 6 PM, and these queries slow down the production application. Reports can use data that is a few seconds old, and no reporting runs at night. The company must isolate the reporting load while keeping automatic failover, at the lowest cost. Which solution will meet these requirements?
 
 - A. Create an RDS read replica on a smaller instance class and point the reporting tools at the replica endpoint.
 - B. Create an RDS read replica and use an EventBridge schedule to stop it each evening and start it each morning.
-- C. Point the reporting tools at the standby instance of the Multi-AZ deployment through its secondary endpoint.
-- D. Scale the primary DB instance to a larger instance class so that the reports and the application can share it.
+- C. Create an RDS read replica of the same instance class, enable Multi-AZ on the replica, and point the reporting tools at it.
+- D. Use scheduled modifications to scale the primary up each weekday morning and down each evening so the reports fit on it.
 
 **Answer:** A
 
 **Explanation:** A read replica serves reads asynchronously and takes reporting off the primary, and it can run on a smaller class to keep cost low while Multi-AZ keeps failover.
 - Stopping the replica nightly: a DB instance that is a read replica cannot be stopped (cấu hình không tồn tại)
-- Querying the Multi-AZ standby: the standby of an instance deployment accepts no connections, so it is not a read target (dùng sai tính năng)
-- Larger primary: pays more and the reports still compete with the application (tốn chi phí hơn)
+- Same-size Multi-AZ replica: isolates reports but pays for a larger replica and its standby (tốn chi phí hơn)
+- Scheduled resizing of the primary: the reports still compete with the application on the same instance (giải bài toán khác)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html
 > 🇻🇳 Tách báo cáo khỏi primary rẻ nhất → read replica nhỏ; replica không dừng được, standby Multi-AZ không đọc được.
 
@@ -257,6 +257,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ExportSnapshot
 - services: Aurora, RDS
 - tags: aurora-serverless, serverless-cost, db-engine
 - difficulty: medium
+- time: 115
 - skills: 4.3.s2, 4.3.s3, 4.3.k9
 - concept: PostgreSQL extensions such as PostGIS require a PostgreSQL engine, and Aurora Serverless v2 with 0 ACUs pauses compute when idle
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -264,12 +265,11 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ExportSnapshot
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A regional planning agency is moving a land-use mapping application from on premises to AWS. The application uses PostgreSQL with the PostGIS extension, which MySQL does not offer. Planners use it on weekdays from 9 to 5, and the database receives no connections at night or on weekends. The agency wants a managed relational database with no commercial license fees and does not want to pay for compute while the database is idle. Which solution will meet these requirements MOST cost-effectively?
 
 - A. Create an Amazon Aurora MySQL-Compatible cluster that uses Serverless v2 with a minimum capacity of 0 ACUs so that compute pauses when no connections arrive.
-- B. Create an Amazon RDS for PostgreSQL provisioned instance and leave it running around the clock, paying for compute even when no connections arrive.
+- B. Create an Amazon RDS for PostgreSQL instance on a burstable db.t4g class so that the hourly compute charge while idle stays low.
 - C. Create an Amazon Aurora PostgreSQL-Compatible cluster that uses Serverless v2 with 0 ACUs as its minimum so that compute pauses without connections.
 - D. Create an Amazon Aurora PostgreSQL-Compatible cluster that uses Serverless v2 with a minimum capacity of 0.5 ACUs so that compute scales down overnight.
 
@@ -277,7 +277,7 @@ A regional planning agency is moving a land-use mapping application from on prem
 
 **Explanation:** Aurora PostgreSQL supports PostGIS and has no license fees, and Serverless v2 with a minimum of 0 ACUs pauses after inactivity, so compute is not billed overnight or on weekends.
 - Aurora MySQL: lacks the PostGIS extension the application needs (vi phạm ràng buộc)
-- Provisioned RDS for PostgreSQL: pays for instance hours while idle (tốn chi phí hơn)
+- Burstable RDS for PostgreSQL instance: cheap per hour, but still billed for compute while idle (tốn chi phí hơn)
 - Minimum of 0.5 ACUs: capacity never pauses, so compute is billed continuously (tốn chi phí hơn)
 Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2-auto-pause.html
 > 🇻🇳 Cần PostGIS (PostgreSQL), nhàn rỗi ban đêm → Aurora PostgreSQL Serverless v2 với min 0 ACU (tự tạm dừng).
@@ -291,6 +291,7 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-server
 - services: Timestream, Redshift, DynamoDB, Aurora, ElastiCache, RDS
 - tags: columnar-formats, time-series, purpose-built-database
 - difficulty: hard
+- time: 155
 - skills: 4.3.s4, 4.3.k9
 - concept: Time series data fits a time series database and wide scans over few columns fit columnar storage such as Redshift
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
@@ -298,22 +299,21 @@ Docs: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-server
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 155
 
 A smart-building company runs two workloads on one large Amazon RDS for PostgreSQL instance. The first stores readings from 40,000 sensors written every second, which are queried in time windows with downsampling and interpolation. The second holds five years of billing records, billions of rows, that analysts aggregate over a few columns for monthly reports. The instance is oversized and expensive. The company will move each workload to the most cost-effective purpose-built database type, using built-in functions rather than custom code. Which TWO actions should a solutions architect take? (Choose TWO)
 
 - A. Store the sensor readings in Amazon Timestream for InfluxDB, a managed InfluxDB engine for time series data.
-- B. Store the sensor readings in Amazon DynamoDB with capacity sized for the peak write rate and aggregate the time windows in application code.
+- B. Store the sensor readings in Amazon Keyspaces with the sensor ID as the partition key and query time ranges with CQL.
 - C. Load the billing records into Amazon Redshift Serverless and run the monthly reports there.
-- D. Store the billing records in Amazon Aurora with ten Aurora Replicas that run the monthly reports.
-- E. Store the billing records in Amazon ElastiCache and run the monthly aggregations on the cached data.
+- D. Load the billing records into Amazon Aurora MySQL and run the monthly aggregations with Aurora parallel query.
+- E. Index the billing records in Amazon OpenSearch Service and run the monthly reports with its aggregation queries.
 
 **Answer:** A, C
 
 **Explanation:** Timestream for InfluxDB is purpose-built for time series with native windowing, downsampling and interpolation, and Redshift's columnar storage reads only the needed columns for large aggregations, with Serverless billing only for active use.
-- DynamoDB for readings: large provisioned write capacity and custom aggregation code (tốn chi phí hơn)
-- Aurora with many replicas: row-based storage makes wide scans costly (dùng sai tính năng)
-- ElastiCache for billing records: an in-memory cache is not a durable analytics store (giải bài toán khác)
+- Keyspaces for readings: scales writes, but offers no built-in downsampling or interpolation functions (vi phạm ràng buộc)
+- Aurora MySQL with parallel query: faster scans on row storage, but a costlier fit than a columnar warehouse for few-column aggregates over billions of rows (tốn chi phí hơn)
+- OpenSearch aggregations: a search engine is a costly store for five years of billing rows (tốn chi phí hơn)
 Docs: https://docs.aws.amazon.com/redshift/latest/dg/c_columnar_storage_disk_mem_mgmnt.html
 > 🇻🇳 Chuỗi thời gian → time series DB (Timestream for InfluxDB); quét ít cột trên hàng tỷ dòng → Redshift (columnar).
 
@@ -326,29 +326,29 @@ Docs: https://docs.aws.amazon.com/redshift/latest/dg/c_columnar_storage_disk_mem
 - services: DynamoDB, DAX
 - tags: dynamodb-capacity, scaling-policies, serverless-cost
 - difficulty: medium
+- time: 105
 - skills: 4.3.k5, 4.3.s3
+- family: ddb-capacity-mode
 - concept: Provisioned capacity with auto scaling and scheduled scaling is cheapest for steady, high-utilization traffic with known spikes
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Tải ghi ổn định ở mức cao và đỉnh biết trước theo giờ — chế độ nào có giá đơn vị thấp hơn khi mức sử dụng cao và ổn định?
-- family: ddb-capacity-mode
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 105
 
 A ticketing company is launching a new Amazon DynamoDB table for order history. A load test shows that writes hold at about 4,000 per second for most of the day. Twice a day, announced sales raise writes to about twice that rate for roughly 20 minutes, and the sale times are known in advance. Traffic never exceeds twice the previous peak, and the company can change the table's capacity mode at any time. Which solution will meet these requirements MOST cost-effectively?
 
 - A. Use on-demand capacity mode so that DynamoDB scales automatically with each request and no capacity is set.
-- B. Use provisioned capacity mode at a fixed level that covers the sale peak around the clock, with no scaling policies.
-- C. Use on-demand capacity mode and add a DynamoDB Accelerator (DAX) cluster in front of the table to cache the requests.
+- B. Use provisioned capacity mode with target tracking auto scaling and no scheduled actions, so that capacity rises after each sale begins.
+- C. Use on-demand capacity mode and set a DynamoDB maximum write throughput on the table at the level of the sale peak.
 - D. Use provisioned capacity mode with auto scaling for the baseline and scheduled scaling actions before each sale.
 
 **Answer:** D
 
 **Explanation:** For steady, highly utilized traffic the provisioned unit price is lower than per-request on-demand pricing; auto scaling tracks the baseline and scheduled actions raise capacity before each sale without throttling.
 - On-demand mode: per-request pricing costs more than provisioned units at steady high utilization (tốn chi phí hơn)
-- Fixed provisioning at the peak: pays for peak capacity around the clock (tốn chi phí hơn)
-- On-demand with DAX: DAX caches reads, not writes, and adds node costs (giải bài toán khác)
+- Auto scaling alone: reacts only after each sale starts, so writes throttle during the 20-minute peak although its time is known (dùng sai tính năng)
+- On-demand with a maximum throughput setting: caps runaway spend but keeps per-request pricing for the steady load (tốn chi phí hơn)
 Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/provisioned-capacity-mode.html
 > 🇻🇳 Tải ghi ổn định + đỉnh biết trước → provisioned + auto scaling + scheduled scaling rẻ nhất.
 
@@ -361,29 +361,29 @@ Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/provision
 - services: DynamoDB, DAX
 - tags: dynamodb-capacity, scaling-policies, serverless-cost
 - difficulty: medium
+- time: 110
 - skills: 4.3.k5, 4.3.s3
+- family: ddb-capacity-mode
 - concept: On-demand capacity mode has no capacity to manage and absorbs spikes up to double the previous peak
 - refs: 03-database-services.md, F-so-sanh-database-theo-dac-diem.md
 - hint: Cùng tình huống nhưng tiêu chí là ít công vận hành nhất — chế độ nào không có cài đặt dung lượng hay chính sách scaling để duy trì?
-- family: ddb-capacity-mode
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 110
 
 A ticketing company is launching a new Amazon DynamoDB table for order history. A load test shows that writes hold at about 4,000 per second for most of the day. Twice a day, announced sales raise writes to about twice that rate for roughly 20 minutes, and the sale times are known in advance. Traffic never exceeds twice the previous peak, and the company can change the table's capacity mode at any time. Which solution will meet these requirements with the LEAST operational overhead?
 
 - A. Use on-demand capacity mode so that DynamoDB scales automatically with each request and no capacity is set.
-- B. Use provisioned capacity mode at a fixed level that covers the sale peak around the clock, with no scaling policies.
-- C. Use on-demand capacity mode and add a DynamoDB Accelerator (DAX) cluster in front of the table to cache the requests.
+- B. Use provisioned capacity mode with target tracking auto scaling and no scheduled actions, so that capacity rises after each sale begins.
+- C. Use on-demand capacity mode and set a DynamoDB maximum write throughput on the table at the level of the sale peak.
 - D. Use provisioned capacity mode with auto scaling for the baseline and scheduled scaling actions before each sale.
 
 **Answer:** A
 
 **Explanation:** On-demand mode has no capacity settings, policies or schedules to maintain, and it instantly absorbs traffic up to double the previous peak, so the sales need no preparation.
+- Auto scaling alone: a policy to tune that still lags each sale and lets writes throttle (tốn vận hành hơn)
+- On-demand with a maximum throughput setting: an extra limit to size and revise as traffic grows (tốn vận hành hơn)
 - Auto scaling with scheduled actions: policies and schedules to configure and keep current (tốn vận hành hơn)
-- Fixed provisioning at the peak: capacity to size and monitor for throttling (tốn vận hành hơn)
-- On-demand with DAX: a cache cluster to operate that does not help writes (tốn vận hành hơn)
 Docs: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand-capacity-mode.html
 > 🇻🇳 Ít vận hành nhất → on-demand (không có dung lượng để quản lý, hấp thụ đỉnh tới gấp đôi đỉnh trước).
 

@@ -18,6 +18,7 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.4"
 - services: Cost Explorer, Organizations
 - tags: tagging, cost-allocation-tags, consolidated-billing
 - difficulty: medium
+- time: 145
 - skills: 4.4.k1, 4.4.k2
 - concept: User-defined tags must be activated as cost allocation tags from the management account before Cost Explorer can group by them
 - refs: 06-management-governance.md
@@ -25,22 +26,21 @@ description: "Câu tình huống chuẩn đề thật (tầng A) cho task 4.4"
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 150
 
 A company has 30 AWS accounts in an organization with all features enabled. Teams tag their resources with a ProductLine tag key. Finance wants a monthly view of costs per product line across all accounts, but ProductLine does not appear as a grouping option in AWS Cost Explorer even though the tag has been applied for several weeks. The company wants a solution that covers every member account without building custom reports. Which combination of steps will meet these requirements? (Choose TWO)
 
 - A. Activate the ProductLine user-defined cost allocation tag in the Billing and Cost Management console of the management account
-- B. Create an AWS Cost and Usage Report in every member account and report the monthly costs by combining them with an AWS Glue job and Amazon Athena queries
+- B. Create an AWS Cost and Usage Report in the management account that includes resource tags and query the monthly costs with Amazon Athena
 - C. In AWS Cost Explorer for the management account, group the monthly costs by the ProductLine tag key
-- D. Create an AWS Organizations tag policy for the ProductLine key so that the tag becomes available in Cost Explorer as a billing dimension for costs
-- E. Activate the ProductLine cost allocation tag separately in the Billing and Cost Management console of each member account to expose the costs
+- D. Create an AWS Organizations tag policy that enforces the ProductLine key and its allowed values in every member account
+- E. Activate the ProductLine cost allocation tag in the Billing and Cost Management console of each member account so that Cost Explorer can group by it
 
 **Answer:** A, C
 
-**Explanation:** Tags appear in Cost Explorer only after activation as cost allocation tags, done in the management account, which also sees the consolidated costs of every member account.
-- Cost and Usage Report per member account plus Glue and Athena: builds the custom reporting the company wants to avoid (tốn vận hành hơn)
-- Organizations tag policy: standardizes tag keys, not billing activation (dùng sai tính năng)
-- Activating in each member account: only the management account has the cost allocation tags manager (đặt sai chỗ)
+**Explanation:** A user-defined tag appears in Cost Explorer only after it is activated as a cost allocation tag in the management account, whose Cost Explorer then groups the consolidated costs of every member account by it.
+- Cost and Usage Report with Athena: builds the custom reporting the company wants to avoid (vi phạm ràng buộc)
+- Tag policy: standardizes tag keys and values but does not activate the tag for billing (giải bài toán khác)
+- Activation in each member account: in an organization, the management account activates cost allocation tags (đặt sai chỗ)
 Docs: https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html
 > 🇻🇳 Thẻ chi phí phải được kích hoạt (cost allocation tag) ở tài khoản quản lý rồi mới nhóm được trong Cost Explorer.
 ---
@@ -129,18 +129,18 @@ Docs: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-targe
 
 A company's monthly bill shows a large increase in NAT gateway data processing charges. The company operates NAT gateways in several VPCs across 12 accounts and cannot tell which gateways are responsible or which applications and destinations generate the traffic. The cloud team wants to identify the most expensive NAT gateways and the main sources and destinations of traffic through them before it decides how to optimize, by using managed services and SQL queries. Which combination of actions will meet these requirements with the LEAST operational overhead? (Choose TWO)
 
-- A. Create AWS Budgets cost budgets for each account with alerts at 80 percent so that the account owners investigate their NAT gateway usage
+- A. Use AWS Cost Explorer filtered to the NAT gateway usage types and grouped by linked account to find where the charges increased
 - B. Create an organization-level Cost and Usage Report with resource IDs delivered to Amazon S3 and query the NAT gateway line items with Athena
-- C. Enable AWS CloudTrail data events for Amazon S3 and query them to find the instances that are the source or destination of traffic through the NAT gateways
-- D. Use AWS Compute Optimizer recommendations to right-size each NAT gateway according to its data processing charges
+- C. Set up VPC Traffic Mirroring for the busiest subnets and analyze the source and destination of mirrored packets on a fleet of EC2 monitoring appliances
+- D. Use AWS Compute Optimizer idle resource recommendations for the organization to find the NAT gateways that drive the processing charges
 - E. Enable VPC Flow Logs for the NAT gateways' network interfaces, deliver them to Amazon S3, and query the top source and destination addresses with Athena
 
 **Answer:** B, E
 
-**Explanation:** The Cost and Usage Report is the most detailed cost dataset and, with resource IDs, shows the charge per NAT gateway. Flow Logs record the traffic through the gateway interfaces, so Athena queries reveal who sends data and where.
-- Budgets with alerts: say that spending rose, not which gateway or traffic causes it (giải bài toán khác)
-- CloudTrail data events for S3: log S3 object API calls, not network flows (dùng sai tính năng)
-- Compute Optimizer: only flags idle, unused NAT gateways; it does not right-size busy ones or show traffic sources (dùng sai tính năng)
+**Explanation:** The Cost and Usage Report with resource IDs shows the charge for each NAT gateway, and Flow Logs on the gateway interfaces record each flow, so Athena SQL queries reveal the costliest gateways and who sends data where.
+- Cost Explorer grouped by account: shows which accounts spend, not which gateway or traffic (giải bài toán khác)
+- Traffic Mirroring to EC2 appliances: self-managed packet analysis instead of managed SQL queries (tốn vận hành hơn)
+- Compute Optimizer idle recommendations: flag only unused NAT gateways, not busy ones (dùng sai tính năng)
 Docs: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
 > 🇻🇳 Rà soát chi phí mạng: CUR (kèm resource ID) + Athena cho chi phí theo NAT gateway, VPC Flow Logs cho nguồn/đích lưu lượng.
 ---
@@ -152,6 +152,7 @@ Docs: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
 - services: Direct Connect, S3
 - tags: direct-connect, hosted-connection, data-transfer-cost
 - difficulty: medium
+- time: 120
 - skills: 4.4.k5, 4.4.s2
 - concept: A Direct Connect hosted connection sized to need beats internet or oversized ports on cost and consistent latency for steady heavy traffic
 - refs: 04-networking-services.md, L-quyet-dinh-nhanh.md
@@ -159,23 +160,22 @@ Docs: https://docs.aws.amazon.com/cur/latest/userguide/what-is-cur.html
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 115
 
 A media company's studio uploads source footage to Amazon S3 and downloads about 15 TB of rendered output from S3 every month. The studio currently uses a Site-to-Site VPN over the internet, which is congested at peak times, and the company needs consistent latency. The studio never needs more than 500 Mbps of throughput, and the company plans to keep the arrangement for at least three years. Which solution will meet these requirements MOST cost-effectively?
 
-- A. Order a 10 Gbps dedicated AWS Direct Connect connection and create a public virtual interface to reach Amazon S3 from the studio
-- B. Enable S3 Transfer Acceleration on the buckets and have the studio transfer the data through the accelerated endpoint over the internet
+- A. Order a 1 Gbps dedicated Direct Connect connection at a Direct Connect location and create a public virtual interface to reach Amazon S3
+- B. Order a 500 Mbps hosted Direct Connect connection from a Partner and create a private virtual interface that reaches Amazon S3 through a gateway endpoint
 - C. Order a 500 Mbps hosted Direct Connect connection from a Direct Connect Partner and create a public virtual interface to reach Amazon S3
-- D. Add Site-to-Site VPN connections over the internet and spread the traffic across them to deliver the 500 Mbps with less congestion
+- D. Recreate the Site-to-Site VPN as an accelerated VPN on a transit gateway so that traffic enters the AWS network at the nearest edge location
 
 **Answer:** C
 
-**Explanation:** A private connection removes congestion, and data transfer out over Direct Connect costs less per GB than internet transfer, which matters for 15 TB of downloads. A hosted connection can be sized below a dedicated port's 1 Gbps.
-- 10 Gbps dedicated connection: far more port capacity than the need (tốn chi phí hơn)
-- S3 Transfer Acceleration: still crosses the public internet and adds a per-GB fee (vi phạm ràng buộc)
-- More VPN connections: stay on the congested internet path at internet transfer rates (vi phạm ràng buộc)
+**Explanation:** A private connection avoids internet congestion, data transfer out over Direct Connect costs less per GB than over the internet, and a hosted connection can be sized at 500 Mbps; a public virtual interface reaches the S3 public endpoints.
+- 1 Gbps dedicated connection: twice the needed capacity at a higher port-hour price (tốn chi phí hơn)
+- Private virtual interface to a gateway endpoint: gateway endpoints cannot be reached from on premises (đặt sai chỗ)
+- Accelerated VPN: the internet still carries the first mile, so latency stays inconsistent (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/directconnect/latest/UserGuide/hosted_connection.html
-> 🇻🇳 Lưu lượng lớn, ổn định, cần độ trễ đều → Direct Connect; chọn hosted connection đúng băng thông thay vì cổng 10 Gbps.
+> 🇻🇳 Lưu lượng lớn, ổn định, cần độ trễ đều → Direct Connect; chọn hosted connection đúng băng thông + public VIF tới S3.
 ---
 
 ## Q ai-20261022-a44-06
@@ -285,6 +285,7 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-rules-m
 - services: CloudFront, S3
 - tags: cloudfront, edge-caching, data-transfer-cost
 - difficulty: easy
+- time: 105
 - skills: 4.4.s4
 - concept: CloudFront caches static downloads at the edge, cutting S3 data transfer out and latency while the bucket stays private through origin access control
 - refs: 04-networking-services.md
@@ -292,21 +293,20 @@ Docs: https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-rules-m
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 100
 
 A software company provides installers and updates, each between 200 MB and 2 GB, from an Amazon S3 bucket in us-east-1 directly to customers worldwide. The monthly bill is dominated by S3 data transfer out to the internet, and customers in Asia report slow downloads. The files change only a few times per month, and the bucket must remain private. Which solution will reduce cost and improve download speed MOST cost-effectively?
 
-- A. Put AWS Global Accelerator in front of the S3 bucket and have customers download through the accelerator's static IP addresses worldwide
+- A. Create an Amazon CloudFront distribution that uses the bucket's static website endpoint as a custom origin, with public read access on the bucket
 - B. Create an Amazon CloudFront distribution with the S3 bucket as its origin by using origin access control, and serve downloads through it
-- C. Replicate the bucket to several Regions with Cross-Region Replication and route customers to the nearest bucket by using Route 53 latency routing
-- D. Enable S3 Transfer Acceleration on the bucket and have customers download through the accelerated endpoint from the nearest edge location
+- C. Replicate the bucket to Regions near the customers with S3 Cross-Region Replication and direct each customer to the closest bucket with Route 53 latency routing
+- D. Enable S3 Transfer Acceleration on the bucket and have customers download through the accelerated endpoint at the nearest edge location
 
 **Answer:** B
 
-**Explanation:** CloudFront caches the rarely changing files at the edge, so most downloads never reach S3, origin fetches from S3 are free, and distant customers get faster delivery. Origin access control keeps the bucket private.
-- Global Accelerator in front of S3: it does not cache and S3 is not a supported endpoint (dùng sai tính năng)
-- Cross-Region Replication with latency routing: adds storage and replication cost, and downloads still come from S3 (tốn chi phí hơn)
-- Transfer Acceleration: speeds transfers but adds a fee and no caching (giải bài toán khác)
+**Explanation:** CloudFront caches the rarely changing files at edge locations, so most downloads never reach S3, origin fetches from S3 are free, and distant customers download faster; origin access control keeps the bucket private.
+- Website endpoint origin with public read: the bucket becomes public (vi phạm ràng buộc)
+- Cross-Region Replication with latency routing: extra copies and replication transfer, and each download still pays S3 transfer out (tốn chi phí hơn)
+- Transfer Acceleration: adds a per-GB fee to every download, with no caching (tốn chi phí hơn)
 Docs: https://aws.amazon.com/cloudfront/pricing/pay-as-you-go/
 > 🇻🇳 Tệp tĩnh ít đổi cho người dùng toàn cầu → CloudFront (cache ở biên, truyền S3→CloudFront miễn phí, bucket riêng tư qua OAC).
 ---
@@ -318,6 +318,7 @@ Docs: https://aws.amazon.com/cloudfront/pricing/pay-as-you-go/
 - services: API Gateway, Lambda
 - tags: throttling, usage-plans, api-keys
 - difficulty: medium
+- time: 120
 - skills: 4.4.s6
 - concept: API Gateway usage plans with API keys throttle and cap each client by tier, protecting backend cost without code changes
 - refs: 11-api-integration.md, 04-networking-services.md
@@ -325,20 +326,19 @@ Docs: https://aws.amazon.com/cloudfront/pricing/pay-as-you-go/
 - status: draft
 - created: 2026-10-22
 - enriched: 2026-10-22
-- time: 125
 
 A company exposes a REST API through Amazon API Gateway with AWS Lambda integrations. Partners buy the API on three subscription tiers that must allow different steady request rates and different monthly request volumes. A few Basic-tier partners send traffic bursts that raise Lambda concurrency and downstream database costs for everyone. The company wants to cap each partner according to its tier without changing the Lambda code. Which solution will meet these requirements with the LEAST operational overhead?
 
-- A. Create an AWS WAF rate-based rule that blocks any source IP address exceeding a fixed number of requests in a five-minute window, and review it monthly for each tier
-- B. Set reserved concurrency on the Lambda function to a value that limits simultaneous executions, and raise it each month for the higher tier
+- A. Associate an AWS WAF web ACL with the stage that has a rate-based rule for each tier, aggregated on the value of the API key header
+- B. Configure stage-level and method-level throttling on the API with separate steady-state rate and burst limits for each resource, reviewed against monthly request counts
 - C. Create an API Gateway usage plan for each tier with rate, burst and monthly quota limits, and associate each partner's API key with its plan
-- D. Add an Amazon SQS queue between API Gateway and Lambda so that bursts from every partner are smoothed, with a larger queue for the Premium tier
+- D. Deploy a separate API Gateway stage for each tier with its own throttling limits, and give each partner the invoke URL of its tier's stage
 
 **Answer:** C
 
-**Explanation:** A usage plan sets per-client throttling rate, burst and quota for clients identified by API keys, so each tier gets its own limits and clients over them receive 429 responses before the backend runs.
-- WAF rate-based rule per IP address: partners can share egress IPs and the rule cannot enforce quotas per tier (dùng sai tính năng)
-- Reserved concurrency: caps the whole function for all partners rather than per tier (đặt sai chỗ)
-- SQS queue before Lambda: smooths load for everyone and applies no tier limits (giải bài toán khác)
+**Explanation:** A usage plan sets throttling rate, burst and monthly quota for each API key, so every partner is capped by its tier and excess calls get 429 responses before Lambda runs.
+- WAF rate-based rules on the key header: limit request rates but cannot enforce monthly request volumes (vi phạm ràng buộc)
+- Stage and method throttling: limits apply to all callers together, not to each partner (giải bài toán khác)
+- One stage per tier: limits are shared by every partner in the tier, so one partner's bursts still affect the others (vi phạm ràng buộc)
 Docs: https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html
 > 🇻🇳 Giới hạn tốc độ và hạn mức theo từng gói/khách hàng → usage plan + API key trên API Gateway.
